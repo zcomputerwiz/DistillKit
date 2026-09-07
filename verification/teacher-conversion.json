@@ -1,0 +1,175 @@
+{
+  "repo": "Qwen/Qwen3.8-27B",
+  "revision": "1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0",
+  "worst_cosine": 0.999946117401123,
+  "passed": true,
+  "tensors": [
+    {
+      "key": "model.embed_tokens.weight",
+      "cosine": 0.9999640583992004,
+      "shuffled_control": 0.0013424678472802043,
+      "shape": [
+        248320,
+        5120
+      ]
+    },
+    {
+      "key": "lm_head.weight",
+      "cosine": 1.0,
+      "shuffled_control": 0.0023922882974147797,
+      "shape": [
+        248320,
+        5120
+      ]
+    },
+    {
+      "key": "model.norm.weight",
+      "cosine": 1.0000001192092896,
+      "shuffled_control": 0.97935950756073,
+      "shape": [
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.in_proj_qkv.weight",
+      "cosine": 0.9999730587005615,
+      "shuffled_control": -0.0003538206219673157,
+      "shape": [
+        10240,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.in_proj_a.weight",
+      "cosine": 0.9999861121177673,
+      "shuffled_control": 0.0014212693786248565,
+      "shape": [
+        48,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.in_proj_b.weight",
+      "cosine": 0.9999858140945435,
+      "shuffled_control": -0.001454206183552742,
+      "shape": [
+        48,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.conv1d.weight",
+      "cosine": 1.0,
+      "shuffled_control": 0.02246740274131298,
+      "shape": [
+        10240,
+        1,
+        4
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.out_proj.weight",
+      "cosine": 0.9999703764915466,
+      "shuffled_control": -0.0014722467167302966,
+      "shape": [
+        5120,
+        6144
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.A_log",
+      "cosine": 1.0000001192092896,
+      "shuffled_control": 0.9174461960792542,
+      "shape": [
+        48
+      ]
+    },
+    {
+      "key": "model.layers.0.linear_attn.norm.weight",
+      "cosine": 0.9999999403953552,
+      "shuffled_control": 0.999038577079773,
+      "shape": [
+        128
+      ]
+    },
+    {
+      "key": "model.layers.0.input_layernorm.weight",
+      "cosine": 1.0000001192092896,
+      "shuffled_control": 0.3828200697898865,
+      "shape": [
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.0.mlp.gate_proj.weight",
+      "cosine": 0.9999757409095764,
+      "shuffled_control": -0.0006157814059406519,
+      "shape": [
+        17408,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.3.self_attn.q_proj.weight",
+      "cosine": 1.0,
+      "shuffled_control": 0.0004229158803354949,
+      "shape": [
+        12288,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.3.self_attn.o_proj.weight",
+      "cosine": 0.999971866607666,
+      "shuffled_control": 0.0010377798462286592,
+      "shape": [
+        5120,
+        6144
+      ]
+    },
+    {
+      "key": "model.layers.3.self_attn.q_norm.weight",
+      "cosine": 1.0,
+      "shuffled_control": 0.9119555354118347,
+      "shape": [
+        256
+      ]
+    },
+    {
+      "key": "model.layers.63.mlp.down_proj.weight",
+      "cosine": 0.999946117401123,
+      "shuffled_control": -0.0011095758527517319,
+      "shape": [
+        5120,
+        17408
+      ]
+    },
+    {
+      "key": "model.layers.63.self_attn.q_proj.weight",
+      "cosine": 0.9999998807907104,
+      "shuffled_control": -6.854477396700531e-05,
+      "shape": [
+        12288,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.62.linear_attn.in_proj_qkv.weight",
+      "cosine": 0.9999690651893616,
+      "shuffled_control": -0.0006120732286944985,
+      "shape": [
+        10240,
+        5120
+      ]
+    },
+    {
+      "key": "model.layers.62.linear_attn.out_proj.weight",
+      "cosine": 0.9999712705612183,
+      "shuffled_control": 0.0011816236656159163,
+      "shape": [
+        5120,
+        6144
+      ]
+    }
+  ]
+}

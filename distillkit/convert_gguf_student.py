@@ -71,11 +71,15 @@ def read_kv(reader) -> dict[str, object]:
     return {key: field.contents() for key, field in reader.fields.items()}
 
 
-def derive_text_config(kv: dict[str, object], vocab_size: int | None = None) -> dict:
+def derive_text_config(
+    kv: dict[str, object], vocab_size: int | None = None, tie_word_embeddings: bool = True
+) -> dict:
     """Build the Qwen3_5TextConfig dict from qwen35.* KV values.
 
     ``vocab_size`` comes from the embedding tensor row count (the GGUF does not
-    store it as a scalar).
+    store it as a scalar). ``tie_word_embeddings`` likewise is not a KV field: it is
+    whether the file carries its own ``output.weight``. The 4B student ties, the 27B
+    teacher does not, so this cannot be assumed either way.
     """
     def g(key: str):
         full = f"{GGUF_ARCH}.{key}"
@@ -140,7 +144,7 @@ def derive_text_config(kv: dict[str, object], vocab_size: int | None = None) -> 
         "num_hidden_layers": num_hidden_layers,
         "num_key_value_heads": int(g("attention.head_count_kv")),
         "rms_norm_eps": float(g("attention.layer_norm_rms_epsilon")),
-        "tie_word_embeddings": True,
+        "tie_word_embeddings": tie_word_embeddings,
         "use_cache": True,
         "vocab_size": vocab_size,
         "mamba_ssm_dtype": "float32",
@@ -193,6 +197,9 @@ class _Dims:
             table = {
                 "token_embd.weight": self._UNRESOLVED,
                 "output_norm.weight": (H,),
+                # Untied output head. Same shape as the embedding, and present only
+                # when the checkpoint does not tie them (the 27B teacher does not).
+                "output.weight": self._UNRESOLVED,
             }
         elif layer_type == "linear_attention":
             table = {
@@ -259,6 +266,10 @@ def map_gguf_tensor(name: str, num_hidden_layers: int) -> tuple[str, str, torch.
         return ("model.embed_tokens.weight", "copy", torch.bfloat16)
     if name == "output_norm.weight":
         return ("model.norm.weight", "copy", torch.bfloat16)
+    if name == "output.weight":
+        # Present only when the head is untied. The 4B student ties its embeddings and
+        # omits this; the 27B teacher ships a real one.
+        return ("lm_head.weight", "copy", torch.bfloat16)
     match = re.fullmatch(r"blk\.(\d+)\.(.*)", name)
     if match is None:
         raise KeyError(f"Unrecognized GGUF tensor name {name!r}")
@@ -275,6 +286,9 @@ def map_gguf_tensor(name: str, num_hidden_layers: int) -> tuple[str, str, torch.
 
 def expected_key_set(cfg: dict) -> set[str]:
     keys = {"model.embed_tokens.weight", "model.norm.weight"}
+    if not cfg.get("tie_word_embeddings", True):
+        # Untied head: the checkpoint carries its own lm_head (the 27B teacher).
+        keys.add("lm_head.weight")
     for i, layer_type in enumerate(cfg["layer_types"]):
         base = f"model.layers.{i}"
         keys |= {
@@ -351,7 +365,27 @@ def _decode_tensor(reader, tensor) -> np.ndarray:
         bits = raw.view(np.uint16).reshape(-1)
         f32 = (bits.astype(np.uint32) << 16).view(np.float32)
         return f32.reshape(raw.shape[:-1] + (raw.shape[-1] // 2,))
-    raise ValueError(f"Unsupported GGML type {tensor.tensor_type} for tensor {tensor.name}")
+
+    # Quantized tensors (the 27B teacher ships Q8_0 for most weights). ggml's own
+    # dequantizer is the reference; hand-rolling per-type unpacking here would be a
+    # second place for the nibble/scale conventions to drift.
+    from gguf import quants
+
+    try:
+        array = quants.dequantize(np.ascontiguousarray(tensor.data), tensor.tensor_type)
+    except Exception as exc:  # unknown/unsupported ggml type
+        raise ValueError(
+            f"Unsupported GGML type {tensor.tensor_type} for tensor {tensor.name}"
+        ) from exc
+    expected = int(np.prod(tensor.shape))
+    if array.size != expected:
+        raise ValueError(
+            f"{tensor.name}: dequantized {array.size} elements, expected {expected}"
+        )
+    # GGUF ne is reversed relative to the HF [out, in] view the caller expects.
+    return np.ascontiguousarray(array, dtype=np.float32).reshape(
+        tuple(int(d) for d in reversed(tensor.shape))
+    )
 
 
 def convert_gguf_to_hf(
@@ -375,7 +409,12 @@ def convert_gguf_to_hf(
 
     embed = next(t for t in reader.tensors if t.name == "token_embd.weight")
     vocab_size, hidden_size = int(embed.shape[1]), int(embed.shape[0])
-    cfg = derive_text_config(kv, vocab_size=vocab_size)
+    # A stored output head means the embeddings are not tied. Asserting either way
+    # would be wrong for one of the two models this converter handles.
+    has_output_head = any(t.name == "output.weight" for t in reader.tensors)
+    cfg = derive_text_config(
+        kv, vocab_size=vocab_size, tie_word_embeddings=not has_output_head
+    )
     if cfg["hidden_size"] != hidden_size:
         raise ValueError("embedding_length disagrees with token_embd row count")
 
@@ -397,7 +436,7 @@ def convert_gguf_to_hf(
         suffix = tensor.name.split(".", 2)[2] if tensor.name.startswith("blk.") else tensor.name
         expected = dims.expected(layer_type, suffix)
         if expected is dims._UNRESOLVED:
-            if suffix == "token_embd.weight":
+            if suffix in ("token_embd.weight", "output.weight"):
                 expected = (vocab_size, hidden_size)
             elif suffix == "ssm_norm.weight":
                 expected = (cfg["linear_key_head_dim"],)
