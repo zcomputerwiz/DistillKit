@@ -29,6 +29,7 @@ distillkit = "distillkit.main:main"
 
 [project.optional-dependencies]
 dev = ["pytest~=9.0.2", "ruff~=0.14.9"]
+ngram = ["gguf~=0.19.0"]
 capture = [
     "vllm>=0.12.0",
     "pyarrow",
@@ -38,4 +39,4 @@ capture = [
 repository = "https://github.com/arcee-ai/distillkit"
 
 [tool.setuptools]
-packages = ["distillkit", "distillkit.compression", "distillkit.lossfuncs"]
+packages = ["distillkit", "distillkit.compression", "distillkit.lossfuncs", "distillkit.models"]

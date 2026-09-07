@@ -2,7 +2,7 @@
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing_extensions import TypeAlias
 
 from distillkit.compression.config import (
@@ -82,7 +82,8 @@ DatasetPath: TypeAlias = HfRepoDataset | LocalDataset
 
 
 class DatasetConfiguration(BaseModel):
-    train_dataset: DatasetPath = Field(
+    train_dataset: DatasetPath | None = Field(
+        default=None,
         description="Dataset to use for training.",
     )
     eval_dataset: DatasetPath | None = Field(
@@ -126,6 +127,9 @@ class TeacherModelConfig(BaseModel):
 
 class TeacherDatasetConfig(BaseModel):
     kind: Literal["dataset"] = "dataset"
+    cache_path: str | None = None
+    anchor_layers: list[int] | None = None
+    cache_dtype: Literal["float8_e4m3fn"] = "float8_e4m3fn"
     legacy_logit_compression: LegacyLogitCompressionConfig | None = Field(
         default=None,
         description="Legacy logit compression configuration. Must match configuration used to capture logits.",
@@ -134,6 +138,29 @@ class TeacherDatasetConfig(BaseModel):
         default=None,
         description="Logit compression configuration. Must match configuration used to capture logits.",
     )
+
+
+class SidecarConfig(BaseModel):
+    table_path: str | None = None
+    enabled: bool = True
+    resident: bool = False
+    prefault: bool = True
+    layer_index: int = Field(default=1, ge=0)
+    num_branches: int = Field(default=4, ge=1)
+
+    @model_validator(mode="after")
+    def require_table(self):
+        if self.enabled and not self.table_path:
+            raise ValueError("sidecar.table_path is required when enabled")
+        return self
+
+
+class OptimizerConfig(BaseModel):
+    strategy: Literal["hybrid", "adamw"] = "hybrid"
+    muon_lr: float | None = Field(default=None, gt=0)
+    freeze_backbone: bool = True
+    unfreeze_at_step: int | None = Field(default=None, ge=1)
+    log_every_n_steps: int = Field(default=100, ge=1)
 
 
 class DistillationRunConfig(BaseModel):
@@ -203,6 +230,8 @@ class DistillationRunConfig(BaseModel):
         default="AutoModelForCausalLM",
         description="Auto class for the model.",
     )
+    sidecar: SidecarConfig | None = None
+    optimizer: OptimizerConfig | None = None
     trust_remote_code: bool = Field(
         default=False,
         description="Trust remote code when loading the model.",
@@ -215,3 +244,25 @@ class DistillationRunConfig(BaseModel):
         default=None,
         description="List of regular expressions matching names of parameters to freeze during training.",
     )
+
+    @model_validator(mode="after")
+    def validate_offline_and_sidecar(self):
+        cached = isinstance(self.teacher, TeacherDatasetConfig) and self.teacher.cache_path
+        if not cached and self.dataset.train_dataset is None:
+            raise ValueError("dataset.train_dataset or teacher.cache_path is required")
+        if cached and (self.dataset.train_dataset or self.dataset.eval_dataset):
+            raise ValueError("cache_path supplies both datasets; omit separate dataset paths")
+        if cached and (self.teacher.logprob_compressor or self.teacher.legacy_logit_compression):
+            raise ValueError("memmap cache already contains raw top-k; omit compressor configs")
+        if cached or self.sidecar:
+            if self.functionary_packing or self.training_args.get("packing") or self.training_args.get("padding_free"):
+                raise ValueError("packing and padding_free must be disabled for sidecar/cache alignment")
+            if self.training_args.get("remove_unused_columns", False):
+                raise ValueError("remove_unused_columns must be false to preserve doc_id and ngram_raw")
+        if self.sidecar and self.sidecar.resident and self.training_args.get("dataloader_num_workers", 0):
+            raise ValueError("resident tables require dataloader_num_workers=0 to prevent worker copies")
+        if self.sidecar and self.resize_embeddings_to_multiple_of is not None:
+            raise ValueError("sidecar preserves the original padded vocabulary; omit embedding resize")
+        if self.optimizer and self.optimizer.freeze_backbone and not self.sidecar:
+            raise ValueError("stage-1 backbone freezing requires a sidecar student")
+        return self

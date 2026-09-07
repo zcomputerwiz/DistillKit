@@ -37,13 +37,19 @@ class LogprobCompressor:
         if legacy_config is not None:
             self.legacy_compressor = LegacyLogitCompressor(legacy_config)
             self.vocab_index_bits = int(self.legacy_compressor.vocab_index_bits)
-        else:
+        elif config is not None:
             self.legacy_compressor = None
             self.vocab_index_bits = int(
                 torch.log2(torch.tensor(self.config.d, dtype=torch.float32))
                 .ceil()
                 .item()
             )
+        else:
+            # Raw top-k rows (`token_ids` + `top_values`) need no codec at all;
+            # decompress_to_sparse passes them straight through. Nothing on that
+            # path reads vocab_index_bits, so there is nothing to derive here.
+            self.legacy_compressor = None
+            self.vocab_index_bits = 0
 
     def compress_from_sparse(
         self, indices: torch.LongTensor, logprobs: torch.Tensor
@@ -114,8 +120,10 @@ class LogprobCompressor:
     ) -> dict[str, torch.Tensor]:
         if self.legacy_compressor is not None:
             k = self.legacy_compressor.config.k
-        else:
+        elif self.config is not None:
             k = self.config.k
+        else:
+            raise ValueError("No config provided for compression.")
 
         sparse_logprobs, sparse_indices = torch.topk(logprobs, k, dim=-1)
         return self.compress_from_sparse(sparse_indices, sparse_logprobs)
