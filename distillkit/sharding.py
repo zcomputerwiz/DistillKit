@@ -83,6 +83,32 @@ def _module_name(model, target) -> str | None:
     return None
 
 
+def returns_outputs_on_input_device(model) -> bool:
+    """True when accelerate gathers the whole forward output back to one device.
+
+    ``dispatch_model`` puts an ``AlignDevicesHook(io_same_device=True)`` on the root,
+    which sends *everything* the forward returns -- logits and the full hidden-state
+    tuple alike -- to the device the inputs came from. So a device map says where a
+    tensor was produced, not where it will be observed.
+    """
+    hook = getattr(model, "_hf_hook", None)
+    return bool(getattr(hook, "io_same_device", False))
+
+
+def anchor_device(model, index: int) -> torch.device:
+    """Device ``outputs.hidden_states[index]`` is actually observed on.
+
+    This is what a distillation projection has to be built on. Under accelerate's
+    dispatch that is the input device regardless of which card produced the state;
+    without it, the producing module's own device.
+    """
+    if returns_outputs_on_input_device(model):
+        # Inputs are prepared for the embeddings, and the output hook returns to
+        # wherever they came from.
+        return model.get_input_embeddings().weight.device
+    return hidden_state_device(model, index)
+
+
 def check_tied_embeddings_colocated(model) -> None:
     """Tied input embeddings and head must be assigned the same device.
 

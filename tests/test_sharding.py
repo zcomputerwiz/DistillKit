@@ -17,11 +17,13 @@ from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs.hidden_state import compute_hs_loss
 from distillkit.lossfuncs.kl import KLDLoss
 from distillkit.sharding import (
+    anchor_device,
     as_device,
     check_tied_embeddings_colocated,
     hidden_state_device,
     is_sharded,
     module_device,
+    returns_outputs_on_input_device,
 )
 from distillkit.signals import SparseSignal
 
@@ -101,6 +103,24 @@ def test_unsharded_model_reports_its_embedding_device():
 
 def test_single_device_map_is_not_sharded():
     assert not is_sharded(_FakeModel({"model": 0, "lm_head": 0}))
+
+
+def test_anchor_device_follows_the_output_hook_not_the_map():
+    """accelerate's root hook returns the whole output to the input device.
+
+    That includes the hidden-state tuple, so an anchor computed on card 1 is handed
+    back on card 0. Building its projection where the map says it was produced costs
+    a round trip of the state and its gradient on every step.
+    """
+    model = _FakeModel(_split_map(first_device_layers=2))
+    assert not returns_outputs_on_input_device(model)
+    assert anchor_device(model, NUM_LAYERS) == torch.device("cuda", 1)
+
+    model._hf_hook = type("H", (), {"io_same_device": True})()
+    assert returns_outputs_on_input_device(model)
+    # Produced on card 1, observed on card 0.
+    assert hidden_state_device(model, NUM_LAYERS) == torch.device("cuda", 1)
+    assert anchor_device(model, NUM_LAYERS) == torch.device("cuda", 0)
 
 
 def test_tied_embeddings_split_across_devices_is_rejected():
@@ -187,8 +207,11 @@ def test_sharded_step_matches_single_device_step(tmp_path):
     # Same initial projection weights, each on its own anchor's card.
     for dst, src in zip(shard_hsm.projections, ref_hsm.projections):
         dst.weight.data.copy_(src.weight.data.to(dst.weight.device))
-    assert shard_hsm.projections[0].weight.device == torch.device("cuda", 0)
-    assert shard_hsm.projections[1].weight.device == torch.device("cuda", 1)
+    # Both land on card 0: dispatch_model's output hook returns the hidden-state
+    # tuple to the input device, so that is where these projections' inputs arrive.
+    assert returns_outputs_on_input_device(sharded)
+    for projection in shard_hsm.projections:
+        assert projection.weight.device == torch.device("cuda", 0)
 
     input_ids, mask, signal = _batch(config.vocab_size, teacher_hidden)
 
@@ -227,3 +250,48 @@ def test_sharded_step_matches_single_device_step(tmp_path):
             atol=2e-5,
             msg=lambda text, index=index: f"projection {index}: {text}",
         )
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="needs two CUDA devices")
+def test_sidecar_student_loads_and_runs_across_two_devices(tmp_path):
+    """The stage-2 config splits the sidecar class, not stock Qwen3.5.
+
+    `_SidecarDecoderLayer` has to be in `_no_split_modules` and the sidecar's raw
+    n-gram rows have to reach layer 1's card. Both are silent if wrong: accelerate
+    would happily cut a decoder layer in half, and a device mismatch on ngram_raw
+    only shows up once the real 28.8 GB table is wired in.
+    """
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+
+    config = _config()
+    config.sidecar_layer_index = 1
+    path = tmp_path / "tiny-sidecar"
+    Qwen35SidecarForCausalLM(config).eval().save_pretrained(path)
+
+    model = Qwen35SidecarForCausalLM.from_pretrained(path, device_map=_split_map())
+    assert is_sharded(model)
+    check_tied_embeddings_colocated(model)
+    # Layer 1 carries the sidecar, so its rows must not have to cross a card.
+    assert module_device(model, "model.layers.1") == torch.device("cuda", 0)
+
+    sidecar = model.model.layers[1].sidecar
+    batch, seq = 2, 12
+    # Zero bytes decode to a zero IQ4_NL scale, so the features are finite zeros;
+    # random bytes would be random fp16 scales and produce NaN. This exercises
+    # placement, not numerics.
+    ngram_raw = torch.zeros(
+        batch, seq, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8
+    )
+    input_ids = torch.randint(0, config.vocab_size, (batch, seq))
+
+    outputs = model(
+        input_ids=input_ids.to("cuda:0"),
+        ngram_raw=ngram_raw,  # deliberately left on the host, as the collator emits it
+        return_dict=True,
+        output_hidden_states=True,
+    )
+    assert torch.isfinite(outputs.logits).all()
+    # Layer 3 runs on card 1, but the output hook hands its state back on card 0.
+    assert hidden_state_device(model, NUM_LAYERS) == torch.device("cuda", 1)
+    for index in (1, NUM_LAYERS):
+        assert outputs.hidden_states[index].device == anchor_device(model, index)

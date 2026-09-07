@@ -43,9 +43,10 @@ model_kwargs:
   # and knows nothing about gradients, optimizer state, or the 248,320-wide head's
   # activation cost, all of which land on card 0 with the head.
   #
-  # Balance at 6 bytes per trainable parameter plus ~5.5 GB of head working set on
-  # card 0 (bf16 logits 2.03 GB + their gradient 2.03 GB + chunked-KL temporaries):
-  #   card 0: 0.636B embedding + 9 layers x 0.114B  = 1.66B -> 9.9 GB + 5.5 GB
+  # Balance at 6 bytes per trainable parameter plus ~6.2 GB of working set on card 0
+  # (bf16 logits 2.03 GB + their gradient 2.03 GB + chunked-KL temporaries, plus the
+  # ~0.7 GB of hidden states that accelerate's output hook copies back here):
+  #   card 0: 0.636B embedding + 9 layers x 0.114B  = 1.66B -> 9.9 GB + 6.2 GB
   #   card 1:              23 layers x 0.114B       = 2.61B -> 15.7 GB
   # Both sit under the 22.08 GB that max_vram_fraction allows, leaving activation room.
   #
@@ -98,8 +99,9 @@ sidecar:
   layer_index: 1
   num_branches: 4
 
-# Anchor 4 is layer 3's output (card 0); anchor 32 is the post-norm state, and
-# model.norm is pinned to card 0, so both projections are built there.
+# Anchor 4 is layer 3's output and anchor 32 is the post-norm state. Both projections
+# are built on card 0 regardless of the map: accelerate's root hook returns the whole
+# output tuple to the input device.
 layer_mapping:
   - [4, 0]
   - [32, 1]

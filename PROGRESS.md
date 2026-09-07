@@ -442,9 +442,17 @@ What did need work is everything that assumed one device:
   `hidden_state_device` is the subtle one: `hidden_states[i]` is decoder layer *i-1*'s
   output, and the final entry is taken after `model.norm`, not from the last layer. An
   off-by-one there builds a projection on the wrong card.
-* **`hsd_mapping.py`** now builds each distillation projection on its own anchor's device
-  rather than all of them on the embedding's. A projection cannot be relocated later
-  without orphaning its optimizer state, so this has to be right at construction.
+* **The device map says where a tensor was *produced*, not where it is *observed*.**
+  `dispatch_model` puts an `AlignDevicesHook(io_same_device=True)` on the root, which
+  sends everything the forward returns -- the logits *and the whole hidden-state tuple*
+  -- back to the input device. The first version of this work placed projections by the
+  map and was caught by the sidecar test: the post-norm anchor is computed on card 1 and
+  handed back on card 0. `anchor_device` reports the observed device and is what
+  placement uses; `hidden_state_device` remains the map answer.
+* **`hsd_mapping.py`** now builds each distillation projection on its anchor's observed
+  device rather than all of them on the embedding's by assumption. A projection cannot be
+  relocated later without orphaning its optimizer state, so this has to be right at
+  construction.
 * **`lossfuncs/kl.py`** pulls the sparse signal and mask to the *head's* device. Direction
   matters: the sparse tensors are `[batch, seq, 64]`, the logits are 248,320 wide, so the
   small side crosses.
@@ -469,6 +477,13 @@ not raise; it quietly trains against a misplaced anchor.
 
 Still serial: one microbatch crosses card 0 then card 1, so this buys capacity, not
 speed. 1F1B interleaving is a separate change to the training loop.
+
+Known cost, not yet addressed: `output_hidden_states=True` materialises all 33 student
+states and the output hook then copies every one of them to card 0 -- about 693 MB at
+sequence 4096, plus the matching gradient traffic, for two anchors that are actually
+read. The capture script already solved this shape with `_AnchorTap` (a forward hook on
+just the anchor modules); porting that into the trainer would remove both the copies and
+the retained states.
 
 ## Fixed: the student was loading in fp32
 
