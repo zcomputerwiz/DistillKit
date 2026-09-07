@@ -1,4 +1,5 @@
 # Copyright 2025 Arcee AI
+import collections
 import hashlib
 import importlib.util
 import json
@@ -28,6 +29,11 @@ from distillkit.configuration import (
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
+from distillkit.sharding import (
+    as_device,
+    check_tied_embeddings_colocated,
+    is_sharded,
+)
 from distillkit.signals import OfflineSignalSource, OnlineSignalSource, SignalSource, OfflineHiddenStateSignalSource
 from distillkit.trainer import DistillationTrainer, HybridDistillationTrainer
 
@@ -220,14 +226,23 @@ def load_student_model(
             raise RuntimeError(
                 "use_flash_attention is true but flash_attn is not installed "
                 "(it has no Windows wheels). Install it, or set "
-                "use_flash_attention: false -- but note that flag is also what "
-                "loads the model in bfloat16 here, so set training_args.bf16 "
-                "explicitly to keep the fp32 distillation projections working "
-                "under autocast."
+                "use_flash_attention: false and set training_args.bf16 so the "
+                "student still loads in bfloat16."
             )
         extra_kwargs["attn_implementation"] = "flash_attention_2"
         extra_kwargs["torch_dtype"] = torch.bfloat16
     extra_kwargs.update(config.model_kwargs)
+    if "torch_dtype" not in extra_kwargs:
+        # Historically only the flash-attention branch set a dtype, so
+        # `use_flash_attention: false` silently loaded the 4.27B student in fp32:
+        # 17.2 GiB of weights instead of 8.5, and fp32 logits whose gradient over a
+        # 248,320-wide head is 3.79 GiB at sequence 4096. That combination OOM'd the
+        # control arm. autocast does not shrink the weights, so honour the trainer's
+        # own mixed-precision flags here.
+        if config.training_args.get("bf16"):
+            extra_kwargs["torch_dtype"] = torch.bfloat16
+        elif config.training_args.get("fp16"):
+            extra_kwargs["torch_dtype"] = torch.float16
     if config.sidecar is not None:
         stock_config = transformers.AutoConfig.from_pretrained(config.train_model)
         text_config = getattr(stock_config, "text_config", stock_config)
@@ -407,6 +422,15 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         )
 
     model = load_student_model(config, tokenizer_vocab_size, signal_vocab_size)
+    if is_sharded(model):
+        # A single-process layer split needs no process group: Tensor.to(device) is
+        # differentiable, so autograd moves activations forward and gradients back
+        # itself, over NVLink where the pair supports peer access. HF Trainer sees
+        # hf_device_map, sets place_model_on_device=False and forces _n_gpu to 1, so
+        # it will not also try to wrap this in DataParallel.
+        check_tied_embeddings_colocated(model)
+        placement = collections.Counter(str(as_device(v)) for v in model.hf_device_map.values())
+        LOG.info("Student sharded across %s", dict(placement))
     if model.config.vocab_size < signal_vocab_size:
         raise ValueError("Student head is smaller than the cache vocabulary")
     if config.sidecar is not None and not config.sidecar.enabled:

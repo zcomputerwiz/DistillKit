@@ -1,0 +1,155 @@
+# Stage-2 sidecar distillation, student sharded across two RTX 3090s.
+#
+# Stage 1 froze the backbone so the sidecar's contribution was attributable. Stage 2
+# unfreezes everything, which is what does not fit on one card:
+#
+#   4.27B parameters x (2 bf16 weight + 2 bf16 grad + 2 AdamW8bit m/v) = 25.6 GB
+#
+# before a single activation, against 24 GB of VRAM. Splitting the layers across both
+# cards is what makes stage 2 possible at all.
+#
+# The split is a single-process layer assignment, not a distributed job. There is no
+# torchrun, no process group, and no NCCL: `Tensor.to(device)` is differentiable, so
+# autograd moves activations forward and gradients back on its own, over NVLink where
+# peer access is available. HF Trainer sees `hf_device_map`, sets
+# `place_model_on_device=False`, and forces `_n_gpu` to 1 so it does not additionally
+# wrap the model in DataParallel.
+#
+# This is capacity parallelism, not throughput parallelism. Each microbatch still
+# traverses card 0 then card 1 in sequence, so expect roughly single-card speed, not
+# double. Overlapping microbatches (1F1B) is a separate change to the training loop.
+#
+# Run with BOTH cards visible -- unlike the stage-1 configs, which pin
+# CUDA_VISIBLE_DEVICES=0 to keep DataParallel out of the way:
+#   python -m distillkit.main examples/qwen35_sidecar_stage2_sharded.yml -v
+
+model: D:/DeepThought/Projects/HybridModel/student-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/sidecar-stage2
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  # Explicit, not device_map "auto": accelerate's automatic map balances raw weights
+  # and knows nothing about gradients, optimizer state, or the 248,320-wide head's
+  # activation cost, all of which land on card 0 with the head.
+  #
+  # Balance at 6 bytes per trainable parameter plus ~5.5 GB of head working set on
+  # card 0 (bf16 logits 2.03 GB + their gradient 2.03 GB + chunked-KL temporaries):
+  #   card 0: 0.636B embedding + 9 layers x 0.114B  = 1.66B -> 9.9 GB + 5.5 GB
+  #   card 1:              23 layers x 0.114B       = 2.61B -> 15.7 GB
+  # Both sit under the 22.08 GB that max_vram_fraction allows, leaving activation room.
+  #
+  # embed_tokens and lm_head must share a device: tie_word_embeddings is true, so they
+  # are one parameter. Splitting them fabricates a second copy that trains apart and
+  # reconstructs into a checkpoint matching neither. main.py rejects that at load.
+  device_map:
+    model.embed_tokens: 0
+    model.rotary_emb: 0
+    model.norm: 0
+    lm_head: 0
+    model.layers.0: 0
+    model.layers.1: 0    # the sidecar layer; its ngram_raw arrives on card 0
+    model.layers.2: 0
+    model.layers.3: 0
+    model.layers.4: 0
+    model.layers.5: 0
+    model.layers.6: 0
+    model.layers.7: 0
+    model.layers.8: 0
+    model.layers.9: 1
+    model.layers.10: 1
+    model.layers.11: 1
+    model.layers.12: 1
+    model.layers.13: 1
+    model.layers.14: 1
+    model.layers.15: 1
+    model.layers.16: 1
+    model.layers.17: 1
+    model.layers.18: 1
+    model.layers.19: 1
+    model.layers.20: 1
+    model.layers.21: 1
+    model.layers.22: 1
+    model.layers.23: 1
+    model.layers.24: 1
+    model.layers.25: 1
+    model.layers.26: 1
+    model.layers.27: 1
+    model.layers.28: 1
+    model.layers.29: 1
+    model.layers.30: 1
+    model.layers.31: 1
+
+sidecar:
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  resident: true
+  prefault: true
+  layer_index: 1
+  num_branches: 4
+
+# Anchor 4 is layer 3's output (card 0); anchor 32 is the post-norm state, and
+# model.norm is pinned to card 0, so both projections are built there.
+layer_mapping:
+  - [4, 0]
+  - [32, 1]
+
+loss_functions:
+  - function: kl
+    weight: 0.7
+    temperature: 1.0
+    missing_probability_handling: zero
+    sparse_chunk_length: 256
+  - function: hs_cosine
+    weight: 0.3
+
+optimizer:
+  # Not `hybrid`: Muon's Newton-Schulz iterations would run on 4.27B parameters here,
+  # and the memory win in stage 2 comes from 8-bit moments. adamw defers to
+  # training_args.optim, which selects bitsandbytes below. bnb keeps each state tensor
+  # on its parameter's own card, so the split holds through the optimizer.
+  strategy: adamw
+  freeze_backbone: false
+  unfreeze_at_step: null
+  log_every_n_steps: 25
+
+use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
+functionary_packing: false
+chunked_cross_entropy: true
+max_vram_fraction: 0.92     # applied to every visible device
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  num_train_epochs: 1
+  # An order of magnitude below stage 1: that run only moved 65.5M sidecar parameters
+  # against a fixed backbone, and reusing its 1e-4 on the full backbone would wash out
+  # what the frozen-backbone arm established.
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 50
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42

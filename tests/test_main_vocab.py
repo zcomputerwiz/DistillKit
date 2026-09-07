@@ -144,3 +144,24 @@ def test_no_stale_accelerator_reads_after_training_args_are_built():
     assert not offenders, (
         "accelerator state read after SFTConfig construction: " + "; ".join(offenders)
     )
+
+
+def test_bf16_training_arg_loads_the_student_in_bfloat16(tmp_path):
+    """Only the flash-attention branch used to set a dtype.
+
+    With `use_flash_attention: false` (no Windows wheels) the 4.27B student loaded in
+    fp32 -- 17.2 GiB of weights instead of 8.5 -- and its fp32 logits produced a
+    3.79 GiB gradient over the 248,320-wide head, which OOM'd the control arm.
+    """
+    model_path = _tiny_model_dir(tmp_path, vocab_size=64)
+    config = _run_config(tmp_path, model_path)
+    config.training_args = {"bf16": True}
+    model = load_student_model(config, tokenizer_vocab_size=60, signal_vocab_size=64)
+    assert model.get_input_embeddings().weight.dtype is __import__("torch").bfloat16
+
+
+def test_no_precision_flag_keeps_the_default_dtype(tmp_path):
+    model_path = _tiny_model_dir(tmp_path, vocab_size=64)
+    config = _run_config(tmp_path, model_path)
+    model = load_student_model(config, tokenizer_vocab_size=60, signal_vocab_size=64)
+    assert model.get_input_embeddings().weight.dtype is __import__("torch").float32

@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import transformers
 
+from distillkit.sharding import hidden_state_device
+
 
 class HiddenStateMapping:
     layer_mapping: list[tuple[int, int]]
@@ -48,7 +50,13 @@ class HiddenStateMapping:
 
             # slap 'em on the student so they're trained and saved
             embedding = student.get_input_embeddings().weight
-            self.projections.to(device=embedding.device, dtype=embedding.dtype)
+            self.projections.to(dtype=embedding.dtype)
+            # Each projection consumes one student anchor. On a model split across
+            # GPUs those anchors do not all live where the embeddings do, and a
+            # projection cannot be moved later without orphaning its optimizer
+            # state, so place each one on its own anchor's device now.
+            for projection, (student_layer_idx, _) in zip(self.projections, layer_mapping):
+                projection.to(device=hidden_state_device(student, student_layer_idx))
             student.add_module("distillation_projections", self.projections)
         else:
             self.projections = None

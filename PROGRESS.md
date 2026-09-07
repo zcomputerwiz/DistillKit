@@ -27,7 +27,9 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **170 passed** in the CUDA-enabled dev environment (≈20 s).
+**Test suite:** green — **180 passed** in the CUDA-enabled dev environment (≈45 s).
+One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
+are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
@@ -45,16 +47,20 @@ regression), and two CUDA-parametrized cases are skipped.
 - Gate 5 (1M-token smoke): **pass**. Real 1M-token capture + a full stage-1 training
   run in 998 s; losses finite and falling, eval 0.6569 -> 0.5853, and the sidecar moved
   off its zero init (see "Teacher capture and the 1M stage-1 run").
-- Gate 6 (5M pilot with control arm): **open**. The 1M control arm is running now; the
-  5M version is a scale-up of the same two configs.
+- Gate 6 (5M pilot with control arm): **open**. Both 1M arms are being re-run under the
+  bf16 load fix; the 5M version is a scale-up of the same two configs.
 
 **What remains:**
 1. ~~Real-corpus teacher capture~~ - **done**: 1,014,574 tokens cached.
-2. Compare the 1M sidecar and control arms (control running now).
+2. Compare the 1M sidecar and control arms (both re-running under the bf16 fix; the
+   first control attempt OOM'd at step 42 because the student was loading in fp32).
 3. 5M-token pilot, if the 1M comparison justifies it.
-4. Stage 2 (full backbone): model-parallel across both cards over NVLink with
-   AdamW8bit, ~25.5 GB total and no CPU offload. See "Multi-GPU and offload".
-5. MTP head - conventions now resolved from llama.cpp; implementation pending.
+4. ~~Stage 2 sharding integration~~ - **done**: `sharding.py`, per-anchor projection
+   placement, device-crossing losses, tied-embedding guard, and
+   `examples/qwen35_sidecar_stage2_sharded.yml`. Not yet exercised on the real 4B
+   student, which is the next GPU-time item. See "Tensor sharding".
+5. 1F1B microbatch interleaving, if the serial split's throughput is the limit.
+6. MTP head - conventions now resolved from llama.cpp; implementation pending.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -372,10 +378,25 @@ Final loss mix: `kl` 0.7 (`sparse_chunk_length: 256`) + `hs_cosine` 0.3.
 ## Multi-GPU and offload: what is actually available here
 
 Measured, not assumed: `torch.distributed.is_nccl_available()` is **False** on this
-Windows torch 2.11.0+cu128 build; gloo only. Consequences:
+Windows torch 2.11.0+cu128 build; gloo only.
 
-* **DDP and DeepSpeed multi-GPU ZeRO are blocked.** GPU collectives would route through
-  the CPU.
+**Update 2026-09-07 (later): NCCL itself is not the blocker; the PyTorch wheel is.**
+NCCL 2.31.2 builds on Windows and runs here. A native all-reduce probe selected
+`P2P/direct pointer` in both directions and all nine reduction checks passed, reaching
+**37.5 GB/s at 64 MiB** (32.6-33.0 GB/s at 8 MiB, 1.6-1.7 GB/s at 64 KiB, fp32/fp16/bf16
+alike). One real Windows bug had to be fixed to get there: `src/debug.cc` called
+`setvbuf(file, NULL, _IOLBF, 0)`, and the Microsoft CRT treats `_IOLBF` as full buffering
+and rejects a zero size, so any run with `NCCL_DEBUG_FILE` set aborted in `ucrtbase.dll`
+with `0xc0000409`. `_IONBF` accepts the zero size and gives the intended immediate
+logging. Full details, artifacts and reproduction:
+`NVLINK_PARALLELISM_RESEARCH_2026-09-07.md`.
+
+What that does *not* change: `torch 2.11.0+cu128` gates `USE_NCCL` on UNIX at build time
+and imports `ProcessGroupNCCL` from compiled extension code. Dropping a DLL beside the
+wheel cannot add the backend. So:
+
+* **DDP, FSDP and DeepSpeed multi-GPU ZeRO stay blocked** until PyTorch itself is
+  rebuilt -- not for want of a working NCCL, but for want of a backend that can call it.
 * **Single-GPU ZeRO-2 with CPU offload is *not* blocked** -- `world_size=1` runs no
   collectives, so NCCL is irrelevant. An earlier note in this document said ZeRO-2 needs
   WSL2/Linux; that over-generalised from the multi-GPU case and is corrected here.
@@ -401,13 +422,86 @@ What it does and does not buy:
 * Caveat: naive `device_map` pipeline parallelism serialises, so it buys capacity, not
   throughput. Real 2x would need microbatch interleaving (GPipe/1F1B).
 
-## Known inefficiency, not yet fixed
+## Tensor sharding: the training integration (2026-09-07)
 
-`signals.py:147` upcasts the cached anchors fp8 -> bf16 **on the CPU, before** the
-host-to-device copy, so they cross PCIe at 2 bytes per dimension instead of 1: 36.9 MB
-per microbatch rather than 18.4 MB. Moving the cast to after the transfer would halve
-it -- the same trick the sidecar already uses by shipping raw IQ4_NL rows and
-dequantising on the GPU. Left alone mid-run.
+Stage 2 is now wired. `examples/qwen35_sidecar_stage2_sharded.yml` splits the student
+across both cards in **one process, with no process group and no NCCL**. That is not a
+compromise: `Tensor.to(device)` is differentiable, so autograd already moves activations
+forward and gradients back by itself, over NVLink where peer access exists. A collective
+library is only needed when the *same* parameter lives on several ranks, which a layer
+split never does.
+
+HF Trainer needed no changes at all. It reads `model.hf_device_map`, and on more than one
+device sets `is_model_parallel`, `place_model_on_device = False`, and `_n_gpu = 1` -- the
+last of which is what keeps `nn.DataParallel` (and its 22.96 GB logits gather) out of the
+way. The map is passed straight through `model_kwargs.device_map`.
+
+What did need work is everything that assumed one device:
+
+* **`distillkit/sharding.py`** (new) answers "where did this end up" from the device map.
+  `hidden_state_device` is the subtle one: `hidden_states[i]` is decoder layer *i-1*'s
+  output, and the final entry is taken after `model.norm`, not from the last layer. An
+  off-by-one there builds a projection on the wrong card.
+* **`hsd_mapping.py`** now builds each distillation projection on its own anchor's device
+  rather than all of them on the embedding's. A projection cannot be relocated later
+  without orphaning its optimizer state, so this has to be right at construction.
+* **`lossfuncs/kl.py`** pulls the sparse signal and mask to the *head's* device. Direction
+  matters: the sparse tensors are `[batch, seq, 64]`, the logits are 248,320 wide, so the
+  small side crosses.
+* **`lossfuncs/hidden_state.py`** aligns each anchor's teacher state and mask to that
+  anchor's card, and moves only the resulting scalar between cards.
+* **`trainer.py`** reduces the per-loss scalars onto one device before weighting.
+* **Tied embeddings are checked, not assumed.** `tie_word_embeddings` is true, so
+  `embed_tokens` and `lm_head` are one parameter; a map that separates them would
+  fabricate a second copy that trains apart and reconstructs into a checkpoint matching
+  neither. `check_tied_embeddings_colocated` reads the *map* (so it fires before anything
+  is materialised) and refuses.
+
+The split in the config balances at 6 bytes per trainable parameter (bf16 weight + bf16
+grad + AdamW8bit m/v) plus ~5.5 GB of head working set charged to card 0: **9 layers plus
+the embedding/head on card 0 (~15.4 GB), 23 layers on card 1 (~15.7 GB)**, both under the
+22.08 GB that `max_vram_fraction` allows.
+
+`tests/test_sharding.py` is the gate. Placement is unit-tested without a GPU; the real
+check runs a tiny student twice -- once on one card, once split -- and requires the loss
+*and every gradient*, backbone and projections alike, to match. A wrong seam here does
+not raise; it quietly trains against a misplaced anchor.
+
+Still serial: one microbatch crosses card 0 then card 1, so this buys capacity, not
+speed. 1F1B interleaving is a separate change to the training loop.
+
+## Fixed: the student was loading in fp32
+
+Only the flash-attention branch of `load_student_model` ever set a dtype. With
+`use_flash_attention: false` -- forced, since flash-attn has no Windows wheels -- the
+4.27B student loaded in **fp32**: 17.2 GB of weights instead of 8.5, and fp32 logits
+whose gradient over the 248,320-wide head is 3.79 GiB at sequence 4096.
+`training_args.bf16` only enables autocast; it does not shrink the weights.
+
+That is what killed the control arm at step 42 of 72:
+
+```
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.79 GiB.
+GPU 0 has a total capacity of 24.00 GiB of which 1.51 GiB is free. 22.08 GiB allowed;
+Of the allocated memory 17.16 GiB is allocated by PyTorch
+```
+
+`17.16 GiB allocated` is the fp32 weight matrix, and `3.79 GiB` is exactly
+`4096 x 248320 x 4` bytes. The stage-1 sidecar arm survived the same waste only because
+it happened not to draw a document long enough to trigger it.
+
+`load_student_model` now honours `training_args.bf16` / `fp16` when nothing else has set
+a dtype. Both 1M arms were re-run from scratch under the fix.
+
+## Fixed: cached anchors crossed PCIe at double width
+
+`signals.py` used to upcast the cached anchors fp8 -> bf16 **on the CPU, before** the
+host-to-device copy, so they crossed PCIe at 2 bytes per dimension instead of 1: 36.9 MB
+per microbatch rather than 18.4 MB. The assembly buffer is now `float8_e4m3fn` and the
+widening happens on the device -- the same trick the sidecar already uses by shipping raw
+IQ4_NL rows and dequantising on the GPU. The finiteness check moved with it:
+`float8_e4m3fn` has NaN but no infinities, and NaN survives the widening, so it still
+catches the same corruption.
 
 ## MTP: reference resolved, implementation pending
 

@@ -154,9 +154,13 @@ class DistillationTrainer(SFTTrainer):
             loss_fns.append(cfg.function.value)
             weights.append(cfg.weight)
 
+        # A sharded student can produce these scalars on different cards -- the KL
+        # term on the head's device, a hidden-state term on its anchor's. Reduce onto
+        # the device the trainer will call backward from.
+        reduce_device = losses[0].device
         total_loss = 0.0
         for loss, weight in zip(losses, weights):
-            total_loss += loss * weight
+            total_loss = total_loss + loss.to(reduce_device) * weight
         total_loss = total_loss / sum(weights)
         self.log(
             {

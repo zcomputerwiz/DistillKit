@@ -209,18 +209,25 @@ class KLDLoss(LossFunctionBase):
                 num_items_in_batch = (
                     student_outputs.logits.shape[0] * student_outputs.logits.shape[1]
                 )
+        # The signal and the mask are built on the batch's device; on a student split
+        # across GPUs the head -- and therefore the logits -- can be on a different
+        # one. The sparse tensors are [batch, seq, k] with k around 64, so pulling
+        # them to the head costs far less than pulling the 248,320-wide logits back.
+        logits_device = student_outputs.logits.device
+        if mask is not None:
+            mask = mask.to(logits_device)
         if isinstance(signal, DenseSignal):
             res = dense_kl_div(
                 student_outputs.logits,
-                signal.logits,
+                signal.logits.to(logits_device),
                 mask=mask,
                 temperature=self.temperature,
             )
         else:
             res = sparse_kl_div(
                 logits=student_outputs.logits,
-                target_ids=signal.sparse_ids,
-                target_values=signal.sparse_values,
+                target_ids=signal.sparse_ids.to(logits_device),
+                target_values=signal.sparse_values.to(logits_device),
                 mask=mask,
                 missing=self.missing,
                 log_target=signal.log_values,

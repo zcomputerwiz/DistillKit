@@ -128,8 +128,12 @@ class OfflineHiddenStateSignalSource(SignalSource):
         top_k = self.cache.manifest["top_k"]
         sparse_ids = torch.zeros((batch_size, seq_length, top_k), dtype=torch.long)
         sparse_values = torch.full((batch_size, seq_length, top_k), -1e4, dtype=torch.float16)
+        # Assembled in the cache's own float8_e4m3fn, not bfloat16. The upcast used to
+        # happen here on the host, which doubled the largest host-to-device payload of
+        # the step (36.9 MB per microbatch instead of 18.4) for a conversion the GPU
+        # does for free. It matters more once the student is split across cards.
         hidden_states = (
-            tuple(torch.zeros((batch_size, seq_length, self.hidden_size), dtype=torch.bfloat16)
+            tuple(torch.zeros((batch_size, seq_length, self.hidden_size), dtype=torch.float8_e4m3fn)
                   for _ in self.anchor_layers) if return_hidden_states else None
         )
         with torch.no_grad():
@@ -144,17 +148,27 @@ class OfflineHiddenStateSignalSource(SignalSource):
                 sparse_ids[row, start:end] = torch.from_numpy(cached["topk_ids"].astype(np.int64))
                 sparse_values[row, start:end] = torch.from_numpy(cached["topk_logprobs"])
                 if hidden_states is not None:
-                    decoded = torch.from_numpy(cached["hidden_states"]).view(torch.float8_e4m3fn).to(torch.bfloat16)
-                    if not torch.isfinite(decoded).all():
-                        raise ValueError(f"Nonfinite hidden-state cache for document {doc_id!r}")
+                    decoded = torch.from_numpy(cached["hidden_states"]).view(torch.float8_e4m3fn)
                     for anchor, target in enumerate(hidden_states):
                         target[row, start:end] = decoded[:, anchor, :]
             return SparseSignal(
                 sparse_ids=sparse_ids.to(tokens.device), sparse_values=sparse_values.to(tokens.device),
                 log_values=True, generation_temperature=1.0,
-                hidden_states=tuple(h.to(tokens.device) for h in hidden_states) if hidden_states is not None else None,
+                # Transfer in fp8, widen on the device. The finiteness check moves here
+                # with it: float8_e4m3fn has NaN but no infinities, and a NaN survives
+                # the widening, so checking after the copy catches the same corruption.
+                hidden_states=tuple(_to_bfloat16_on(h, tokens.device) for h in hidden_states)
+                if hidden_states is not None else None,
                 vocab_size=self.vocab_size,
             )
+
+
+
+def _to_bfloat16_on(cached_fp8: torch.Tensor, device: torch.device) -> torch.Tensor:
+    widened = cached_fp8.to(device=device, non_blocking=True).to(torch.bfloat16)
+    if not torch.isfinite(widened).all():
+        raise ValueError("Nonfinite hidden-state cache")
+    return widened
 
 
 class OnlineSignalSource(SignalSource):
