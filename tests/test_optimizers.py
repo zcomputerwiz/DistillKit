@@ -280,3 +280,69 @@ def test_hybrid_trainer_delivers_metrics_to_integrations_before_callback_copy(tm
     late = reporter.received[-1]
     assert late["loss"] == 0.4
     assert not any(k.startswith("architecture/") for k in late)
+
+
+def test_dataparallel_gathered_loss_is_reduced_to_a_scalar():
+    """nn.DataParallel returns one loss per replica; everything downstream wants a scalar.
+
+    With two visible GPUs and no distributed launcher, HF Trainer wraps the model in
+    nn.DataParallel, and `student_outputs.loss` comes back shaped [n_gpu]. The
+    cross_entropy loss function returns that object directly, the trainer logs
+    `loss.item()` on it, and the weighted sum broadcasts it -- so an unreduced loss
+    fails with "a Tensor with 2 elements cannot be converted to Scalar", but only at
+    batch > 1, since DataParallel cannot split a single example.
+    """
+    import torch
+    from transformers.modeling_outputs import CausalLMOutputWithPast
+
+    from distillkit.lossfuncs.cross_entropy import CrossEntropyLoss
+
+    gathered = CausalLMOutputWithPast(
+        loss=torch.tensor([1.5, 2.5]), logits=torch.zeros(2, 3, 8)
+    )
+    # Mirrors DistillationTrainer.compute_loss's reduction.
+    if gathered.loss is not None and gathered.loss.dim() > 0:
+        gathered.loss = gathered.loss.mean()
+
+    value = CrossEntropyLoss()(gathered, signal=None)
+    assert value.dim() == 0, f"expected a scalar, got shape {tuple(value.shape)}"
+    assert value.item() == pytest.approx(2.0)
+
+
+@pytest.mark.parametrize(
+    "student_dtype,proj_dtype,teacher_dtype",
+    [
+        (torch.bfloat16, torch.float32, torch.bfloat16),  # projections built in fp32
+        (torch.float32, torch.bfloat16, torch.float32),   # the reverse, seen in practice
+        (torch.bfloat16, torch.bfloat16, torch.float32),  # teacher upcast from fp8
+    ],
+)
+def test_hidden_state_loss_tolerates_mixed_dtypes(student_dtype, proj_dtype, teacher_dtype):
+    """The projection matmul must not depend on autocast being active at the call site.
+
+    HiddenStateMapping builds its projections in fp32 after the student is loaded in
+    bf16. Without explicit alignment this raises "expected mat1 and mat2 to have the
+    same dtype" at step 0, naming neither the tensor nor the side that is wrong.
+    """
+    import torch.nn as nn
+    from transformers.modeling_outputs import CausalLMOutputWithPast
+
+    from distillkit.lossfuncs.hidden_state import compute_hs_loss
+
+    B, T, Hs, Ht = 2, 6, 16, 32
+
+    class Mapping:
+        layer_mapping = [(1, 0)]
+        projections = nn.ModuleList([nn.Linear(Hs, Ht, bias=False).to(proj_dtype)])
+
+    outputs = CausalLMOutputWithPast(
+        logits=torch.zeros(B, T, 8),
+        hidden_states=tuple(torch.randn(B, T, Hs, dtype=student_dtype) for _ in range(2)),
+    )
+
+    class Signal:
+        hidden_states = (torch.randn(B, T, Ht, dtype=teacher_dtype),)
+
+    for kind in ("mse", "cosine"):
+        value = compute_hs_loss(kind, outputs, Signal(), mask=None, hidden_state_mapping=Mapping())
+        assert value.dim() == 0 and torch.isfinite(value), f"{kind} -> {value}"

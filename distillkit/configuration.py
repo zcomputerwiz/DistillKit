@@ -214,6 +214,18 @@ class DistillationRunConfig(BaseModel):
         default=False,
         description="Use linear layers to project between teacher and student hidden states even if sizes are equal.",
     )
+    max_vram_fraction: float | None = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description=(
+            "Cap PyTorch's share of each GPU. On Windows WDDM an over-budget run does "
+            "not OOM: the driver spills to shared system memory and services it over "
+            "PCIe, which looks like 100% GPU utilisation at ~40% power with an idle "
+            "memory controller and runs ~7x slower. Capping the allocator turns that "
+            "silent degradation into an ordinary OOM."
+        ),
+    )
     chunked_cross_entropy: bool = Field(
         default=True,
         description=(

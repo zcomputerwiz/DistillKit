@@ -44,7 +44,17 @@ def compute_hs_loss(
         teacher_h = signal.hidden_states[teacher_layer_idx]
 
         if hidden_state_mapping.projections is not None:
-            student_h = hidden_state_mapping.projections[i](student_h)
+            projection = hidden_state_mapping.projections[i]
+            # The projections are built in fp32 after the student is loaded in bf16, so
+            # this matmul only works when autocast happens to be active at this call
+            # site. Align explicitly instead: relying on an ambient context manager for
+            # dtype correctness fails at step 0 with a bare "mat1 and mat2 have
+            # different dtype" and no indication of which side is wrong.
+            student_h = projection(student_h.to(projection.weight.dtype))
+
+        # The cached teacher states are upcast from fp8 and need not share the student's
+        # dtype either; the subtraction and cosine below assume they do.
+        teacher_h = teacher_h.to(student_h.dtype)
 
         if kind == "mse":
             squared_error = (student_h - teacher_h) ** 2

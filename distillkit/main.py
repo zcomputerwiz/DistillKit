@@ -397,6 +397,15 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         ds_train, ds_eval = load_data(config.dataset, tokenizer)
         signal_vocab_size = tokenizer_vocab_size
 
+    if config.max_vram_fraction is not None and torch.cuda.is_available():
+        for index in range(torch.cuda.device_count()):
+            torch.cuda.set_per_process_memory_fraction(config.max_vram_fraction, index)
+        LOG.info(
+            "Capped PyTorch to %.0f%% of VRAM; over-budget allocations now raise "
+            "instead of spilling to shared system memory.",
+            100 * config.max_vram_fraction,
+        )
+
     model = load_student_model(config, tokenizer_vocab_size, signal_vocab_size)
     if model.config.vocab_size < signal_vocab_size:
         raise ValueError("Student head is smaller than the cache vocabulary")
@@ -475,7 +484,9 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         )
         table = GGUFNGramTable(config.sidecar.table_path)
         if config.sidecar.resident:
-            if accelerator.num_processes > 1:
+            # training_arguments, not the Accelerator created before SFTConfig: building
+            # SFTConfig resets AcceleratorState, after which that instance raises.
+            if training_arguments.world_size > 1:
                 raise ValueError("Resident table duplication across distributed ranks is unsupported; use memmap")
             table.load_resident()
         elif config.sidecar.prefault:

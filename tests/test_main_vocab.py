@@ -115,3 +115,32 @@ def test_missing_flash_attn_fails_before_loading_with_actionable_message(monkeyp
     )
     with pytest.raises(RuntimeError, match="flash_attn is not installed"):
         main_module.load_student_model(config, tokenizer_vocab_size=32, signal_vocab_size=32)
+
+
+def test_no_stale_accelerator_reads_after_training_args_are_built():
+    """Reading the pre-SFTConfig Accelerator later raises, and only at runtime.
+
+    `trl.SFTConfig(...)` can call `AcceleratorState._reset_state()`, after which the
+    `Accelerator` built earlier in `do_distill` raises AttributeError on any state
+    access. That bit twice -- once at the optimizer-backend check and once at the
+    resident-table guard -- each time only after the 4B student had already loaded.
+
+    Rather than mock the whole run, assert the source does not reach for accelerator
+    state after the training arguments exist: past that line, `training_arguments`
+    carries the same values from a source that cannot go stale.
+    """
+    import inspect
+
+    from distillkit import main as main_module
+
+    source = inspect.getsource(main_module.do_distill)
+    build_index = source.index("training_arguments = trl.SFTConfig(")
+    after = source[build_index:]
+    offenders = [
+        line.strip()
+        for line in after.splitlines()
+        if "accelerator." in line and not line.strip().startswith("#")
+    ]
+    assert not offenders, (
+        "accelerator state read after SFTConfig construction: " + "; ".join(offenders)
+    )

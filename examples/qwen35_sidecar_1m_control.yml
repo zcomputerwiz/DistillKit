@@ -12,8 +12,15 @@
 # Without this arm a loss delta cannot be attributed to the table rather than to the
 # extra optimisation steps, so the sidecar arm is uninterpretable on its own.
 #
+# NOTE: run this with CUDA_VISIBLE_DEVICES=0.
+#
+# With both cards visible and no distributed launcher, HF Trainer wraps the model in
+# nn.DataParallel, which gathers every replica's [batch, seq, 248320] logits onto GPU 0
+# and OOMs at 22.96 GB. A 248k-wide head makes DataParallel's gather the bottleneck, and
+# it is the wrong tool here anyway: the student fits on one card, so replication buys
+# nothing. Real multi-GPU would need torchrun + DDP, which is a separate exercise.
 # Run:
-#   python -m distillkit.main examples/qwen35_sidecar_1m_control.yml -v
+#   CUDA_VISIBLE_DEVICES=0 python -m distillkit.main examples/qwen35_sidecar_1m_control.yml -v
 
 model: D:/DeepThought/Projects/HybridModel/student-hf
 output_path: D:/DeepThought/Projects/HybridModel/runs/control-1m
@@ -52,22 +59,24 @@ layer_mapping:
   - [32, 1]
 
 loss_functions:
-  # Ground truth, so the student does not drift on tokens the teacher is unsure about.
-  - function: cross_entropy
-    weight: 0.25
+  # cross_entropy is deliberately absent. It is the only loss that reads
+  # student_outputs.loss, so omitting it makes requires_model_loss false and the model
+  # skips its 248,320-wide cross-entropy entirely -- forward and backward. Keeping it
+  # cost a 3.79 GiB fp32 gradient over the full logits and OOM'd on long documents.
+  # KL is the teacher-alignment term anyway; ground-truth CE can come back in stage 2.
   # The teacher-alignment term: match the full distribution, not just the argmax.
   - function: kl
-    weight: 0.5
+    weight: 0.7
     temperature: 1.0
     missing_probability_handling: zero
     # Without this the KL term takes a full fp32 log_softmax over the 248,320-wide
     # vocabulary in one go: 4.07 GB at sequence 4096, held for backward. Chunked and
     # checkpointed it is ~0.5 GB.
-    sparse_chunk_length: 512
+    sparse_chunk_length: 256
   # Representation alignment. Cosine rather than MSE because the student's projected
   # 5120-d states have no reason to match the teacher's scale, only its direction.
   - function: hs_cosine
-    weight: 0.25
+    weight: 0.3
 
 optimizer:
   strategy: hybrid          # Muon on 2D matrices, AdamW on embeddings/norms/gates
@@ -77,7 +86,8 @@ optimizer:
 
 use_flash_attention: false  # no Windows wheels; bf16 is set explicitly below
 functionary_packing: false  # qwen3_5 hits monkey_patch_packing's else-raise anyway
-chunked_cross_entropy: true # 13.15 vs 18.76 GB peak over the 248k-wide head
+chunked_cross_entropy: true
+max_vram_fraction: 0.92    # fail loudly rather than spill to shared memory # 13.15 vs 18.76 GB peak over the 248k-wide head
 
 training_args:
   bf16: true                     # fp32 distillation projections need autocast
@@ -85,11 +95,15 @@ training_args:
   dataloader_num_workers: 0      # required by sidecar.resident
   # sequence_length must stay 4096 to match the cache's truncation rule, but that is
   # not the padded batch length: the collator pads to the longest document in each
-  # batch, and documents average ~870 tokens. group_by_length batches similar lengths
-  # together, which cuts padding waste and makes the worst case predictable.
-  per_device_train_batch_size: 2
-  gradient_accumulation_steps: 8
-  group_by_length: true
+  # batch, and documents average ~870 tokens.
+  # No group_by_length: trl 0.25.1's SFTConfig dropped that field (only
+  # length_column_name survives), so batch 2 eats some padding waste. Both arms eat
+  # the same waste, so the comparison is unaffected.
+  # Batch 2 pushed the working set to 24.3 GB dedicated + 19.7 GB SPILLED to shared
+  # system memory: 100% GPU utilisation at 133 W with a 0% memory controller, and
+  # 200 tok/s instead of 1428. Batch 1 keeps it resident; effective batch is unchanged.
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
   gradient_checkpointing: true
   num_train_epochs: 1
   learning_rate: 1.0e-4

@@ -106,6 +106,12 @@ class DistillationTrainer(SFTTrainer):
             return_dict=True,
             output_hidden_states=self.need_hidden_states,
         )
+        # nn.DataParallel gathers one loss per replica, so student_outputs.loss arrives
+        # as [n_gpu] rather than a scalar. Every downstream consumer (the cross_entropy
+        # loss function, the .item() logging, the weighted sum) assumes a scalar, and
+        # batch 1 hides it because DataParallel cannot split a single example.
+        if student_outputs.loss is not None and student_outputs.loss.dim() > 0:
+            student_outputs.loss = student_outputs.loss.mean()
         if student_outputs.logits.shape[-1] < self.true_vocab_size:
             raise ValueError("Student vocabulary is smaller than the teacher signal vocabulary")
         if student_outputs.logits.shape[-1] != self.true_vocab_size:

@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **154 passed** in the CUDA-enabled dev environment (≈20 s).
+**Test suite:** green — **170 passed** in the CUDA-enabled dev environment (≈20 s).
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
@@ -42,17 +42,19 @@ regression), and two CUDA-parametrized cases are skipped.
   end-to-end** — see "Real-table forward" below.
 - Gate 4 (signal alignment): **pass** in synthetic form (`test_signal_alignment.py`);
   the real-corpus version needs the capture run (remaining work #1).
-- Gate 5 (1M-token smoke): **pass** in stage-1 form on one RTX 3090 - see
-  "Stage-1 GPU smoke" below. Not with ZeRO-2 offload (impossible here), which
-  stage 1 does not need.
-- Gate 6 (5M pilot with control arm): **open** - about 1 h of GPU time, ready to run.
+- Gate 5 (1M-token smoke): **pass**. Real 1M-token capture + a full stage-1 training
+  run in 998 s; losses finite and falling, eval 0.6569 -> 0.5853, and the sidecar moved
+  off its zero init (see "Teacher capture and the 1M stage-1 run").
+- Gate 6 (5M pilot with control arm): **open**. The 1M control arm is running now; the
+  5M version is a scale-up of the same two configs.
 
 **What remains:**
-1. Real-corpus teacher capture (needs the 27B teacher resident).
-2. 5M-token controlled pilot with the sidecar-disabled control arm (gate 6). ~1 h GPU.
-3. ZeRO-2 is **not needed for stages 1 and 6** and is unavailable on this OS anyway
-   (see "Environment blockers"). It only returns as a question for full-backbone
-   stage-2 training.
+1. ~~Real-corpus teacher capture~~ - **done**: 1,014,574 tokens cached.
+2. Compare the 1M sidecar and control arms (control running now).
+3. 5M-token pilot, if the 1M comparison justifies it.
+4. Stage 2 (full backbone): model-parallel across both cards over NVLink with
+   AdamW8bit, ~25.5 GB total and no CPU offload. See "Multi-GPU and offload".
+5. MTP head - conventions now resolved from llama.cpp; implementation pending.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -252,6 +254,197 @@ Two bugs found while building it, both caught by tests rather than review:
   instead of calling it, so it could have passed while the trainer silently gave back
   5.6 GB. The gate is now `maybe_install_chunked_loss()` and the test calls it,
   including the DDP/DeepSpeed wrapper path.
+
+## Teacher capture and the 1M stage-1 run (2026-09-07)
+
+### Capture
+
+1,213 documents / **1,014,574 tokens**, 11 GB, anchors 8 and 64, ~220 tok/s on the
+27B teacher in int8 across both cards. Split 1,152 train / 61 eval, with the eval
+holdout carved out in the same pass.
+
+Corpus is `r0b0tlab/qwen3.8-max-glm5.2-kimi-k3-distillation`, rendered through the
+*teacher's* chat template by `distillkit/prepare_corpus.py`.
+
+### Sidecar arm result
+
+`examples/qwen35_sidecar_1m.yml`, backbone frozen, one RTX 3090:
+
+| | |
+| --- | --- |
+| runtime | **998 s (16.6 min)**, 72 optimizer steps |
+| train loss | 1.049 (final step 0.5677) |
+| eval loss | 0.6569 -> **0.5853** |
+
+**The architecture is not dead weight.** Spec section 3b asks whether the gates and
+projection ever move off identity; if they do not, the gated residual should be dropped
+rather than carried into the long run. Measured over the run:
+
+| metric | start | end |
+| --- | ---: | ---: |
+| `W_side_proj` weight norm | 0.0000 | **1.7834** |
+| gated-residual branch 1/2/3 norms | 0.0000 | **1.788** |
+| `W_x` bias absmax | 0.0000 | 0.0036 |
+| gate means | 0.5004 | 0.5010 |
+| gate saturation | 0.0508 | 0.0547 |
+
+The zero-init projection and all three zero-init branches moved off zero, and the gates
+stayed unsaturated at ~0.501 (saturation 0.055, where 0.5 would mean fully saturated).
+That is exactly the intended behaviour: dormant at init, trainable thereafter.
+
+The control arm (identical but `sidecar.enabled: false`) is what makes the loss numbers
+interpretable, and is running now.
+
+### Five failures worth recording
+
+Each cost a model load, and all but the first are real bugs rather than config typos.
+
+1. **`group_by_length` is not an SFTConfig field** in trl 0.25.1 (only
+   `length_column_name` survives). Removed; both arms eat the same padding waste so the
+   comparison is unaffected.
+2. **Stale `Accelerator` at two sites.** `trl.SFTConfig(...)` can call
+   `AcceleratorState._reset_state()`, after which the `Accelerator` built earlier in
+   `do_distill` raises on any state access. Fixed at both sites by reading
+   `training_arguments.world_size`, plus a source-level guard test so a third site
+   cannot appear.
+3. **DataParallel returns one loss per replica.** With both cards visible and no
+   distributed launcher, HF wraps the model in `nn.DataParallel` and
+   `student_outputs.loss` arrives shaped `[n_gpu]`. Everything downstream wants a
+   scalar. Invisible at batch 1, because DataParallel cannot split a single example.
+   Now mean-reduced in `compute_loss`.
+4. **DataParallel then OOM'd anyway**, gathering both replicas' `[B, T, 248320]` logits
+   onto GPU 0 at 22.96 GB. A 248k-wide head makes the gather the bottleneck. Runs now
+   use `CUDA_VISIBLE_DEVICES=0`; real multi-GPU needs torchrun + DDP, which NCCL blocks
+   (see below).
+5. **Hidden-state projections depended on ambient autocast.** `HiddenStateMapping`
+   builds them in fp32 after the student loads in bf16, so the matmul only worked if
+   autocast happened to be active at that call site. It was not, and the failure was a
+   bare "expected mat1 and mat2 to have the same dtype" naming neither side. Now aligned
+   explicitly, with a parametrized test over three dtype combinations.
+
+### The VRAM spillover trap (the important one)
+
+At batch 2 the run *appeared* to train: 100% GPU utilisation, steps advancing, losses
+falling. It was 7x too slow (200 tok/s against 1428 in the stage-1 smoke) and the
+profile was wrong in a specific way:
+
+| signal | value | what it means |
+| --- | --- | --- |
+| `utilization.gpu` | 100% | a kernel is resident -- not that it is doing work |
+| `utilization.memory` | **0-2%** | the device memory controller is idle |
+| power | **133 W of 333 W**, flat | stalled, not computing |
+| process CPU | 0.45 cores | not CPU-bound either |
+
+Nothing was saturated. The cause, found by checking the Windows performance counters
+rather than nvidia-smi:
+
+    GPU Process Memory / Dedicated Usage : 24,294 MB   (card full)
+    GPU Process Memory / Shared Usage    : 19,682 MB   <-- spilled to host RAM
+
+**Windows WDDM does not OOM when VRAM is exhausted. It silently spills to shared system
+memory and services those pages over PCIe.** Nearly 20 GB of the working set was living
+in host RAM. That also explains the saturated PCIe bus observed at the time, which had
+been attributed to teacher-signal streaming -- the sidecar is only ~6% of host-to-device
+traffic (2.6 MB per microbatch against the teacher cache's 36.9 MB).
+
+On Linux this is a clean OOM. On Windows it is a silent 7x slowdown that looks like a
+healthy run, which makes it exactly the kind of thing to guard against rather than
+notice by luck.
+
+Two changes:
+
+* **`max_vram_fraction`** (new config field, set to 0.92 in both arms) caps PyTorch's
+  allocator so an over-budget run raises `torch.OutOfMemoryError` instead of degrading
+  silently. It worked immediately: the next attempt failed loudly with "22.08 GiB
+  allowed" rather than spilling.
+* **batch 1 x accumulation 16** (same effective batch) to fit.
+
+The loud OOM then pointed at a **3.79 GiB allocation in backward** -- the fp32 gradient
+of the full `[1, 4096, 248320]` logits. Chunking the forward does not shrink it: every
+chunk backpropagates into one full-size gradient buffer. Dropping `cross_entropy` from
+the loss list removed it entirely, because that is the only loss reading
+`student_outputs.loss`, so `requires_model_loss` goes false and the model skips its
+248k-wide cross-entropy in both directions. KL is the teacher-alignment term regardless;
+ground-truth CE can return in stage 2.
+
+Final loss mix: `kl` 0.7 (`sparse_chunk_length: 256`) + `hs_cosine` 0.3.
+
+## Multi-GPU and offload: what is actually available here
+
+Measured, not assumed: `torch.distributed.is_nccl_available()` is **False** on this
+Windows torch 2.11.0+cu128 build; gloo only. Consequences:
+
+* **DDP and DeepSpeed multi-GPU ZeRO are blocked.** GPU collectives would route through
+  the CPU.
+* **Single-GPU ZeRO-2 with CPU offload is *not* blocked** -- `world_size=1` runs no
+  collectives, so NCCL is irrelevant. An earlier note in this document said ZeRO-2 needs
+  WSL2/Linux; that over-generalised from the multi-GPU case and is corrected here.
+  The blocker for that path is toolchain, not NCCL: pre-built DeepSpeed wheels target
+  CUDA 12.1/12.4, torch here is cu128, and the installed standalone toolkit is v13.3
+  with `CUDA_HOME` unset. It would need a source build against a CUDA 12.8 toolkit.
+* ZeRO-1/2 also flattens each param group into a 1-D partition, and `torch.optim.Muon`
+  raises on non-2D gradients -- so ZeRO costs Muon either way.
+
+**NVLink is present and healthy**: 4 links x 14.062 GB/s = **56 GB/s per direction**,
+`can_device_access_peer` true both ways, about 3.5x PCIe 4.0 x8.
+
+What it does and does not buy:
+
+* It is **GPU-to-GPU only**. The largest bandwidth consumer here is *host-to-device*
+  (the teacher cache), which still crosses PCIe. NVLink does nothing for it.
+* Plain CUDA P2P needs no collectives, so **`device_map` model parallelism works**
+  without NCCL -- the same mechanism already used for the 27B teacher.
+* For stage 2 that is decisive: full-backbone AdamW fp32 is 34.2 GB of optimizer state
+  (51.2 GB total with weights and grads) and does not fit one card. With `AdamW8bit`
+  the total is 25.5 GB -- still over 24 GB, but comfortable **across two cards over
+  NVLink, with no CPU offload at all**. That sidesteps the DeepSpeed question entirely.
+* Caveat: naive `device_map` pipeline parallelism serialises, so it buys capacity, not
+  throughput. Real 2x would need microbatch interleaving (GPipe/1F1B).
+
+## Known inefficiency, not yet fixed
+
+`signals.py:147` upcasts the cached anchors fp8 -> bf16 **on the CPU, before** the
+host-to-device copy, so they cross PCIe at 2 bytes per dimension instead of 1: 36.9 MB
+per microbatch rather than 18.4 MB. Moving the cast to after the transfer would halve
+it -- the same trick the sidecar already uses by shipping raw IQ4_NL rows and
+dequantising on the GPU. Left alone mid-run.
+
+## MTP: reference resolved, implementation pending
+
+The student GGUF carries a complete trained MTP block (`blk.32`, 15 tensors, 241 MB)
+that the converter currently discards, because transformers has no MTP implementation
+for `qwen3_5` -- its only two mentions are `_keys_to_ignore_on_load_unexpected`.
+
+`llama.cpp/src/models/qwen35.cpp` settles the two conventions that shapes alone cannot,
+and both would have been guessed wrong:
+
+* **Concat order** is `ggml_concat(e_norm, h_norm, dim=0)`, i.e. torch
+  `cat([enorm(embed), hnorm(hidden)], dim=-1)`.
+* **Which hidden state**: the main graph exports `h_nextn` *after* `model.output_norm`
+  (qwen35.cpp:206-209), so MTP consumes the **post-norm** trunk output. DeepSeek uses
+  the pre-norm state, which is what a reasonable guess would have assumed.
+
+The rest is a stock `Qwen3_5DecoderLayer` (full attention) applied to `eh_proj(concat)`,
+then `shared_head_norm`, then the shared `lm_head`. No dedicated MTP embeddings in this
+checkpoint, so the main embedding table is reused.
+
+Why it is worth doing: the student has no draft model, so MTP is the missing piece for
+self-speculative decoding. And the cache already supports training it without recapture
+-- the MTP head at position *t* predicts token *t+2*, which is exactly the teacher's
+next-token distribution at *t+1*, one index over.
+
+Measured sidecar cost under speculative decoding, since it was raised as a concern:
+
+| K (draft tokens) | rows/step | cold | warm |
+| ---: | ---: | ---: | ---: |
+| 1 | 16 | 3.82 ms | 0.002 ms |
+| 8 | 128 | 22.88 ms | 0.004 ms |
+| 32 | 512 | 96.73 ms | 0.008 ms |
+
+Warm, that is 0.0003-0.002 ms per output token against a ~20-40 ms decode step. Larger
+draft chunks make it *cheaper* per token, not more expensive: total rows for N output
+tokens is 16N regardless of K, and batching amortises. The risk is residency, not chunk
+size -- cold is 1,900x slower.
 
 ## Launch-bound step, diagnosed and fixed (2026-09-07)
 
