@@ -47,15 +47,17 @@ regression), and two CUDA-parametrized cases are skipped.
 - Gate 5 (1M-token smoke): **pass**. Real 1M-token capture + a full stage-1 training
   run in 998 s; losses finite and falling, eval 0.6569 -> 0.5853, and the sidecar moved
   off its zero init (see "Teacher capture and the 1M stage-1 run").
-- Gate 6 (5M pilot with control arm): **open**. Both 1M arms are being re-run split
-  across the two cards, which is what gets the control arm past the fragmentation OOM;
-  the 5M version is a scale-up of the same two configs.
+- Gate 6 (paired arms): **pass at 1M**. Both arms completed sharded; the sidecar arm
+  reaches eval_loss 0.5807 against the control's 0.6255, with the whole gap in the KL
+  term. See "Gate 6, 1M paired arms". The 5M version is a scale-up of the same two
+  configs and should carry at least two seeds per arm.
 
 **What remains:**
 1. ~~Real-corpus teacher capture~~ - **done**: 1,014,574 tokens cached.
-2. Compare the 1M sidecar and control arms (both re-running sharded; the single-card
-   control attempts OOM'd at step 42 on allocator fragmentation under the VRAM cap).
-3. 5M-token pilot, if the 1M comparison justifies it.
+2. ~~Compare the 1M sidecar and control arms~~ - **done**: -0.0448 eval_loss for the
+   sidecar, concentrated entirely in the KL term.
+3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
+   the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
 4. ~~Stage 2 sharding integration~~ - **done**: `sharding.py`, per-anchor projection
    placement, device-crossing losses, tied-embedding guard, and
    `examples/qwen35_sidecar_stage2_sharded.yml`. Smoked on the real 4B student (loss
@@ -423,6 +425,58 @@ What it does and does not buy:
   NVLink, with no CPU offload at all**. That sidesteps the DeepSpeed question entirely.
 * Caveat: naive `device_map` pipeline parallelism serialises, so it buys capacity, not
   throughput. Real 2x would need microbatch interleaving (GPipe/1F1B).
+
+## Gate 6, 1M paired arms: the table earns its place (2026-09-07)
+
+Both arms completed sharded across the two cards, exit 0. Identical data, order, seed,
+schedule and trainable-parameter policy; the only difference is `sidecar.enabled`.
+
+| | sidecar | control | delta |
+| --- | ---: | ---: | ---: |
+| eval_loss @ epoch 0.694 | 0.6607 | 0.6976 | **-0.0369** |
+| eval_loss @ epoch 1.0 | **0.5807** | 0.6255 | **-0.0448** (-7.2%) |
+| train_loss | 1.047 | 1.089 | -0.042 |
+| KL term, mean of last 50 logs | 0.5177 | 0.5803 | -0.0626 |
+| hs_cosine term, mean of last 50 | 0.7404 | 0.7494 | -0.0090 |
+| train_runtime | 1026 s | 1020 s | +6 s |
+
+The weighted terms reconstruct the gap: `0.7 x -0.0626 + 0.3 x -0.0090 = -0.0465`
+against an observed -0.042. **Essentially all of the improvement is in the KL term** --
+the student's agreement with the teacher's distribution -- and almost none in the
+hidden-state term. That is the expected shape: the sidecar injects at decoder layer 1
+while the anchors sit at layer 4 and post-norm, so the n-gram features reach the head
+much more directly than they reach either anchor.
+
+Architecture diagnostics, first -> last logged value:
+
+| metric | sidecar | control |
+| --- | --- | --- |
+| `W_side_proj/weight_norm` | 0.0000 -> 1.8000 | 0.0000 -> **0.0000** |
+| `branch_1/2/3_weight_norm` | 0.0000 -> 1.817 | 0.0000 -> 1.889 |
+| `W_x_norm` | 88.66 -> 88.68 | 88.69 -> 88.71 |
+| `W_x_bias_absmax` | 0.0000 -> 0.0031 | 0.0000 -> 0.0034 |
+| `gate_1_mean` | 0.5001 -> 0.5008 | 0.5006 -> 0.5015 |
+| `gate_saturation` | 0.0664 -> 0.0664 | 0.0644 -> 0.0664 |
+
+Two things worth reading off that table. `W_side_proj` stays at exactly 0.0000 in the
+control for the whole run, which is the check that `disable_sidecar_projection()` really
+does bypass the table rather than merely zeroing its output. And the gated residual moves
+*slightly further* in the control (1.889 vs 1.817), so the control is not handicapped on
+optimisation -- it got the same budget and used it. The sidecar arm wins with a smaller
+residual because it has better features to route.
+
+The gates themselves barely moved: means still ~0.5, saturation flat at 0.066. Over 1M
+tokens the gain is coming from `W_side_proj` and the zero-initialised branches, not from
+learned gating. That is consistent with the design note that gate gradients only start
+flowing once the branch weights leave zero.
+
+**How much to trust -0.0448.** The arms are paired tightly, which controls for data order
+and for the gated residual's initialisation. What there is no estimate of is seed
+variance -- one run per arm. The nearest thing available is the same sidecar arm run three
+times under different memory configurations: eval_loss 0.5853, 0.5973 and 0.5807, a spread
+of 0.017. That is not a seed replicate (the configurations differed), but it bounds
+run-to-run wobble at roughly 38% of the effect. The effect is real but a 5M pilot should
+carry at least two seeds per arm before anything is concluded about its size.
 
 ## Tensor sharding: the training integration (2026-09-07)
 
