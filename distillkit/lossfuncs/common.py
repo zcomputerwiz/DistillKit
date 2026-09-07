@@ -83,6 +83,26 @@ def get_target_logprobs(
         return logits - sparse_lse
 
 
+def divergence_dtype(logits: torch.Tensor) -> torch.dtype:
+    """Dtype the sparse divergences should compute and report in.
+
+    These losses used to receive fp32 logits for free: accelerate wrapped the prepared
+    forward in ``convert_outputs_to_fp32``, which upcast the whole
+    ``[batch, seq, 248320]`` tensor before any loss ran. That allocation is 3.79 GiB at
+    sequence 4096 and is exactly what ``sparse_chunk_length`` exists to avoid, so the
+    trainer now strips the wrapper (see ``chunked_ce.keep_bf16_forward_outputs``).
+
+    The precision it bought is still wanted -- log-probabilities over a 248k vocabulary
+    have no business being differenced in bf16 -- so take it here instead, where the
+    only full-vocabulary operation is a log-sum-exp over a single chunk. Widening bf16
+    to fp32 is exact, so a chunk-wise upcast reproduces the old numbers rather than
+    approximating them.
+    """
+    if logits.dtype in (torch.float16, torch.bfloat16):
+        return torch.float32
+    return logits.dtype
+
+
 def get_logprobs(
     logits: torch.Tensor,
     target_ids: torch.LongTensor,
@@ -106,7 +126,7 @@ def get_logprobs(
     assert distillation_temperature > eps, (
         f"Temperature must be positive and non-zero, got {distillation_temperature}"
     )
-    out_dtype = logits.dtype
+    out_dtype = divergence_dtype(logits)
 
     if (not log_target) and (missing != MissingProbabilityHandling.ZERO):
         raise ValueError(
@@ -117,7 +137,11 @@ def get_logprobs(
         )
 
     if not math.isclose(distillation_temperature, student_generation_temperature):
-        logits = logits * (student_generation_temperature / distillation_temperature)
+        # In fp32: scaling in bf16 first would round every logit before the log-sum-exp
+        # and defeat the point of computing the divergence in fp32 at all.
+        logits = logits.to(torch.float32) * (
+            student_generation_temperature / distillation_temperature
+        )
     student_lse = torch.logsumexp(logits.to(torch.float32), dim=-1, keepdim=True).to(
         out_dtype
     )

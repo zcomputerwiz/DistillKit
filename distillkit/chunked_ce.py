@@ -25,6 +25,8 @@ Equivalence to the stock implementation is asserted in ``tests/test_chunked_ce.p
 
 from __future__ import annotations
 
+from types import MethodType
+
 import torch
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
@@ -128,4 +130,56 @@ def maybe_install_chunked_loss(model, *, need_model_loss: bool, enabled: bool) -
     if getattr(base_model, "loss_function", None) is None:
         return False
     base_model.loss_function = chunked_causal_lm_loss
+    return True
+
+
+def keep_bf16_forward_outputs(model) -> bool:
+    """Drop accelerate's blanket fp32 upcast of the forward's outputs.
+
+    ``Accelerator.prepare_model`` wraps a mixed-precision model as::
+
+        model.forward = convert_outputs_to_fp32(autocast_context(model.forward))
+
+    and that wrapper walks the returned structure calling ``tensor.float()`` on every
+    bf16/fp16 tensor in it. For a 248,320-wide head that is a 3.79 GiB allocation of
+    logits at sequence 4096, plus another 3.79 GiB for its gradient, plus ~1.4 GB more
+    when ``output_hidden_states`` returns all 33 states. It is what OOM'd both the 1M
+    control arm and the first stage-2 attempt.
+
+    It also defeats the point of ``sparse_chunk_length``: the KL loss chunks precisely
+    so that no full-vocabulary fp32 tensor ever exists, and this allocates one before
+    the loss is even called.
+
+    Dropping it is not free by itself: the sparse divergences took ``out_dtype`` from
+    the logits they were handed, so bf16 logits made them difference log-probabilities
+    in bf16. ``lossfuncs.common.divergence_dtype`` restores fp32 there, on chunk-sized
+    slices, and because widening bf16 to fp32 is exact the result is bit-identical to
+    what the blanket upcast produced -- ``tests/test_bf16_outputs.py`` asserts that at
+    rtol=atol=0. Do not remove the wrapper without that half.
+
+    The other consumers never needed it:
+
+    * the hidden-state losses align dtypes explicitly against the projection weight;
+    * ``cross_entropy`` reads ``student_outputs.loss``, a scalar the model already
+      computed, which this wrapper never touched.
+
+    Autocast itself is left in place: only the output conversion is removed. Returns
+    whether a wrapper was found and removed, so callers can stay idempotent.
+    """
+    from accelerate.utils.operations import ConvertOutputsToFp32
+
+    forward = getattr(model, "forward", None)
+    if forward is None:
+        return False
+    # Bound-method form (accelerate's usual path) and plain-function form both occur;
+    # which one depends on whether model.forward had __func__ at prepare time.
+    function = getattr(forward, "__func__", forward)
+    converter = getattr(function, "__wrapped__", None)
+    if not isinstance(converter, ConvertOutputsToFp32):
+        return False
+    inner = converter.model_forward
+    if hasattr(forward, "__func__"):
+        model.forward = MethodType(inner, model)
+    else:
+        model.forward = inner
     return True

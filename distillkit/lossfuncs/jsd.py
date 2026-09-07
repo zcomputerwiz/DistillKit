@@ -9,6 +9,7 @@ from distillkit.lossfuncs.common import (
     LossFunctionBase,
     MissingProbabilityHandling,
     accumulate_over_chunks,
+    divergence_dtype,
     get_logprobs,
 )
 from distillkit.signals import DenseSignal, TeacherSignal
@@ -27,7 +28,7 @@ def sparse_jsd_inner(
     student_generation_temperature: float = 1.0,
 ) -> torch.Tensor:
     batch_size, seq_len, vocab_size = logits.shape
-    out_dtype = logits.dtype
+    out_dtype = divergence_dtype(logits)
     sparse_student_logprobs, sparse_target_logprobs = get_logprobs(
         logits,
         target_ids,
@@ -231,7 +232,7 @@ def dense_js_div(
     Returns:
         torch.Tensor: Scalar JSD loss averaged over the batch.
     """
-    out_dtype = logits.dtype
+    out_dtype = divergence_dtype(logits)
 
     # 1. Apply temperature scaling
     student_logits = logits / temperature

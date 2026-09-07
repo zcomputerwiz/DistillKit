@@ -9,6 +9,7 @@ from distillkit.lossfuncs.common import (
     LossFunctionBase,
     MissingProbabilityHandling,
     accumulate_over_chunks,
+    divergence_dtype,
     get_logprobs,
 )
 from distillkit.signals import DenseSignal, TeacherSignal
@@ -31,7 +32,7 @@ def sparse_kl_div_inner(
     See `sparse_kl_div` for details.
     """
     batch_size, seq_len, vocab_size = logits.shape
-    out_dtype = logits.dtype
+    out_dtype = divergence_dtype(logits)
     sparse_student_logprobs, sparse_target_logprobs = get_logprobs(
         logits,
         target_ids,
@@ -150,7 +151,7 @@ def dense_kl_div(
         mask: Optional boolean mask tensor. True indicates tokens to include, False to exclude.
         temperature: Temperature to apply to the distributions.
     """
-    out_dtype = logits.dtype
+    out_dtype = divergence_dtype(logits)
 
     student_logprobs = torch.log_softmax(logits.float() / temperature, dim=-1)
     teacher_logprobs = torch.log_softmax(target_logits.float() / temperature, dim=-1)

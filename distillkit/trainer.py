@@ -6,7 +6,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 
-from distillkit.chunked_ce import maybe_install_chunked_loss
+from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
@@ -72,6 +72,7 @@ class DistillationTrainer(SFTTrainer):
             )
 
         self.model_accepts_loss_kwargs = False
+        self._kept_bf16_outputs = False
 
     def compute_loss(
         self,
@@ -98,6 +99,13 @@ class DistillationTrainer(SFTTrainer):
         forwarded = ["input_ids", "attention_mask", "position_ids", "ngram_raw"]
         if self.need_model_loss:
             forwarded.append("labels")
+        # accelerate wraps the prepared forward so every bf16 tensor it returns is
+        # upcast to fp32 -- 3.79 GiB for the logits alone at sequence 4096, and the
+        # thing that OOM'd both the control arm and the first stage-2 attempt. The
+        # model is only prepared once training starts, so strip it on first use.
+        if not self._kept_bf16_outputs:
+            keep_bf16_forward_outputs(model)
+            self._kept_bf16_outputs = True
         model_inputs = {k: inputs[k] for k in forwarded if k in inputs}
         if self.config.sidecar is not None:
             model_inputs["sidecar_enabled"] = self.config.sidecar.enabled
