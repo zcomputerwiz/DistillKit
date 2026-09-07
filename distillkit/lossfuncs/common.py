@@ -171,14 +171,25 @@ def accumulate_over_chunks(
         else:
             cur_mask = None
         end_idx = min(start_idx + chunk_length, seq_len)
-        total += fn(
-            logits[:, start_idx:end_idx],
-            target_ids[:, start_idx:end_idx],
-            target_values[:, start_idx:end_idx],
-            cur_mask,
-            *args,
-            **kwargs,
-        )
+        chunk_logits = logits[:, start_idx:end_idx]
+        chunk_ids = target_ids[:, start_idx:end_idx]
+        chunk_values = target_values[:, start_idx:end_idx]
+
+        if chunk_logits.requires_grad:
+            # Without this, chunking saves nothing during training: every chunk's
+            # fp32 log_softmax stays alive in the autograd graph until backward, so
+            # peak memory equals the unchunked case and `sparse_chunk_length` only
+            # helps under no_grad. Over a 248k-wide vocabulary at sequence 4096 that
+            # difference is ~4 GB, which is the whole reason the knob exists.
+            total = total + torch.utils.checkpoint.checkpoint(
+                lambda a, b, c, m=cur_mask: fn(a, b, c, m, *args, **kwargs),
+                chunk_logits,
+                chunk_ids,
+                chunk_values,
+                use_reentrant=False,
+            )
+        else:
+            total = total + fn(chunk_logits, chunk_ids, chunk_values, cur_mask, *args, **kwargs)
     return total
 
 
