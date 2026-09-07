@@ -346,3 +346,26 @@ def test_hidden_state_loss_tolerates_mixed_dtypes(student_dtype, proj_dtype, tea
     for kind in ("mse", "cosine"):
         value = compute_hs_loss(kind, outputs, Signal(), mask=None, hidden_state_mapping=Mapping())
         assert value.dim() == 0 and torch.isfinite(value), f"{kind} -> {value}"
+
+
+def test_memory_metrics_reports_checkpointing_and_survives_cpu_only():
+    """A silently inactive gradient_checkpointing flag is worth gigabytes.
+
+    Its usual tell -- "use_cache=True is incompatible with gradient checkpointing" --
+    never fires when the config already has use_cache off, so absence of that warning
+    proves nothing. Report the flag itself alongside the peaks.
+    """
+    import torch
+
+    from distillkit.optimizers import memory_metrics
+
+    model = torch.nn.Linear(2, 2)
+    report = memory_metrics(model)
+    if not torch.cuda.is_available():
+        assert report == {}
+        return
+    assert report["vram/gradient_checkpointing"] == 0.0
+    model.is_gradient_checkpointing = True
+    assert memory_metrics(model)["vram/gradient_checkpointing"] == 1.0
+    for index in range(torch.cuda.device_count()):
+        assert f"vram/cuda{index}_peak_gib" in memory_metrics(model)

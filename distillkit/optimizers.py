@@ -291,6 +291,44 @@ def architecture_metrics(model: nn.Module) -> dict[str, float]:
     return report
 
 
+def memory_metrics(model: nn.Module) -> dict[str, float]:
+    """Per-device peak allocation, plus whether gradient checkpointing is really on.
+
+    Three OOMs in this project were diagnosed by arithmetic on a traceback and twice
+    the arithmetic was wrong, because a standalone probe does not reproduce what the
+    Trainer actually builds -- accelerate's prepared forward, the dataloader, the
+    optimizer state, and whichever of the memory-saving flags actually took effect.
+    Reporting it from inside the run costs one `torch.cuda` query per logged step and
+    removes the guessing.
+
+    ``max_memory_allocated`` is reset each time this runs, so the reported peak is
+    "since the last log" rather than since process start -- a steady per-step high
+    water mark is more useful than a number that only ever ratchets up.
+    """
+    if not torch.cuda.is_available():
+        return {}
+    report = {}
+    gib = 1024**3
+    for index in range(torch.cuda.device_count()):
+        try:
+            peak = torch.cuda.max_memory_allocated(index)
+            reserved = torch.cuda.memory_reserved(index)
+            torch.cuda.reset_peak_memory_stats(index)
+        except RuntimeError:
+            # A visible device the process never allocated on has no allocator state
+            # and raises "Invalid device argument" on reset. Nothing to report.
+            continue
+        report[f"vram/cuda{index}_peak_gib"] = peak / gib
+        report[f"vram/cuda{index}_reserved_gib"] = reserved / gib
+    # A silently inactive flag is worth many gigabytes, and `use_cache=True is
+    # incompatible with gradient checkpointing` does not warn when the config already
+    # has use_cache off -- so absence of that warning proves nothing either way.
+    report["vram/gradient_checkpointing"] = float(
+        bool(getattr(model, "is_gradient_checkpointing", False))
+    )
+    return report
+
+
 class ArchitectureMetricsCallback(TrainerCallback):
     """Request a normal Trainer log every N steps and enrich it with gate metrics."""
 
@@ -319,6 +357,7 @@ class ArchitectureMetricsCallback(TrainerCallback):
         ):
             return {}
         metrics = architecture_metrics(model)
+        metrics.update(memory_metrics(model))
         logs.update(metrics)
         self._last_step = state.global_step
         return metrics

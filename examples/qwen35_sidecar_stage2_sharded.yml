@@ -43,12 +43,23 @@ model_kwargs:
   # and knows nothing about gradients, optimizer state, or the 248,320-wide head's
   # activation cost, all of which land on card 0 with the head.
   #
-  # Balance at 6 bytes per trainable parameter plus ~6.2 GB of working set on card 0
-  # (bf16 logits 2.03 GB + their gradient 2.03 GB + chunked-KL temporaries, plus the
-  # ~0.7 GB of hidden states that accelerate's output hook copies back here):
-  #   card 0: 0.636B embedding + 9 layers x 0.114B  = 1.66B -> 9.9 GB + 6.2 GB
-  #   card 1:              23 layers x 0.114B       = 2.61B -> 15.7 GB
-  # Both sit under the 22.08 GB that max_vram_fraction allows, leaving activation room.
+  # Balanced from measurement, not arithmetic. At 9 layers on card 0 the run reported
+  # (vram/* metrics, logged every step):
+  #   card 0  peak 16.86 GiB, RESERVED 20.75 GiB
+  #   card 1  peak 15.74 GiB, reserved 16.29 GiB
+  # and died asking for 1024 MiB. The peak was survivable; the 3.9 GiB gap between
+  # card 0's peak and its reservation was not, and Windows cannot defragment it --
+  # torch warns "expandable_segments not supported on this platform" and keeps the
+  # native allocator. Card 1 fragments only 0.55 GiB because it holds no head.
+  #
+  # So move three layers to card 1, which had ~6 GiB of slack. At 6 bytes per trainable
+  # parameter (bf16 weight + bf16 grad + AdamW8bit m/v):
+  #   card 0: 0.636B embedding + 6 layers x 0.114B = 1.32B -> 7.9 GiB persistent
+  #           + ~6.9 GiB of measured activations + ~3.9 GiB fragmentation = ~18.7 GiB
+  #   card 1:              26 layers x 0.114B      = 2.95B -> 17.7 GiB persistent
+  #           + ~0.1 GiB activations + ~0.6 GiB fragmentation = ~18.4 GiB
+  # Card 0's activation cost barely moves with the split -- it is the head and the
+  # gathered hidden states -- so the only lever on it is persistent state.
   #
   # embed_tokens and lm_head must share a device: tie_word_embeddings is true, so they
   # are one parameter. Splitting them fabricates a second copy that trains apart and
@@ -64,9 +75,9 @@ model_kwargs:
     model.layers.3: 0
     model.layers.4: 0
     model.layers.5: 0
-    model.layers.6: 0
-    model.layers.7: 0
-    model.layers.8: 0
+    model.layers.6: 1
+    model.layers.7: 1
+    model.layers.8: 1
     model.layers.9: 1
     model.layers.10: 1
     model.layers.11: 1
@@ -123,7 +134,7 @@ optimizer:
   strategy: adamw
   freeze_backbone: false
   unfreeze_at_step: null
-  log_every_n_steps: 25
+  log_every_n_steps: 1     # diagnostic: per-step VRAM until the split is settled
 
 use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
 functionary_packing: false
