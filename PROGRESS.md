@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **130 passed** in the CUDA-enabled dev environment (≈19 s).
+**Test suite:** green — **131 passed** in the CUDA-enabled dev environment (≈20 s).
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
@@ -38,17 +38,74 @@ regression), and two CUDA-parametrized cases are skipped.
   0.9971, min 0.9962; wrong-row control max |cos| 0.2319. Sampled agreement up to
   quantization, not an exhaustive 320M-row comparison.
 - Gate 3 (forward parity, dormant sidecar): **pass** bit-identically on the converted
-  `student-hf` weights (stock vs sidecar). The final custom-student check with real table
-  features flowing through the collator is remaining work #1 below.
+  `student-hf` weights (stock vs sidecar), **and now with the real 28.8 GB table wired
+  end-to-end** — see "Real-table forward" below.
 - Gate 4 (signal alignment): **pass** in synthetic form (`test_signal_alignment.py`);
-  the real-corpus version needs the capture run (remaining work #2).
+  the real-corpus version needs the capture run (remaining work #1).
 - Gates 5–6 (1M smoke, 5M pilot): **open**, GPU-blocked.
 
 **What remains (all need the dev box; see "Remaining work" below):**
-1. Integrate the real table end-to-end and confirm a full forward with real row gathers.
-2. Real-corpus teacher capture (needs the 27B teacher resident).
-3. ZeRO-2 offload verification on Windows.
-4. 1M-token smoke run + 5M-token controlled pilot.
+1. Real-corpus teacher capture (needs the 27B teacher resident).
+2. ZeRO-2 offload — **blocked on this OS, not just on hardware**: see "Environment
+   blockers" below. This is a plan change, not a scheduling delay.
+3. 1M-token smoke run + 5M-token controlled pilot.
+
+## Environment blockers found 2026-09-07 (verified in the venv)
+
+These contradict spec §0/§4 and change the plan, so they are recorded here rather
+than discovered at run time:
+
+- **`deepspeed` is not installed, and `torch.distributed.is_nccl_available()` is
+  False** on this Windows torch 2.11.0+cu128 build (gloo only). DeepSpeed's Windows
+  build is single-GPU because multi-GPU ZeRO relies on NCCL. Spec §0's "optimizer
+  offload (DeepSpeed ZeRO-2) is the chosen memory strategy" therefore cannot run
+  two-rank on Windows — it needs WSL2/Linux, or the run goes single-process.
+- **ZeRO-2 and Muon are mutually exclusive as specified.** ZeRO-1/2 flattens each
+  param group into one contiguous fp32 partition and hands the optimizer 1-D
+  tensors; `torch.optim.Muon` raises on non-2D gradients. Separately, with
+  `offload_optimizer.device=cpu`, accelerate replaces any optimizer with
+  `DeepSpeedCPUAdam` unless `zero_force_ds_cpu_optimizer: false` is set. Muon is
+  usable in the plain single-process/DDP path only.
+- **`flash_attn` is not installed** (no Windows wheels) while
+  `use_flash_attention` defaults to true. `load_student_model` now fails fast with
+  an actionable message instead of dying inside `from_pretrained` after the dataset
+  and cache are built — and the message notes that the same flag is what selects
+  bfloat16, so turning it off requires setting `training_args.bf16` explicitly to
+  keep the fp32 distillation projections working under autocast.
+  Regression: `test_main_vocab.py::test_missing_flash_attn_fails_before_loading_with_actionable_message`.
+- **`bitsandbytes` is not installed**, so spec §1's "load the 27B text decoder in
+  int8" has no backend here. Resolve before the capture run.
+
+## Real-table forward — gate 3 closed (2026-09-07)
+
+`scratch/real_table_forward.py` drives the actual 28.8 GB IQ4_NL table through
+`SidecarDataCollator` into `Qwen35SidecarForCausalLM` loaded from `student-hf`.
+CPU-only (`torch.cuda.is_available` stubbed in-process); the GPUs were at
+21.6/24.6 GB with the user's own model resident and were not touched.
+
+The point of the script is that dormancy alone cannot prove the table path is
+wired: with a zero-init projection, a working feature tensor and a silently
+dropped one produce identical logits. So it perturbs the projection and compares
+against rows for *different* tokens.
+
+| Check | Result |
+| --- | --- |
+| Real rows dequantize finite, non-degenerate | l2 mean 0.4252 (0.3753–0.6089), matches the table's per-element std ~0.0076 over 2560 dims |
+| Features vary with tokens | 100% distinct feature vectors across positions |
+| Dormant sidecar vs `sidecar_enabled=False` | **bit-identical** with real features flowing |
+| Perturbed projection moves logits | max abs delta 0.61182 |
+| These rows vs other-token rows | max abs delta 0.79142 — token-dependent, so the gather reaches the residual |
+| Stage-1 freeze + backward | 7 trainable tensors (all sidecar), loss 6.2596, `W_side_proj` grad norm 1.9617 |
+
+An earlier revision compared against *zeroed* rows; that is not a real control,
+because zero bytes dequantize to zero features and `W @ 0` simply reproduces the
+dormant logits (both deltas came out identically 0.61182). Rows for different
+tokens are what distinguish "these specific rows arrived" from "some nonzero
+tensor arrived" — a permuted or off-by-one gather passes the zero-row version.
+
+Still not covered: that the lookup *overlaps* the training step under optimizer-offload
+memory pressure (`training_overlap_verified` remains false). The isolated benchmark
+shows ~70 ms at batch 8 × 4096, but overlap is a property of the real run.
 
 **Hard constraints for this machine (do not violate):**
 - **Do not load models on the GPUs** — the user's own model occupies most VRAM. Verify
@@ -297,13 +354,12 @@ actually remains is #1–#4 below.
 
 What remains, in order:
 
-1. **Integrate the real table end-to-end on the dev box.** Load `student-hf` into
-   `Qwen35SidecarForCausalLM`, wire `SidecarDataCollator` with the resident IQ4_NL GGUF
-   table (28.8 GB), and confirm a full forward produces finite, sane features from real
-   row gathers (not just synthetic rows / zero-init dormancy). This closes gate 3 on the
-   final custom student. The isolated benchmark already shows gather+pin+H2D+GPU-dequant ≈
-   70 ms at batch 8 × 4096, but `training_overlap_verified` is still false — confirm the
-   lookup overlaps the training step under optimizer-offload memory pressure.
+1. ~~**Integrate the real table end-to-end.**~~ — **done** on CPU, 2026-09-07; see
+   "Real-table forward" above. Gate 3 is closed on the final custom student. What is
+   still open from that item is only `training_overlap_verified`: the isolated benchmark
+   shows gather+pin+H2D+GPU-dequant ≈ 70 ms at batch 8 × 4096, but whether the lookup
+   overlaps the training step under optimizer-offload memory pressure is a property of
+   the real run and is folded into item 3 below.
 2. **Real-corpus teacher capture.** Run `capture_teacher` with the 27B text decoder
    resident to produce the actual fp8 hidden-state + top-k logit cache (needs GPU/teacher).
 3. **ZeRO-2 offload verification on Windows.** Confirm optimizer offload coexists with the

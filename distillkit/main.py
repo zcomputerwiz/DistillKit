@@ -1,5 +1,6 @@
 # Copyright 2025 Arcee AI
 import hashlib
+import importlib.util
 import json
 import logging
 import os
@@ -206,6 +207,18 @@ def load_student_model(
     LOG.info(f"Loading model {config.train_model} with class {auto_cls}")
     extra_kwargs = {"trust_remote_code": config.trust_remote_code}
     if config.use_flash_attention:
+        if importlib.util.find_spec("flash_attn") is None:
+            # from_pretrained's own failure here names the package but not the two
+            # consequences of turning the flag off, and it surfaces only after the
+            # dataset and teacher cache have already been built.
+            raise RuntimeError(
+                "use_flash_attention is true but flash_attn is not installed "
+                "(it has no Windows wheels). Install it, or set "
+                "use_flash_attention: false -- but note that flag is also what "
+                "loads the model in bfloat16 here, so set training_args.bf16 "
+                "explicitly to keep the fp32 distillation projections working "
+                "under autocast."
+            )
         extra_kwargs["attn_implementation"] = "flash_attention_2"
         extra_kwargs["torch_dtype"] = torch.bfloat16
     extra_kwargs.update(config.model_kwargs)

@@ -6,6 +6,8 @@ must not shrink such a head just because the tokenizer has fewer real entries,
 and must reject heads that genuinely cannot cover the cached IDs.
 """
 
+from types import SimpleNamespace
+
 import pytest
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
@@ -82,3 +84,34 @@ def test_online_teacher_signal_reaches_resize_not_cache_error(tmp_path):
     config = _run_config(tmp_path, model_path)
     model = load_student_model(config, tokenizer_vocab_size=60, signal_vocab_size=60)
     assert model.get_input_embeddings().weight.shape[0] == 60
+
+
+def test_missing_flash_attn_fails_before_loading_with_actionable_message(monkeypatch):
+    """use_flash_attention defaults true, but flash_attn has no Windows wheels.
+
+    Without this guard the run dies inside from_pretrained after the dataset and
+    teacher cache are already built, and the message does not mention that the flag
+    is also what selects bfloat16.
+    """
+    import importlib.util
+
+    from distillkit import main as main_module
+
+    real_find_spec = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name, *a, **k: None if name == "flash_attn" else real_find_spec(name, *a, **k),
+    )
+
+    config = SimpleNamespace(
+        functionary_packing=False,
+        sidecar=None,
+        model_auto_class="AutoModelForCausalLM",
+        trust_remote_code=False,
+        train_model="does-not-matter",
+        use_flash_attention=True,
+        model_kwargs={},
+    )
+    with pytest.raises(RuntimeError, match="flash_attn is not installed"):
+        main_module.load_student_model(config, tokenizer_vocab_size=32, signal_vocab_size=32)

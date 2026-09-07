@@ -1,0 +1,31 @@
+{
+  "gguf": "C:\\Users\\Owner\\.cache\\huggingface\\hub\\models--unsloth--Qwen3.8-Flash-Next-GGUF\\snapshots\\38bb39ee97821de2c9009abb7e93950eec396e66\\UD-IQ4_XS\\Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf",
+  "student": "D:\\DeepThought\\Projects\\HybridModel\\student-hf",
+  "dtype": "float32",
+  "batch_shape": [
+    2,
+    14
+  ],
+  "ngram_raw_shape": [
+    2,
+    14,
+    16,
+    90
+  ],
+  "feature_l2_mean": 0.42522841691970825,
+  "feature_unique_fraction": 1.0,
+  "dormant_bit_identical": true,
+  "perturbed_logit_delta": 0.6118199825286865,
+  "other_token_rows_delta": 0.7914154529571533,
+  "stage1_trainable": [
+    "model.layers.1.sidecar.W_side_proj.weight",
+    "model.layers.1.sidecar.gated_residual.branches.0.weight",
+    "model.layers.1.sidecar.gated_residual.branches.1.weight",
+    "model.layers.1.sidecar.gated_residual.branches.2.weight",
+    "model.layers.1.sidecar.gated_residual.W_x.weight",
+    "model.layers.1.sidecar.gated_residual.W_x.bias",
+    "model.layers.1.sidecar.gated_residual.W_h.weight"
+  ],
+  "loss": 6.259589195251465,
+  "w_side_proj_grad_norm": 1.9616855382919312
+}
