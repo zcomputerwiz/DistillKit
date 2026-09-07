@@ -12,15 +12,15 @@
 # Without this arm a loss delta cannot be attributed to the table rather than to the
 # extra optimisation steps, so the sidecar arm is uninterpretable on its own.
 #
-# NOTE: run this with CUDA_VISIBLE_DEVICES=0.
+# NOTE: run this with BOTH cards visible and no CUDA_VISIBLE_DEVICES pin.
 #
-# With both cards visible and no distributed launcher, HF Trainer wraps the model in
-# nn.DataParallel, which gathers every replica's [batch, seq, 248320] logits onto GPU 0
-# and OOMs at 22.96 GB. A 248k-wide head makes DataParallel's gather the bottleneck, and
-# it is the wrong tool here anyway: the student fits on one card, so replication buys
-# nothing. Real multi-GPU would need torchrun + DDP, which is a separate exercise.
+# The explicit device_map below is what makes that safe. Without a map and with both
+# cards visible, HF Trainer wraps the model in nn.DataParallel, which gathers every
+# replica's [batch, seq, 248320] logits onto GPU 0 and OOMs -- a 248k-wide head makes
+# that gather the bottleneck. A device map instead sets is_model_parallel, which forces
+# _n_gpu to 1 and keeps DataParallel out entirely.
 # Run:
-#   CUDA_VISIBLE_DEVICES=0 python -m distillkit.main examples/qwen35_sidecar_1m_control.yml -v
+#   python -m distillkit.main examples/qwen35_sidecar_1m_control.yml -v
 
 model: D:/DeepThought/Projects/HybridModel/student-hf
 output_path: D:/DeepThought/Projects/HybridModel/runs/control-1m
@@ -38,6 +38,64 @@ teacher:
   cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
   anchor_layers: [8, 64]
   cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  # Both arms run split across the two cards. On one card this run peaks at 15.16 GiB
+  # of live tensors under a 22.08 GiB cap, and the control arm died anyway: the 3.79 GiB
+  # contiguous request for the logits gradient could not be placed against 4.04 GiB of
+  # reserved-but-unallocated fragmentation. The allocator's own remedy is unavailable
+  # here -- PyTorch warns "expandable_segments not supported on this platform" on
+  # Windows -- so the fix is to stop running at the edge. Split, the same step peaks at
+  # 10.29 GiB on card 0 and 9.58 GiB on card 1.
+  #
+  # This is one process with no NCCL and no process group: Tensor.to(device) is
+  # differentiable, so autograd moves activations forward and gradients back itself.
+  #
+  # The map has to name every module. A compact form leaning on prefixes
+  # ({"model": 1} plus a few overrides) is accepted by from_pretrained and then places
+  # tensors wrongly -- accelerate hooks at the granularity of the keys given, so an
+  # override nested inside a mapped subtree never gets its own input alignment and the
+  # forward dies with "found at least two devices".
+  #
+  # embed_tokens and lm_head share card 0: tie_word_embeddings is true, so they are one
+  # parameter. main.py rejects a map that separates them.
+  device_map:
+    model.embed_tokens: 0
+    model.rotary_emb: 0
+    model.norm: 0
+    lm_head: 0
+    model.layers.0: 0
+    model.layers.1: 0
+    model.layers.2: 0
+    model.layers.3: 0
+    model.layers.4: 0
+    model.layers.5: 0
+    model.layers.6: 0
+    model.layers.7: 0
+    model.layers.8: 0
+    model.layers.9: 1
+    model.layers.10: 1
+    model.layers.11: 1
+    model.layers.12: 1
+    model.layers.13: 1
+    model.layers.14: 1
+    model.layers.15: 1
+    model.layers.16: 1
+    model.layers.17: 1
+    model.layers.18: 1
+    model.layers.19: 1
+    model.layers.20: 1
+    model.layers.21: 1
+    model.layers.22: 1
+    model.layers.23: 1
+    model.layers.24: 1
+    model.layers.25: 1
+    model.layers.26: 1
+    model.layers.27: 1
+    model.layers.28: 1
+    model.layers.29: 1
+    model.layers.30: 1
+    model.layers.31: 1
 
 sidecar:
   # Shard 2 of the Unsloth GGUF carries per_layer_token_embd.weight (IQ4_NL, 28.8 GB).

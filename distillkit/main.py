@@ -233,12 +233,12 @@ def load_student_model(
         extra_kwargs["torch_dtype"] = torch.bfloat16
     extra_kwargs.update(config.model_kwargs)
     if "torch_dtype" not in extra_kwargs:
-        # Historically only the flash-attention branch set a dtype, so
-        # `use_flash_attention: false` silently loaded the 4.27B student in fp32:
-        # 17.2 GiB of weights instead of 8.5, and fp32 logits whose gradient over a
-        # 248,320-wide head is 3.79 GiB at sequence 4096. That combination OOM'd the
-        # control arm. autocast does not shrink the weights, so honour the trainer's
-        # own mixed-precision flags here.
+        # Only the flash-attention branch ever set a dtype, so with
+        # `use_flash_attention: false` the dtype came entirely from the checkpoint's
+        # own config -- fine for `student-hf`, which records bfloat16, and silently
+        # fp32 for any checkpoint that does not. autocast does not shrink the weights,
+        # so honour the trainer's own mixed-precision flags when nothing else has
+        # chosen.
         if config.training_args.get("bf16"):
             extra_kwargs["torch_dtype"] = torch.bfloat16
         elif config.training_args.get("fp16"):

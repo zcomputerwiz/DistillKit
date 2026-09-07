@@ -47,18 +47,20 @@ regression), and two CUDA-parametrized cases are skipped.
 - Gate 5 (1M-token smoke): **pass**. Real 1M-token capture + a full stage-1 training
   run in 998 s; losses finite and falling, eval 0.6569 -> 0.5853, and the sidecar moved
   off its zero init (see "Teacher capture and the 1M stage-1 run").
-- Gate 6 (5M pilot with control arm): **open**. Both 1M arms are being re-run under the
-  bf16 load fix; the 5M version is a scale-up of the same two configs.
+- Gate 6 (5M pilot with control arm): **open**. Both 1M arms are being re-run split
+  across the two cards, which is what gets the control arm past the fragmentation OOM;
+  the 5M version is a scale-up of the same two configs.
 
 **What remains:**
 1. ~~Real-corpus teacher capture~~ - **done**: 1,014,574 tokens cached.
-2. Compare the 1M sidecar and control arms (both re-running under the bf16 fix; the
-   first control attempt OOM'd at step 42 because the student was loading in fp32).
+2. Compare the 1M sidecar and control arms (both re-running sharded; the single-card
+   control attempts OOM'd at step 42 on allocator fragmentation under the VRAM cap).
 3. 5M-token pilot, if the 1M comparison justifies it.
 4. ~~Stage 2 sharding integration~~ - **done**: `sharding.py`, per-anchor projection
    placement, device-crossing losses, tied-embedding guard, and
-   `examples/qwen35_sidecar_stage2_sharded.yml`. Not yet exercised on the real 4B
-   student, which is the next GPU-time item. See "Tensor sharding".
+   `examples/qwen35_sidecar_stage2_sharded.yml`. Smoked on the real 4B student (loss
+   finite, gradients reach the sidecar, 10.29/9.58 GiB peaks); a full stage-2 run has
+   not been done. See "Tensor sharding".
 5. 1F1B microbatch interleaving, if the serial split's throughput is the limit.
 6. MTP head - conventions now resolved from llama.cpp; implementation pending.
 
@@ -485,28 +487,60 @@ read. The capture script already solved this shape with `_AnchorTap` (a forward 
 just the anchor modules); porting that into the trainer would remove both the copies and
 the retained states.
 
-## Fixed: the student was loading in fp32
+## Why the control arm OOM'd: fragmentation at the cap, on a platform that cannot defragment
 
-Only the flash-attention branch of `load_student_model` ever set a dtype. With
-`use_flash_attention: false` -- forced, since flash-attn has no Windows wheels -- the
-4.27B student loaded in **fp32**: 17.2 GB of weights instead of 8.5, and fp32 logits
-whose gradient over the 248,320-wide head is 3.79 GiB at sequence 4096.
-`training_args.bf16` only enables autocast; it does not shrink the weights.
+Measured, after one wrong diagnosis recorded below.
 
-That is what killed the control arm at step 42 of 72:
+A single 4096-token step of the control arm on one card peaks at **15.16 GiB** of live
+tensors, against the 22.08 GiB that `max_vram_fraction: 0.92` allows. The two largest
+allocations are both the logits: 1.89 GiB for `[1, 4096, 248320]` bf16 out of `lm_head`,
+and 1.89 GiB again for its gradient. Nothing in the step is close to the size that
+failed.
+
+What failed:
 
 ```
 torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 3.79 GiB.
 GPU 0 has a total capacity of 24.00 GiB of which 1.51 GiB is free. 22.08 GiB allowed;
-Of the allocated memory 17.16 GiB is allocated by PyTorch
+Of the allocated memory 17.16 GiB is allocated by PyTorch, and 4.04 GiB is reserved
+by PyTorch but unallocated.
 ```
 
-`17.16 GiB allocated` is the fp32 weight matrix, and `3.79 GiB` is exactly
-`4096 x 248320 x 4` bytes. The stage-1 sidecar arm survived the same waste only because
-it happened not to draw a document long enough to trigger it.
+17.16 GiB live plus **4.04 GiB reserved but unallocated** is 21.2 GiB of reservation
+against a 22.08 GiB cap, so a 3.79 GiB contiguous request had nowhere to go. The error's
+own suggested remedy is not available here:
 
-`load_student_model` now honours `training_args.bf16` / `fp16` when nothing else has set
-a dtype. Both 1M arms were re-run from scratch under the fix.
+```
+UserWarning: expandable_segments not supported on this platform
+```
+
+That is torch 2.11.0+cu128 on Windows, verified directly -- `get_allocator_backend()`
+stays `native` and every segment reports `is_expandable: False`. The launcher had been
+setting `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` and it was being ignored.
+
+So the run was not too big; it was running at the edge of a cap it could not defragment,
+and step 42 lost the coin flip. The sidecar arm, with the same peak, won it.
+
+**The fix is to stop running at the edge: both 1M arms now use the device map.** Split
+across the two cards the same step peaks at **10.29 GiB on card 0 and 9.58 GiB on card
+1**, and card 0's weights drop from 8.10 GiB to 3.23. See "Tensor sharding".
+
+### A wrong diagnosis, corrected
+
+The first reading of that traceback was that `17.16 GiB` was a 4.27B-parameter model in
+fp32 and `3.79 GiB` was `4096 x 248320 x 4` bytes of fp32 logits gradient. The arithmetic
+works, and `load_student_model` really did set a dtype only on its flash-attention
+branch, so `use_flash_attention: false` looked like it must be loading fp32.
+
+It was not. `student-hf/config.json` carries `dtype: bfloat16`, and transformers 5.x
+honours the checkpoint's own dtype by default. Measured: the student loads at **7.96 GiB,
+bfloat16 throughout**, before and after the change. The 1M arms were re-run for nothing,
+and the byte-identical repeat of the OOM message was the clue -- a real 9 GiB swing in
+weights cannot leave the numbers unchanged.
+
+The dtype change was kept anyway, because it is right for a checkpoint whose config does
+*not* name a dtype: `load_student_model` now honours `training_args.bf16` / `fp16` when
+nothing else has set one. It fixed nothing here.
 
 ## Fixed: cached anchors crossed PCIe at double width
 

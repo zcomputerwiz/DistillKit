@@ -149,9 +149,10 @@ def test_no_stale_accelerator_reads_after_training_args_are_built():
 def test_bf16_training_arg_loads_the_student_in_bfloat16(tmp_path):
     """Only the flash-attention branch used to set a dtype.
 
-    With `use_flash_attention: false` (no Windows wheels) the 4.27B student loaded in
-    fp32 -- 17.2 GiB of weights instead of 8.5 -- and its fp32 logits produced a
-    3.79 GiB gradient over the 248,320-wide head, which OOM'd the control arm.
+    With `use_flash_attention: false` (no Windows wheels) the dtype fell through to
+    whatever the checkpoint config named, so a checkpoint that names none loaded a
+    4.27B student in fp32 -- 17.2 GiB of weights instead of 8.5 -- while
+    `training_args.bf16` sat right there saying otherwise.
     """
     model_path = _tiny_model_dir(tmp_path, vocab_size=64)
     config = _run_config(tmp_path, model_path)
