@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **180 passed** in the CUDA-enabled dev environment (≈45 s).
+**Test suite:** green — **191 passed** in the CUDA-enabled dev environment (≈35 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -58,13 +58,16 @@ regression), and two CUDA-parametrized cases are skipped.
    sidecar, concentrated entirely in the KL term.
 3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
-4. ~~Stage 2 sharding integration~~ - **done**: `sharding.py`, per-anchor projection
-   placement, device-crossing losses, tied-embedding guard, and
-   `examples/qwen35_sidecar_stage2_sharded.yml`. Smoked on the real 4B student (loss
-   finite, gradients reach the sidecar, 10.29/9.58 GiB peaks); a full stage-2 run has
-   not been done. See "Tensor sharding".
-5. 1F1B microbatch interleaving, if the serial split's throughput is the limit.
-6. MTP head - conventions now resolved from llama.cpp; implementation pending.
+4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
+   across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
+   runs". Margins are thin (22.12 / 21.45 GiB reserved against 22.80 allowed).
+5. Port `_AnchorTap` into the trainer. `output_hidden_states=True` retains 33 states and
+   copies all of them to card 0 for the 2 that are read -- about 1.4 GiB, more than the
+   current margin.
+6. Run the actual staged curriculum: the stage-2 config starts from the stock student,
+   not from `runs/sidecar-1m`, so stage 1 -> stage 2 chaining is untested.
+7. 1F1B microbatch interleaving, if the serial split's throughput is the limit.
+8. MTP head - conventions now resolved from llama.cpp; implementation pending.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -477,6 +480,89 @@ times under different memory configurations: eval_loss 0.5853, 0.5973 and 0.5807
 of 0.017. That is not a seed replicate (the configurations differed), but it bounds
 run-to-run wobble at roughly 38% of the effect. The effect is real but a 5M pilot should
 carry at least two seeds per arm before anything is concluded about its size.
+
+## Stage 2 runs: 4.3B trainable across two cards (2026-09-07)
+
+**It works.** `examples/qwen35_sidecar_stage2_sharded.yml` completed in 1269 s with the
+entire backbone trainable, split across both cards, no NCCL and no process group.
+
+| | value |
+| --- | ---: |
+| eval_loss @ epoch 0.694 | 0.5709 |
+| eval_loss @ epoch 1.0 | **0.5347** |
+| train_loss | 1.025 |
+| train_runtime | 1269 s (vs 1026 s for the frozen-backbone arm) |
+| trainable | 4.298B parameters, 24.15 GiB of weights + grads + AdamW8bit state |
+
+The saved checkpoint was checked rather than assumed: 435 tensors, key set **identical**
+to the stage-1 checkpoint's, `tie_word_embeddings` preserved with no duplicated
+`lm_head.weight`, and it reloads and produces finite logits. The device map does not
+leak into the saved model.
+
+**Caveat on what this run is.** `model:` points at the stock `student-hf`, not at
+`runs/sidecar-1m`, so this trained everything jointly from a zero-initialised sidecar
+instead of continuing stage 1 -- visible in the final `W_side_proj` norm of 0.165
+against stage 1's 1.80. As a baseline it beats the stage-1 arm (0.5347 vs 0.5807), but
+the staged curriculum has not actually been run. The config header now says so.
+
+### Four attempts, and what each one taught
+
+It took four tries, and the first three failed at step 4 of 72 for three different
+reasons. Worth recording because two of them were diagnosed wrongly first.
+
+**1. accelerate upcasts the entire head to fp32.** `Accelerator.prepare_model` wraps a
+mixed-precision forward in `convert_outputs_to_fp32`, which calls `.float()` on every
+bf16 tensor the model returns -- 3.79 GiB for `[1, 4096, 248320]` logits, again for the
+gradient, and ~1.4 GB more for the 33 hidden states. This is the allocation named in the
+1M control arm's traceback too, so it had been the real cause there all along. It also
+defeats `sparse_chunk_length` outright: the KL loss chunks precisely so that no
+full-vocabulary fp32 tensor exists, and this materialises one before the loss runs.
+
+Removing it (`chunked_ce.keep_bf16_forward_outputs`) was *not* free, and the
+equivalence test caught what inspection missed: the sparse divergences took `out_dtype`
+from the logits handed to them, so bf16 logits meant differencing 248k-vocabulary
+log-probabilities in bf16. `lossfuncs.common.divergence_dtype` restores fp32 inside the
+losses, on chunk-sized slices. Because widening bf16 to fp32 is exact, the result is
+bit-identical to the blanket upcast -- asserted at rtol=atol=0.
+
+**2. Guessing at memory from a traceback does not work.** Two diagnoses in a row were
+wrong (fp32 weights, then absent gradient checkpointing -- the latter inferred from a
+missing `use_cache=True is incompatible with gradient checkpointing` warning, which
+never fires when the config already has `use_cache` off). A standalone probe peaked at
+14.80 GiB where the real run reached 18.17, because a probe does not build what the
+Trainer builds.
+
+`optimizers.memory_metrics` now reports per-device peak and reserved bytes plus the
+model's actual `is_gradient_checkpointing` through the existing metrics callback, into
+the logs and TensorBoard on every run. It immediately showed checkpointing *was* on and
+that the problem was never the peak:
+
+| split | card 0 peak | card 0 reserved | card 1 peak | card 1 reserved | died |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 9 / 23 | 16.86 | **20.75** | 15.74 | 16.29 | card 0, wanting 1024 MiB |
+| 6 / 26 | 14.99 | **20.36** | 17.12 | 18.23 | card 1 at 20.37 allocated |
+| 7 / 25 | 15.62 | 22.12 | 16.71 | 21.45 | completed |
+
+**3. Reducing live memory does not reclaim a stranded reservation.** Moving three layers
+off card 0 dropped its peak by 1.9 GiB and left its reservation within 0.4 GiB of where
+it was; the OOM simply moved to card 1. Windows cannot defragment --
+`expandable_segments not supported on this platform`, allocator stays `native` -- but
+`garbage_collection_threshold` *is* plain native-allocator behaviour and is not blocked.
+Setting it to 0.8, raising `max_vram_fraction` from 0.92 to 0.95 (the cap was holding
+1.9 GiB idle while runs failed by ~1 GiB), and settling on 7 layers for card 0 is what
+got past step 4.
+
+### Still on the edge
+
+Final margins are thin: card 0 reserved 22.12 GiB and card 1 21.45 GiB against 22.80
+allowed. The reservation still sits well above the live peak, so it is the garbage
+collector holding this together rather than genuine headroom.
+
+The largest remaining waste is known and unaddressed: `output_hidden_states=True`
+materialises all 33 student states and accelerate's output hook copies every one to
+card 0 -- roughly 1.4 GiB with gradients -- for the **two** anchors that are read. That
+is more than the entire current margin. The capture script already solved this shape
+with `_AnchorTap`; porting it into the trainer is the next memory item.
 
 ## Tensor sharding: the training integration (2026-09-07)
 

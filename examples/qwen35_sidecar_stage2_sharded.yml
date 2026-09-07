@@ -1,7 +1,18 @@
 # Stage-2 sidecar distillation, student sharded across two RTX 3090s.
 #
 # Stage 1 froze the backbone so the sidecar's contribution was attributable. Stage 2
-# unfreezes everything, which is what does not fit on one card:
+# unfreezes everything, which is what does not fit on one card.
+#
+# NOTE: `model:` below is the stock student, not stage 1's output, so this trains the
+# whole thing jointly from a zero-initialised sidecar rather than continuing stage 1.
+# That is deliberate as a baseline -- it reached eval_loss 0.5347 against the stage-1
+# arm's 0.5807 -- but it is not the staged curriculum. To chain the stages instead,
+# point `model:` at D:/DeepThought/Projects/HybridModel/runs/sidecar-1m; note that
+# `distillation_projections.*` are saved into the checkpoint but reload as UNEXPECTED
+# (they belong to the trainer, not the architecture), so the projections restart either
+# way.
+#
+# The memory problem is the same for both:
 #
 #   4.27B parameters x (2 bf16 weight + 2 bf16 grad + 2 AdamW8bit m/v) = 25.6 GB
 #
@@ -52,14 +63,21 @@ model_kwargs:
   # torch warns "expandable_segments not supported on this platform" and keeps the
   # native allocator. Card 1 fragments only 0.55 GiB because it holds no head.
   #
-  # So move three layers to card 1, which had ~6 GiB of slack. At 6 bytes per trainable
-  # parameter (bf16 weight + bf16 grad + AdamW8bit m/v):
-  #   card 0: 0.636B embedding + 6 layers x 0.114B = 1.32B -> 7.9 GiB persistent
-  #           + ~6.9 GiB of measured activations + ~3.9 GiB fragmentation = ~18.7 GiB
-  #   card 1:              26 layers x 0.114B      = 2.95B -> 17.7 GiB persistent
-  #           + ~0.1 GiB activations + ~0.6 GiB fragmentation = ~18.4 GiB
-  # Card 0's activation cost barely moves with the split -- it is the head and the
-  # gathered hidden states -- so the only lever on it is persistent state.
+  # Moving three layers to card 1 dropped card 0's peak to 14.99 GiB and left its
+  # reservation at 20.36 -- reducing live memory does not reclaim a stranded segment --
+  # and then card 1 died instead at 20.37 GiB allocated with only 0.83 GiB unallocated.
+  # Both failures were marginal, about 1 GiB short, from opposite directions.
+  #
+  # Settled at 7 layers on card 0, with the cap raised to 0.95 and the allocator told to
+  # collect under pressure. At 6 bytes per trainable parameter (bf16 weight + bf16 grad
+  # + AdamW8bit m/v), against 22.8 GiB allowed:
+  #   card 0: 0.636B embedding + 7 layers x 0.114B = 1.43B -> 8.6 GiB persistent
+  #           + ~8.2 GiB measured activations + fragmentation
+  #   card 1:              25 layers x 0.114B      = 2.84B -> 17.0 GiB persistent
+  #           + ~1 GiB activations + ~0.8 GiB fragmentation
+  # Card 0's activation cost barely moves with the split -- it is the head plus the 33
+  # hidden states accelerate's output hook copies here for the 2 that get read -- so
+  # persistent state is the only lever on it until those copies go away.
   #
   # embed_tokens and lm_head must share a device: tie_word_embeddings is true, so they
   # are one parameter. Splitting them fabricates a second copy that trains apart and
@@ -75,7 +93,7 @@ model_kwargs:
     model.layers.3: 0
     model.layers.4: 0
     model.layers.5: 0
-    model.layers.6: 1
+    model.layers.6: 0
     model.layers.7: 1
     model.layers.8: 1
     model.layers.9: 1
@@ -139,7 +157,10 @@ optimizer:
 use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
 functionary_packing: false
 chunked_cross_entropy: true
-max_vram_fraction: 0.92     # applied to every visible device
+# 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
+# The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
+# -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.
+max_vram_fraction: 0.95     # applied to every visible device
 
 training_args:
   bf16: true
