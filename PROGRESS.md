@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **132 passed** in the CUDA-enabled dev environment (≈20 s).
+**Test suite:** green — **154 passed** in the CUDA-enabled dev environment (≈20 s).
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
@@ -79,6 +79,78 @@ than discovered at run time:
   Regression: `test_main_vocab.py::test_missing_flash_attn_fails_before_loading_with_actionable_message`.
 - **`bitsandbytes` is not installed**, so spec §1's "load the 27B text decoder in
   int8" has no backend here. Resolve before the capture run.
+
+## Cross-entropy memory, and not computing it at all (2026-09-07)
+
+Follow-up to the launch-bound work. With the delta rule fixed, the remaining
+inefficiency was the 248,320-wide head. Transformers' `ForCausalLMLoss` opens with
+`logits = logits.float()`, a full fp32 copy of `[batch * seq, 248320]` kept alive for
+backward -- 3.05 GB at batch 3 x 1024, measured at ~54% of all activation memory.
+
+Two changes, both landed.
+
+**1. Withhold labels when nothing reads the model's loss (free).** DistillKit computes
+its own losses; the model's cross-entropy is only consumed by the `cross_entropy` loss
+function, via `student_outputs.loss`. For any config without it -- a KL-only or
+KL + hidden-state pilot -- the model was computing a full-vocabulary cross-entropy and
+discarding it. `LossFunctionBase.requires_model_loss()` now declares the dependency and
+the trainer forwards `labels` only when some loss needs them. `CrossEntropyLoss` raises
+a clear error if it is ever called without them rather than returning `None`.
+
+**2. Chunked cross-entropy when it *is* needed (a real trade).** `distillkit/chunked_ce.py`
+computes the same loss in token chunks, each wrapped in `torch.utils.checkpoint` so its
+fp32 upcast is freed immediately and recomputed in backward. Installed via
+`model.loss_function`, which transformers looks up per call, so no loss class or
+signature changes. Opt out with `chunked_cross_entropy: false`.
+
+Measured at batch 3 x seq 1024, backbone frozen, real weights:
+
+| variant | step | throughput | peak VRAM |
+| --- | ---: | ---: | ---: |
+| cross-entropy, stock loss | 2149 ms | 1430 tok/s | 18.76 GB |
+| cross-entropy, chunked | 2312 ms | 1329 tok/s | **13.15 GB** |
+| no cross-entropy (labels withheld) | 2113 ms | **1454 tok/s** | **11.70 GB** |
+
+So chunking costs about 7% throughput for 30% less memory, and skipping the loss
+entirely is strictly better on both axes. Which applies depends only on whether
+`cross_entropy` is in `loss_functions`.
+
+**What the memory buys.** Shapes that previously hit OOM now fit:
+
+| shape | tokens/step | before | after |
+| --- | ---: | --- | ---: |
+| b3 x 1024 | 3,072 | 18.76 GB | 13.15 GB |
+| b4 x 1024 | 4,096 | OOM | 14.73 GB |
+| b6 x 1024 | 6,144 | OOM | 17.91 GB |
+| b8 x 1024 | 8,192 | OOM | 21.09 GB |
+| b1 x 4096 | 4,096 | OOM | 15.19 GB |
+| b2 x 2048 | 4,096 | OOM | 14.73 GB |
+
+Per-token throughput is now roughly flat across shapes (1232-1454 tok/s), which is the
+signature of a compute-bound step -- the launch-bound behaviour is gone. b3 x 1024 is
+the throughput sweet spot; larger shapes exist for when the distillation losses need
+the batch, not because they are faster.
+
+Note this headroom is not spare: the real run adds cached teacher signals, hidden-state
+anchors and the top-k KL machinery on top of what the smoke measures.
+
+**Equivalence.** `tests/test_chunked_ce.py` compares the chunked loss against
+`ForCausalLMLoss` on value and on `dL/dlogits` (the checkpointed recompute being the
+part most likely to be wrong), across chunk sizes, ignore-index fractions, explicit
+`shift_labels`, `num_items_in_batch`, and bf16 inputs, plus an all-padding batch that
+would divide by zero in the naive form.
+
+Two bugs found while building it, both caught by tests rather than review:
+
+* The first default was a fixed `chunk_tokens=4096`. Memory scales with
+  `tokens x vocab`, so at a 1024-token batch that is exactly one chunk and saves
+  nothing -- the memory test measured 2.84 GB either way. The budget is now in bytes
+  (`DEFAULT_CHUNK_BYTES`, 128 MB of fp32 logits), with a regression test asserting a
+  248k vocabulary is actually split.
+* The first version of the install-gate test reimplemented the trainer's condition
+  instead of calling it, so it could have passed while the trainer silently gave back
+  5.6 GB. The gate is now `maybe_install_chunked_loss()` and the test calls it,
+  including the DDP/DeepSpeed wrapper path.
 
 ## Launch-bound step, diagnosed and fixed (2026-09-07)
 

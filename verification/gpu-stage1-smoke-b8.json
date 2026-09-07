@@ -1,0 +1,32 @@
+{
+  "device": "NVIDIA GeForce RTX 3090",
+  "batch": 8,
+  "seq": 1024,
+  "gradient_checkpointing": true,
+  "table_resident": true,
+  "trainable_tensors": 7,
+  "trainable_params": 65543680,
+  "total_params": 4271294976,
+  "weights_gb": 8.050660610198975,
+  "peak_allocated_gb": 21.084993839263916,
+  "peak_reserved_gb": 22.80859375,
+  "card_total_gb": 23.99951171875,
+  "median_step_s": 6.651689499994973,
+  "median_gather_s": 0.02609379999921657,
+  "gather_fraction_of_step": 0.003922883050875465,
+  "tokens_per_s": 1231.566807200816,
+  "losses": [
+    13.842572212219238,
+    13.737338066101074,
+    13.6650972366333,
+    13.59206771850586
+  ],
+  "w_side_proj_grad_norms": [
+    0.1366492509841919,
+    0.13027043640613556,
+    0.11612997204065323,
+    0.1095009371638298
+  ],
+  "hours_1m_tokens": 0.2255482821992653,
+  "hours_5m_tokens": 1.1277414109963264
+}

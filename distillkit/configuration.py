@@ -214,6 +214,16 @@ class DistillationRunConfig(BaseModel):
         default=False,
         description="Use linear layers to project between teacher and student hidden states even if sizes are equal.",
     )
+    chunked_cross_entropy: bool = Field(
+        default=True,
+        description=(
+            "Compute the model's causal-LM cross-entropy in chunks instead of "
+            "upcasting the whole logits tensor to fp32. Over a 248k-wide head this "
+            "measured 13.15 GB vs 18.76 GB peak for a 7% throughput cost (the "
+            "checkpoint recompute). Set false when VRAM is not the constraint. Has no "
+            "effect unless a configured loss reads the model's own loss."
+        ),
+    )
     functionary_packing: bool = Field(
         default=False,
         description="Use functionary's packing code. Requires flash attention and may not be compatible with all models.",

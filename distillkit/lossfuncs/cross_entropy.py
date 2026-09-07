@@ -16,6 +16,10 @@ class CrossEntropyLoss(LossFunctionBase):
         return "cross_entropy"
 
     @override
+    def requires_model_loss(self) -> bool:
+        return True
+
+    @override
     def __init__(self): ...
 
     @override
@@ -27,4 +31,9 @@ class CrossEntropyLoss(LossFunctionBase):
         hidden_state_mapping: HiddenStateMapping | None = None,
         num_items_in_batch: int | None = None,
     ) -> torch.Tensor:
+        if student_outputs.loss is None:
+            raise ValueError(
+                "cross_entropy loss needs the model's own loss, but the forward ran "
+                "without labels. requires_model_loss() should have kept them."
+            )
         return student_outputs.loss

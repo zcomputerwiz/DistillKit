@@ -6,6 +6,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 
+from distillkit.chunked_ce import maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
@@ -39,6 +40,16 @@ class DistillationTrainer(SFTTrainer):
         self.loss_functions = [create_loss_func(lfc) for lfc in config.loss_functions]
         self.need_hidden_states = any(
             lf.requires_hidden_states() for lf in self.loss_functions
+        )
+        self.need_model_loss = any(lf.requires_model_loss() for lf in self.loss_functions)
+
+        # The stock causal-LM loss keeps a full fp32 copy of the logits alive for
+        # backward. Over a 248k-wide head that measured 2.84 GB where the chunked
+        # form needs 1.01 GB, for the same number to within 1e-6.
+        maybe_install_chunked_loss(
+            model,
+            need_model_loss=self.need_model_loss,
+            enabled=config.chunked_cross_entropy,
         )
 
         self.signal_source = signal_source
@@ -81,11 +92,13 @@ class DistillationTrainer(SFTTrainer):
                 )
 
         # Call the wrapper: bypassing it skips DDP/DeepSpeed forward bookkeeping.
-        model_inputs = {
-            k: inputs[k]
-            for k in ("input_ids", "attention_mask", "labels", "position_ids", "ngram_raw")
-            if k in inputs
-        }
+        # Withhold labels unless a configured loss reads student_outputs.loss: the
+        # model would otherwise run a full-vocabulary cross-entropy whose result is
+        # discarded, paying for it in both compute and activation memory.
+        forwarded = ["input_ids", "attention_mask", "position_ids", "ngram_raw"]
+        if self.need_model_loss:
+            forwarded.append("labels")
+        model_inputs = {k: inputs[k] for k in forwarded if k in inputs}
         if self.config.sidecar is not None:
             model_inputs["sidecar_enabled"] = self.config.sidecar.enabled
         student_outputs = model(

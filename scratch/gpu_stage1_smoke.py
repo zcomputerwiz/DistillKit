@@ -80,6 +80,7 @@ def main() -> int:
 
     from transformers import AutoTokenizer
 
+    from distillkit.chunked_ce import chunked_causal_lm_loss
     from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
     from distillkit.ngram_hash import NGramHasher
     from distillkit.ngram_table import GGUFNGramTable
@@ -109,6 +110,7 @@ def main() -> int:
     weights_gb = gb(torch.cuda.max_memory_allocated(device))
     print(f"   student on GPU in {load_s:.1f}s, weights {weights_gb:.2f} GB")
 
+    model.loss_function = chunked_causal_lm_loss  # as DistillationTrainer does
     model.freeze_backbone()
     if not args.no_checkpointing:
         model.gradient_checkpointing_enable()

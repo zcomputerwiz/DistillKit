@@ -190,6 +190,15 @@ class LossFunctionBase(ABC):
     def requires_hidden_states(self) -> bool:
         return False
 
+    def requires_model_loss(self) -> bool:
+        """True if this loss consumes ``student_outputs.loss``.
+
+        The model's own cross-entropy runs over the full 248k-wide head and is
+        otherwise computed and discarded, so the trainer withholds ``labels`` from
+        the forward unless some configured loss actually reads the result.
+        """
+        return False
+
     @abstractmethod
     def __init__(self, **kwargs) -> None: ...
 
