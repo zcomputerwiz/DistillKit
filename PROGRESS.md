@@ -80,6 +80,107 @@ than discovered at run time:
 - **`bitsandbytes` is not installed**, so spec §1's "load the 27B text decoder in
   int8" has no backend here. Resolve before the capture run.
 
+## Teacher capture: corpus chosen and pipeline proven (2026-09-07)
+
+### Corpus
+
+`r0b0tlab/qwen3.8-max-glm5.2-kimi-k3-distillation` -- 57,937 traces distilled from
+Qwen3.8-Max-Preview (48,283), GLM-5.2 (5,307) and Kimi Code K3 (4,347). Public,
+ungated.
+
+Sizing from the dataset's own `token_stats` config (per-row Qwen3 token counts):
+
+| split | rows | tokens | mean |
+| --- | ---: | ---: | ---: |
+| train | 98,455 | 92,026,135 | 934 |
+| validation | 2,872 | 2,966,098 | 1,032 |
+| test | 2,860 | 2,982,956 | 1,042 |
+| **total** | **104,187** | **97,975,189** | **940** |
+
+97% of rows fit in 4096 tokens. Domain mix: code 33%, agent/tool 19%, math 12%,
+grounded long-context 11%, reasoning 9%, instruction 8%.
+
+That covers the 1M smoke and 5M pilot with enormous margin, and even the spec's
+100M-token ambition almost exactly -- though 98M tokens is ~1 TB of cache at two
+anchors, so the practical ceiling here is disk, not data.
+
+### Does the teacher find it in-distribution?
+
+Measured from the capture itself rather than argued: the cache stores the teacher's
+top-64 logprobs, so its surprise on this corpus falls out directly. Over 28,141
+captured tokens:
+
+* true next token inside the teacher's **top-64: 90.62%**
+* mean logprob of the true next token when present: **-2.93** (perplexity 18.66)
+* **median top-1 probability: 0.979**
+
+A wrong chat template or alien formatting would show up as collapsed top-64 coverage
+and a diffuse top-1; neither is present. The corpus is in-distribution for this teacher.
+
+Note this measures the *rendering*, not the data's provenance. The traces were written
+by other frontier models, which is fine here: we teacher-force our own 27B over that
+text and record *its* distribution, so the other models' identities never enter the
+targets. It does mean the student learns the 27B's conditional distribution over text
+the 27B did not itself write, which is the normal and intended setup.
+
+### Rendering
+
+`distillkit/prepare_corpus.py` renders the `sft_balanced` messages through **the
+teacher's own chat template**. The dataset also ships `prompt_completion_text`
+(generic `<|system|>` markers) and `glm47_native` (pre-tokenized with GLM's
+tokenizer); both would put the 27B off-distribution and were rejected for that reason.
+`reasoning_content` is empty in this release -- the `<think>` blocks already live
+inside assistant `content` -- so nothing needs merging, though the renderer folds it
+back in if a future release splits it out.
+
+One trap found the hard way: shard filenames sort `test-*` before `train-*`, so the
+first `--limit` run drew all 40 documents from the held-out split. `--split train` now
+also reorders shards, so a truncated run is representative rather than silently
+entirely eval.
+
+### Measured capture
+
+40 documents / 28,141 tokens, teacher int8 across both 3090s, anchors 8 and 64:
+
+| | |
+| --- | --- |
+| wall clock | 96 s including a ~45 s model load |
+| throughput | **~550 tokens/s** |
+| output | 286 MB (10.4 KB/token) |
+| 1M tokens | ~0.5 h, 10.6 GB |
+| 5M tokens | ~2.5 h, 53 GB |
+
+### Two capture-blocking fixes
+
+**Anchor capture now uses hooks, not `output_hidden_states=True`.** The teacher at
+int8 leaves only ~2 GiB free per card, and requesting all 65 hidden states costs
+2.7 GB at 4096 tokens to extract two anchors worth 84 MB. Capture OOM'd on the first
+real document. `_AnchorTap` registers a forward-pre-hook on each anchor layer instead.
+
+Index semantics are preserved exactly, and the subtlety is load-bearing:
+`hidden_states[i]` is the *input* to layer `i`, but the final entry
+`hidden_states[num_layers]` is the last layer's output **after `model.norm`**. Hooking
+the last decoder layer there returns the pre-norm state -- a different tensor, and a
+silently wrong target for the deepest anchor. `scratch/hook_index_check.py` asserts all
+`num_layers + 1` indices match the reference tuple; the first version failed only at
+the last index, which is exactly how that bug would have shipped.
+
+**fp8 anchor range constrains which layers are usable** (see the previous section):
+layers 55-59 overflow, and 16-48 have only 2.0-2.8x headroom. Anchors 8 and 64
+(5.1x and 6.7x) were used for the smoke and are the safe default.
+
+### Licensing, flagged not decided
+
+The dataset is `license: other` and its LICENSE restricts use to "controlled,
+noncommercial research", noting Alibaba Cloud Model Studio terms that bar using Model
+Studio outputs to train products competing with Alibaba or its affiliates. The mixture
+also carries CC BY-NC-SA / CC BY-NC / CC BY-SA / Apache / MIT / ODC-BY material with
+per-record provenance in the `canonical` view.
+
+Separately, the upstream README states the validation and test splits are
+benchmark-derived and contaminated. Usable as a held-out loss signal; **not** usable as
+a capability claim.
+
 ## Cross-entropy memory, and not computing it at all (2026-09-07)
 
 Follow-up to the launch-bound work. With the delta rule fixed, the remaining

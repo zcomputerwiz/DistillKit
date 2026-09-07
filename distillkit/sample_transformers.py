@@ -88,6 +88,63 @@ def _input_device(model) -> torch.device:
     return device
 
 
+class _AnchorTap:
+    """Capture only the requested hidden states, via hooks.
+
+    ``output_hidden_states=True`` materializes all ``num_layers + 1`` states and keeps
+    them for the whole forward. On the 27B that is 65 x tokens x 5120 x 2 bytes -- 2.7 GB
+    at 4096 tokens -- to extract two anchors worth 84 MB. With the teacher quantized to
+    int8 there is only ~2 GiB free per card, so that difference decides whether a
+    document fits at all.
+
+    Index semantics are preserved exactly: ``hidden_states[i]`` is the *input* to decoder
+    layer ``i``, so an anchor below ``num_layers`` is a forward-pre-hook on that layer.
+    The final entry, ``hidden_states[num_layers]``, is the last layer's output *after*
+    ``model.norm`` -- not the raw layer output -- so that anchor hooks the norm instead.
+    Hooking the last decoder layer there silently yields the pre-norm state, which is a
+    different tensor and would make the deepest anchor a wrong target.
+    """
+
+    def __init__(self, model, anchor_layers):
+        text_model = model.model.language_model if hasattr(model.model, "language_model") else model.model
+        self.layers = text_model.layers
+        self.final_norm = text_model.norm
+        self.n_layers = len(self.layers)
+        self.anchors = list(anchor_layers)
+        self.captured: dict[int, torch.Tensor] = {}
+        self._handles = []
+
+    def __enter__(self):
+        for anchor in self.anchors:
+            if anchor < self.n_layers:
+                def pre_hook(_module, args, kwargs, _a=anchor):
+                    tensor = args[0] if args else kwargs.get("hidden_states")
+                    self.captured[_a] = tensor.detach()
+                    return None
+                self._handles.append(
+                    self.layers[anchor].register_forward_pre_hook(pre_hook, with_kwargs=True)
+                )
+            elif anchor == self.n_layers:
+                def post_hook(_module, _args, output, _a=anchor):
+                    tensor = output[0] if isinstance(output, tuple) else output
+                    self.captured[_a] = tensor.detach()
+                    return None
+                self._handles.append(self.final_norm.register_forward_hook(post_hook))
+            else:
+                raise ValueError(
+                    f"Anchor {anchor} exceeds the teacher's hidden_states tuple "
+                    f"(0..{self.n_layers})"
+                )
+        return self
+
+    def __exit__(self, *exc):
+        for handle in self._handles:
+            handle.remove()
+        self._handles.clear()
+        self.captured.clear()
+        return False
+
+
 def capture_teacher(
     model,
     documents: Iterable[dict[str, Any]],
@@ -145,13 +202,16 @@ def capture_teacher(
             if "attention_mask" in record and not np.all(np.asarray(record["attention_mask"]) == 1):
                 raise ValueError("Capture inputs must be unpadded, unpacked documents")
             input_ids = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0)
-            result = model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
-                           output_hidden_states=True, use_cache=False, return_dict=True)
+            with _AnchorTap(model, anchor_layers) as tap:
+                result = model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
+                               use_cache=False, return_dict=True)
+                anchor_states = dict(tap.captured)
             logits = result.logits
             if logits.shape != (1, len(tokens), vocab_size):
                 raise ValueError("Teacher logits must cover every unshifted input position and the full vocabulary")
-            if result.hidden_states is None or max(anchor_layers) >= len(result.hidden_states):
-                raise ValueError("Teacher did not return all requested anchor states")
+            if set(anchor_states) != set(anchor_layers):
+                missing = sorted(set(anchor_layers) - set(anchor_states))
+                raise ValueError(f"Teacher did not produce anchor states {missing}")
             ids = np.empty((len(tokens), top_k), dtype="<u4")
             values = np.empty((len(tokens), top_k), dtype="<f2")
             for start in range(0, len(tokens), logit_chunk_tokens):
@@ -166,7 +226,7 @@ def capture_teacher(
                 del chunk, best, indices, logprobs
             states = np.empty((len(tokens), len(anchor_layers), hidden_size), dtype=np.uint8)
             for compact_index, layer_index in enumerate(anchor_layers):
-                hidden = result.hidden_states[layer_index]
+                hidden = anchor_states[layer_index]
                 if hidden.shape != (1, len(tokens), hidden_size):
                     raise ValueError(f"Invalid anchor {layer_index} shape: {tuple(hidden.shape)}")
                 if not torch.isfinite(hidden).all() or hidden.abs().max() > torch.finfo(torch.float8_e4m3fn).max:
@@ -175,7 +235,7 @@ def capture_teacher(
             writer.append(doc_id, tokens, ids, values, states,
                           split=record.get("split", "eval" if ordinal % eval_every == 0 else "train"),
                           original_length=len(raw_tokens))
-            del result, logits, states, hidden
+            del result, logits, states, hidden, anchor_states
             if ordinal % 100 == 0:
                 LOG.info("Captured document %d (%s)", ordinal + 1, doc_id)
     return Path(output) / "manifest.json"
