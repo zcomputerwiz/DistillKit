@@ -173,3 +173,48 @@ def test_disable_sidecar_projection_freezes_only_bypassed_weight():
     model.disable_sidecar_projection()
     assert not sidecar.W_side_proj.weight.requires_grad
     assert all(branch.weight.requires_grad for branch in sidecar.gated_residual.branches)
+
+
+def test_stock_qwen35_runs_on_cpu_after_importing_capture_path():
+    """flash-linear-attention must not break CPU forwards of a *stock* model.
+
+    transformers binds fla's Triton kernels at import time with no device check, so
+    once fla is installed every CPU call raises "Pointer argument cannot be accessed
+    from Triton". That breaks the capture path and the CPU-only verification scripts
+    this project depends on, and it is invisible from the sidecar tests because they
+    import the sidecar model (which installs the dispatch patch) as a side effect.
+
+    This asserts the non-sidecar entry point is covered on its own.
+    """
+    import subprocess
+    import sys
+    import textwrap
+
+    program = textwrap.dedent(
+        """
+        import torch
+        import distillkit.sample_transformers  # must install the device-aware dispatch
+        from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+        from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
+
+        config = Qwen3_5TextConfig(
+            vocab_size=256, hidden_size=64, intermediate_size=96, num_hidden_layers=8,
+            num_attention_heads=4, num_key_value_heads=2, head_dim=16,
+            linear_key_head_dim=16, linear_value_head_dim=16, linear_num_key_heads=2,
+            linear_num_value_heads=4, linear_conv_kernel_dim=4,
+            full_attention_interval=4, max_position_embeddings=128,
+        )
+        torch.manual_seed(0)
+        model = Qwen3_5ForCausalLM(config).eval()
+        with torch.no_grad():
+            out = model(input_ids=torch.randint(0, 256, (1, 32)))
+        assert out.logits.shape == (1, 32, 256), out.logits.shape
+        print("OK")
+        """
+    )
+    # A subprocess is the point: in-process, another test may already have imported
+    # the sidecar model and installed the patch, hiding the regression.
+    result = subprocess.run(
+        [sys.executable, "-c", program], capture_output=True, text=True, timeout=600
+    )
+    assert "OK" in result.stdout, f"stock CPU forward failed:\n{result.stderr[-1500:]}"

@@ -16,6 +16,7 @@ import click
 import numpy as np
 import torch
 
+from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.offline_cache import (
     OfflineCacheWriter,
     file_sha256,
@@ -24,6 +25,12 @@ from distillkit.offline_cache import (
 
 
 LOG = logging.getLogger(__name__)
+
+# flash-linear-attention, when installed, is bound by transformers at import time with
+# no device check, and its Triton kernels reject CPU tensors. Restore per-call dispatch
+# so CPU capture/verification runs keep working. Idempotent; no-op without fla.
+install_device_aware_linear_attention()
+
 
 
 def text_causal_lm_class(config):

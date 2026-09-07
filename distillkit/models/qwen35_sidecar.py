@@ -25,7 +25,13 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
 )
 
 from distillkit.gated_residual import GatedResidual
+from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
+
+# flash-linear-attention, when installed, is bound by transformers at import time with
+# no device check, and its Triton kernels reject CPU tensors. Restore per-call
+# dispatch so CPU verification runs keep working. No-op without fla.
+install_device_aware_linear_attention()
 
 
 def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:

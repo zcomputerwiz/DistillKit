@@ -26,11 +26,17 @@ from distillkit.configuration import (
     TeacherModelConfig,
 )
 from distillkit.hsd_mapping import HiddenStateMapping
+from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
 from distillkit.signals import OfflineSignalSource, OnlineSignalSource, SignalSource, OfflineHiddenStateSignalSource
 from distillkit.trainer import DistillationTrainer, HybridDistillationTrainer
 
 LOG = logging.getLogger(__name__)
+
+# flash-linear-attention, when installed, is bound by transformers at import time with
+# no device check, and its Triton kernels reject CPU tensors. Restore per-call dispatch
+# so CPU capture/verification runs keep working. Idempotent; no-op without fla.
+install_device_aware_linear_attention()
 
 
 def _format_row(

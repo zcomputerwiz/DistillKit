@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **131 passed** in the CUDA-enabled dev environment (≈20 s).
+**Test suite:** green — **132 passed** in the CUDA-enabled dev environment (≈20 s).
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
@@ -42,13 +42,17 @@ regression), and two CUDA-parametrized cases are skipped.
   end-to-end** — see "Real-table forward" below.
 - Gate 4 (signal alignment): **pass** in synthetic form (`test_signal_alignment.py`);
   the real-corpus version needs the capture run (remaining work #1).
-- Gates 5–6 (1M smoke, 5M pilot): **open**, GPU-blocked.
+- Gate 5 (1M-token smoke): **pass** in stage-1 form on one RTX 3090 - see
+  "Stage-1 GPU smoke" below. Not with ZeRO-2 offload (impossible here), which
+  stage 1 does not need.
+- Gate 6 (5M pilot with control arm): **open** - about 1 h of GPU time, ready to run.
 
-**What remains (all need the dev box; see "Remaining work" below):**
+**What remains:**
 1. Real-corpus teacher capture (needs the 27B teacher resident).
-2. ZeRO-2 offload — **blocked on this OS, not just on hardware**: see "Environment
-   blockers" below. This is a plan change, not a scheduling delay.
-3. 1M-token smoke run + 5M-token controlled pilot.
+2. 5M-token controlled pilot with the sidecar-disabled control arm (gate 6). ~1 h GPU.
+3. ZeRO-2 is **not needed for stages 1 and 6** and is unavailable on this OS anyway
+   (see "Environment blockers"). It only returns as a question for full-backbone
+   stage-2 training.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -75,6 +79,95 @@ than discovered at run time:
   Regression: `test_main_vocab.py::test_missing_flash_attn_fails_before_loading_with_actionable_message`.
 - **`bitsandbytes` is not installed**, so spec §1's "load the 27B text decoder in
   int8" has no backend here. Resolve before the capture run.
+
+## Launch-bound step, diagnosed and fixed (2026-09-07)
+
+The first GPU run measured 303 tok/s at batch 1 x 1024 and, tellingly, step time
+barely moved from batch 1 (3.15 s) to batch 2 (3.46 s). That is the signature of a
+launch-bound step: thousands of tiny kernels with the GPU idle between them, not a
+compute bottleneck. Bigger batches were not the fix.
+
+**Cause.** 24 of Qwen3.5-4B's 32 layers are `linear_attention`. Their chunked delta
+rule, `transformers...torch_chunk_gated_delta_rule`, is a pure-PyTorch fallback
+containing two Python loops - 63 iterations for the intra-chunk triangular solve, plus
+one per 64-token chunk. A CPU-side profile of one step showed **28,420 `aten::copy_`,
+15,809 `aten::mul`, 7,937 `aten::bmm` and 73,496 `aten::as_strided` calls**. Isolated,
+one call cost **47.7 ms**; across 24 layers that is ~1146 ms per forward, doubled again
+by gradient-checkpoint recompute - essentially the whole step.
+
+The function is decorated
+`@use_kernel_func_from_hub_with_fallback("chunk_gated_delta_rule", "fla")`, so it uses
+a fused Triton kernel when one is available. None of `fla`, `kernels`, `triton` or
+`causal_conv1d` was installed, so every run took the slowest path.
+
+**Fix.** `triton-windows` 3.8.0 compiles and runs here, and `flash-linear-attention`
+0.5.2 installs additively (3 packages, no torch/transformers change). Declared as the
+`fused` extra in `pyproject.toml`.
+
+| | before | after | |
+| --- | ---: | ---: | ---: |
+| one delta-rule call (b1 x 1024) | 47.7 ms | 1.3 ms | **37x** |
+| step, b1 x 1024 | 3147 ms | 780 ms | 4.0x |
+| step, b3 x 1024 | 4349 ms | 2151 ms | 2.0x |
+| throughput, b3 x 1024 | 706 tok/s | **1428 tok/s** | 2.0x |
+| 5M-token pilot | 1.97 h | **0.97 h** | |
+
+Losses are unchanged to four decimal places across the swap (13.8114 -> 13.5438 in
+both), which is the correctness evidence for the fused path.
+
+**One regression this introduced, and its fix.** transformers binds fla at *import*
+time with no device check, and fla's kernels are Triton, hence CUDA-only. Once
+installed, every CPU forward of any Qwen3.5 raised
+`ValueError: Pointer argument cannot be accessed from Triton (cpu tensor?)` - 12 tests
+failed, and the CPU-only verification scripts this box depends on would have broken
+too. `distillkit/linear_attention_dispatch.py` restores a per-call device check,
+recovering the original torch implementation from the wrapper's `__wrapped__` rather
+than reimplementing it. Installed from the sidecar model, the capture path and the CLI.
+
+Note the test suite hid this at first: `test_signal_alignment.py` passed only because
+it imports `test_sidecar_model`, which installs the patch as a side effect. The
+regression test therefore runs a *stock* model in a subprocess
+(`test_sidecar_model.py::test_stock_qwen35_runs_on_cpu_after_importing_capture_path`)
+so import order cannot mask it again.
+
+## Stage-1 GPU smoke - gate 5 (2026-09-07)
+
+`scratch/gpu_stage1_smoke.py`, one RTX 3090, real 28.8 GB IQ4_NL table resident,
+real `student-hf` weights, backbone frozen.
+
+Spec 5.5 assumes ZeRO-2 with optimizer offload. Stage 1 does not need it: with the
+backbone frozen only **65.5M of 4.27B parameters (1.535%)** train, so grads and
+optimizer state stay under a gigabyte and the step fits on one card unaided.
+
+| Measurement | Value |
+| --- | --- |
+| Config | batch 3 x seq 1024, gradient checkpointing, bf16, sdpa attention |
+| Peak VRAM | 18.76 GB allocated / 19.35 GB reserved, of 24.0 GB |
+| Throughput | **1428 tok/s** (median step 2151 ms) |
+| Table gather | 7.7 ms = **0.4% of a step** |
+| Losses | finite, 13.5438-13.8114, monotonically decreasing |
+| `W_side_proj` grad norm | 0.157-0.200 every step, never zero |
+| Extrapolated | 1M tokens 0.19 h, 5M tokens 0.97 h |
+
+**`training_overlap_verified` is now settled.** With the table resident the gather is
+0.4% of a step even measured *serially*, so no overlap is required at all. Cold mmap is
+the opposite: the same gather took **2826 ms**, 80% of the step (5,790 rows/s, matching
+the known cold-fault rate). Residency is mandatory and is the only thing that matters
+here - `--resident` costs 8-21 s at startup and 28.8 GB of RAM.
+
+**Two spec corrections.**
+
+*Batch 8 x 4096 does not fit.* Measured ceiling on a 24 GB card is ~3-4k tokens per
+step (b3 x 1024 = 18.76 GB; b4 x 1024, b2 x 2048 and b1 x 4096 all OOM). The spec's
+5.5 shape is 32,768 tokens, roughly 8x over budget. Use gradient accumulation for the
+effective batch.
+
+*The memory wall is the vocabulary head, not the backbone.* With 248,320 logits per
+token, one logits tensor at b1 x 1024 is 0.47 GB bf16 and 0.95 GB upcast to fp32.
+Isolated (`scratch/logit_memory.py`): activations are 1.60 GB without a loss and
+**3.50 GB with cross-entropy** - so the head and its loss are ~54% of activation
+memory, scaling linearly with tokens. A chunked or fused cross-entropy is the lever if
+larger batches are wanted; the backbone is not the problem.
 
 ## Real-table forward — gate 3 closed (2026-09-07)
 
