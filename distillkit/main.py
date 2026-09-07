@@ -26,8 +26,8 @@ from distillkit.configuration import (
 )
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
-from distillkit.signals import OfflineSignalSource, OnlineSignalSource, SignalSource
-from distillkit.trainer import DistillationTrainer
+from distillkit.signals import OfflineSignalSource, OnlineSignalSource, SignalSource, OfflineHiddenStateSignalSource
+from distillkit.trainer import DistillationTrainer, HybridDistillationTrainer
 
 LOG = logging.getLogger(__name__)
 
@@ -190,10 +190,15 @@ def load_data(
 def load_student_model(
     config: DistillationRunConfig,
     tokenizer_vocab_size: int,
+    signal_vocab_size: int | None = None,
 ) -> transformers.PreTrainedModel:
     if config.functionary_packing:
         monkey_patch_packing_for_model(config.train_model)
-    auto_cls = getattr(transformers, config.model_auto_class, None)
+    if config.sidecar is not None:
+        from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+        auto_cls = Qwen35SidecarForCausalLM
+    else:
+        auto_cls = getattr(transformers, config.model_auto_class, None)
     if auto_cls is None:
         raise ValueError(
             f"Model class {config.model_auto_class} not found in transformers."
@@ -203,27 +208,69 @@ def load_student_model(
     if config.use_flash_attention:
         extra_kwargs["attn_implementation"] = "flash_attention_2"
         extra_kwargs["torch_dtype"] = torch.bfloat16
+    extra_kwargs.update(config.model_kwargs)
+    if config.sidecar is not None:
+        stock_config = transformers.AutoConfig.from_pretrained(config.train_model)
+        text_config = getattr(stock_config, "text_config", stock_config)
+        text_config.sidecar_layer_index = config.sidecar.layer_index
+        text_config.sidecar_num_branches = config.sidecar.num_branches
+        extra_kwargs["config"] = text_config
     model = auto_cls.from_pretrained(
         config.train_model,
         **extra_kwargs,
-        **config.model_kwargs,
     )
     LOG.info("Loaded model.")
 
     model_vocab_size = model.get_input_embeddings().weight.shape[0]
-    if (
-        model_vocab_size != tokenizer_vocab_size
-        or config.resize_embeddings_to_multiple_of
-    ):
-        model.resize_token_embeddings(
-            tokenizer_vocab_size,
-            pad_to_multiple_of=config.resize_embeddings_to_multiple_of,
-        )
-        new_model_vocab_size = model.get_input_embeddings().weight.shape[0]
-        if new_model_vocab_size != model_vocab_size:
-            LOG.info(
-                f"Resized model vocab size from {model_vocab_size} to {new_model_vocab_size}"
+    required_vocab_size = max(tokenizer_vocab_size, signal_vocab_size or 0)
+    if config.sidecar is not None:
+        if model_vocab_size < required_vocab_size:
+            raise ValueError(
+                "Student head does not cover the tokenizer/signal vocabulary"
             )
+    else:
+        # Only a cached signal normalized over a padded (larger-than-tokenizer)
+        # head forbids growth. An online teacher's signal_vocab_size equals the
+        # tokenizer size and must still reach the resize path below.
+        if (
+            signal_vocab_size is not None
+            and signal_vocab_size > tokenizer_vocab_size
+            and model_vocab_size < signal_vocab_size
+        ):
+            # Growing would fabricate rows for IDs the cached signals already
+            # normalize over, changing the captured distribution.
+            raise ValueError(
+                f"Student head ({model_vocab_size}) is smaller than the cached "
+                f"signal vocabulary ({signal_vocab_size}); re-capture or use a "
+                f"student whose head covers the cache vocabulary"
+            )
+        # A cached signal normalized over a padded teacher head must not be
+        # shrunk to the tokenizer size; only resize when that cannot break
+        # signal coverage.
+        preserves_padded_head = (
+            signal_vocab_size is not None
+            and signal_vocab_size > tokenizer_vocab_size
+            and model_vocab_size >= signal_vocab_size
+        )
+        if preserves_padded_head:
+            LOG.info(
+                f"Preserving padded student head of {model_vocab_size} entries "
+                f"(tokenizer vocab {tokenizer_vocab_size}) to cover the cached "
+                f"signal vocabulary"
+            )
+        elif (
+            model_vocab_size != tokenizer_vocab_size
+            or config.resize_embeddings_to_multiple_of
+        ):
+            model.resize_token_embeddings(
+                tokenizer_vocab_size,
+                pad_to_multiple_of=config.resize_embeddings_to_multiple_of,
+            )
+            new_model_vocab_size = model.get_input_embeddings().weight.shape[0]
+            if new_model_vocab_size != model_vocab_size:
+                LOG.info(
+                    f"Resized model vocab size from {model_vocab_size} to {new_model_vocab_size}"
+                )
 
     model: transformers.PreTrainedModel
     if config.frozen_modules:
@@ -250,9 +297,18 @@ def load_student_model(
 
 
 def create_signal_source(
-    config: DistillationRunConfig, vocab_size: int
+    config: DistillationRunConfig, vocab_size: int, tokenizer=None
 ) -> SignalSource:
     if isinstance(config.teacher, TeacherDatasetConfig):
+        if config.teacher.cache_path:
+            from distillkit.offline_cache import tokenizer_vocab_hash
+            return OfflineHiddenStateSignalSource(
+                config.teacher.cache_path,
+                expected_anchor_layers=config.teacher.anchor_layers,
+                expected_cache_dtype=config.teacher.cache_dtype,
+                expected_sequence_length=config.sequence_length,
+                expected_tokenizer_vocab_hash=tokenizer_vocab_hash(tokenizer) if tokenizer is not None else None,
+            )
         compressor = LogprobCompressor(
             config=config.teacher.logprob_compressor,
             legacy_config=config.teacher.legacy_logit_compression,
@@ -304,19 +360,45 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
     accelerator = Accelerator()
     with accelerator.main_process_first():
         tokenizer = load_tokenizer(config)
-        ds_train, ds_eval = load_data(config.dataset, tokenizer)
 
         tokenizer_vocab_size = max(
             len(tokenizer.get_vocab()),
             max(tokenizer.get_vocab().values()) + 1,
         )
+    signal_source = create_signal_source(config, tokenizer_vocab_size, tokenizer)
+    if isinstance(signal_source, OfflineHiddenStateSignalSource):
+        ds_train = signal_source.cache.to_dataset("train")
+        ds_eval = signal_source.cache.to_dataset("eval")
+        if not len(ds_train):
+            raise ValueError("Cache has no training documents")
+        if not len(ds_eval):
+            ds_eval = None
+        signal_vocab_size = signal_source.vocab_size
+    else:
+        ds_train, ds_eval = load_data(config.dataset, tokenizer)
+        signal_vocab_size = tokenizer_vocab_size
 
-    model = load_student_model(config, tokenizer_vocab_size)
+    model = load_student_model(config, tokenizer_vocab_size, signal_vocab_size)
+    if model.config.vocab_size < signal_vocab_size:
+        raise ValueError("Student head is smaller than the cache vocabulary")
+    if config.sidecar is not None and not config.sidecar.enabled:
+        # Control arm: forward runs with sidecar_enabled=False, so W_side_proj is
+        # permanently bypassed. A trainable-but-unused parameter makes DDP's
+        # find_unused_parameters=False raise on the next reduction; freeze it
+        # before optimizer/distributed setup. The gated residual stays trainable.
+        model.disable_sidecar_projection()
 
     config_kwargs = dict(config.training_args)
+    resume_from_checkpoint = config_kwargs.pop("resume_from_checkpoint", None)
     dataset_kwargs = config_kwargs.pop("dataset_kwargs", {})
-    if config.dataset.prepacked:
+    if config.dataset.prepacked or isinstance(signal_source, OfflineHiddenStateSignalSource):
         dataset_kwargs["skip_prepare_dataset"] = True
+    if config.sidecar or isinstance(signal_source, OfflineHiddenStateSignalSource):
+        config_kwargs["remove_unused_columns"] = False
+        config_kwargs["packing"] = False
+        config_kwargs["padding_free"] = False
+    if config.optimizer and config.optimizer.strategy == "adamw":
+        config_kwargs.setdefault("optim", "adamw_torch")
     max_length = config_kwargs.pop("max_length", config.sequence_length)
     training_arguments = trl.SFTConfig(
         **config_kwargs,
@@ -325,17 +407,24 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         dataset_kwargs=dataset_kwargs,
     )
 
-    signal_source = create_signal_source(config, tokenizer_vocab_size)
     if config.layer_mapping is not None:
-        if not isinstance(signal_source, OnlineSignalSource):
+        if isinstance(signal_source, OfflineHiddenStateSignalSource):
+            teacher_hidden_size = signal_source.hidden_size
+            if config.layer_mapping == "all":
+                raise ValueError("Cached anchors require explicit (student_layer, compact_anchor_index) pairs")
+            mapping = config.layer_mapping
+            if any(t < 0 or t >= len(signal_source.anchor_layers) for _, t in mapping):
+                raise ValueError("Teacher mapping index must address the compact cached anchor tuple")
+        elif isinstance(signal_source, OnlineSignalSource):
+            teacher_hidden_size = signal_source.teacher_model.config.hidden_size
+            mapping = ([(i, i) for i in range(model.config.num_hidden_layers)]
+                       if config.layer_mapping == "all" else config.layer_mapping)
+        else:
             raise RuntimeError(
                 "Hidden state distillation not supported for offline teachers"
             )
-        teacher_hidden_size = signal_source.teacher_model.config.hidden_size
-        if config.layer_mapping == "all":
-            mapping = [(i, i) for i in range(model.config.num_hidden_layers)]
-        else:
-            mapping = config.layer_mapping
+        if any(s < 0 or s > model.config.num_hidden_layers for s, _ in mapping):
+            raise ValueError("Student hidden-state index outside model depth")
         hsm = HiddenStateMapping(
             student=model,
             teacher_hidden_size=teacher_hidden_size,
@@ -344,20 +433,68 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         )
     else:
         hsm = None
-    trainer = DistillationTrainer(
+    from distillkit.data import CachedBatchCollator
+    if isinstance(signal_source, OfflineHiddenStateSignalSource):
+        collator = CachedBatchCollator(tokenizer.pad_token_id or tokenizer.eos_token_id)
+    elif config.dataset.prepacked:
+        collator = collate_packed_batch
+    else:
+        # Leave ordinary collation to SFTTrainer so packing/padding_free/
+        # completion_only_loss are honored. TRL rejects a custom collator when
+        # BFD packing enables padding-free mode, so an unconditional collator
+        # here breaks packing=True configurations (e.g. examples/afm_test.yml).
+        collator = None
+    if config.sidecar and config.sidecar.enabled:
+        from trl.trainer.sft_trainer import DataCollatorForLanguageModeling
+        from distillkit.ngram_table import GGUFNGramTable
+        from distillkit.sidecar_collator import SidecarDataCollator
+        # The sidecar wraps a concrete base collator. Packing is forced off for
+        # sidecar runs above, so a plain LM collator is valid when none was set.
+        base_collator = (
+            collator if collator is not None else DataCollatorForLanguageModeling(
+                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id)
+        )
+        table = GGUFNGramTable(config.sidecar.table_path)
+        if config.sidecar.resident:
+            if accelerator.num_processes > 1:
+                raise ValueError("Resident table duplication across distributed ranks is unsupported; use memmap")
+            table.load_resident()
+        elif config.sidecar.prefault:
+            table.prefault()
+        collator = SidecarDataCollator(base_collator, table)
+    callbacks = []
+    if config.optimizer:
+        from distillkit.optimizers import (
+            validate_optimizer_backend, freeze_backbone_for_stage1,
+            UnfreezeBackboneCallback, ArchitectureMetricsCallback,
+        )
+        validate_optimizer_backend(
+            strategy=config.optimizer.strategy, deepspeed=training_arguments.deepspeed,
+            fsdp=training_arguments.fsdp,
+            dynamic_unfreeze=config.optimizer.unfreeze_at_step is not None,
+            world_size=accelerator.num_processes,
+        )
+        if config.optimizer.freeze_backbone:
+            frozen_names = freeze_backbone_for_stage1(model)
+            if hasattr(model, "enable_input_require_grads"):
+                model.enable_input_require_grads()
+            if config.optimizer.unfreeze_at_step:
+                callbacks.append(UnfreezeBackboneCallback(config.optimizer.unfreeze_at_step, frozen_names))
+        callbacks.append(ArchitectureMetricsCallback(config.optimizer.log_every_n_steps))
+    trainer_class = HybridDistillationTrainer if config.optimizer else DistillationTrainer
+    trainer = trainer_class(
         model=model,
         config=config,
         signal_source=signal_source,
         hidden_state_mapping=hsm,
-        true_vocab_size=tokenizer_vocab_size,
+        true_vocab_size=signal_vocab_size,
         train_dataset=ds_train,
         eval_dataset=ds_eval,
         args=training_arguments,
-        data_collator=collate_packed_batch if config.dataset.prepacked else None,
-        processing_class=None if config.dataset.prepacked else tokenizer,
+        data_collator=collator,
+        processing_class=tokenizer,
+        callbacks=callbacks,
     )
-
-    resume_from_checkpoint = config.training_args.get("resume_from_checkpoint", None)
 
     LOG.info("Starting training.")
     trainer.train(
