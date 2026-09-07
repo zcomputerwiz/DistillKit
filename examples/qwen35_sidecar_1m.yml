@@ -82,8 +82,13 @@ training_args:
   bf16: true                     # fp32 distillation projections need autocast
   remove_unused_columns: false   # or doc_id / ngram_raw are dropped before the collator
   dataloader_num_workers: 0      # required by sidecar.resident
-  per_device_train_batch_size: 1
-  gradient_accumulation_steps: 16
+  # sequence_length must stay 4096 to match the cache's truncation rule, but that is
+  # not the padded batch length: the collator pads to the longest document in each
+  # batch, and documents average ~870 tokens. group_by_length batches similar lengths
+  # together, which cuts padding waste and makes the worst case predictable.
+  per_device_train_batch_size: 2
+  gradient_accumulation_steps: 8
+  group_by_length: true
   gradient_checkpointing: true
   num_train_epochs: 1
   learning_rate: 1.0e-4
