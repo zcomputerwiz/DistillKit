@@ -491,7 +491,10 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
             strategy=config.optimizer.strategy, deepspeed=training_arguments.deepspeed,
             fsdp=training_arguments.fsdp,
             dynamic_unfreeze=config.optimizer.unfreeze_at_step is not None,
-            world_size=accelerator.num_processes,
+            # Read from the training args, not the Accelerator created earlier:
+            # constructing SFTConfig can reset AcceleratorState, after which the
+            # earlier instance raises on attribute access. Same number, stable source.
+            world_size=training_arguments.world_size,
         )
         if config.optimizer.freeze_backbone:
             frozen_names = freeze_backbone_for_stage1(model)
