@@ -1,0 +1,30 @@
+{
+  "gguf": "C:\\Users\\Owner\\.cache\\huggingface\\hub\\models--unsloth--Qwen3.8-Flash-Next-GGUF\\snapshots\\38bb39ee97821de2c9009abb7e93950eec396e66\\UD-IQ4_XS\\Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf",
+  "resident": true,
+  "platform": "Windows-11-10.0.26200-SP0",
+  "torch": "2.11.0+cu128",
+  "batch_size": 8,
+  "sequence_length": 4096,
+  "prepare_seconds": 22.15135519999967,
+  "measurements": [
+    {
+      "hash_seconds": 0.005560000001423759,
+      "gather_seconds": 0.08965580000221962,
+      "gather_cpu_dequant_seconds": 0.576518699999724,
+      "gather_pin_transfer_gpu_dequant_seconds": 0.443469499998173
+    },
+    {
+      "hash_seconds": 0.002781999999569962,
+      "gather_seconds": 0.07207579999885638,
+      "gather_cpu_dequant_seconds": 0.5071018999988155,
+      "gather_pin_transfer_gpu_dequant_seconds": 0.07001470000250265
+    },
+    {
+      "hash_seconds": 0.0021401000012701843,
+      "gather_seconds": 0.09454159999950207,
+      "gather_cpu_dequant_seconds": 0.49420570000074804,
+      "gather_pin_transfer_gpu_dequant_seconds": 0.07029920000059064
+    }
+  ],
+  "training_overlap_verified": false
+}
