@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **191 passed** in the CUDA-enabled dev environment (≈35 s).
+**Test suite:** green — **203 passed** in the CUDA-enabled dev environment (≈30 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -61,13 +61,14 @@ regression), and two CUDA-parametrized cases are skipped.
 4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
    runs". Margins are thin (22.12 / 21.45 GiB reserved against 22.80 allowed).
-5. Port `_AnchorTap` into the trainer. `output_hidden_states=True` retains 33 states and
-   copies all of them to card 0 for the 2 that are read -- about 1.4 GiB, more than the
-   current margin.
-6. Run the actual staged curriculum: the stage-2 config starts from the stock student,
-   not from `runs/sidecar-1m`, so stage 1 -> stage 2 chaining is untested.
-7. 1F1B microbatch interleaving, if the serial split's throughput is the limit.
-8. MTP head - conventions now resolved from llama.cpp; implementation pending.
+5. ~~Port `_AnchorTap` into the trainer~~ - **done**: `distillkit/anchor_tap.py`.
+6. ~~Run the staged curriculum~~ - **done**: chaining wins, 0.5262 against 0.5347, but
+   inside the run-to-run spread. See "The staged curriculum beats training jointly".
+7. 1F1B microbatch interleaving over the existing layer split. The tap has freed the
+   headroom it needs; the remaining work is the schedule itself.
+8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
+   it should keep adapting rather than freezing at stage 1's value.
+9. MTP head - conventions now resolved from llama.cpp; implementation pending.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -480,6 +481,90 @@ times under different memory configurations: eval_loss 0.5853, 0.5973 and 0.5807
 of 0.017. That is not a seed replicate (the configurations differed), but it bounds
 run-to-run wobble at roughly 38% of the effect. The effect is real but a 5M pilot should
 carry at least two seeds per arm before anything is concluded about its size.
+
+## The staged curriculum beats training jointly (2026-09-07)
+
+`examples/qwen35_sidecar_stage2_chained.yml` is byte-identical to the from-scratch
+stage-2 config except that `model:` is stage 1's output, so the sidecar starts from an
+adapter already trained to read the n-gram table rather than from zero.
+
+| run | eval @0.694 | eval @1.0 | runtime | final `W_side_proj` |
+| --- | ---: | ---: | ---: | ---: |
+| stage 1, frozen backbone | 0.6607 | 0.5807 | 1026 s | 2.1055 |
+| stage 2, from the stock student | 0.5709 | 0.5347 | 1269 s | 0.1652 |
+| **stage 2, chained from stage 1** | **0.5468** | **0.5262** | 1291 s | 2.1077 |
+
+Chaining wins, but the margin (0.0085) is smaller than the 0.017 run-to-run spread
+measured on repeated sidecar arms, so treat the ordering as suggestive rather than
+established. `train_loss` is not comparable across these rows: it is the epoch mean, and
+the chained run starts from a much better model (0.5623 against 1.025).
+
+**The finding worth keeping is the weight norm, not the loss.** The chained sidecar moved
+from 2.1055 to 2.1077 across an entire stage-2 epoch -- it carried over and then sat
+still. The from-scratch run reached only 0.1652 in the same budget. So:
+
+* Stage 1 is where the sidecar is actually learned. Its `lr 1e-4` against a frozen
+  backbone moves `W_side_proj` two orders of magnitude further than stage 2's `lr 1e-5`
+  against a free backbone does.
+* Stage 2 cannot substitute for stage 1. Given a free backbone and a low learning rate,
+  the optimiser improves the model through the 4.27B backbone parameters and leaves the
+  65.5M sidecar path where it found it.
+* If the sidecar should keep adapting during stage 2, it needs its own parameter group
+  at a higher learning rate. That is untested.
+
+Note the chaining is partial in both arms: `distillation_projections.*` are written into
+the checkpoint but reload as UNEXPECTED (they belong to the trainer, not the
+architecture), so the hidden-state projections restart from fresh xavier init either
+way. Equal treatment, so the comparison holds, but the sidecar is the only thing that
+actually carries over.
+
+## Anchor taps: stop gathering 33 hidden states for 2 (2026-09-07)
+
+`output_hidden_states=True` retains every state and, on a device-mapped model,
+accelerate's output hook then copies *all of them* to the input device: 33 tensors of
+`[1, 4096, 2560]` bf16, about 0.7 GiB retained plus the same again copied plus gradients
+for the copies, to serve the two anchors the loss reads. `distillkit/anchor_tap.py`
+hooks just those two modules instead.
+
+Two consequences beyond the memory:
+
+* The captured state stays on the card that produced it, so a projection built there
+  consumes it in place and nothing crosses the bus. That removed the need for the
+  `anchor_device` / `returns_outputs_on_input_device` pair, which existed only to
+  predict where accelerate would gather a state to; both are deleted.
+* It is the mechanism 1F1B needs anyway, since a pipelined step has to collect anchors
+  from two different stages.
+
+`tests/test_anchor_tap.py` asserts the tapped states equal `output_hidden_states=True`
+bit for bit at every anchor position, that the off-by-one is right (`hidden_states[i]` is
+layer *i-1*'s output and the last entry is post-norm), that gradients flow through the
+captured tensor, and that gradient checkpointing's recompute does not replace it.
+
+The two-GPU equivalence test caught a real bug in the process: `compute_hs_loss` read
+`hidden_states[0]` unconditionally, only to pick a device for its accumulator. With a
+tapped forward that index is absent -- the real run's anchors are 4 and 32 -- so it now
+takes its reference from the first mapped anchor. `CapturedStates` raises on an untapped
+index rather than returning a neighbouring state, which is what surfaced it.
+
+## Why 1F1B needs the tap first
+
+1F1B keeps at least two microbatches in flight, so the question is what a second one
+costs. Measured at the 7/25 split:
+
+| | card 0 | card 1 |
+| --- | ---: | ---: |
+| persistent (weights + grads + AdamW8bit) | 8.0 GiB | 15.87 GiB |
+| measured peak | 15.62 GiB | 16.71 GiB |
+| activations | **7.6 GiB** | 0.84 GiB |
+
+Card 0's activation cost is almost entirely the head -- logits 1.89 GiB, their gradient
+1.89 GiB, the chunked-KL temporaries, and the gathered hidden states. With gradient
+checkpointing the *front stage* retains only 7 layers x `[1, 4096, 2560]` bf16, about
+150 MB. So a second in-flight microbatch costs roughly 200 MB on card 0 and 525 MB on
+card 1, provided only one microbatch is in the head at a time.
+
+Card 1 has 6.1 GiB of margin for that. Card 0 had 0.7 GiB against its *reservation*,
+which is why the tap comes first.
 
 ## Stage 2 runs: 4.3B trainable across two cards (2026-09-07)
 

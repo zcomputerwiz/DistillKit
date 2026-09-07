@@ -6,6 +6,7 @@ from transformers import (
 )
 from trl import SFTTrainer
 
+from distillkit.anchor_tap import AnchorTap
 from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
@@ -109,11 +110,19 @@ class DistillationTrainer(SFTTrainer):
         model_inputs = {k: inputs[k] for k in forwarded if k in inputs}
         if self.config.sidecar is not None:
             model_inputs["sidecar_enabled"] = self.config.sidecar.enabled
-        student_outputs = model(
-            **model_inputs,
-            return_dict=True,
-            output_hidden_states=self.need_hidden_states,
-        )
+        if self.need_hidden_states:
+            # Not output_hidden_states=True: that retains all 33 states and, on a
+            # device-mapped model, accelerate's output hook copies every one of them to
+            # the input device -- ~0.7 GiB retained plus the same again copied, plus
+            # gradients for the copies, to serve the two anchors the loss reads. Hooks
+            # on just those two modules give the same tensors, on the card that made
+            # them, with no copy.
+            anchors = [student for student, _ in self.hidden_state_mapping.layer_mapping]
+            with AnchorTap(model, anchors) as tap:
+                student_outputs = model(**model_inputs, return_dict=True)
+            student_outputs.hidden_states = tap.states()
+        else:
+            student_outputs = model(**model_inputs, return_dict=True)
         # nn.DataParallel gathers one loss per replica, so student_outputs.loss arrives
         # as [n_gpu] rather than a scalar. Every downstream consumer (the cross_entropy
         # loss function, the .item() logging, the weighted sum) assumes a scalar, and

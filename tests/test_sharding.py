@@ -16,14 +16,13 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs.hidden_state import compute_hs_loss
 from distillkit.lossfuncs.kl import KLDLoss
+from distillkit.anchor_tap import AnchorTap
 from distillkit.sharding import (
-    anchor_device,
     as_device,
     check_tied_embeddings_colocated,
     hidden_state_device,
     is_sharded,
     module_device,
-    returns_outputs_on_input_device,
 )
 from distillkit.signals import SparseSignal
 
@@ -105,22 +104,6 @@ def test_single_device_map_is_not_sharded():
     assert not is_sharded(_FakeModel({"model": 0, "lm_head": 0}))
 
 
-def test_anchor_device_follows_the_output_hook_not_the_map():
-    """accelerate's root hook returns the whole output to the input device.
-
-    That includes the hidden-state tuple, so an anchor computed on card 1 is handed
-    back on card 0. Building its projection where the map says it was produced costs
-    a round trip of the state and its gradient on every step.
-    """
-    model = _FakeModel(_split_map(first_device_layers=2))
-    assert not returns_outputs_on_input_device(model)
-    assert anchor_device(model, NUM_LAYERS) == torch.device("cuda", 1)
-
-    model._hf_hook = type("H", (), {"io_same_device": True})()
-    assert returns_outputs_on_input_device(model)
-    # Produced on card 1, observed on card 0.
-    assert hidden_state_device(model, NUM_LAYERS) == torch.device("cuda", 1)
-    assert anchor_device(model, NUM_LAYERS) == torch.device("cuda", 0)
 
 
 def test_tied_embeddings_split_across_devices_is_rejected():
@@ -172,7 +155,12 @@ def _batch(vocab_size, hidden_size, batch=2, seq=12, top_k=5, seed=0, device="cu
 
 
 def _loss(model, hsm, input_ids, mask, signal):
-    outputs = model(input_ids=input_ids, return_dict=True, output_hidden_states=True)
+    # Tapped, like the trainer: the states stay on the card that produced them instead
+    # of all being gathered to the input device.
+    anchors = [student for student, _ in hsm.layer_mapping]
+    with AnchorTap(model, anchors) as tap:
+        outputs = model(input_ids=input_ids, return_dict=True)
+    outputs.hidden_states = tap.states()
     kl = KLDLoss(temperature=1.0)(outputs, signal, mask=mask, hidden_state_mapping=hsm)
     hs = compute_hs_loss("cosine", outputs, signal, mask, hsm)
     return kl.to("cuda:0") + hs.to("cuda:0")
@@ -207,11 +195,10 @@ def test_sharded_step_matches_single_device_step(tmp_path):
     # Same initial projection weights, each on its own anchor's card.
     for dst, src in zip(shard_hsm.projections, ref_hsm.projections):
         dst.weight.data.copy_(src.weight.data.to(dst.weight.device))
-    # Both land on card 0: dispatch_model's output hook returns the hidden-state
-    # tuple to the input device, so that is where these projections' inputs arrive.
-    assert returns_outputs_on_input_device(sharded)
-    for projection in shard_hsm.projections:
-        assert projection.weight.device == torch.device("cuda", 0)
+    # One per card: the tap captures each anchor where it is produced, so the
+    # projections are built apart and neither state crosses the bus.
+    assert shard_hsm.projections[0].weight.device == torch.device("cuda", 0)
+    assert shard_hsm.projections[1].weight.device == torch.device("cuda", 1)
 
     input_ids, mask, signal = _batch(config.vocab_size, teacher_hidden)
 
@@ -291,7 +278,9 @@ def test_sidecar_student_loads_and_runs_across_two_devices(tmp_path):
         output_hidden_states=True,
     )
     assert torch.isfinite(outputs.logits).all()
-    # Layer 3 runs on card 1, but the output hook hands its state back on card 0.
-    assert hidden_state_device(model, NUM_LAYERS) == torch.device("cuda", 1)
+    # Tapped states stay put: layer 0's output on card 0, post-norm on card 1.
+    with AnchorTap(model, [1, NUM_LAYERS]) as tap:
+        model(input_ids=input_ids.to("cuda:0"), ngram_raw=ngram_raw, return_dict=True)
+        states = tap.states()
     for index in (1, NUM_LAYERS):
-        assert outputs.hidden_states[index].device == anchor_device(model, index)
+        assert states[index].device == hidden_state_device(model, index)

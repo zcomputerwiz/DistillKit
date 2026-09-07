@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import transformers
 
-from distillkit.sharding import anchor_device
+from distillkit.sharding import hidden_state_device
 
 
 class HiddenStateMapping:
@@ -52,12 +52,13 @@ class HiddenStateMapping:
             embedding = student.get_input_embeddings().weight
             self.projections.to(dtype=embedding.dtype)
             # Each projection consumes one student anchor, and on a split model those
-            # anchors need not surface where the embeddings are. A projection cannot
-            # be moved later without orphaning its optimizer state, so place each one
-            # where its anchor will actually be observed -- which is not the same as
-            # where it is computed once accelerate's output hook is in play.
+            # anchors are not all on the embeddings' card. A projection cannot be moved
+            # later without orphaning its optimizer state, so place each one on its
+            # anchor's card now. The trainer taps anchors at their own modules, so this
+            # is where the tensor is produced *and* observed; the loss still aligns
+            # devices defensively for callers that pass gathered states instead.
             for projection, (student_layer_idx, _) in zip(self.projections, layer_mapping):
-                projection.to(device=anchor_device(student, student_layer_idx))
+                projection.to(device=hidden_state_device(student, student_layer_idx))
             student.add_module("distillation_projections", self.projections)
         else:
             self.projections = None

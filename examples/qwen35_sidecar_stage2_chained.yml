@@ -1,0 +1,195 @@
+# Stage-2 sidecar distillation, student sharded across two RTX 3090s.
+#
+# Stage 1 froze the backbone so the sidecar's contribution was attributable. Stage 2
+# unfreezes everything, which is what does not fit on one card.
+#
+# THIS IS THE CHAINED ARM: `model:` is stage 1's output, not the stock student, so the
+# sidecar starts from an adapter already trained to read the n-gram table against a
+# frozen backbone (W_side_proj norm 2.1055) rather than from zero. Everything else is
+# byte-identical to `qwen35_sidecar_stage2_sharded.yml`, which reached eval_loss 0.5347
+# starting the same adapter from zero -- that is the comparison.
+#
+# The 28.8 GB n-gram table is unaffected either way: it is frozen data read by the
+# collator, never a parameter, so "from zero" only ever described the 65.5M-parameter
+# adapter that consumes it.
+#
+# `distillation_projections.*` are saved into the checkpoint but reload as UNEXPECTED
+# (they belong to the trainer, not the architecture), so the hidden-state projections
+# restart from fresh xavier init in both arms. That is equal treatment, not a bug, but
+# it does mean the chaining is partial: the sidecar carries over, the projections do not.
+#
+# The memory problem is the same for both:
+#
+#   4.27B parameters x (2 bf16 weight + 2 bf16 grad + 2 AdamW8bit m/v) = 25.6 GB
+#
+# before a single activation, against 24 GB of VRAM. Splitting the layers across both
+# cards is what makes stage 2 possible at all.
+#
+# The split is a single-process layer assignment, not a distributed job. There is no
+# torchrun, no process group, and no NCCL: `Tensor.to(device)` is differentiable, so
+# autograd moves activations forward and gradients back on its own, over NVLink where
+# peer access is available. HF Trainer sees `hf_device_map`, sets
+# `place_model_on_device=False`, and forces `_n_gpu` to 1 so it does not additionally
+# wrap the model in DataParallel.
+#
+# This is capacity parallelism, not throughput parallelism. Each microbatch still
+# traverses card 0 then card 1 in sequence, so expect roughly single-card speed, not
+# double. Overlapping microbatches (1F1B) is a separate change to the training loop.
+#
+# Run with BOTH cards visible -- unlike the stage-1 configs, which pin
+# CUDA_VISIBLE_DEVICES=0 to keep DataParallel out of the way:
+#   python -m distillkit.main examples/qwen35_sidecar_stage2_chained.yml -v
+
+model: D:/DeepThought/Projects/HybridModel/runs/sidecar-1m
+output_path: D:/DeepThought/Projects/HybridModel/runs/sidecar-stage2-chained
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  # Explicit, not device_map "auto": accelerate's automatic map balances raw weights
+  # and knows nothing about gradients, optimizer state, or the 248,320-wide head's
+  # activation cost, all of which land on card 0 with the head.
+  #
+  # Balanced from measurement, not arithmetic. At 9 layers on card 0 the run reported
+  # (vram/* metrics, logged every step):
+  #   card 0  peak 16.86 GiB, RESERVED 20.75 GiB
+  #   card 1  peak 15.74 GiB, reserved 16.29 GiB
+  # and died asking for 1024 MiB. The peak was survivable; the 3.9 GiB gap between
+  # card 0's peak and its reservation was not, and Windows cannot defragment it --
+  # torch warns "expandable_segments not supported on this platform" and keeps the
+  # native allocator. Card 1 fragments only 0.55 GiB because it holds no head.
+  #
+  # Moving three layers to card 1 dropped card 0's peak to 14.99 GiB and left its
+  # reservation at 20.36 -- reducing live memory does not reclaim a stranded segment --
+  # and then card 1 died instead at 20.37 GiB allocated with only 0.83 GiB unallocated.
+  # Both failures were marginal, about 1 GiB short, from opposite directions.
+  #
+  # Settled at 7 layers on card 0, with the cap raised to 0.95 and the allocator told to
+  # collect under pressure. At 6 bytes per trainable parameter (bf16 weight + bf16 grad
+  # + AdamW8bit m/v), against 22.8 GiB allowed:
+  #   card 0: 0.636B embedding + 7 layers x 0.114B = 1.43B -> 8.6 GiB persistent
+  #           + ~8.2 GiB measured activations + fragmentation
+  #   card 1:              25 layers x 0.114B      = 2.84B -> 17.0 GiB persistent
+  #           + ~1 GiB activations + ~0.8 GiB fragmentation
+  # Card 0's activation cost barely moves with the split -- it is the head plus the 33
+  # hidden states accelerate's output hook copies here for the 2 that get read -- so
+  # persistent state is the only lever on it until those copies go away.
+  #
+  # embed_tokens and lm_head must share a device: tie_word_embeddings is true, so they
+  # are one parameter. Splitting them fabricates a second copy that trains apart and
+  # reconstructs into a checkpoint matching neither. main.py rejects that at load.
+  device_map:
+    model.embed_tokens: 0
+    model.rotary_emb: 0
+    model.norm: 0
+    lm_head: 0
+    model.layers.0: 0
+    model.layers.1: 0    # the sidecar layer; its ngram_raw arrives on card 0
+    model.layers.2: 0
+    model.layers.3: 0
+    model.layers.4: 0
+    model.layers.5: 0
+    model.layers.6: 0
+    model.layers.7: 1
+    model.layers.8: 1
+    model.layers.9: 1
+    model.layers.10: 1
+    model.layers.11: 1
+    model.layers.12: 1
+    model.layers.13: 1
+    model.layers.14: 1
+    model.layers.15: 1
+    model.layers.16: 1
+    model.layers.17: 1
+    model.layers.18: 1
+    model.layers.19: 1
+    model.layers.20: 1
+    model.layers.21: 1
+    model.layers.22: 1
+    model.layers.23: 1
+    model.layers.24: 1
+    model.layers.25: 1
+    model.layers.26: 1
+    model.layers.27: 1
+    model.layers.28: 1
+    model.layers.29: 1
+    model.layers.30: 1
+    model.layers.31: 1
+
+sidecar:
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  resident: true
+  prefault: true
+  layer_index: 1
+  num_branches: 4
+
+# Anchor 4 is layer 3's output and anchor 32 is the post-norm state. Both projections
+# are built on card 0 regardless of the map: accelerate's root hook returns the whole
+# output tuple to the input device.
+layer_mapping:
+  - [4, 0]
+  - [32, 1]
+
+loss_functions:
+  - function: kl
+    weight: 0.7
+    temperature: 1.0
+    missing_probability_handling: zero
+    sparse_chunk_length: 256
+  - function: hs_cosine
+    weight: 0.3
+
+optimizer:
+  # Not `hybrid`: Muon's Newton-Schulz iterations would run on 4.27B parameters here,
+  # and the memory win in stage 2 comes from 8-bit moments. adamw defers to
+  # training_args.optim, which selects bitsandbytes below. bnb keeps each state tensor
+  # on its parameter's own card, so the split holds through the optimizer.
+  strategy: adamw
+  freeze_backbone: false
+  unfreeze_at_step: null
+  log_every_n_steps: 1     # diagnostic: per-step VRAM until the split is settled
+
+use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
+functionary_packing: false
+chunked_cross_entropy: true
+# 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
+# The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
+# -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.
+max_vram_fraction: 0.95     # applied to every visible device
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 16
+  gradient_checkpointing: true
+  num_train_epochs: 1
+  # An order of magnitude below stage 1: that run only moved 65.5M sidecar parameters
+  # against a fixed backbone, and reusing its 1e-4 on the full backbone would wash out
+  # what the frozen-backbone arm established.
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 50
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42

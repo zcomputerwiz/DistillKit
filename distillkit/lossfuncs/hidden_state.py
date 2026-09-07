@@ -26,17 +26,21 @@ def compute_hs_loss(
     assert student_outputs.hidden_states is not None
     assert signal.hidden_states is not None
 
+    # Index 0 is not necessarily available: the trainer taps only the anchors this
+    # mapping names, so `hidden_states` can be a sparse view whose keys are exactly
+    # those anchors. Take the reference shape and device from the first one instead.
+    first_anchor = hidden_state_mapping.layer_mapping[0][0]
+    reference = student_outputs.hidden_states[first_anchor]
+
     if mask is None:
         mask = torch.ones(
-            student_outputs.hidden_states[0].shape[:-1],
-            dtype=torch.bool,
-            device=student_outputs.hidden_states[0].device,
+            reference.shape[:-1], dtype=torch.bool, device=reference.device,
         )
 
     if mask is not None and mask.dim() == 2:
         mask = mask.unsqueeze(-1)
 
-    total_loss = torch.tensor(0.0, device=student_outputs.hidden_states[0].device)
+    total_loss = torch.tensor(0.0, device=reference.device)
     for i, (student_layer_idx, teacher_layer_idx) in enumerate(
         hidden_state_mapping.layer_mapping
     ):
