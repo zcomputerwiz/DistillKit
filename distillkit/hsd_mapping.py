@@ -47,6 +47,8 @@ class HiddenStateMapping:
                     raise ValueError(f"Unknown projection_init: {init_strategy}")
 
             # slap 'em on the student so they're trained and saved
+            embedding = student.get_input_embeddings().weight
+            self.projections.to(device=embedding.device, dtype=embedding.dtype)
             student.add_module("distillation_projections", self.projections)
         else:
             self.projections = None

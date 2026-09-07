@@ -83,6 +83,80 @@ class OfflineSignalSource(SignalSource):
         )
 
 
+class OfflineHiddenStateSignalSource(SignalSource):
+    """Load a compact anchor tuple and top-k log probabilities by document ID.
+
+    The collator must preserve ``doc_id`` and the exact captured tokens. Only
+    contiguous left/right padding is accepted; cropped windows and packing
+    require new teacher captures because they change the visible prefix.
+    """
+
+    def __init__(self, cache_path, **cache_validation):
+        from distillkit.offline_cache import OfflineTeacherCache
+
+        self.cache = OfflineTeacherCache(cache_path, **cache_validation)
+        self.vocab_size = self.cache.vocab_size
+        self.anchor_layers = self.cache.anchor_layers
+        self.hidden_size = self.cache.hidden_size
+        self.preapplied_temperature = 1.0
+        self.log_values = True
+
+    @override
+    def supports_hidden_states(self) -> bool:
+        return True
+
+    @override
+    def get_signal(self, batch: dict[str, Any], return_hidden_states: bool = False) -> SparseSignal:
+        import numpy as np
+
+        tokens = batch.get("input_ids")
+        if not isinstance(tokens, torch.Tensor) or tokens.ndim != 2:
+            raise ValueError("Offline cache requires a [batch, sequence] input_ids tensor")
+        doc_ids = batch.get("doc_id")
+        if not isinstance(doc_ids, (list, tuple)) or len(doc_ids) != tokens.shape[0]:
+            raise ValueError("Offline cache requires one doc_id string per batch row")
+        if any(not isinstance(doc_id, str) for doc_id in doc_ids):
+            raise ValueError("Offline cache doc_id values must be strings")
+        mask = batch.get("attention_mask", torch.ones_like(tokens))
+        if not isinstance(mask, torch.Tensor) or mask.shape != tokens.shape:
+            raise ValueError("Offline cache attention_mask must match input_ids")
+        if not torch.all((mask == 0) | (mask == 1)):
+            raise ValueError("Offline cache requires a binary attention_mask; packing is unsupported")
+        host_tokens = tokens.detach().cpu().numpy()
+        host_mask = mask.detach().bool().cpu().numpy()
+        batch_size, seq_length = tokens.shape
+        top_k = self.cache.manifest["top_k"]
+        sparse_ids = torch.zeros((batch_size, seq_length, top_k), dtype=torch.long)
+        sparse_values = torch.full((batch_size, seq_length, top_k), -1e4, dtype=torch.float16)
+        hidden_states = (
+            tuple(torch.zeros((batch_size, seq_length, self.hidden_size), dtype=torch.bfloat16)
+                  for _ in self.anchor_layers) if return_hidden_states else None
+        )
+        with torch.no_grad():
+            for row, doc_id in enumerate(doc_ids):
+                positions = np.flatnonzero(host_mask[row])
+                if not len(positions) or not np.array_equal(positions, np.arange(positions[0], positions[-1] + 1)):
+                    raise ValueError("Offline cache requires nonempty contiguous document tokens")
+                cached = self.cache.read_document(doc_id, include_hidden_states=return_hidden_states)
+                if not np.array_equal(host_tokens[row, positions], cached["input_ids"]):
+                    raise ValueError(f"Offline cache token mismatch for document {doc_id!r}; truncation/packing is unsupported")
+                start, end = int(positions[0]), int(positions[-1]) + 1
+                sparse_ids[row, start:end] = torch.from_numpy(cached["topk_ids"].astype(np.int64))
+                sparse_values[row, start:end] = torch.from_numpy(cached["topk_logprobs"])
+                if hidden_states is not None:
+                    decoded = torch.from_numpy(cached["hidden_states"]).view(torch.float8_e4m3fn).to(torch.bfloat16)
+                    if not torch.isfinite(decoded).all():
+                        raise ValueError(f"Nonfinite hidden-state cache for document {doc_id!r}")
+                    for anchor, target in enumerate(hidden_states):
+                        target[row, start:end] = decoded[:, anchor, :]
+            return SparseSignal(
+                sparse_ids=sparse_ids.to(tokens.device), sparse_values=sparse_values.to(tokens.device),
+                log_values=True, generation_temperature=1.0,
+                hidden_states=tuple(h.to(tokens.device) for h in hidden_states) if hidden_states is not None else None,
+                vocab_size=self.vocab_size,
+            )
+
+
 class OnlineSignalSource(SignalSource):
     teacher_model: transformers.PreTrainedModel
     vocab_size: int
