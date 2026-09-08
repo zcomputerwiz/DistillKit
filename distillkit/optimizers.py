@@ -217,9 +217,42 @@ class MixedMuonAdamW(torch.optim.Optimizer):
 
 
 def build_mixed_optimizer(model: nn.Module, *, include_frozen: bool = True, **kwargs):
-    return MixedMuonAdamW(
-        mixed_parameter_groups(model, include_frozen=include_frozen), **kwargs
-    )
+    groups = mixed_parameter_groups(model, include_frozen=include_frozen)
+    _refuse_trainable_muon_shards(model, groups)
+    return MixedMuonAdamW(groups, **kwargs)
+
+
+def _refuse_trainable_muon_shards(model: nn.Module, groups) -> None:
+    """Muon must not receive a tensor-parallel shard that is actually being trained.
+
+    Newton-Schulz orthogonalization does not commute with slicing, so Muon on a shard is
+    not the shard of Muon on the whole matrix; the shape-dependent learning-rate scaling
+    would use the shard's dimensions too. Configuration already refuses the combination
+    that could produce this, but only for runs driven by ``main.py``: a programmatic
+    caller can reach ``unfreeze_backbone()`` directly. This is the same invariant checked
+    where it is actually load-bearing, against the live parameters.
+
+    Note which parameters are at risk. Column- and row-parallel weights are
+    ``nn.Parameter`` inside an ``nn.ParameterList`` and never match Muon's
+    ``isinstance(module, nn.Linear)`` test, but the sharded GatedDeltaNet projections are
+    built by ``_slice_linear`` and *are* real ``nn.Linear`` modules, so they do route to
+    Muon. Tensor parallelism therefore gives a mixture, not a clean fallback to AdamW.
+    """
+    if not hasattr(model, "_distillkit_tp_devices"):
+        return
+    offenders = [
+        name
+        for group in groups
+        if group["optimizer_kind"] == "muon"
+        for name, parameter in zip(group["param_names"], group["params"])
+        if parameter.requires_grad
+    ]
+    if offenders:
+        raise ValueError(
+            "Muon would receive %d trainable tensor-parallel shard(s), starting with %s. "
+            "Use optimizer.strategy=adamw for a trainable backbone under tensor "
+            "parallelism." % (len(offenders), offenders[0])
+        )
 
 
 def freeze_backbone_for_stage1(model: nn.Module) -> tuple[str, ...]:

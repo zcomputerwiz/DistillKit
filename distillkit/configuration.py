@@ -304,11 +304,12 @@ class DistillationRunConfig(BaseModel):
                 # matter only for parameters that actually receive updates.
                 #
                 # Routing: mixed_parameter_groups identifies Muon's matrices with
-                # isinstance(module, nn.Linear), but sharded weights are nn.Parameter
-                # inside an nn.ParameterList on ColumnParallelLinear and friends. Under
-                # tensor parallelism every sharded matrix would therefore fall through
-                # to AdamW while the config still said "hybrid" -- a silent change of
-                # optimizer, which is worse than a refusal.
+                # isinstance(module, nn.Linear). Column- and row-parallel weights are
+                # nn.Parameter inside an nn.ParameterList and so fall through to AdamW
+                # while the config still says "hybrid" -- but the sharded GatedDeltaNet
+                # projections are built by _slice_linear and *are* nn.Linear, so they
+                # still route to Muon. Tensor parallelism thus yields an inconsistent
+                # mixture rather than a clean fallback, which is worse than either.
                 #
                 # Mathematics: even with the routing fixed, Newton-Schulz
                 # orthogonalization does not commute with slicing, so Muon on a shard is

@@ -14,7 +14,38 @@ from torch import nn
 
 from distillkit.configuration import DistillationRunConfig
 from distillkit.gated_residual import GatedResidual
-from distillkit.optimizers import freeze_backbone_for_stage1, mixed_parameter_groups
+from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
+
+install_device_aware_linear_attention()
+
+from distillkit.optimizers import (  # noqa: E402
+    _auxiliary_parameter_ids,
+    build_mixed_optimizer,
+    freeze_backbone_for_stage1,
+    mixed_parameter_groups,
+)
+
+
+def _sharded_student():
+    """A real tensor-parallel Qwen3.5, sharded across two CPU 'devices'."""
+    from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+    from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
+
+    from distillkit.tp_model import shard_model
+
+    config = Qwen3_5TextConfig(
+        vocab_size=64, hidden_size=32, intermediate_size=64, num_hidden_layers=4,
+        num_attention_heads=4, num_key_value_heads=2, head_dim=8, linear_key_head_dim=8,
+        linear_value_head_dim=8, linear_num_key_heads=2, linear_num_value_heads=4,
+        linear_conv_kernel_dim=4, full_attention_interval=2, tie_word_embeddings=True,
+        max_position_embeddings=64, pad_token_id=0, eos_token_id=3, use_cache=False,
+    )
+    torch.manual_seed(0)
+    model = Qwen3_5ForCausalLM(config).eval()
+    # Stage 1 trains these; without one, freeze_backbone_for_stage1 refuses.
+    model.sidecar = nn.Linear(32, 32, bias=False)
+    model.gated_residual = GatedResidual(32, num_branches=2)
+    return shard_model(model, ["cpu", "cpu"])
 
 
 class _Student(nn.Module):
@@ -63,6 +94,45 @@ def test_stage1_leaves_muon_with_no_trainable_parameters():
         "parallelism with strategy=hybrid is no longer sound" % after.get("muon", 0)
     )
     assert after.get("adamw", 0) > 0, "stage 1 must still train the auxiliary modules"
+
+
+def test_the_invariant_holds_on_an_actually_sharded_model():
+    """The one that matters. Checking routing on an unsharded stand-in would miss the
+    case that makes this delicate: the sharded GatedDeltaNet projections are built by
+    _slice_linear and really are nn.Linear, so they still route to Muon even under
+    tensor parallelism -- unlike the column/row-parallel weights, which are bare
+    Parameters and fall through to AdamW. Only the freeze keeps Muon empty.
+    """
+    model = _sharded_student()
+    muon_before = [
+        name for group in mixed_parameter_groups(model)
+        if group["optimizer_kind"] == "muon" for name in group["param_names"]
+    ]
+    assert any(".in_proj_" in name for name in muon_before), (
+        "expected the sharded gated-delta projections to route to Muon; if this "
+        "changed, the reasoning behind the relaxation needs revisiting"
+    )
+
+    freeze_backbone_for_stage1(model)
+    assert _trainable_by_kind(model).get("muon", 0) == 0
+
+    # Codex's stronger form: check every non-auxiliary parameter, not just Muon's
+    # group, so a misrouted shard cannot hide behind a Muon-only assertion.
+    auxiliary = _auxiliary_parameter_ids(model)
+    leaked = [n for n, p in model.named_parameters()
+              if p.requires_grad and id(p) not in auxiliary]
+    assert not leaked, "non-auxiliary parameters still trainable after freezing: %s" % leaked[:5]
+
+
+def test_build_mixed_optimizer_refuses_trainable_shards_at_runtime():
+    """Configuration only governs runs driven by main.py; unfreeze_backbone() and other
+    programmatic paths can reach a trainable sharded backbone regardless."""
+    model = _sharded_student()  # nothing frozen: the backbone is trainable
+    with pytest.raises(ValueError, match="trainable tensor-parallel shard"):
+        build_mixed_optimizer(model)
+
+    freeze_backbone_for_stage1(model)
+    build_mixed_optimizer(model)  # stage 1 is fine
 
 
 def _config(**optimizer):

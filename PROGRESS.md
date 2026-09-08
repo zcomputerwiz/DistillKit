@@ -1021,6 +1021,68 @@ hours** for 5M. The likeliest explanation is that the 1M capture predates the
 grouped-query attention fix, which was the largest single win in this project and is
 installed at import in `sample_transformers`.
 
+## Muon, tensor parallelism, and where each optimizer earns its place (2026-09-08)
+
+Stage 1 could not use tensor parallelism: configuration refused `tensor_parallel`
+alongside `optimizer.strategy=hybrid`. The cost was measured, not assumed -- stage 1 runs
+the layer split, `nvidia-smi` shows exactly one card busy in 21 of 30 samples, and the
+batching worth 1.5-1.6x under tensor parallelism is worth **1.12x** there (13.86 -> 12.42
+s/it at a constant 16 sequences per optimizer step).
+
+### The guard was refusing something equivalent to what it allowed
+
+Census on the real model. Unfrozen, routing sends 3569.1M parameters to Muon and 702.2M
+to AdamW. After `freeze_backbone_for_stage1`, the Muon group holds **0.0M trainable**
+against AdamW's 65.5M, because everything stage 1 trains -- sidecar, gated residual,
+distillation projections -- is auxiliary and routed to AdamW. **Muon has never trained
+anything in this project**: stage 1 gives it nothing, and stage 2 uses `adamw`.
+
+So `hybrid` under stage-1 freezing *is* AdamW-on-auxiliary, and tensor parallelism is now
+permitted exactly when `freeze_backbone` is set and `unfreeze_at_step` is None.
+
+### Two corrections from adversarial review, both of which I had wrong
+
+**Tensor parallelism does not simply fall back to AdamW.** I claimed sharded matrices all
+miss Muon's `isinstance(module, nn.Linear)` test. Column- and row-parallel weights do --
+they are bare `nn.Parameter` in a `ParameterList` -- but the sharded GatedDeltaNet
+projections are built by `_slice_linear` and *are* real `nn.Linear`, so they still route
+to Muon. Measured on a sharded 4-layer model: 16 parameters remain in the Muon group. The
+combination gives an inconsistent mixture rather than a clean fallback, which makes the
+refusal more necessary, not less.
+
+**Muon is not more expensive here.** I measured 4.00 bytes per parameter against
+AdamW8bit's 2.05 and concluded Muon would double optimizer memory. That measurement used
+fp32 parameters. `torch.optim.Muon` allocates its momentum with `zeros_like(p.grad)`, and
+these runs load bf16, so the real figure is **2.00 bytes per parameter -- a wash with
+AdamW8bit**, not double:
+
+| optimizer | bytes/param | 3.57B backbone |
+| --- | ---: | ---: |
+| Muon, bf16 parameters (what a run would see) | 2.00 | 7.1 GB |
+| bnb AdamW8bit (stage 2 today) | 2.05 | 7.3 GB |
+| Muon, fp32 parameters (the misleading measurement) | 4.00 | 14.3 GB |
+| torch AdamW fp32 | 8.00 | 28.6 GB |
+
+Muon still costs compute the table does not show -- five Newton-Schulz iterations are
+about fifteen matmuls per 2D parameter per optimizer step, amortized over the accumulation
+window.
+
+### Where each optimizer earns its place
+
+* **Stage 1** -- AdamW, whatever the config says. Only 65.5M auxiliary parameters train
+  and none of them is a hidden matrix Muon would want. `hybrid` here is a label.
+* **Stage 2** -- an open question, and now a fair one. Muon would cover the 3569.1M
+  backbone matrices at memory parity with AdamW8bit, so the choice is about convergence
+  rather than capacity. Nothing in this project has tested it. Settling it needs a
+  matched pair on the same data, seed and hardware with its own learning-rate sweep,
+  since Muon's scale is not AdamW's.
+* **Never** -- Muon on a tensor-parallel shard. Newton-Schulz orthogonalization does not
+  commute with slicing, and the shape-dependent learning-rate scaling would use the
+  shard's dimensions. Configuration refuses the combination, and
+  `build_mixed_optimizer` now refuses it again against live parameters, because
+  configuration only governs runs driven by `main.py` while `unfreeze_backbone()` is
+  reachable programmatically.
+
 ## Batching: throughput is set by tokens per microbatch, not by batch size (2026-09-08)
 
 The single most mispriced knob in this project. Batching was written off twice on a
