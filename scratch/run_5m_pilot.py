@@ -6,11 +6,13 @@ pressure, and this pilot is measuring a 0.0448 effect.
 
     python scratch/run_5m_pilot.py            # run every arm that has no result yet
     python scratch/run_5m_pilot.py --summary  # just print what has finished
-    python scratch/run_5m_pilot.py --smoke    # 3 steps per arm against the 1M cache
+    python scratch/run_5m_pilot.py --smoke    # 3 steps of arm 1, against the real cache
 
---smoke is the gate to run first: it exercises stage 1 with tensor parallelism and
-sortish batching together, a combination no completed run has used, and it fails in
-minutes rather than an hour into the first real arm.
+--smoke is the gate to run first: it exercises stage 1 with sortish batching and the
+folded head, a combination no completed run has used, and it fails in minutes rather
+than an hour into the first real arm. It already earned its place -- the first version
+of these configs set tensor_parallel alongside stage 1's hybrid (Muon) optimizer, which
+config validation refuses, and the smoke caught it in 12 seconds.
 """
 
 import argparse
@@ -97,10 +99,8 @@ def main():
         return 0
 
     if args.smoke:
-        # Against the 1M cache, which exists; the point is the code path, not the data.
         import yaml
         config = yaml.safe_load(open(ARMS[0][1], encoding="utf-8"))
-        config["teacher"]["cache_path"] = str(ROOT / "teacher-cache-1m")
         config["output_path"] = str(ROOT / "runs" / "smoke-5m-path")
         config["training_args"]["max_steps"] = 3
         config["training_args"]["eval_steps"] = 3

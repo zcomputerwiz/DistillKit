@@ -39,16 +39,64 @@ teacher:
   anchor_layers: [8, 64]
   cache_dtype: float8_e4m3fn
 
-# No explicit device_map: tensor parallelism places the model itself, and shard_model
-# refuses a model that already carries accelerate hooks. TP is faster than the layer
-# split (2.598 s against 3.99 s per 4096-token microbatch) and was verified to be the
-# same function -- stage 2 gave eval_loss 0.5329 under TP against 0.5330 under the
-# layer split, and the exported weights move identically.
-tensor_parallel: true
-# Required under tensor parallelism: the residual stream and the head share card 0, so
-# the 1.89 GiB materialized logits are what binds. Under the layer split this was worth
-# 4.4% and left off; the knob is only correct relative to a placement.
-chunked_head: true
+model_kwargs:
+  # Both arms run split across the two cards. On one card this run peaks at 15.16 GiB
+  # of live tensors under a 22.08 GiB cap, and the control arm died anyway: the 3.79 GiB
+  # contiguous request for the logits gradient could not be placed against 4.04 GiB of
+  # reserved-but-unallocated fragmentation. The allocator's own remedy is unavailable
+  # here -- PyTorch warns "expandable_segments not supported on this platform" on
+  # Windows -- so the fix is to stop running at the edge. Split, the same step peaks at
+  # 10.29 GiB on card 0 and 9.58 GiB on card 1.
+  #
+  # This is one process with no NCCL and no process group: Tensor.to(device) is
+  # differentiable, so autograd moves activations forward and gradients back itself.
+  #
+  # The map has to name every module. A compact form leaning on prefixes
+  # ({"model": 1} plus a few overrides) is accepted by from_pretrained and then places
+  # tensors wrongly -- accelerate hooks at the granularity of the keys given, so an
+  # override nested inside a mapped subtree never gets its own input alignment and the
+  # forward dies with "found at least two devices".
+  #
+  # embed_tokens and lm_head share card 0: tie_word_embeddings is true, so they are one
+  # parameter. main.py rejects a map that separates them.
+  device_map:
+    model.embed_tokens: 0
+    model.rotary_emb: 0
+    model.norm: 0
+    lm_head: 0
+    model.layers.0: 0
+    model.layers.1: 0
+    model.layers.2: 0
+    model.layers.3: 0
+    model.layers.4: 0
+    model.layers.5: 0
+    model.layers.6: 0
+    model.layers.7: 0
+    model.layers.8: 0
+    model.layers.9: 1
+    model.layers.10: 1
+    model.layers.11: 1
+    model.layers.12: 1
+    model.layers.13: 1
+    model.layers.14: 1
+    model.layers.15: 1
+    model.layers.16: 1
+    model.layers.17: 1
+    model.layers.18: 1
+    model.layers.19: 1
+    model.layers.20: 1
+    model.layers.21: 1
+    model.layers.22: 1
+    model.layers.23: 1
+    model.layers.24: 1
+    model.layers.25: 1
+    model.layers.26: 1
+    model.layers.27: 1
+    model.layers.28: 1
+    model.layers.29: 1
+    model.layers.30: 1
+    model.layers.31: 1
+
 sidecar:
   # Shard 2 of the Unsloth GGUF carries per_layer_token_embd.weight (IQ4_NL, 28.8 GB).
   table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
@@ -97,8 +145,16 @@ optimizer:
 use_flash_attention: false  # no Windows wheels; bf16 is set explicitly below
 functionary_packing: false  # qwen3_5 hits monkey_patch_packing's else-raise anyway
 chunked_cross_entropy: true
+# Required once a microbatch holds four sequences: the logits this removes are
+# [4, seq, 248320]. At batch 1 it cost 4.4% and was left off.
+chunked_head: true
+# Length-group each microbatch and shuffle the batch order. Throughput is set by tokens
+# per microbatch, not batch size, and this corpus is median 537 tokens -- at batch 1 most
+# microbatches run the GPU at under half its rate. HF's group_by_length buys the same
+# speed for 0.0176 of eval_loss; sortish costs 0.0084. Every arm here samples
+# identically, so that offset is common-mode and cancels in sidecar minus control.
 sortish_batching: true
-max_vram_fraction: 0.95     # applied to every visible device
+max_vram_fraction: 0.95     # batch 4 wants the headroom
 
 training_args:
   bf16: true                     # fp32 distillation projections need autocast
@@ -113,21 +169,12 @@ training_args:
   # Batch 2 pushed the working set to 24.3 GB dedicated + 19.7 GB SPILLED to shared
   # system memory: 100% GPU utilisation at 133 W with a 0% memory controller, and
   # 200 tok/s instead of 1428. Batch 1 keeps it resident; effective batch is unchanged.
-  # Throughput is set by tokens per microbatch, not batch size, and this corpus is
-  # median 537 tokens -- at batch 1 most microbatches run the GPU at under half its
-  # rate. 4 x 4 keeps the effective batch at 16, exactly what the 1M arms used, so the
-  # arms stay comparable with those results. sortish_batching groups each microbatch by
-  # length and shuffles the batch order; HF's group_by_length costs 0.0176 of eval_loss
-  # for the same speed, sortish 0.0084. Every arm here uses identical sampling, so the
-  # offset is common-mode and cancels in the sidecar-minus-control difference.
+  # 4 x 4 keeps the effective batch at 16, exactly what the 1M arms used, so these
+  # results stay comparable with them.
   per_device_train_batch_size: 4
   length_column_name: length
   gradient_accumulation_steps: 4
   gradient_checkpointing: true
-  # Non-reentrant is required: the TP collectives are custom autograd Functions
-  # and reentrant checkpointing cannot see through them.
-  gradient_checkpointing_kwargs:
-    use_reentrant: false
   num_train_epochs: 1
   learning_rate: 1.0e-4
   # Constant LR on purpose: a cosine schedule tuned for a long run decays differently
