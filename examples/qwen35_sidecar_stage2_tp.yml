@@ -69,6 +69,9 @@ optimizer:
 # working set is the binding constraint there rather than layer weights. Without this
 # the run OOM'd at step 4 asking for the 1.89 GiB materialized logits, with card 0 at
 # 20.52 GiB. Folded, the same step peaks at 12.22 GiB.
+use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
+functionary_packing: false
+chunked_cross_entropy: true
 chunked_head: true
 #   chunked_head: false   997 tok/s   card 0 15.16 GiB
 #
