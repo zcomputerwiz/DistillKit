@@ -105,6 +105,35 @@ def test_short_datasets_are_still_a_permutation(count):
     assert sorted(indices) == list(range(count))
 
 
+@pytest.mark.parametrize("count", [1150, 1151, 1153, 999])
+def test_a_short_final_batch_stays_final(count):
+    """The flat stream is re-chunked at batch_size by the DataLoader, so a short batch
+    anywhere but the end shifts every later boundary and undoes the grouping.
+
+    Caught by adversarial review, not by these tests: the original fixtures all divided
+    evenly by the batch size, which is exactly the case that hides it.
+    """
+    lengths = _lengths(count=count)
+    indices = sortish_indices(lengths, BATCH, generator=_generator())
+    assert sorted(indices) == list(range(count))
+    assert _padding_waste(indices, lengths) < 0.05, "a misplaced short batch mixes lengths"
+
+
+def test_the_sort_window_is_independent_of_the_batch_size():
+    """Padding is set by how many examples are sorted together, which HF ties to the
+    batch size. Grouping at the microbatch must not cost padding to do it."""
+    from transformers.trainer_pt_utils import get_length_grouped_indices
+
+    lengths = _lengths()
+    # What HF would do grouping at the optimizer step (batch 4 x accumulation 4).
+    hf = _padding_waste(get_length_grouped_indices(lengths, 16, generator=_generator()), lengths)
+    narrow = _padding_waste(sortish_indices(lengths, BATCH, sort_window=200, generator=_generator()), lengths)
+    wide = _padding_waste(sortish_indices(lengths, BATCH, generator=_generator()), lengths)
+
+    assert narrow > hf, "the narrow window should be the regression this guards against"
+    assert wide < hf, f"sortish {wide:.4f} should beat HF's grouping {hf:.4f}"
+
+
 def test_sampler_wraps_the_indices():
     lengths = _lengths(200)
     sampler = SortishSampler(BATCH, lengths, generator=_generator())
