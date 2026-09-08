@@ -679,6 +679,40 @@ which is why the tap comes first.
 
 ## Hybrid tensor parallelism: working, 1.41x (2026-09-08)
 
+### Not yet through a full training run
+
+`examples/qwen35_sidecar_stage2_tp.yml` is wired and validated, and `shard_model`
+applies cleanly at startup -- "sharded 32 MLPs, 8 attention, 24 gated-delta blocks;
+83.6% of parameters split, 4.63/3.32 GiB per card". It has not completed an epoch.
+
+Three attempts, the first two my own errors and recorded because the second is a trap
+anyone repeating this will hit:
+
+1. Inherited `chunked_head: false` from the layer-split config. The probe that measured
+   12.22 GiB used the folded head. **The knob is only correct relative to a placement**:
+   the layer split gives card 0 thirteen layers so weights bind and the head's 4.4%
+   recompute is not worth paying; tensor parallelism halves every layer but leaves the
+   residual stream, tied embeddings and the whole head working set on card 0, so the
+   head binds instead. Opposite answers, same setting.
+2. My edit enabling it also swallowed `use_flash_attention: false`,
+   `functionary_packing: false` and `chunked_cross_entropy: true`, so the run died on a
+   missing Windows wheel. Both configs are now diffed with comments stripped: the only
+   differences are the output path, `tensor_parallel`, `chunked_head` and the
+   `use_reentrant` requirement.
+3. **Open**: with the folded head on, still OOM at step 4 of 72, card 0 asking 1.89 GiB
+   -- the size of `[1, 4096, 248320]` bf16 -- **during backward**, not forward. So the
+   head is folded correctly on the way in and something in the backward materializes a
+   full-sequence logits-shaped tensor anyway. Candidates worth checking first: the
+   checkpointed chunk recompute interacting with the reduction barrier, and the
+   `lm_head` weight gradient (`[248320, 2560]`, 1.27 GiB) accumulating alongside a live
+   chunk.
+
+Until an epoch completes, the 1.41x stands only as a microbatch measurement. The
+trajectory-level risks a single step cannot show -- a gradient scaled by a constant, a
+shard drifting from its partner, the replicated-norm reduction firing intermittently --
+remain unverified.
+
+
 Single-process tensor parallelism across both cards, sharding **83.6% of the 4.271B
 parameters**. Measured on the real student with the same losses the layer split was
 measured with -- chunked KL over the 248,320-wide vocabulary plus hidden-state cosine:
