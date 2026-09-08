@@ -49,7 +49,7 @@ class HiddenStateMapping:
                     raise ValueError(f"Unknown projection_init: {init_strategy}")
 
             # slap 'em on the student so they're trained and saved
-            embedding = student.get_input_embeddings().weight
+            embedding = next(student.get_input_embeddings().parameters())  # a shard, when vocab-parallel
             self.projections.to(dtype=embedding.dtype)
             # Each projection consumes one student anchor, and on a split model those
             # anchors are not all on the embeddings' card. A projection cannot be moved

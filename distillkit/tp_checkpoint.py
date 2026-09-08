@@ -13,6 +13,7 @@ import torch
 from distillkit.tp_blocks import TensorParallelAttention
 from distillkit.tp_gated_delta_module import TensorParallelGatedDeltaNet
 from distillkit.tp_linear import ColumnParallelLinear, RowParallelLinear
+from distillkit.tp_vocab import VocabParallelEmbedding, VocabParallelHead
 
 MARKER = "distillkit_tp.json"
 
@@ -35,6 +36,11 @@ def tensor_specs(model):
                                     dim=0 if isinstance(module, ColumnParallelLinear) else 1))
             if isinstance(module, ColumnParallelLinear) and module.biases is not None:
                 specs.append(TensorSpec(prefix + ".bias", tuple(f"{prefix}.biases.{i}" for i in range(len(module.biases)))))
+        if isinstance(module, (VocabParallelEmbedding, VocabParallelHead)):
+            # Both roles hold the same shards; each reconstructs under its own name and
+            # the tie de-duplicates them on save, as it does for the stock model.
+            specs.append(TensorSpec(prefix + ".weight",
+                                    tuple(f"{prefix}.shards.{i}" for i in range(len(module.shards))), dim=0))
         if isinstance(module, TensorParallelAttention):
             for name in ("q_norm", "k_norm"):
                 replicas = getattr(module, name + "s")

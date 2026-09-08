@@ -49,6 +49,17 @@ def is_sharded(model) -> bool:
     return len(devices) > 1
 
 
+def embedding_device(model) -> torch.device:
+    """Where the input embeddings put their output.
+
+    A vocab-parallel embedding spans cards and names its home; a stock one is
+    wherever its weight is.
+    """
+    embed = model.get_input_embeddings()
+    device = getattr(embed, "device", None)
+    return device if device is not None else embed.weight.device
+
+
 def module_device(model, name: str) -> torch.device:
     """Device of a named submodule, falling back to the input embeddings."""
     device_map = getattr(model, "hf_device_map", None)
@@ -56,7 +67,7 @@ def module_device(model, name: str) -> torch.device:
         found = _lookup(device_map, name)
         if found is not None:
             return as_device(found)
-    return model.get_input_embeddings().weight.device
+    return embedding_device(model)
 
 
 def hidden_state_device(model, index: int) -> torch.device:

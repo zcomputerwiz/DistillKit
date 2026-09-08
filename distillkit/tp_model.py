@@ -10,20 +10,14 @@ norm, rotary and the sidecar -- stays on card 0 throughout, and the outer model 
 unmodified: gradient checkpointing, the anchor tap and the folded head all continue to
 work untouched.
 
-The tied embedding/head is the one whole parameter big enough to matter: 0.636B
-parameters, 16.4% of the model, and with its gradient and 8-bit optimizer moments
-3.5 GiB that would otherwise all sit on the home card on top of its half of every
-layer. It cannot be split across cards without becoming two parameters, but it can be
-*moved*: it lives on the last card, and :class:`RemoteEmbedding` / :class:`RemoteLinear`
-run it where the weight is and hand the result back to the caller's card, so the
-residual stream never notices. What crosses NVLink is the embedding output and the
-post-norm state -- 20 MiB each at sequence 4096, against the ~100 reductions of the
-same size the layers already do per microbatch. With the folded head, the loss's
-logits chunks and their gradients live on that card too.
-
-Vocab-parallel embeddings would instead split the parameter each way; the loss would
-then need a distributed log-sum-exp, cheap here but not built, and after the move
-there is no imbalance left for it to fix.
+The tied embedding/head is split by vocabulary rows (``tp_vocab``), half on each card,
+with its gradient and optimizer state following the shards. It is the one whole
+parameter big enough to unbalance the cards -- 0.636B parameters, 3.5 GiB with 8-bit
+moments -- and both other placements were measured and rejected: whole on the home card
+left card 0 the heavier by about 5 GiB, whole on the other card flipped that to
+11.42 / 15.02. The lookup's result and the head's input are the only added traffic,
+20 MiB each per 4096-token microbatch; the folded loss composes its log-sum-exp from
+per-card pieces rather than gathering logits.
 
 Replicated on purpose, per the review that informed this design: the norms, the
 n-gram sidecar and the distillation projections. Sharding any of them inserts a
@@ -45,72 +39,20 @@ from distillkit.tp_gated_delta_module import (
     TensorParallelGatedDeltaNet,
     sync_replicated_gradients,
 )
+from distillkit.tp_vocab import VocabParallelEmbedding, VocabParallelHead
 
 LOG = logging.getLogger(__name__)
 
-__all__ = [
-    "RemoteEmbedding",
-    "RemoteLinear",
-    "place_tied_embeddings",
-    "shard_model",
-    "sharded_parameter_report",
-    "sync_replicated_gradients",
-]
+__all__ = ["shard_model", "sharded_parameter_report", "sync_replicated_gradients"]
 
 
-class RemoteEmbedding(nn.Embedding):
-    """An embedding whose weight lives on another card than its callers.
-
-    Swapped onto the stock module's class the way ``torch.nn.utils.parametrize`` does,
-    so the module object, its parameter and its state_dict keys are unchanged and
-    checkpoints stay stock. The lookup runs where the weight is; the result lands on
-    the caller's card, and autograd routes the gradient back the same way.
-    """
-
-    def forward(self, input_ids):
-        return super().forward(input_ids.to(self.weight.device)).to(input_ids.device)
-
-
-class RemoteLinear(nn.Linear):
-    """``lm_head`` counterpart of :class:`RemoteEmbedding`.
-
-    The output lands where the input came from, so a caller already on the weight's
-    card pays no copy. The folded head relies on that: it moves the post-norm state
-    over once and keeps every logits chunk, and its gradient, on the weight's card.
-    """
-
-    def forward(self, x):
-        return super().forward(x.to(self.weight.device)).to(x.device)
-
-
-def place_tied_embeddings(model: nn.Module, device) -> None:
-    """Move the input embedding and output head to ``device``, keeping them tied."""
-    embed, head = model.get_input_embeddings(), model.get_output_embeddings()
-    if type(embed) is not nn.Embedding or type(head) is not nn.Linear:
-        raise ValueError("embedding placement expects a stock nn.Embedding and nn.Linear head")
-    tied = head.weight is embed.weight
-    embed.to(device)
-    if tied:
-        # Module.to may or may not keep the Parameter object; make the tie explicit.
-        head.weight = embed.weight
-    else:
-        head.to(device)
-    embed.__class__, head.__class__ = RemoteEmbedding, RemoteLinear
-
-
-def shard_model(
-    model: nn.Module, devices, home: str | int | None = None, embedding_device=None,
-) -> nn.Module:
+def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.Module:
     """Replace every shardable submodule in place. Returns the same model.
 
     ``devices`` are the cards to split across; the first is home, where the residual
-    stream stays. ``embedding_device`` is where the tied embedding/head parameter goes,
-    the last device unless told otherwise (see the module docstring for why).
+    stream stays.
     """
     resolved = [torch.device(d) for d in devices]
-    embedding_home = torch.device(embedding_device) if embedding_device is not None else resolved[-1]
-    if embedding_home not in resolved:
-        raise ValueError("embedding_device must be one of the tensor-parallel devices")
     if hasattr(model, "_distillkit_tp_devices"):
         raise ValueError("Model is already tensor parallel")
     if getattr(model.config, "model_type", None) != "qwen3_5_text":
@@ -129,10 +71,10 @@ def shard_model(
         raise ValueError("home must be the first device; the shards assume it")
 
     base = getattr(model, "model", model)
-    # The outer model stays on the home card -- both layer norms per layer, the final
-    # norm, rotary -- except the tied embedding/head, which is parked where it balances.
+    # The outer model stays on the home card: both layer norms per layer, the final
+    # norm and rotary. The tied embedding/head is then split by rows across all cards.
     model.to(home_device)
-    place_tied_embeddings(model, embedding_home)
+    _shard_tied_embeddings(model, base, resolved)
 
     counts = {"mlp": 0, "full_attention": 0, "linear_attention": 0}
     for layer in base.layers:
@@ -149,22 +91,33 @@ def shard_model(
     model._distillkit_tp_devices = tuple(str(d) for d in resolved)
     # This is placement metadata, not accelerate dispatch hooks: prevent Trainer
     # from moving the whole model to one device or wrapping it in DataParallel.
-    # remove_duplicate=False lists lm_head.weight beside the embedding it is tied to,
-    # so check_tied_embeddings_colocated can see both entries agree.
-    model.hf_device_map = {
-        "": str(home_device),
-        **{n: str(p.device) for n, p in model.named_parameters(remove_duplicate=False)},
-    }
+    model.hf_device_map = {"": str(home_device), **{n: str(p.device) for n, p in model.named_parameters()}}
 
     report = sharded_parameter_report(model)
     LOG.info(
         "Tensor-parallel across %s: sharded %d MLPs, %d attention, %d gated-delta "
-        "blocks; %.1f%% of parameters split, %.2f/%.2f GiB per card",
+        "blocks and the tied embedding; %.1f%% of parameters split, %.2f/%.2f GiB per card",
         [str(d) for d in resolved], counts["mlp"], counts["full_attention"],
         counts["linear_attention"], 100 * report["sharded_fraction"],
         *(report["gib_per_device"] + [0.0])[:2],
     )
     return model
+
+
+def _shard_tied_embeddings(model: nn.Module, base: nn.Module, devices) -> None:
+    embed, head = model.get_input_embeddings(), model.get_output_embeddings()
+    if head is None or head.weight is not embed.weight:
+        raise ValueError(
+            "tensor parallelism expects tie_word_embeddings: the head is sharded "
+            "through the embedding it shares a parameter with"
+        )
+    if head.bias is not None:
+        raise ValueError("a biased lm_head is not supported by the vocab-parallel head")
+    embedding = VocabParallelEmbedding(embed, devices)
+    base.embed_tokens = embedding
+    model.lm_head = VocabParallelHead(embedding)
+    if model.get_input_embeddings() is not embedding or model.get_output_embeddings() is not model.lm_head:
+        raise ValueError("model does not expose its embeddings as model.embed_tokens / lm_head")
 
 
 def sharded_parameter_report(model: nn.Module) -> dict:
@@ -175,6 +128,7 @@ def sharded_parameter_report(model: nn.Module) -> dict:
     """
     sharded_modules = (
         TensorParallelMLP, TensorParallelAttention, TensorParallelGatedDeltaNet,
+        VocabParallelEmbedding,
     )
     sharded_ids = set()
     for child in model.modules():

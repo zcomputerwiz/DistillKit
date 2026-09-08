@@ -8,6 +8,7 @@ from transformers.modeling_outputs import CausalLMOutput
 
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.missing_probability import MissingProbabilityHandling
+from distillkit.tp_vocab import VocabShardedLogits
 from distillkit.signals import TeacherSignal
 
 
@@ -136,17 +137,24 @@ def get_logprobs(
             "Use MissingProbabilityHandling.ZERO."
         )
 
+    scale = None
     if not math.isclose(distillation_temperature, student_generation_temperature):
-        # In fp32: scaling in bf16 first would round every logit before the log-sum-exp
-        # and defeat the point of computing the divergence in fp32 at all.
-        logits = logits.to(torch.float32) * (
-            student_generation_temperature / distillation_temperature
-        )
-    student_lse = torch.logsumexp(logits.to(torch.float32), dim=-1, keepdim=True).to(
-        out_dtype
-    )
-    sparse_student_logprobs = logits.gather(-1, target_ids) - student_lse
-    del student_lse, logits
+        scale = student_generation_temperature / distillation_temperature
+    if isinstance(logits, VocabShardedLogits):
+        # Vocab-parallel head: the log-sum-exp and the gather compose from per-card
+        # pieces, and the full row is never assembled on any card.
+        sparse_student_logprobs = logits.sparse_logprobs(target_ids, scale).to(out_dtype)
+    else:
+        if scale is not None:
+            # In fp32: scaling in bf16 first would round every logit before the
+            # log-sum-exp and defeat the point of computing the divergence in fp32.
+            logits = logits.to(torch.float32) * scale
+        student_lse = torch.logsumexp(
+            logits.to(torch.float32), dim=-1, keepdim=True
+        ).to(out_dtype)
+        sparse_student_logprobs = logits.gather(-1, target_ids) - student_lse
+        del student_lse
+    del logits
 
     with torch.no_grad():
         sparse_target_logprobs = get_target_logprobs(

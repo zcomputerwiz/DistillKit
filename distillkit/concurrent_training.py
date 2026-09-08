@@ -9,6 +9,8 @@ import threading
 
 import torch
 
+from distillkit.sharding import embedding_device
+
 
 def validate_concurrent_model(model):
     devices = sorted({p.device for p in model.parameters()}, key=str)
@@ -121,7 +123,7 @@ class ConcurrentMicrobatches:
                 with ExitStack() as stack:
                     for d in self.devices:
                         stack.enter_context(torch.cuda.stream(local.streams[d]))
-                    stack.enter_context(torch.cuda.device(self.model.get_input_embeddings().weight.device))
+                    stack.enter_context(torch.cuda.device(embedding_device(self.model)))
                     # The caller owns precision contexts. HF already autocasts
                     # model.forward; autocasting the loss too changes its numerics.
                     loss, logs = forward_loss(batch)

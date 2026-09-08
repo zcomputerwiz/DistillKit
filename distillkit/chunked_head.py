@@ -48,9 +48,11 @@ def chunked_head_loss(
     ``vocab_size`` truncates each chunk's logits to the teacher's vocabulary, matching
     the trainer's behaviour when the student's head is padded wider than the signal.
     """
-    # The head may live on another card (tensor parallelism parks the tied embedding
-    # off the home card). Move its input over once and keep every chunk there.
-    hidden_states = hidden_states.to(head.weight.device)
+    # The head may live on another card than the state; move its input over once
+    # and keep every chunk there. A vocab-parallel head projects to per-card pieces
+    # that the sparse divergences consume without ever assembling the full row.
+    hidden_states = hidden_states.to(head_device(head))
+    project = getattr(head, "sharded_logits", None)
     batch, seq_len = hidden_states.shape[0], hidden_states.shape[1]
     if chunk_length is None:
         chunk_length = seq_len
@@ -71,9 +73,12 @@ def chunked_head_loss(
         chunk_mask = None if mask is None else mask[:, start:end]
 
         def compute(hidden, ids, values, current_mask=chunk_mask):
-            logits = head(hidden)
-            if vocab_size is not None and logits.shape[-1] > vocab_size:
-                logits = logits[..., :vocab_size]
+            if project is not None:
+                logits = project(hidden, vocab_size)
+            else:
+                logits = head(hidden)
+                if vocab_size is not None and logits.shape[-1] > vocab_size:
+                    logits = logits[..., :vocab_size]
             return fn(logits, ids, values, current_mask, *args, **kwargs)
 
         if chunk_hidden.requires_grad:
@@ -87,6 +92,16 @@ def chunked_head_loss(
             part = compute(chunk_hidden, chunk_ids, chunk_values)
         total = part if total is None else total + part
     return total
+
+
+def head_device(head: torch.nn.Module) -> torch.device:
+    """Where the head wants its input and leaves its result.
+
+    A vocab-parallel head spans cards and names its home; a stock Linear is wherever
+    its weight is.
+    """
+    device = getattr(head, "device", None)
+    return device if device is not None else head.weight.device
 
 
 class HeadContext:
@@ -104,7 +119,7 @@ class HeadContext:
 
     @property
     def device(self):
-        return self.head.weight.device
+        return head_device(self.head)
 
     def accumulate(self, fn, target_ids, target_values, mask, *args, **kwargs):
         return chunked_head_loss(

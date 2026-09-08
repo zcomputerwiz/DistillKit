@@ -32,7 +32,7 @@ def test_checkpoint_reconstructs_every_tensor_and_preserves_freezes(dtype):
     rebuilt = consolidated_state_dict(tp)
     for name, expected in original.state_dict().items():
         torch.testing.assert_close(rebuilt[name], expected, rtol=0, atol=0, msg=name)
-    assert tp.lm_head.weight is tp.model.embed_tokens.weight
+    assert tp.lm_head.shards is tp.model.embed_tokens.shards
 
 
 def test_replicated_norms_and_clipping_match_unsharded_update():

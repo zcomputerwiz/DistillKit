@@ -24,6 +24,7 @@ from distillkit.tp_model import (  # noqa: E402
     sharded_parameter_report,
     sync_replicated_gradients,
 )
+from distillkit.tp_vocab import VocabParallelEmbedding, VocabParallelHead  # noqa: E402
 
 TWO_GPUS = pytest.mark.skipif(
     torch.cuda.device_count() < 2, reason="needs two CUDA devices"
@@ -70,10 +71,14 @@ def test_report_counts_what_was_actually_split():
     model = _model()
     shard_model(model, ["cpu", "cpu"])
     report = sharded_parameter_report(model)
-    # Embeddings are tied and stay whole on the home card; everything else splits.
-    embedding = model.get_input_embeddings().weight.numel()
-    assert report["total_parameters"] - report["sharded_parameters"] < embedding * 1.5
-    assert report["sharded_fraction"] > 0.5
+    # Everything splits except the norms, so the tied embedding's shards must count
+    # once -- both roles hold the same parameters.
+    norms = sum(
+        p.numel() for n, p in model.named_parameters()
+        if "layernorm" in n or n == "model.norm.weight"
+    )
+    assert report["total_parameters"] - report["sharded_parameters"] == norms
+    assert report["total_parameters"] == sum(p.numel() for p in model.parameters())
 
 
 def test_sharded_model_matches_the_original_on_cpu():
@@ -97,10 +102,10 @@ def test_sharded_model_gradients_match_the_original_on_cpu():
     sharded(input_ids=input_ids, return_dict=True).logits.sum().backward()
     sync_replicated_gradients(sharded)
 
-    # The embedding is untouched by sharding, so it is the cleanest end-to-end check
-    # that the whole backward path reassembled correctly.
+    # The embedding's gradient collects the lookup and head halves of every rank, so
+    # reassembled it is the cleanest end-to-end check of the whole backward path.
     torch.testing.assert_close(
-        sharded.get_input_embeddings().weight.grad,
+        torch.cat([shard.grad for shard in sharded.get_input_embeddings().shards]),
         original.get_input_embeddings().weight.grad,
         rtol=2e-3, atol=2e-5,
     )
@@ -127,15 +132,14 @@ def test_parameters_actually_land_on_both_cards():
     report = sharded_parameter_report(model)
     first, second = report["gib_per_device"]
     assert second > 0, "card 1 holds nothing; nothing was sharded"
-    # The tied embedding is parked on card 1, which holds no norms, so card 1 now
-    # comes out heavier by about that parameter rather than lighter by it.
-    assert second > first, f"card 1 holds {second:.3g} against {first:.3g} GiB"
+    # Card 0 additionally carries only the norms, so the two should be close.
+    assert second > 0.8 * first, f"card 1 holds only {second:.3g} against {first:.3g} GiB"
 
 
 @TWO_GPUS
-def test_residual_stream_stays_home_and_the_tied_embedding_moves():
-    """Norms stay on the home card; the one big whole parameter goes to the other
-    card, stays a single tied tensor under its stock names, and no caller notices."""
+def test_residual_stream_stays_home_and_the_tied_embedding_splits():
+    """Norms stay on the home card; the tied embedding lands half on each card as one
+    ParameterList serving both roles, and no caller notices."""
     model = shard_model(_model(), ["cuda:0", "cuda:1"])
     home, other = torch.device("cuda", 0), torch.device("cuda", 1)
     assert model.model.norm.weight.device == home
@@ -144,22 +148,19 @@ def test_residual_stream_stays_home_and_the_tied_embedding_moves():
         assert layer.post_attention_layernorm.weight.device == home
 
     embed, head = model.get_input_embeddings(), model.get_output_embeddings()
-    assert embed.weight.device == other and head.weight is embed.weight
-    assert model.hf_device_map["lm_head.weight"] == model.hf_device_map["model.embed_tokens.weight"] == "cuda:1"
-    assert {"model.embed_tokens.weight", "lm_head.weight"} <= set(model.state_dict())
+    assert isinstance(embed, VocabParallelEmbedding) and isinstance(head, VocabParallelHead)
+    assert head.shards is embed.shards
+    assert [shard.device for shard in embed.shards] == [home, other]
+    assert sum(p is embed.shards[0] for p in model.parameters()) == 1, "one optimizer entry per shard"
+    assert {
+        "model.embed_tokens.shards.0", "model.embed_tokens.shards.1",
+        "lm_head.shards.0", "lm_head.shards.1",
+    } <= set(model.state_dict())
 
     logits = model(input_ids=torch.randint(0, 64, (1, 8), device=home)).logits
     assert logits.device == home
     logits.float().square().mean().backward()
-    assert embed.weight.grad is not None and embed.weight.grad.device == other
-
-
-@TWO_GPUS
-def test_embedding_can_be_pinned_home():
-    model = shard_model(_model(), ["cuda:0", "cuda:1"], embedding_device="cuda:0")
-    assert model.get_input_embeddings().weight.device == torch.device("cuda", 0)
-    with pytest.raises(ValueError, match="one of the tensor-parallel devices"):
-        shard_model(_model(), ["cuda:0", "cuda:1"], embedding_device="cpu")
+    assert all(s.grad is not None and s.grad.device == s.device for s in embed.shards)
 
 
 @TWO_GPUS
