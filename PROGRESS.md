@@ -1067,6 +1067,43 @@ Muon still costs compute the table does not show -- five Newton-Schulz iteration
 about fifteen matmuls per 2D parameter per optimizer step, amortized over the accumulation
 window.
 
+### 8-bit Muon exists, and is a memory option we do not currently need
+
+Checked because it would change the arithmetic above if true. It is largely true.
+
+`Effective Quantization of Muon Optimizer States` (arXiv 2509.23106, Gupta et al.,
+Nubank/LinkedIn) is real: blockwise quantization of Muon's momentum, linear and dynamic
+schemes, parity with full Muon on validation loss and downstream benchmarks up to 2.7B
+pretraining plus instruction fine-tuning, up to 62% off the optimizer state.
+bitsandbytes issue #1973 requesting `bnb.optim.Muon8bit` is open, with the submitter
+reporting 8-bit matching 32-bit at 43% less allocated and 26% less peak memory.
+`YupengSu/MuonQ` is real but primarily a **4-bit** framework (arXiv 2605.11396), not the
+8-bit one. `junaidaliop/zij` **has no implementation** -- it lists the paper in a
+reference table with dashes where the code column would be.
+
+No Muon ships in bitsandbytes 0.50.2, so this would be built, not configured. The
+`bitsandbytes.functional` route is viable here: `quantize_blockwise` and
+`dequantize_blockwise` exist with compatible signatures, and measured on a
+`[2560, 9728]` bf16 momentum buffer:
+
+| blocksize | bytes/param | mean relative error | cosine |
+| ---: | ---: | ---: | ---: |
+| 256 | 1.016 | 0.0106 | 0.999940 |
+| 2048 | 1.002 | 0.0121 | 0.999921 |
+| 4096 | 1.001 | 0.0125 | 0.999915 |
+
+For this student's 3.569B Muon-eligible parameters that is 7.14 GB of resident momentum
+down to 3.58 GB. **The saving is on the resident buffer, not the peak**: Newton-Schulz
+needs a bf16 copy of each matrix it touches, which is why the issue's own numbers are 43%
+allocated against only 26% peak. Anyone quoting the headline reduction as a peak saving
+is quoting the wrong number.
+
+Not needed now. Stage 1 peaks 8.4 / 10.3 GiB and stage 2 peaks 13.3 / 12.6 GiB against a
+22.80 GiB cap, so nothing is VRAM-bound. It is also a memory optimization layered on a
+decision not yet made -- whether Muon beats AdamW8bit on convergence here at all -- and
+this student is 83.6% Muon-eligible with a 248,320-token vocabulary, which is the
+embedding-dominated case where the benefit is diluted.
+
 ### Where each optimizer earns its place
 
 * **Stage 1** -- AdamW, whatever the config says. Only 65.5M auxiliary parameters train
