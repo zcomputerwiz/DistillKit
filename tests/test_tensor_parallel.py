@@ -7,6 +7,8 @@ learns more slowly. So both directions are checked against autograd's own answer
 the equivalent single-device computation.
 """
 
+import time
+
 import pytest
 import torch
 
@@ -191,3 +193,35 @@ def test_reduce_to_costs_half_the_transfers_of_all_reduce():
     b = torch.randn(8, 8, device="cuda:1")
     assert count(lambda: module._sum_to_each((a, b))) == 2
     assert count(lambda: reduce_to([a, b], "cuda:0")) == 1
+
+
+@TWO_GPUS
+@pytest.mark.parametrize("reduction", ["reduce", "all_reduce"])
+@pytest.mark.parametrize("early_stop", [True, False])
+def test_checkpoint_recomputes_once_before_reduction_backward_forks(reduction, early_stop):
+    """Two device workers must not unpack the same uncomputed frame concurrently."""
+    from torch.utils.checkpoint import checkpoint, set_checkpoint_early_stop
+    from distillkit.tensor_parallel import reduce_to
+
+    devices = ["cuda:0", "cuda:1"]
+    calls = []
+
+    def fn(x):
+        calls.append(1)
+        if len(calls) > 1:
+            # Release the GIL before saving anything on recompute, exposing the
+            # race reliably if both shard backwards are allowed to start it.
+            time.sleep(0.05)
+        parts = [part.sin() for part in replicate(x, devices)]
+        if reduction == "reduce":
+            return reduce_to(parts, devices[0])
+        return all_reduce(parts)[0]
+
+    x = torch.randn(4, 8, device=devices[0], requires_grad=True)
+    with set_checkpoint_early_stop(early_stop):
+        out = checkpoint(fn, x, use_reentrant=False)
+    out.sum().backward()
+
+    assert len(calls) == 2, "expected one forward and one recomputation"
+    torch.testing.assert_close(out, 2 * x.sin())
+    torch.testing.assert_close(x.grad, 2 * x.cos())

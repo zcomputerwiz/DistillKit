@@ -52,11 +52,26 @@ class AllReduce(torch.autograd.Function):
 
     @staticmethod
     def forward(ctx, *shards):
+        _save_recompute_barrier(ctx, shards[0])
         return _sum_to_each(shards)
 
     @staticmethod
     def backward(ctx, *grads):
+        _ = ctx.saved_tensors  # Recompute before releasing per-device branches.
         return _sum_to_each(grads)
+
+
+def _save_recompute_barrier(ctx, tensor):
+    """Make a reduction trigger checkpoint recomputation before backward forks.
+
+    Non-reentrant checkpoint's saved-tensor unpack hook (torch 2.11) does not
+    serialize recomputation across device workers. Without a saved tensor here,
+    both upstream shards can unpack concurrently and recompute the same frame,
+    corrupting its saved-tensor counter. Unpacking this empty sentinel in the
+    reduction's single backward node finishes recomputation before either shard
+    is scheduled. No activation storage or numerical operation is needed.
+    """
+    ctx.save_for_backward(tensor.new_empty(0))
 
 
 def _sum_to_each(shards):
@@ -128,6 +143,7 @@ class Reduce(torch.autograd.Function):
     @staticmethod
     def forward(ctx, home, *shards):
         ctx.shard_devices = [shard.device for shard in shards]
+        _save_recompute_barrier(ctx, shards[0])
         total = shards[0] if shards[0].device == home else shards[0].to(home)
         for shard in shards[1:]:
             total = total + shard.to(home)
@@ -135,6 +151,7 @@ class Reduce(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad):
+        _ = ctx.saved_tensors  # Recompute before releasing per-device branches.
         return (None,) + tuple(
             grad if grad.device == device else grad.to(device)
             for device in ctx.shard_devices

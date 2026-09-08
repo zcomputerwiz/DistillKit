@@ -76,12 +76,8 @@ class ColumnParallelLinear(nn.Module):
     def forward(self, x, copies=None):
         """``copies`` lets a caller replicate once and feed several projections.
 
-        Two column-parallel layers on the same input would otherwise each create a
-        Replicate node, and each returns the *input tensor itself* for the home
-        device -- two autograd outputs aliasing one tensor. Combining those aliases
-        elementwise, as an MLP does with gate and up, made non-reentrant
-        checkpointing recompute different values. Sharing one replication avoids
-        that and costs one fewer node.
+        Sharing copies avoids redundant peer transfers and Replicate nodes when
+        several projections consume the same input.
         """
         if copies is None:
             copies = replicate(x, self.devices)

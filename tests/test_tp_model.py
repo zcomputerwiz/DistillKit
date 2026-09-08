@@ -142,3 +142,54 @@ def test_residual_stream_stays_on_the_home_card():
     for layer in model.model.layers:
         assert layer.input_layernorm.weight.device == home
         assert layer.post_attention_layernorm.weight.device == home
+
+
+@TWO_GPUS
+@pytest.mark.parametrize("shard_all", [False, True], ids=["mlp", "all_blocks"])
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_non_reentrant_checkpoint_matches_uncheckpointed_training(shard_all, dtype):
+    """Check logits and every parameter gradient, including both MLP shards."""
+    model = _model().to(device="cuda:0", dtype=dtype).train()
+    devices = ["cuda:0", "cuda:1"]
+    if shard_all:
+        shard_model(model, devices)
+    else:
+        for layer in model.model.layers:
+            layer.mlp = TensorParallelMLP(layer.mlp, devices)
+    # Gated-delta constructs local Linear modules in the default dtype; apply
+    # the training dtype to the finished model as well as the source weights.
+    model.to(dtype=dtype)
+
+    ids = torch.randint(0, 64, (1, 8), device="cuda:0")
+    if shard_all:
+        # Cold Triton autotuners share mutable state between the two GPU workers.
+        # Warm their kernels serially before testing normal multithreaded backward.
+        # Both measured paths below use the default autograd worker scheduling.
+        with torch.autograd.set_multithreading_enabled(False):
+            model(input_ids=ids).logits.float().square().mean().backward()
+        model.zero_grad(set_to_none=True)
+    reference = model(input_ids=ids).logits
+    reference.float().square().mean().backward()
+    reference_grads = {
+        name: parameter.grad.clone()
+        for name, parameter in model.named_parameters()
+    }
+    expected = reference.detach().clone()
+    del reference
+    model.zero_grad(set_to_none=True)
+    model.gradient_checkpointing_enable(
+        gradient_checkpointing_kwargs={"use_reentrant": False}
+    )
+
+    # Multiple iterations also exercise frame lifetime and gradient reset.
+    for _ in range(3):
+        actual = model(input_ids=ids).logits
+        actual.float().square().mean().backward()
+        torch.testing.assert_close(actual, expected, rtol=0, atol=0)
+        for name, parameter in model.named_parameters():
+            torch.testing.assert_close(
+                parameter.grad, reference_grads[name], rtol=0, atol=0,
+                msg=lambda message: f"{name}: {message}",
+            )
+        del actual
+        model.zero_grad(set_to_none=True)
