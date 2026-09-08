@@ -2,7 +2,7 @@
 
 Every other block in the tensor-parallel student is split by channel or by head and
 keeps the residual stream on the home card. The tied embedding/head is different: one
-``[248320, 2560]`` parameter serving two roles, 16.4% of the model, and with its
+``[248320, 2560]`` parameter serving two roles, 14.9% of the model, and with its
 gradient and 8-bit optimizer moments 3.5 GiB that has to land somewhere. Whole on the
 home card it made card 0 the heavier one by about 5 GiB; whole on the other card it
 flipped the imbalance (11.42 / 15.02 GiB measured at sequence 4096). Split by rows it

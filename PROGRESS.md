@@ -32,7 +32,7 @@ are the chronological evidence trail.
 - **Tensor parallelism** (`tp_*.py`): 83.6% of parameters sharded across both cards,
   1.41x faster than the layer split and smaller on both. No NCCL and none needed.
 
-**Test suite:** green — **287 passed** in the CUDA-enabled dev environment (≈43 s).
+**Test suite:** green — **306 passed** in the CUDA-enabled dev environment (≈47 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -51,6 +51,9 @@ python -m distillkit.main examples/qwen35_sidecar_stage2_sharded.yml -v
 
 # Stage 2 continuing from stage 1 rather than the stock student
 python -m distillkit.main examples/qwen35_sidecar_stage2_chained.yml -v
+
+# Stage 2, tensor parallel across both cards -- fastest; see "Hybrid tensor parallelism"
+python -m distillkit.main examples/qwen35_sidecar_stage2_tp.yml -v
 ```
 
 Set `PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.8`. `expandable_segments`
@@ -64,8 +67,11 @@ Knobs whose right value depends on what is binding, not on taste:
 - `per_device_train_batch_size`: 1. Batching needs length grouping to be worth
   anything here, and grouping then fragments the allocator. See "Batching needs length
   grouping".
-- Tensor parallelism is not yet wired into `main.py`; use `shard_model` directly, as
-  `scratch/tp_real_probe.py` does.
+- `tensor_parallel: true` needs `chunked_head: true`, `gradient_checkpointing_kwargs:
+  {use_reentrant: false}` and no `model_kwargs.device_map`;
+  `examples/qwen35_sidecar_stage2_tp.yml` has all three. Under tensor parallelism the
+  folded head is *required*, not the 4.4% option it is under the layer split, and a
+  duplicated YAML key silently keeps the last value -- `grep -c chunked_head` the file.
 
 **Verification gates:**
 - Gate 1 (imports/tests): **pass** on installed Transformers 5.16.1.
@@ -95,7 +101,7 @@ Knobs whose right value depends on what is binding, not on taste:
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
    runs". The thin margins recorded there (22.12 / 21.45 GiB against 22.80 allowed) are
    historical: the grouped-query fix and the rebalance to boundary 13 brought the layer
-   split to 13.68 / 12.92 GiB, and tensor parallelism to 12.22 / 8.52.
+   split to 13.68 / 12.92 GiB, and tensor parallelism to 9.03 / 8.53.
 5. ~~Port `_AnchorTap` into the trainer~~ - **done**: `distillkit/anchor_tap.py`.
 6. ~~Run the staged curriculum~~ - **done**: chaining wins, 0.5262 against 0.5347, but
    inside the run-to-run spread. See "The staged curriculum beats training jointly".
@@ -106,10 +112,10 @@ Knobs whose right value depends on what is binding, not on taste:
 8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
    it should keep adapting rather than freezing at stage 1's value.
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
-10. ~~Hybrid tensor parallelism~~ - **working, 1.41x faster and smaller on both cards**.
-    See "Hybrid tensor parallelism". Remaining: wire it into main.py behind a config
-    flag, checkpoint save/load reconstruction from shards, and a real training run to
-    confirm the loss curve matches. Vocab-parallel embeddings are the last 16.4%.
+10. ~~Hybrid tensor parallelism~~ - **wired into `main.py`, 98.5% of parameters
+    sharded, 1.54x the layer split per microbatch, cards balanced at 13.25 / 12.62 GiB
+    in steady state**. See "Hybrid tensor parallelism" for the epoch-level result
+    against the layer split's 1263 s / eval_loss 0.5330.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -677,52 +683,77 @@ card 1, provided only one microbatch is in the head at a time.
 Card 1 has 6.1 GiB of margin for that. Card 0 had 0.7 GiB against its *reservation*,
 which is why the tap comes first.
 
-## Hybrid tensor parallelism: working, 1.41x (2026-09-08)
+## Hybrid tensor parallelism: working, 1.54x, balanced (2026-09-08)
 
-### Not yet through a full training run
+### The training-run OOM was a duplicate key, not a bug
 
-`examples/qwen35_sidecar_stage2_tp.yml` is wired and validated, and `shard_model`
-applies cleanly at startup -- "sharded 32 MLPs, 8 attention, 24 gated-delta blocks;
-83.6% of parameters split, 4.63/3.32 GiB per card". It has not completed an epoch.
+Three attempts failed before an epoch ran. The first two were my own config errors, and
+the third turned out to be the first one again: `examples/qwen35_sidecar_stage2_tp.yml`
+carried `chunked_head: true` and, eight lines later, the stale `chunked_head: false` it
+had inherited from the layer-split config. YAML keeps the last duplicate. The run trained
+with the head unfolded and died at step 4 asking for the 1.89 GiB logits gradient with
+card 0 at 20.52 GiB -- "during backward, not forward", which read like a bug and was the
+unfolded head's gradient. The tell I missed: a probe of the same step *with* the real
+AdamW8bit state fit at 14.30 GiB, so the arithmetic left no room for a 6 GiB mystery.
 
-Three attempts, the first two my own errors and recorded because the second is a trap
-anyone repeating this will hit:
+**The knob is only correct relative to a placement**, and that stays true: the layer
+split gives card 0 thirteen layers so weights bind and the head's 4.4% recompute is not
+worth paying; tensor parallelism halves every layer, so the head binds instead. Under
+tensor parallelism the folded head is required. And count the key rather than reading
+the file.
 
-1. Inherited `chunked_head: false` from the layer-split config. The probe that measured
-   12.22 GiB used the folded head. **The knob is only correct relative to a placement**:
-   the layer split gives card 0 thirteen layers so weights bind and the head's 4.4%
-   recompute is not worth paying; tensor parallelism halves every layer but leaves the
-   residual stream, tied embeddings and the whole head working set on card 0, so the
-   head binds instead. Opposite answers, same setting.
-2. My edit enabling it also swallowed `use_flash_attention: false`,
-   `functionary_packing: false` and `chunked_cross_entropy: true`, so the run died on a
-   missing Windows wheel. Both configs are now diffed with comments stripped: the only
-   differences are the output path, `tensor_parallel`, `chunked_head` and the
-   `use_reentrant` requirement.
-3. **Open**: with the folded head on, still OOM at step 4 of 72, card 0 asking 1.89 GiB
-   -- the size of `[1, 4096, 248320]` bf16 -- **during backward**, not forward. So the
-   head is folded correctly on the way in and something in the backward materializes a
-   full-sequence logits-shaped tensor anyway. Candidates worth checking first: the
-   checkpointed chunk recompute interacting with the reduction barrier, and the
-   `lm_head` weight gradient (`[248320, 2560]`, 1.27 GiB) accumulating alongside a live
-   chunk.
+### Where the tied embedding lives, measured three ways
 
-Until an epoch completes, the 1.41x stands only as a microbatch measurement. The
-trajectory-level risks a single step cannot show -- a gradient scaled by a constant, a
-shard drifting from its partner, the replicated-norm reduction firing intermittently --
-remain unverified.
+With the head folded the run fits, but card 0 carried the tied embedding on top of its
+half of every layer: 0.636B parameters, 14.9% of the model, 3.5 GiB with gradient and
+8-bit moments. Steady-state peaks at sequence 4096 with the optimizer state present
+(`scratchpad/probe_tp_optimizer.py`; the first step has no optimizer state yet and
+understates every later one by about 4 GiB, so it measures the second step too):
 
+| tied embedding | card 0 | card 1 | 4096-token microbatch |
+| --- | ---: | ---: | ---: |
+| whole, on the home card | ~19.0 GiB | ~13.6 GiB | 2.838 s |
+| whole, moved to card 1 (commit 7f93c9d) | 11.42 GiB | 15.02 GiB | -- |
+| **split by vocabulary rows (`tp_vocab.py`)** | **13.25 GiB** | **12.62 GiB** | **2.598 s** |
 
-Single-process tensor parallelism across both cards, sharding **83.6% of the 4.271B
+Moving the parameter whole is the simple shift and it overshoots by 3.6 GiB: card 1
+holds no norms and then held the head's entire working set too. Splitting by rows
+balances the cards to within 0.6 GiB and, because the head's ~20 TFLOP per microbatch
+(projection, recompute, two backward products) splits with it, is 8.5% faster as well.
+98.5% of parameters are now sharded; what stays whole is the norms, the sidecar and the
+distillation projections.
+
+The split is Megatron's `VocabParallelEmbedding` in single-process form. The lookup
+embeds each rank's range and sums the rows onto home through the existing `Reduce`. The
+head keeps its per-rank logits apart: the sparse KL needs only a row's log-sum-exp and
+its values at the teacher's top-k ids, and both compose from per-rank pieces
+(`VocabShardedLogits.sparse_logprobs`), so the 248,320-wide chunk row never exists on
+any card and what crosses NVLink per chunk is `[batch, chunk, 1]` and
+`[batch, chunk, k]`. `Collect`, the many-output sibling of `Reduce`, carries the same
+recompute barrier. Checkpoints still export the stock `model.embed_tokens.weight` /
+`lm_head.weight` pair. Verified against the dense head at rtol 1e-5 on CPU and across
+two cards, gradients included, through the checkpointed chunk loop.
+
+Two latent bugs surfaced on the way, both pinned by tests now: `KLDLoss` counted
+`num_items_in_batch` from the mask on the batch's card and divided a result on the
+head's card -- 0-dim tensors on two CUDA devices do not mix, and the layer split never
+hit it because its head was on card 0 -- and three callers read
+`get_input_embeddings().weight`, which a sharded embedding does not have
+(`sharding.embedding_device`).
+
+### Measured against the layer split
+
+Single-process tensor parallelism across both cards, sharding **98.5% of the 4.271B
 parameters**. Measured on the real student with the same losses the layer split was
-measured with -- chunked KL over the 248,320-wide vocabulary plus hidden-state cosine:
+measured with -- chunked KL over the 248,320-wide vocabulary plus hidden-state cosine,
+forward and backward, no optimizer state:
 
 | | layer split (boundary 13) | tensor parallel |
 | --- | ---: | ---: |
-| 4096-token microbatch | 3.99 s | **2.838 s (1.41x)** |
-| 1024-token microbatch | 1.049 s | **0.834 s (1.26x)** |
-| card 0 peak | 13.68 GiB | **12.22 GiB** |
-| card 1 peak | 12.92 GiB | **8.52 GiB** |
+| 4096-token microbatch | 3.99 s | **2.598 s (1.54x)** |
+| 1024-token microbatch | 1.049 s | 0.834 s (1.26x; before the vocabulary split) |
+| card 0 peak | 13.68 GiB | **9.03 GiB** |
+| card 1 peak | 12.92 GiB | **8.53 GiB** |
 
 Faster *and* smaller on both cards. It is the first thing in this project to actually
 convert the second GPU into throughput: the layer split is capacity-only by
@@ -732,7 +763,8 @@ balanced split.
 **Beware the number that is not this one.** An earlier run reported 1.80x, comparing a
 tensor-parallel step whose loss was `logits.pow(2).mean()` against a layer-split
 baseline carrying the real chunked-KL and hidden-state losses. Matching the losses cost
-28% of the apparent speedup. 1.41x is the comparable figure.
+28% of the apparent speedup; 1.41x was the comparable figure with the embedding whole
+on card 0, and 1.54x is it with the embedding split.
 
 ### No NCCL, and none needed
 
@@ -751,17 +783,16 @@ it lacks backward through the collective. What was borrowed is transformers'
 
 ### What is sharded, and what is deliberately not
 
-MLPs (58.5%), full attention (5.4%) and the 24 GatedDeltaNet layers by head (19.7%).
-Upstream's plan marks every `linear_attn` projection `colwise_gather_output`, replicating
-the recurrence on both ranks and capping coverage at 63.9%; sharding by head lifts it to
-83.6%.
+MLPs (58.5%), full attention (5.4%), the 24 GatedDeltaNet layers by head (19.7%) and
+the tied embedding/head by vocabulary row (14.9%). Upstream's plan marks every
+`linear_attn` projection `colwise_gather_output`, replicating the recurrence on both
+ranks and capping coverage at 63.9%; sharding by head lifts it to 83.6%, and the
+vocabulary split to 98.5%.
 
 Replicated on purpose: the norms, the n-gram sidecar and the distillation projections --
-reunifying any of them costs more than the flops saved. The tied embeddings (16.4%) stay
-whole on the home card, which costs less total memory than replicating them and leaves
-the outer model untouched, so gradient checkpointing, the anchor tap and the folded head
-keep working. Vocab-parallel embeddings would split that 1.9 GiB each way and need a
-distributed log-sum-exp; designed, not built.
+reunifying any of them costs more than the flops saved. The residual stream stays on the
+home card, so the outer model is untouched and gradient checkpointing, the anchor tap and
+the folded head keep working.
 
 ### Three silent-failure traps, all now pinned by tests
 
