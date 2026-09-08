@@ -73,8 +73,18 @@ class ColumnParallelLinear(nn.Module):
         self.shards = nn.ParameterList(weights)
         self.biases = nn.ParameterList(biases) if biases else None
 
-    def forward(self, x: torch.Tensor):
-        copies = replicate(x, self.devices)
+    def forward(self, x, copies=None):
+        """``copies`` lets a caller replicate once and feed several projections.
+
+        Two column-parallel layers on the same input would otherwise each create a
+        Replicate node, and each returns the *input tensor itself* for the home
+        device -- two autograd outputs aliasing one tensor. Combining those aliases
+        elementwise, as an MLP does with gate and up, made non-reentrant
+        checkpointing recompute different values. Sharing one replication avoids
+        that and costs one fewer node.
+        """
+        if copies is None:
+            copies = replicate(x, self.devices)
         outputs = [
             nn.functional.linear(
                 copy, weight, None if self.biases is None else self.biases[index]

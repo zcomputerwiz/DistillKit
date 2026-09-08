@@ -43,11 +43,16 @@ class TensorParallelMLP(nn.Module):
         self.act_fn = mlp.act_fn
         self.gate_proj = ColumnParallelLinear(mlp.gate_proj, self.devices)
         self.up_proj = ColumnParallelLinear(mlp.up_proj, self.devices)
-        self.down_proj = RowParallelLinear(mlp.down_proj, self.devices)
+        # reduce_only: the residual stream is on the home card, so producing a
+        # second output on card 1 only to discard it leaves an unused tensor in
+        # the graph and costs a transfer.
+        self.down_proj = RowParallelLinear(mlp.down_proj, self.devices, reduce_only=True)
 
     def forward(self, x: torch.Tensor):
-        gates = self.gate_proj(x)
-        ups = self.up_proj(x)
+        # One replication feeding both projections, not one each.
+        copies = replicate(x, self.devices)
+        gates = self.gate_proj(x, copies)
+        ups = self.up_proj(x, copies)
         hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
         return self.down_proj(hidden)[0]
 
@@ -92,7 +97,7 @@ class TensorParallelAttention(nn.Module):
         self.q_proj = ColumnParallelLinear(attention.q_proj, self.devices)
         self.k_proj = ColumnParallelLinear(attention.k_proj, self.devices)
         self.v_proj = ColumnParallelLinear(attention.v_proj, self.devices)
-        self.o_proj = RowParallelLinear(attention.o_proj, self.devices)
+        self.o_proj = RowParallelLinear(attention.o_proj, self.devices, reduce_only=True)
         # Small, elementwise, per-head: replicated on every rank.
         self.q_norms = nn.ModuleList(
             _clone_to(attention.q_norm, device) for device in self.devices
@@ -105,9 +110,10 @@ class TensorParallelAttention(nn.Module):
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
 
         input_shape = hidden_states.shape[:-1]
-        queries = self.q_proj(hidden_states)
-        keys = self.k_proj(hidden_states)
-        values = self.v_proj(hidden_states)
+        copies = replicate(hidden_states, self.devices)
+        queries = self.q_proj(hidden_states, copies)
+        keys = self.k_proj(hidden_states, copies)
+        values = self.v_proj(hidden_states, copies)
         cos, sin = position_embeddings
         outputs = []
         for index, device in enumerate(self.devices):

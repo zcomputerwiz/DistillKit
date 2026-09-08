@@ -95,7 +95,7 @@ class TensorParallelGatedDeltaNet(nn.Module):
         self.norm = nn.ModuleList(norms)
         self.A_log = nn.ParameterList(a_logs)
         self.dt_bias = nn.ParameterList(dts)
-        self.out_proj = RowParallelLinear(source.out_proj, self.devices)
+        self.out_proj = RowParallelLinear(source.out_proj, self.devices, reduce_only=True)
 
     def replicated_parameters(self):
         """Parameters held whole on every rank, whose gradients are partials.

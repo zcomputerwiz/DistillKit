@@ -70,9 +70,9 @@ def _sum_to_each(shards):
     home = shards[0].device
     total = shards[0]
     for shard in shards[1:]:
-        total = total + shard.to(home, non_blocking=True)
+        total = total + shard.to(home)
     return tuple(
-        total if shard.device == home else total.to(shard.device, non_blocking=True)
+        total if shard.device == home else total.to(shard.device)
         for shard in shards
     )
 
@@ -94,7 +94,7 @@ class Replicate(torch.autograd.Function):
     def forward(ctx, source, *devices):
         ctx.source_device = source.device
         return tuple(
-            source if source.device == device else source.to(device, non_blocking=True)
+            source if source.device == device else source.to(device)
             for device in devices
         )
 
@@ -103,7 +103,7 @@ class Replicate(torch.autograd.Function):
         home = ctx.source_device
         total = None
         for grad in grads:
-            moved = grad if grad.device == home else grad.to(home, non_blocking=True)
+            moved = grad if grad.device == home else grad.to(home)
             total = moved if total is None else total + moved
         return (total,) + (None,) * len(grads)
 
@@ -128,15 +128,15 @@ class Reduce(torch.autograd.Function):
     @staticmethod
     def forward(ctx, home, *shards):
         ctx.shard_devices = [shard.device for shard in shards]
-        total = shards[0] if shards[0].device == home else shards[0].to(home, non_blocking=True)
+        total = shards[0] if shards[0].device == home else shards[0].to(home)
         for shard in shards[1:]:
-            total = total + shard.to(home, non_blocking=True)
+            total = total + shard.to(home)
         return total
 
     @staticmethod
     def backward(ctx, grad):
         return (None,) + tuple(
-            grad if grad.device == device else grad.to(device, non_blocking=True)
+            grad if grad.device == device else grad.to(device)
             for device in ctx.shard_devices
         )
 
