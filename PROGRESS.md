@@ -97,6 +97,9 @@ Knobs whose right value depends on what is binding, not on taste:
    sidecar, concentrated entirely in the KL term.
 3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
+4a. **The 5M-token pilot is now the top open item.** Everything below it is
+   infrastructure that is finished; this is the question the infrastructure was for.
+   See "What remains" in `HANDOFF.md` for the steps.
 4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
    runs". The thin margins recorded there (22.12 / 21.45 GiB against 22.80 allowed) are
@@ -112,10 +115,10 @@ Knobs whose right value depends on what is binding, not on taste:
 8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
    it should keep adapting rather than freezing at stage 1's value.
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
-10. ~~Hybrid tensor parallelism~~ - **wired into `main.py`, 98.5% of parameters
-    sharded, 1.54x the layer split per microbatch, cards balanced at 13.25 / 12.62 GiB
-    in steady state**. See "Hybrid tensor parallelism" for the epoch-level result
-    against the layer split's 1263 s / eval_loss 0.5330.
+10. ~~Hybrid tensor parallelism~~ - **done and through a full epoch**: 98.5% of
+    parameters sharded, 1193 s against the layer split's 1263 s, eval_loss 0.5329
+    against 0.5330, export verified as a stock checkpoint. 1.54x per microbatch but
+    1.06x per epoch -- see "Hybrid tensor parallelism" for why, and what it buys.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -683,7 +686,52 @@ card 1, provided only one microbatch is in the head at a time.
 Card 1 has 6.1 GiB of margin for that. Card 0 had 0.7 GiB against its *reservation*,
 which is why the tap comes first.
 
-## Hybrid tensor parallelism: working, 1.54x, balanced (2026-09-08)
+## Hybrid tensor parallelism: through a full epoch, 1.06x, balanced (2026-09-08)
+
+### The epoch-level result
+
+| | layer split (boundary 13) | tensor parallel |
+| --- | ---: | ---: |
+| `train_runtime` | 1263 s | **1193 s (1.06x)** |
+| `eval_loss` | 0.5330 | **0.5329** |
+| card 0 peak / reserved | 13.68 GiB | **14.98 / 15.99 GiB** |
+| card 1 peak / reserved | 12.92 GiB | **13.71 / 14.81 GiB** |
+
+72 steps, 4.271B parameters, `runs/sidecar-stage2-tp`. **The loss matches the layer
+split to the fourth decimal**, which is the trajectory-level check a microbatch
+measurement cannot give: a gradient scaled by a constant, a shard drifting from its
+partner or the replicated-norm reduction firing intermittently would all show here.
+Stronger still, the exported weights move *identically*: the same 86 of 426 tensors are
+unchanged from the starting checkpoint under both arms -- the norms and `dt_bias`, whose
+bf16 updates at lr 1e-5 round away -- and even `A_log`'s single 5.96e-08 nudge is the
+same in both.
+
+**1.06x, not 1.54x.** The microbatch measurement is real and so is this one; they differ
+because a step is not only forward and backward. Each of the 72 steps carries 16
+microbatches plus clipping over 795 parameter tensors, the AdamW8bit update, the
+collator and the evaluation passes, none of which the probe timed and none of which the
+split makes faster. That is the honest speedup for this configuration: the microbatch
+work shrank by a third and it moved the epoch by 5.5%. The memory is the real prize --
+and it is what buys batching, which is where the microbatch speedup would actually
+convert (see "What remains").
+
+Trainer peaks run about 1.7 GiB above `scratch/tp_optimizer_probe.py` (14.98 against
+13.25): clipping's `foreach_norm` temporaries and the collator's on-GPU rows, the same
+gap that made three earlier preflights understate their runs.
+
+### Export verified against a stock load
+
+`runs/sidecar-stage2-tp/model.safetensors` reconstructs stock names and shapes from the
+shards: no key missing against `student-hf`, no shape mismatch, and no dtype mismatch
+against the layer-split export. It loads on **one** card without any TP machinery
+(8.05 GiB) and produces finite logits. The nine extra keys are the sidecar and the
+distillation projections, as in every other export.
+
+One pre-existing wrinkle, not a TP one: `A_log` and the gated `norm.weight` are fp32 in
+`student-hf` and bf16 in *every* export this project has produced -- stage 1, both layer
+splits, the chained run and this one. It is the bf16 training load, and it is why the
+comparison above is against a layer-split export rather than the starting weights.
+
 
 ### The training-run OOM was a duplicate key, not a bug
 
