@@ -111,3 +111,36 @@ class Replicate(torch.autograd.Function):
 def replicate(source: torch.Tensor, devices):
     """Broadcast ``source`` to each device, summing gradients on the way back."""
     return Replicate.apply(source, *[torch.device(d) for d in devices])
+
+
+class Reduce(torch.autograd.Function):
+    """Sum shards onto one device only, rather than onto all of them.
+
+    An all-reduce whose result is used on a single device still pays to copy the
+    total back out to the others. Where the consumer is one device -- which is every
+    row-parallel layer here, since the residual stream lives on the home card -- this
+    halves the traffic: n-1 copies in, none back.
+
+    Backward is the mirror: the single output gradient is broadcast to each shard's
+    device, since each contributed additively.
+    """
+
+    @staticmethod
+    def forward(ctx, home, *shards):
+        ctx.shard_devices = [shard.device for shard in shards]
+        total = shards[0] if shards[0].device == home else shards[0].to(home, non_blocking=True)
+        for shard in shards[1:]:
+            total = total + shard.to(home, non_blocking=True)
+        return total
+
+    @staticmethod
+    def backward(ctx, grad):
+        return (None,) + tuple(
+            grad if grad.device == device else grad.to(device, non_blocking=True)
+            for device in ctx.shard_devices
+        )
+
+
+def reduce_to(shards, home) -> torch.Tensor:
+    """Autograd-aware reduction onto ``home``. One tensor out, not one per device."""
+    return Reduce.apply(torch.device(home), *shards)

@@ -147,3 +147,47 @@ def test_reduction_costs_one_transfer_per_extra_device():
     finally:
         torch.Tensor.to = real_to
     assert len(moved) == 2, f"expected 2 cross-device copies, made {len(moved)}"
+
+
+def test_reduce_to_matches_all_reduce_but_returns_one_tensor():
+    """Same sum, without copying the total back out to devices that never read it."""
+    from distillkit.tensor_parallel import reduce_to
+
+    a = torch.randn(4, 8, requires_grad=True)
+    b = torch.randn(4, 8, requires_grad=True)
+    total = reduce_to([a, b], "cpu")
+    torch.testing.assert_close(total, a + b)
+
+    grad = torch.randn(4, 8)
+    total.backward(grad)
+    # Each shard contributed additively, so each receives the whole gradient.
+    torch.testing.assert_close(a.grad, grad)
+    torch.testing.assert_close(b.grad, grad)
+
+
+@TWO_GPUS
+def test_reduce_to_costs_half_the_transfers_of_all_reduce():
+    from distillkit.tensor_parallel import reduce_to
+    import distillkit.tensor_parallel as module
+
+    def count(fn):
+        moved = []
+        real_to = torch.Tensor.to
+
+        def counting_to(self, *args, **kwargs):
+            target = args[0] if args else kwargs.get("device")
+            if isinstance(target, (str, torch.device)) and torch.device(target) != self.device:
+                moved.append(1)
+            return real_to(self, *args, **kwargs)
+
+        torch.Tensor.to = counting_to
+        try:
+            fn()
+        finally:
+            torch.Tensor.to = real_to
+        return len(moved)
+
+    a = torch.randn(8, 8, device="cuda:0")
+    b = torch.randn(8, 8, device="cuda:1")
+    assert count(lambda: module._sum_to_each((a, b))) == 2
+    assert count(lambda: reduce_to([a, b], "cuda:0")) == 1

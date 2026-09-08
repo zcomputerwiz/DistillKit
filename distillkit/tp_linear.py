@@ -23,7 +23,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from distillkit.tensor_parallel import all_reduce, replicate
+from distillkit.tensor_parallel import all_reduce, reduce_to, replicate
 
 
 def _devices(devices) -> list[torch.device]:
@@ -95,9 +95,13 @@ class RowParallelLinear(nn.Module):
     every device already holds the full sum.
     """
 
-    def __init__(self, source: nn.Linear, devices):
+    def __init__(self, source: nn.Linear, devices, reduce_only: bool = False):
         super().__init__()
         self.devices = _devices(devices)
+        # reduce_only: the consumer is the home device alone, so skip copying the
+        # total back out to the others. That is the case throughout this model,
+        # where the residual stream stays on the home card.
+        self.reduce_only = reduce_only
         self.in_features = source.in_features
         self.out_features = source.out_features
         sizes = split_sizes(source.in_features, len(self.devices))
@@ -124,6 +128,9 @@ class RowParallelLinear(nn.Module):
             nn.functional.linear(part, weight)
             for part, weight in zip(parts, self.shards)
         ]
+        if self.reduce_only:
+            total = reduce_to(partials, self.devices[0])
+            return [total + self.bias if self.bias is not None else total]
         reduced = list(all_reduce(partials))
         if self.bias is not None:
             # Added after the reduction, once: each device holds the same total, so

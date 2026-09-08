@@ -39,6 +39,9 @@ from distillkit.tp_linear import RowParallelLinear
 
 def _slice_linear(source: nn.Linear, rows: torch.Tensor, device) -> nn.Linear:
     """A linear holding only the given output rows, on the given device."""
+    # The plan's indices are built on CPU; index_select needs them beside the weight,
+    # which shard_model has already moved to the home card.
+    rows = rows.to(source.weight.device)
     shard = nn.Linear(source.in_features, len(rows), bias=source.bias is not None)
     with torch.no_grad():
         shard.weight.copy_(source.weight.data.index_select(0, rows))
@@ -80,8 +83,9 @@ class TensorParallelGatedDeltaNet(nn.Module):
             convs.append(_slice_conv(source.conv1d, channels, device))
             # Replicated: one shared head_v_dim weight, not per head.
             norms.append(copy.deepcopy(source.norm).to(device))
-            a_logs.append(nn.Parameter(source.A_log.data.index_select(0, heads).clone().to(device)))
-            dts.append(nn.Parameter(source.dt_bias.data.index_select(0, heads).clone().to(device)))
+            local_heads = heads.to(source.A_log.device)
+            a_logs.append(nn.Parameter(source.A_log.data.index_select(0, local_heads).clone().to(device)))
+            dts.append(nn.Parameter(source.dt_bias.data.index_select(0, local_heads).clone().to(device)))
 
         self.in_proj_qkv = nn.ModuleList(qkv)
         self.in_proj_z = nn.ModuleList(z_proj)
@@ -159,6 +163,7 @@ class TensorParallelGatedDeltaNet(nn.Module):
 
 def _slice_conv(source: nn.Conv1d, channels: torch.Tensor, device) -> nn.Conv1d:
     """Depthwise conv over a subset of channels; groups shrink with the channels."""
+    channels = channels.to(source.weight.device)
     count = len(channels)
     shard = nn.Conv1d(
         count, count, kernel_size=source.kernel_size[0], groups=count,
