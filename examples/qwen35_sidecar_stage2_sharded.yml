@@ -161,10 +161,22 @@ use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the loa
 functionary_packing: false
 chunked_cross_entropy: true
 # Project lm_head inside the loss chunk loop instead of materializing
-# [1, 4096, 248320] logits (1.89 GiB) and their gradient (1.89 GiB again). Identical
-# loss and gradients; measured to drop this model's single-card peak at sequence 4096
-# from OOM to 20.02 GiB.
-chunked_head: true
+# [1, 4096, 248320] logits (1.89 GiB) and their gradient (1.89 GiB again), for
+# identical loss and gradients.
+#
+# OFF here, because it is a memory-for-compute trade and memory is no longer the
+# binding constraint. The head is recomputed during backward, which measured at
+# boundary 13, sequence 1024:
+#
+#   chunked_head: true    955 tok/s   card 0 13.50 GiB
+#   chunked_head: false   997 tok/s   card 0 15.16 GiB
+#
+# 4.4% of throughput to save 1.66 GiB. That was the right trade before the
+# grouped-query fix -- it was the difference between OOM and fitting at sequence
+# 4096, and it is what makes a ZeRO-2 rank fit at full length. Turn it back on when
+# memory binds again: longer sequences, a larger batch, or data-parallel ranks that
+# each carry the whole model.
+chunked_head: false
 # 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
 # The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
 # -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.
@@ -175,6 +187,12 @@ training_args:
   remove_unused_columns: false
   dataloader_num_workers: 0
   optim: adamw_bnb_8bit
+  # Stays 1. Batching looks like a win at fixed length (997 -> 1092 tok/s at batch 4)
+  # and is a large net loss on this corpus, whose documents are median 545 and max
+  # 4096 tokens: a batch pads to its longest member, so simulated over the real length
+  # distribution batch 2 wastes 28.8% and batch 4 wastes 48.7%, for effective
+  # throughputs of 748 and 561 tok/s. trl 0.25.1 dropped group_by_length, so there is
+  # no length-grouped sampler to fix it; adding one would unlock the batch gain.
   per_device_train_batch_size: 1
   gradient_accumulation_steps: 16
   gradient_checkpointing: true
