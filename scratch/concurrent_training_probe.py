@@ -50,6 +50,12 @@ def main():
         def on_step_begin(self, args, state, control, **kwargs):
             for d in range(2):
                 torch.cuda.synchronize(d)
+                # These eight documents are the longest in the cache, so every
+                # microbatch is near the 4096 cap and the allocator ratchets its
+                # reservation up until it cannot place the next block. Releasing
+                # cached blocks between steps keeps the timing question separate
+                # from the fragmentation one, and costs both modes equally.
+                torch.cuda.empty_cache()
                 torch.cuda.reset_peak_memory_stats(d)
             self.started = time.perf_counter()
 
@@ -73,8 +79,16 @@ def main():
 
     class ProbeTrainer(entry.HybridDistillationTrainer):
         def train(self, *args, **kwargs):
-            indices = sorted(range(len(self.train_dataset)),
-                             key=lambda i: (-len(self.train_dataset[i]["input_ids"]), i))[:8]
+            # Median-length documents, not the longest. The longest pin every
+            # microbatch at the 4096 cap, which ratchets the allocator until it OOMs
+            # at step 2 -- and step 1 is the one window the threaded path handicaps
+            # itself on, running the first microbatch alone to prime lazy init. A
+            # timing comparison has to reach step 2. These are also closer to the real
+            # corpus, whose documents average ~870 tokens.
+            order = sorted(range(len(self.train_dataset)),
+                           key=lambda i: (len(self.train_dataset[i]["input_ids"]), i))
+            middle = len(order) // 2
+            indices = sorted(order[max(0, middle - 6):middle + 6][:12])
             self.train_dataset = self.train_dataset.select(indices)
             report["documents"] = list(self.train_dataset["doc_id"])
             report["lengths"] = [len(x) for x in self.train_dataset["input_ids"]]

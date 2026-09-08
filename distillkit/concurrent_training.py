@@ -131,9 +131,16 @@ class ConcurrentMicrobatches:
                     scaled.backward()
                     value = scaled.detach().float().item()
                     del loss, scaled
-                    # AccumulateGrad can use a stream inherited from an older graph.
-                    # Complete all writers before another backward or optimizer step.
-                    self._sync()
+                    # Quiesce THIS worker's streams before releasing the gate, so the
+                    # next microbatch's backward sees completed .grad writes. Not
+                    # torch.cuda.synchronize(device): that is a whole-device barrier
+                    # which also waits on the other worker's in-flight forward, and
+                    # waiting for the very work we are trying to overlap turns the
+                    # pipeline back into a serial one. Every op of this microbatch ran
+                    # under these streams, so they cover its gradient writers; the
+                    # window start and end still use full device syncs.
+                    for stream in local.streams.values():
+                        stream.synchronize()
                     return value, logs
             except BaseException:
                 aborted.set()

@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **203 passed** in the CUDA-enabled dev environment (≈30 s).
+**Test suite:** green — **210 passed** in the CUDA-enabled dev environment (≈37 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -64,8 +64,10 @@ regression), and two CUDA-parametrized cases are skipped.
 5. ~~Port `_AnchorTap` into the trainer~~ - **done**: `distillkit/anchor_tap.py`.
 6. ~~Run the staged curriculum~~ - **done**: chaining wins, 0.5262 against 0.5347, but
    inside the run-to-run spread. See "The staged curriculum beats training jointly".
-7. 1F1B microbatch interleaving over the existing layer split. The tap has freed the
-   headroom it needs; the remaining work is the schedule itself.
+7. ~~Threaded microbatch overlap~~ - **done and measured: 8.7% slower**, left opt-in and
+   off. See "Threaded microbatch overlap". A real gain needs the explicit stage
+   schedule, whose ceiling is bounded by the reachable split rather than the balanced
+   one.
 8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
    it should keep adapting rather than freezing at stage 1's value.
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
@@ -481,6 +483,76 @@ times under different memory configurations: eval_loss 0.5853, 0.5973 and 0.5807
 of 0.017. That is not a seed replicate (the configurations differed), but it bounds
 run-to-run wobble at roughly 38% of the effect. The effect is real but a 5M pilot should
 carry at least two seeds per arm before anything is concluded about its size.
+
+## Threaded microbatch overlap: measured, slower, left off by default (2026-09-07)
+
+`distillkit/concurrent_training.py` runs two microbatches of an accumulation window in
+worker threads, overlapping one forward with another's head and backward. It is correct
+-- it reproduces serial losses and gradients -- and it is **8.7% slower**. It stays
+opt-in behind `concurrent_microbatches: 2`, which defaults to 1.
+
+Steady-state steps of the real cache at boundary 10, four accumulated microbatches per
+step (`scratch/concurrent_training_probe.py`):
+
+| step | serial | threaded |
+| --- | ---: | ---: |
+| 1 (threaded warms up serially) | 4.85 s | 5.15 s |
+| 2 | **3.33 s** | **3.63 s** |
+| 3 | **3.32 s** | **3.61 s** |
+
+It also costs memory: card 0 reserved 19.79 GiB against serial's 18.80, card 1 16.54
+against 14.37, for the second in-flight microbatch.
+
+### What the measurement cost to get right
+
+Three separate mistakes, each caught by the next measurement rather than by reasoning:
+
+* **Boundary 18 does not fit.** The stage timings put the compute-balanced split at 18
+  layers on card 0 (2296 ms vs 2342 ms, a 1.98x pipelining ceiling) and the preflight
+  reported a 18.23 GiB *peak* against a 22.80 GiB cap. But the cap applies to
+  *reserved*, and both modes OOM'd there at 18.34 GiB allocated plus 4.40 GiB stranded.
+  At boundary 7 fragmentation had 7 GiB to hide in; at 18 it has none. The balanced
+  split is unreachable, so the 1.98x ceiling is theoretical.
+* **"Launch-bound" was wrong.** CPU issue time is 90% of wall time at every sequence
+  length, which looks conclusive. It is not: holding kernel count fixed and scaling the
+  batch 1 -> 2 -> 4 gave 1020 -> 1941 -> 3684 ms, near-linear in work. A launch
+  bottleneck would have been flat. The 90% is the CUDA launch queue filling and blocking
+  the CPU inside `cudaLaunchKernel` -- a symptom of a GPU-bound step, not its cause.
+* **The first four comparisons measured the wrong window.** Both modes OOM'd at step 2,
+  so every number came from step 1 -- the one window where `warmup_first` runs the first
+  microbatch alone and pays one-time setup. The probe selected the eight *longest*
+  documents, pinning every microbatch at the 4096 cap. Median-length documents (closer
+  to the corpus mean of ~870 tokens anyway) reach step 3, and the steady-state result is
+  the same as the biased one, so the bias was not what made threading lose.
+
+### Two fixes that stand regardless
+
+* `_OrderedGate` admits microbatches to the head in submission order. The original
+  semaphore admitted whichever worker arrived first, so gradients accumulated into the
+  shared `.grad` buffers in a nondeterministic order; bf16 addition is not associative
+  and the equivalence test failed on a different element each run. Backward is
+  serialized under that gate anyway, so fixing *which* order costs no overlap and buys
+  reproducibility.
+* The per-worker post-backward sync is scoped to that worker's own streams.
+  `torch.cuda.synchronize(device)` is a whole-device barrier that also waits on the
+  other worker's in-flight forward -- blocking on precisely the work being overlapped.
+  Fixing it changed the timing by 0.03 s, so it was not the bottleneck, but a
+  whole-device barrier inside a pipeline is wrong on its own terms.
+
+### Why it does not pay, and what would
+
+The gate holds from `lm_head` entry through backward, and backward is roughly two thirds
+of a microbatch, so at best one third can overlap. The step is GPU-bound, so two threads
+contending for the same saturated devices add scheduling overhead without creating
+capacity.
+
+A real gain needs the schedule to keep *different devices* busy on *different*
+microbatches, rather than letting two threads race for both. That is the explicit stage
+schedule: split front/middle/head into separately callable stages with detached
+boundaries, and drive them from one thread in 1F1B order. It is a larger change --
+it reimplements `Qwen3_5TextModel.forward`'s layer loop, mask construction and rotary
+setup, which then has to be kept in step with the library -- and the honest ceiling for
+it here is bounded by the reachable split, not the balanced one.
 
 ## The staged curriculum beats training jointly (2026-09-07)
 

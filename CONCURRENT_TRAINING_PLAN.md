@@ -43,3 +43,15 @@ measured. Individual GPU utilization percentages do not have to sum to 100%.
 - Only claim acceleration after this measurement. If backward serialization limits
   gains, use these results to design an explicit stage schedule or gradient-stream
   protocol. NCCL/custom c10d backend work is a separate later tier.
+
+## Outcome (2026-09-07)
+
+Measured on the real cache at boundary 10: threaded steady-state steps take 3.63/3.61 s
+against serial's 3.33/3.32 s -- **8.7% slower** -- and reserve about 1 GiB more on card 0
+and 2 GiB more on card 1. Correctness held throughout: serial losses and gradients are
+reproduced, with bf16 weights differing by a couple of ulp.
+
+This is the branch the plan named: backward serialization limits gains. The feature
+stays opt-in and off. See PROGRESS.md, "Threaded microbatch overlap", for the three
+measurement mistakes made along the way and for what an explicit stage schedule would
+have to do differently.
