@@ -9,7 +9,7 @@ sensitive.
 ## State at handoff
 
 - Branch `sidecar-distill` at `github.com/zcomputerwiz/DistillKit`, tree clean, all
-  commits pushed. **306 tests pass** (`.venv/Scripts/python.exe -m pytest tests -q`,
+  commits pushed. **323 tests pass** (`.venv/Scripts/python.exe -m pytest tests -q`,
   about 47 s on the CUDA machine; two-GPU tests skip elsewhere).
 - Stage-2 full-backbone distillation runs three ways, all verified end to end:
   layer split (`examples/qwen35_sidecar_stage2_sharded.yml`, 1263 s, eval_loss 0.5330),
@@ -65,19 +65,19 @@ converted student in `student-hf`.
    `flash_attn_func` instead. The 24 GatedDeltaNet layers are unaffected (FLA kernels).
    Expect memory first, speed second: attention is 5.4% of parameters.
 
-4. **Batching -- measured: 1.58x faster, 0.0176 worse. Decide before the pilot.**
-   Throughput is set by *tokens per microbatch*, not batch size (744 tok/s at 512
-   tokens, plateau near 1700 from 2048 up), and this corpus is median 547 tokens, so at
-   batch 1 most microbatches run the GPU at under half its rate. Grouped batch 4
-   (`examples/qwen35_sidecar_stage2_batch4.yml`) ran the epoch in 756.6 s against
-   1193 s -- but `eval_loss` came out 0.5505 against 0.5329. That is not noise: with the
-   math held fixed this pipeline reproduces to four decimals (the layer split and tensor
-   parallelism gave 0.5330 and 0.5329), and 0.0176 is 39% of the 0.0448 sidecar effect
-   the pilot exists to measure. Either run the pilot at batch 1 and pay the wall time
-   for comparability with the 1M results, or run every arm grouped identically and rely
-   on the offset cancelling in the difference. See PROGRESS, "Batching: throughput is
-   set by tokens per microbatch", for the sampler mechanics and which of ordering or
-   step composition is responsible.
+4. **Batching -- mostly solved; one decision left before the pilot.** Throughput is set
+   by *tokens per microbatch*, not batch size (744 tok/s at 512 tokens, plateau near
+   1700 from 2048 up), and this corpus is median 547 tokens, so at batch 1 most
+   microbatches run the GPU at under half its rate. Batch 4 is ~1.5-1.6x.
+   `train_sampling_strategy: group_by_length` costs 0.0176 of eval_loss for it;
+   `sortish_batching: true` (`examples/qwen35_sidecar_stage2_sortish.yml`) costs 0.0084
+   at the same speed. Order-seed variance is 0.0005 (baseline reshuffled, seed 42 vs 43:
+   0.5329 vs 0.5324), so the residual is real, not noise. Either run the pilot at batch 1
+   -- directly comparable with the 1M results, no argument needed -- or run every arm
+   with identical sampling and rely on so reproducible an offset cancelling in the
+   sidecar-minus-control difference. **Do not mix samplers across arms.** PROGRESS,
+   "Batching: throughput is set by tokens per microbatch", has the full table and the two
+   untested candidates for the residual 0.005.
 
 5. **MTP head.** Conventions resolved from llama.cpp; implementation
    pending ("MTP: reference resolved, implementation pending" in PROGRESS). Under tensor
@@ -122,6 +122,13 @@ converted student in `student-hf`.
   saves an empty sentinel and unpacks it first. A new collective must do the same or
   fail intermittently with "recomputed values have different values".
 - **`pytest | tail` masks the exit code.** Run pytest bare, or check `PIPESTATUS`.
+- **A test fixture whose size divides evenly by the batch size hides tail-batch bugs.**
+  That is how a 1.4% -> 23.8% padding regression shipped in the first sortish sampler.
+  Parametrize dataset sizes that do *not* divide.
+- **Comparing runs across different data orders needs a reshuffle control**, not an
+  execution-reproducibility one. Two different pipelines running the same order agreeing
+  to four decimals says nothing about how much the order itself is worth (0.0005, as it
+  turns out).
 - **Never run llama.cpp model binaries on this machine** -- they touched the GPU and
   RAM despite `-ngl 0`. Reading GGUF files with Python is fine.
 - The dataset's license restricts use to controlled, noncommercial research; the user

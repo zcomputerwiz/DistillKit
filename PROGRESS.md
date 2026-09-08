@@ -98,10 +98,10 @@ Knobs whose right value depends on what is binding, not on taste:
    sidecar, concentrated entirely in the KL term.
 3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
-4b. ~~Batching~~ - **measured: grouped batch 4 is 1.58x (1193 s -> 756.6 s) and costs
-   0.0176 of eval_loss**, which is 39% of the effect the pilot is meant to measure and
-   is not noise. Decide per-arm before the pilot, not during it. See "Batching:
-   throughput is set by tokens per microbatch".
+4b. ~~Batching~~ - **measured, and mostly fixed**: batch 4 is ~1.5-1.6x, and
+   `sortish_batching` cuts its loss cost from 0.0176 to 0.0084 at the same speed.
+   Order-seed variance is 0.0005, so the residual is real. Decide per-arm before the
+   pilot, not during it. See "Batching: throughput is set by tokens per microbatch".
 4a. **The 5M-token pilot is now the top open item.** Everything below it is
    infrastructure that is finished; this is the question the infrastructure was for.
    See "What remains" in `HANDOFF.md` for the steps.
@@ -1069,9 +1069,56 @@ sequences of *similar* length rather than 16 random ones. The first logged gradi
 is **464 against the baseline's 76.5**, clipped to `max_grad_norm: 1.0`, which is the
 densest-possible first batch doing almost nothing useful.
 
-`examples/qwen35_sidecar_stage2_grouped1.yml` separates the two: grouping at batch 1,
-where no padding exists and each step still averages 16 whatever-length sequences, so
-only the ordering changes. «GROUPED1_RESULT»
+### Calibrating against a reshuffle, which is the control that was missing
+
+Every comparison in this section is between different data orders, so the yardstick has
+to be how much `eval_loss` moves when the order changes *for no other reason*. The
+0.5330 / 0.5329 pair from the layer split and tensor parallelism does not measure that --
+it holds the order fixed and measures execution reproducibility. The right control is the
+baseline config with `training_args.seed` 42 -> 43 and `dataset.seed` untouched, so the
+train/eval split is identical and only the shuffle differs:
+
+| | `train_runtime` | `eval_loss` | vs baseline |
+| --- | ---: | ---: | ---: |
+| batch 1, no grouping, seed 42 | 1193 s | 0.5329 | -- |
+| batch 1, no grouping, **seed 43** | 1128 s | **0.5324** | **0.0005** |
+| batch 1, `group_by_length` | 1131 s | 0.5474 | +0.0145 |
+| batch 4, `group_by_length`, accum 4 | 756.6 s | 0.5505 | +0.0176 |
+| batch 4, **sortish**, accum 4 | **752.1 s** | **0.5413** | **+0.0084** |
+
+**Order-seed variance is 0.0005.** Every sampler effect above is 17x to 35x that, so all
+of them are real. Note also that `train_runtime` is the noisier quantity here -- 1193 s
+and 1128 s are the same configuration -- so treat the speedups as ~1.5-1.6x rather than
+1.58x to three figures.
+
+### Sortish recovers half the loss at full speed
+
+`distillkit/sortish_sampler.py` groups at the microbatch and shuffles the batch order
+(see that module for why HF's sampler does neither, and the two bugs review found in the
+first version). It keeps all of the throughput -- 752.1 s against grouped's 756.6 s --
+and takes the regression from 0.0176 to **0.0084**, so the descending-length sawtooth was
+about half the problem.
+
+Half, not all. Accounting for the rest: batching itself is 0.0031 (batch-1-grouped 0.5474
+to batch-4-grouped 0.5505), which leaves roughly 0.005 of ordering effect that shuffling
+the batch order did not remove. Two candidates, neither tested: each microbatch is still
+length-homogeneous, so sortish restored diversity *between* microbatches within an
+optimizer step but not *inside* one; and the deliberately-first longest batch still
+arrives at step 0 with an elevated gradient norm (124.5, against the baseline's 76.5 and
+grouped's 462). The first would be tested by grouping more loosely and paying padding for
+it; the second by dropping the longest-first placement, which costs the OOM-fail-fast
+property that placement exists for.
+
+### What this means for the pilot
+
+Sortish is 1.5-1.6x for 0.0084 of `eval_loss`, which is 19% of the 0.0448 sidecar effect
+-- better than `group_by_length`'s 39%, still not free. The reshuffle control improves
+the case for spending it: at 0.0005 of order-seed variance, a sampler offset is highly
+reproducible, so running *every arm* with identical sampling should cancel it in the
+sidecar-minus-control difference far more cleanly than a noisy offset would. Running the
+pilot at batch 1 remains the option that needs no such argument and stays directly
+comparable with the 1M results already recorded.
+
 
 ### What this means for the pilot
 

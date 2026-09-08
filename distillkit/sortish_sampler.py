@@ -3,9 +3,14 @@
 `train_sampling_strategy: group_by_length` made a stage-2 epoch 1.58x faster and
 `eval_loss` 0.0176 worse. A control isolated the cause: grouping at batch 1, where no
 padding exists and grouping therefore changes *nothing but the order*, cost 0.0145 of
-that 0.0176. So the loss is an ordering effect, not a batching or padding one, and it is
-not noise -- with the mathematics held fixed this pipeline reproduces `eval_loss` to four
-decimals (the layer split and tensor parallelism gave 0.5330 and 0.5329).
+that 0.0176. So the loss is an ordering effect, not a batching or padding one.
+
+It is not noise, and the control that establishes that is a reshuffle: the same config
+at `training_args.seed` 43 gives 0.5324 against seed 42's 0.5329, so changing the data
+order for no reason but the seed moves `eval_loss` by 0.0005. (The 0.5330/0.5329 pair
+from the layer split and tensor parallelism does *not* establish it -- that holds the
+order fixed and measures execution reproducibility, which is a different quantity.)
+Against 0.0005, every number below is a real effect.
 
 Two properties of HF's sampler cause it, and neither is needed to save padding.
 
