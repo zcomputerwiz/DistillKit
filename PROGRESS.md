@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **233 passed** in the CUDA-enabled dev environment (≈40 s).
+**Test suite:** green — **279 passed** in the CUDA-enabled dev environment (≈40 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -71,7 +71,10 @@ regression), and two CUDA-parametrized cases are skipped.
 8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
    it should keep adapting rather than freezing at stage 1's value.
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
-10. Hybrid tensor parallelism - in progress, see "Hybrid tensor parallelism".
+10. Hybrid tensor parallelism - components done and verified, assembly blocked. Two
+    integration failures to clear before any throughput number: gradient checkpointing
+    rejects the custom autograd Functions, and FLA's autotuner returns None at the real
+    model's head geometry. See "Hybrid tensor parallelism".
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -638,6 +641,87 @@ card 1, provided only one microbatch is in the head at a time.
 
 Card 1 has 6.1 GiB of margin for that. Card 0 had 0.7 GiB against its *reservation*,
 which is why the tap comes first.
+
+## Hybrid tensor parallelism: components done, integration blocked (2026-09-08)
+
+Single-process tensor parallelism across the two cards, built because threading
+measured negative and the layer split gives capacity without concurrency. **Every
+component is implemented and verified against the unsharded model; the assembled
+model does not yet run at production shapes.** No throughput number exists yet, and
+none should be quoted until it does.
+
+### What is built
+
+| module | covers | commit |
+| --- | --- | --- |
+| `tensor_parallel.py` | `AllReduce`, `Replicate`, `Reduce`, peer check | `a02c815`, `ce2ec48` |
+| `tp_linear.py` | Column/RowParallelLinear | `2430ce8` |
+| `tp_blocks.py` | MLP (58.5%) + full attention (5.4%) | `1bd8589` |
+| `tp_gated_delta.py` | corrected channel plan | `420e917` |
+| `tp_gated_delta_module.py` | head-sharded GatedDeltaNet (19.7%) | `b922960` |
+| `tp_model.py` | `shard_model` entry point | `ce2ec48` |
+
+~84% of parameters shard. The tied embeddings (16.4%) stay whole on the home card --
+splitting them needs vocab-parallel logits, which is designed but not built.
+
+**No NCCL, and none needed.** Two GPUs in one process with peer access make an
+all-reduce a peer copy and an add, which autograd differentiates for free. Measured
+here, peer copies run 38-48 GB/s at 64 MiB against NCCL's 37.5 GB/s all-reduce, so a
+collective library would buy nothing while adding `Work` objects, process-group
+lifecycle and `wait()` ordering -- where a hand-rolled c10d backend's deadlocks would
+have lived. That deletes the ZeRO-2 backend project rather than deferring it: tensor
+parallelism gives each rank half the weights, gradients *and* optimizer state, which
+is what ZeRO-2 was wanted for.
+
+llama.cpp was considered as a donor and rejected. Its `allreduce.cu` stages through
+pinned host memory *because* it targets machines without NVLink, and being
+inference-only it lacks the hard part, backward through the collective. What was
+borrowed is transformers' `base_model_tp_plan` as the sharding specification.
+
+### Two silent-failure traps found, both now pinned by tests
+
+**The `q_proj` output gate.** Qwen3.5 packs a gate into `q_proj`, which emits
+`num_heads * head_dim * 2`. The layout is head-major -- `view(..., -1, head_dim*2)`
+then `chunk(2, dim=-1)` -- so each head owns a contiguous `[query | gate]` block and a
+contiguous column split is valid. Had it been packed `[all queries | all gates]`, the
+same split would have given one rank every query and the other every gate, run without
+error, and trained nonsense. `_assert_head_major` fails loudly if that changes.
+
+**The GatedDeltaNet conv channels.** An adversarial review (Codex) found the plan right
+in principle and wrong in mechanism. The claim "conv1d is depthwise, so channels split
+trivially" is true about depthwise independence and says nothing about *packing order*:
+`conv_dim` is `[all Q | all K | all V]`, so a contiguous half-split takes the wrong mix.
+Each block must be sliced separately. The review also caught three more silent failures:
+`RMSNormGated`'s weight is one shared parameter whose per-rank gradient is a *partial*
+and must be summed (`sync_replicated_gradients`); the recurrent cache is keyed by
+`layer_idx` so both ranks would alias one slot; and after `repeat_interleave` each shard
+hands FLA 16 Q/K/V heads rather than 8 and 16. FLA itself imposes no power-of-two head
+requirement -- the real limit is `K <= 256`, satisfied at 128.
+
+### Two integration blockers, in order
+
+1. **Gradient checkpointing rejects the sharded modules.** Non-reentrant checkpointing
+   raises `Unexpected state: target_frame.early_stop is set`, and with early stop
+   disabled, `trying to save more tensors during recomputation than during the original
+   forward pass`. The custom autograd Functions produce tensors on two devices and the
+   recompute visits them in a different order. Suspect first: `Replicate.forward` and
+   `_sum_to_each` return the *input tensor itself* for the home device rather than a
+   distinct one, which changes autograd's saved-tensor accounting. Checkpointing is not
+   optional -- without it the model OOMs at sequence 4096 on the first layer.
+2. **FLA's autotuner returns `None` at production shapes**, `TypeError: 'NoneType'
+   object is not a mapping` inside `check_disk_cache`. Not cache corruption; clearing
+   `~/.triton/cache` does not fix it. The toy-model GPU tests pass, so the sharded
+   module is correct at small shapes and something about the real head geometry
+   (16 k-heads / 32 v-heads at 128 dims) trips the autotuner.
+
+### The honest expectation
+
+Communication is 2 reductions per layer x 32 layers x 20 MB at the 13.1 GB/s measured
+for that payload, roughly 7.5% of a microbatch. Halving the shardable compute against
+that overhead puts the ceiling near **1.6x, not 2x**, and the replicated remainder caps
+it further. That is worth having only because the alternatives are exhausted: threading
+measured 8.7% slower and does not recover at a balanced split, and the layer split is
+capacity-only by construction.
 
 ## Attention was on the math kernel (2026-09-07) — largest single win
 
