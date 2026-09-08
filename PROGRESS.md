@@ -98,9 +98,10 @@ Knobs whose right value depends on what is binding, not on taste:
    sidecar, concentrated entirely in the KL term.
 3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
-4b. **Batching**: grouped batch 4 is projected to cut microbatch compute 1.61x and is
-   the largest remaining throughput lever. See "Batching: throughput is set by tokens
-   per microbatch".
+4b. ~~Batching~~ - **measured: grouped batch 4 is 1.58x (1193 s -> 756.6 s) and costs
+   0.0176 of eval_loss**, which is 39% of the effect the pilot is meant to measure and
+   is not noise. Decide per-arm before the pilot, not during it. See "Batching:
+   throughput is set by tokens per microbatch".
 4a. **The 5M-token pilot is now the top open item.** Everything below it is
    infrastructure that is finished; this is the question the infrastructure was for.
    See "What remains" in `HANDOFF.md` for the steps.
@@ -1029,7 +1030,65 @@ the largest blocks first, which is the friendly direction for a fragmenting allo
 `gradient_accumulation_steps` cut 16 -> 4, holding the effective batch at 16 so the loss
 stays comparable with the batch-1 run's 0.5329.
 
-«BATCH4_RESULT»
+### The run: 1.58x, and a loss cost that is not noise
+
+| | batch 1 | grouped batch 4 |
+| --- | ---: | ---: |
+| `train_runtime` | 1193 s | **756.6 s (1.58x)** |
+| `eval_loss` | **0.5329** | 0.5505 (+0.0176) |
+| card 0 peak / reserved | 15.00 / 15.99 GiB | 18.44 / 19.99 GiB |
+| card 1 peak / reserved | 13.77 / 14.81 GiB | 14.52 / 16.63 GiB |
+
+The speed prediction held: 1.58x measured against 1.61x projected on microbatch compute,
+and the epoch beat the projection's implied 1.43x because cutting
+`gradient_accumulation_steps` 16 -> 4 also removed three quarters of the per-microbatch
+overhead. Memory landed where the probe said plus the trainer's usual ~1.7 GiB
+(19.99 GiB reserved against the 22.80 cap), no OOM, and it went straight past step 18,
+where the layer split's attempt at grouping died of fragmentation.
+
+**The loss cost is real.** 0.0176 would be inside the 0.017 run-to-run spread recorded
+for stage-1 arms, but that spread is the wrong yardstick here: it was measured across
+*different memory configurations*, and this project has a much tighter control available.
+The layer split and tensor parallelism -- different execution strategies, identical
+mathematics -- produced **0.5330 and 0.5329**. When the math is held fixed this pipeline
+reproduces `eval_loss` to four decimals, so a sampler change that moves it by 0.0176 is a
+trajectory change, not wobble. For scale, that is 39% of the 0.0448 sidecar effect the
+whole project exists to measure.
+
+`train_loss` looks *better* under grouping (0.4819 against 0.5167 at the end) and that
+comparison is worthless: HF's sampler sorts by length **within** megabatches
+(`mega_batch_mult * batch_size`, here 50 x 4 = 200, so about six sawtooth passes over the
+epoch), so late steps in every pass are short documents and the running training loss is
+confounded with document length. Only `eval_loss`, measured on a fixed set, compares.
+
+What the sampler actually does, since the cost has to come from one of these: it permutes
+randomly, cuts megabatches, sorts each descending, and swaps the single longest element
+to position 0 "so that an OOM happens sooner rather than later". So grouping changes both
+(a) the order examples arrive in and (b) the composition of each optimizer step -- 16
+sequences of *similar* length rather than 16 random ones. The first logged gradient norm
+is **464 against the baseline's 76.5**, clipped to `max_grad_norm: 1.0`, which is the
+densest-possible first batch doing almost nothing useful.
+
+`examples/qwen35_sidecar_stage2_grouped1.yml` separates the two: grouping at batch 1,
+where no padding exists and each step still averages 16 whatever-length sequences, so
+only the ordering changes. «GROUPED1_RESULT»
+
+### What this means for the pilot
+
+Grouped batch 4 is a 1.58x throughput win that costs 0.0176 of `eval_loss`. For
+*infrastructure* work that is an easy trade. For the 5M pilot it is not, because the
+quantity being measured is 0.0448 and an arm-independent offset of 39% of it eats the
+margin that two seeds were supposed to establish. Two defensible ways to spend it:
+
+* **Run the pilot at batch 1** and pay 1.58x in wall time for arms directly comparable
+  with the 1M results already recorded.
+* **Run every arm grouped**, identically, and treat the offset as a constant that cancels
+  in the sidecar-minus-control difference -- which it should, but "should" is exactly the
+  kind of assumption the fixed-cost-per-token model above already got wrong once.
+
+The second is cheaper and probably fine; the first is what the existing numbers can be
+compared against. Not a decision to make silently either way.
+
 
 ## What the memory work bought, end to end
 

@@ -65,16 +65,19 @@ converted student in `student-hf`.
    `flash_attn_func` instead. The 24 GatedDeltaNet layers are unaffected (FLA kernels).
    Expect memory first, speed second: attention is 5.4% of parameters.
 
-4. **Batching -- measured, configured, and the largest remaining throughput lever.**
-   Throughput on this student is set by *tokens per microbatch*, not batch size: 744
-   tok/s at 512 tokens, 1340 at 1024, and a plateau near 1700 from 2048 up. This corpus
-   is median 547 tokens, so at batch 1 most microbatches run the GPU at under half its
-   rate. `examples/qwen35_sidecar_stage2_batch4.yml` is batch 4 with `group_by_length`
-   and accumulation cut 16 -> 4 (effective batch unchanged, so the loss stays comparable
-   with 0.5329). Projected 1.61x on microbatch compute at 0.6% padding waste. Batch 8
-   fits neither the full-length groups nor the allocator. Watch reserved-but-unallocated
-   in the per-step vram metrics: the layer split's attempt at this died of fragmentation
-   at step 18. See PROGRESS, "Batching: throughput is set by tokens per microbatch".
+4. **Batching -- measured: 1.58x faster, 0.0176 worse. Decide before the pilot.**
+   Throughput is set by *tokens per microbatch*, not batch size (744 tok/s at 512
+   tokens, plateau near 1700 from 2048 up), and this corpus is median 547 tokens, so at
+   batch 1 most microbatches run the GPU at under half its rate. Grouped batch 4
+   (`examples/qwen35_sidecar_stage2_batch4.yml`) ran the epoch in 756.6 s against
+   1193 s -- but `eval_loss` came out 0.5505 against 0.5329. That is not noise: with the
+   math held fixed this pipeline reproduces to four decimals (the layer split and tensor
+   parallelism gave 0.5330 and 0.5329), and 0.0176 is 39% of the 0.0448 sidecar effect
+   the pilot exists to measure. Either run the pilot at batch 1 and pay the wall time
+   for comparability with the 1M results, or run every arm grouped identically and rely
+   on the offset cancelling in the difference. See PROGRESS, "Batching: throughput is
+   set by tokens per microbatch", for the sampler mechanics and which of ordering or
+   step composition is responsible.
 
 5. **MTP head.** Conventions resolved from llama.cpp; implementation
    pending ("MTP: reference resolved, implementation pending" in PROGRESS). Under tensor
