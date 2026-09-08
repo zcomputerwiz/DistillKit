@@ -6,7 +6,7 @@ unfinished GGUF provider + verification work and has grown into the authoritativ
 "where things stand" document. Read **Where things stand** first; the sections below
 are the chronological evidence trail.
 
-## Where things stand (as of 2026-09-07)
+## Where things stand (as of 2026-09-08)
 
 **Built and verified (all CPU-testable parts done):**
 - GGUF IQ4_NL table provider (`ngram_table.py`): hash ported from Flash-Next modeling
@@ -26,6 +26,11 @@ are the chronological evidence trail.
   callback, architecture/gate metrics logging to W&B/TensorBoard.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
+- Memory work that made stage 2 comfortable: anchor taps instead of all 33 hidden
+  states, the folded output head, grouped-query KV expansion (the single largest win --
+  4328 -> 249 MiB per attention call), and a split rebalanced from measurement.
+- **Tensor parallelism** (`tp_*.py`): 83.6% of parameters sharded across both cards,
+  1.41x faster than the layer split and smaller on both. No NCCL and none needed.
 
 **Test suite:** green — **287 passed** in the CUDA-enabled dev environment (≈43 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
@@ -33,6 +38,34 @@ are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
 bf16-trainer test that needs `use_cpu` (an environmental artifact of CPU forcing, not a
 regression), and two CUDA-parametrized cases are skipped.
+
+**How to run the thing (current configuration):**
+
+```
+# Stage 1, frozen backbone, sidecar vs control -- both cards, no CUDA_VISIBLE_DEVICES pin
+python -m distillkit.main examples/qwen35_sidecar_1m.yml -v
+python -m distillkit.main examples/qwen35_sidecar_1m_control.yml -v
+
+# Stage 2, full backbone, layer split at boundary 13
+python -m distillkit.main examples/qwen35_sidecar_stage2_sharded.yml -v
+
+# Stage 2 continuing from stage 1 rather than the stock student
+python -m distillkit.main examples/qwen35_sidecar_stage2_chained.yml -v
+```
+
+Set `PYTORCH_CUDA_ALLOC_CONF=garbage_collection_threshold:0.8`. `expandable_segments`
+is unsupported on this platform, so that is the only defence against the fragmentation
+that killed several runs.
+
+Knobs whose right value depends on what is binding, not on taste:
+- `chunked_head`: off at batch 1 (costs 4.4%), **required** at batch 4 or for a
+  data-parallel rank at full sequence length, where the logits it removes are 7.6 GiB
+  plus the same again in gradient.
+- `per_device_train_batch_size`: 1. Batching needs length grouping to be worth
+  anything here, and grouping then fragments the allocator. See "Batching needs length
+  grouping".
+- Tensor parallelism is not yet wired into `main.py`; use `shard_model` directly, as
+  `scratch/tp_real_probe.py` does.
 
 **Verification gates:**
 - Gate 1 (imports/tests): **pass** on installed Transformers 5.16.1.
@@ -60,7 +93,9 @@ regression), and two CUDA-parametrized cases are skipped.
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
 4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
-   runs". Margins are thin (22.12 / 21.45 GiB reserved against 22.80 allowed).
+   runs". The thin margins recorded there (22.12 / 21.45 GiB against 22.80 allowed) are
+   historical: the grouped-query fix and the rebalance to boundary 13 brought the layer
+   split to 13.68 / 12.92 GiB, and tensor parallelism to 12.22 / 8.52.
 5. ~~Port `_AnchorTap` into the trainer~~ - **done**: `distillkit/anchor_tap.py`.
 6. ~~Run the staged curriculum~~ - **done**: chaining wins, 0.5262 against 0.5347, but
    inside the run-to-run spread. See "The staged curriculum beats training jointly".

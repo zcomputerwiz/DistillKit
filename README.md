@@ -4,6 +4,40 @@ A flexible and production-ready toolkit for knowledge distillation of large lang
 
 DistillKit powers the training of many of Arcee's popular open-source models, including [Virtuoso](https://huggingface.co/arcee-ai/Virtuoso-Large), [SuperNova Medius](https://huggingface.co/arcee-ai/SuperNova-Medius), and [Blitz](https://huggingface.co/arcee-ai/Arcee-Blitz).
 
+---
+
+## This fork: n-gram sidecar distillation on two consumer GPUs
+
+Distils Qwen3.8-27B into a modified Qwen3.5-4B student carrying a frozen 28.8 GB
+IQ4_NL n-gram table extracted from Qwen3.8-Flash-Next, plus a retrofitted gated
+residual, trained from an offline cache of teacher logits *and* hidden states.
+Everything runs in one process on two NVLinked RTX 3090s under native Windows.
+
+**Read [`PROGRESS.md`](PROGRESS.md) first** -- it is the authoritative record of what
+works, what was measured, and which plausible ideas turned out to be wrong. Highlights:
+
+- **The n-gram sidecar earns its place.** Paired 1M-token arms, identical seed and data
+  order: eval_loss 0.5807 with the table against 0.6255 without, the whole gap in the
+  KL term.
+- **Tensor parallelism** (`distillkit/tp_*.py`): 83.6% of parameters sharded across both
+  cards in a single process with no NCCL, 1.41x faster than a layer split and smaller on
+  both cards. An all-reduce between peer-accessible devices in one process is a peer copy
+  and an add; measured peer copies run 38-48 GB/s against NCCL's 37.5 GB/s all-reduce.
+- **Grouped-query attention was silently on the math kernel**
+  (`distillkit/gqa_dispatch.py`), costing 4328 MiB per attention call against 249. The
+  flag meant to avoid the math kernel was what selected it on a build with no flash
+  backend.
+- Memory tooling that made a 4.27B full-backbone run fit: anchor taps
+  (`anchor_tap.py`), a head folded into the loss chunk loop (`chunked_head.py`), and
+  per-device VRAM reporting from inside the run.
+
+Windows specifics worth knowing before debugging anything: `expandable_segments` is
+unsupported, so allocator fragmentation is a real failure mode; `torch.distributed`
+has no NCCL backend in the stock wheel; and PyTorch here has no flash SDPA kernel at
+all.
+
+---
+
 ## Features
 
 - **Online Distillation**: Real-time teacher inference during student training
