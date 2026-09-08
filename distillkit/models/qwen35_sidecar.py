@@ -25,6 +25,7 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
 )
 
 from distillkit.gated_residual import GatedResidual
+from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
 
@@ -32,6 +33,10 @@ from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, 
 # no device check, and its Triton kernels reject CPU tensors. Restore per-call
 # dispatch so CPU verification runs keep working. No-op without fla.
 install_device_aware_linear_attention()
+# Qwen3.5's 16:4 query/KV head ratio reaches SDPA as enable_gqa=True, which this
+# build has no fused kernel for -- it silently picks the math kernel and 4328 MiB
+# per attention call at sequence 4096 instead of 249.
+install_expanded_gqa_attention()
 
 
 def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:

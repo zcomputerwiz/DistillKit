@@ -27,6 +27,7 @@ from distillkit.configuration import (
     TeacherModelConfig,
 )
 from distillkit.hsd_mapping import HiddenStateMapping
+from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
 from distillkit.sharding import (
@@ -43,6 +44,10 @@ LOG = logging.getLogger(__name__)
 # no device check, and its Triton kernels reject CPU tensors. Restore per-call dispatch
 # so CPU capture/verification runs keep working. Idempotent; no-op without fla.
 install_device_aware_linear_attention()
+# Qwen3.5's 16:4 query/KV head ratio reaches SDPA as enable_gqa=True, which this
+# build has no fused kernel for -- it silently picks the math kernel and 4328 MiB
+# per attention call at sequence 4096 instead of 249.
+install_expanded_gqa_attention()
 
 
 def _format_row(
