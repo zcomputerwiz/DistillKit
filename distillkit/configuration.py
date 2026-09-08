@@ -170,6 +170,16 @@ class DistillationRunConfig(BaseModel):
     concurrent_microbatches: Literal[1, 2] = Field(
         default=1, description="Opt-in bounded two-worker forward overlap on a GPU-sharded student.",
     )
+    sortish_batching: bool = Field(
+        default=False,
+        description=(
+            "Length-group each microbatch and shuffle the batch order, instead of "
+            "HF's group_by_length. Keeps the padding saving without the ordering cost: "
+            "group_by_length grouped at the optimizer step and emitted descending "
+            "lengths, which measured 0.0145 of eval_loss on a control where grouping "
+            "changed nothing but the order."
+        ),
+    )
     chunked_head: bool = Field(
         default=False,
         description=(
@@ -299,6 +309,10 @@ class DistillationRunConfig(BaseModel):
                 options = self.training_args.get("gradient_checkpointing_kwargs") or {}
                 if options.get("use_reentrant", True):
                     raise ValueError("Tensor parallel checkpoints require use_reentrant=False")
+        if self.sortish_batching and self.training_args.get("train_sampling_strategy"):
+            raise ValueError(
+                "sortish_batching replaces train_sampling_strategy; set one or the other"
+            )
         if self.chunked_head:
             # The forward runs with logits_to_keep=1, so student_outputs.logits covers
             # one position. cross_entropy reads the model's own loss over the full

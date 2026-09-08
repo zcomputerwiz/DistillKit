@@ -78,6 +78,7 @@ class DistillationTrainer(SFTTrainer):
         self.model_accepts_loss_kwargs = False
         self._kept_bf16_outputs = False
         self.chunked_head = bool(getattr(config, "chunked_head", False))
+        self.sortish_batching = bool(getattr(config, "sortish_batching", False))
         # The head loop reuses whatever chunk length the sparse divergence was tuned
         # with; they are the same positions either way.
         self._head_chunk_length = next(
@@ -154,6 +155,32 @@ class DistillationTrainer(SFTTrainer):
             for entry in microbatch_logs:
                 self.log(entry)
         return torch.tensor(value, device=self.args.device)
+
+    def _get_train_sampler(self, train_dataset=None):
+        if not self.sortish_batching:
+            return super()._get_train_sampler(train_dataset)
+        from distillkit.sortish_sampler import SortishSampler
+
+        dataset = self.train_dataset if train_dataset is None else train_dataset
+        column = self.args.length_column_name or "length"
+        if column not in getattr(dataset, "column_names", []):
+            raise ValueError(
+                f"sortish_batching needs a `{column}` column on the training dataset"
+            )
+        # args.train_batch_size, deliberately not multiplied by
+        # gradient_accumulation_steps the way Trainer does: padding is decided per
+        # forward pass, and grouping the whole optimizer step strips the length
+        # diversity out of every update. See distillkit/sortish_sampler.py.
+        return SortishSampler(
+            self.args.train_batch_size, dataset[column], generator=self._sortish_generator(),
+        )
+
+    def _sortish_generator(self):
+        # Seeded from args.seed so a run is reproducible, and advanced per epoch so the
+        # order is not identical every epoch.
+        generator = torch.Generator()
+        generator.manual_seed(self.args.seed + int(self.state.epoch or 0))
+        return generator
 
     def _clip_grad_norm(self, model):
         if not self.config.tensor_parallel:
