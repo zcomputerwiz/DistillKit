@@ -164,6 +164,9 @@ class OptimizerConfig(BaseModel):
 
 
 class DistillationRunConfig(BaseModel):
+    tensor_parallel: bool = Field(
+        default=False, description="Shard Qwen3.5 across cuda:0 and cuda:1 using single-process CUDA P2P.",
+    )
     concurrent_microbatches: Literal[1, 2] = Field(
         default=1, description="Opt-in bounded two-worker forward overlap on a GPU-sharded student.",
     )
@@ -281,6 +284,21 @@ class DistillationRunConfig(BaseModel):
     @model_validator(mode="after")
     def validate_offline_and_sidecar(self):
         cached = isinstance(self.teacher, TeacherDatasetConfig) and self.teacher.cache_path
+        if self.tensor_parallel:
+            if not cached or not self.optimizer or self.optimizer.strategy != "adamw":
+                raise ValueError("Tensor parallel training requires an offline cache and optimizer.strategy=adamw")
+            if self.concurrent_microbatches != 1:
+                raise ValueError("Tensor parallelism cannot be combined with concurrent_microbatches")
+            if self.model_kwargs.get("device_map") is not None:
+                raise ValueError("Tensor parallelism owns placement; omit model_kwargs.device_map")
+            if any(self.training_args.get(k) for k in ("fp16", "deepspeed", "fsdp", "activation_offloading", "torch_compile", "use_cpu")):
+                raise ValueError("Tensor parallelism requires native single-process CUDA bf16/fp32 training")
+            if self.optimizer.unfreeze_at_step:
+                raise ValueError("Tensor parallelism does not support mid-run unfreezing")
+            if self.training_args.get("gradient_checkpointing"):
+                options = self.training_args.get("gradient_checkpointing_kwargs") or {}
+                if options.get("use_reentrant", True):
+                    raise ValueError("Tensor parallel checkpoints require use_reentrant=False")
         if self.chunked_head:
             # The forward runs with logits_to_keep=1, so student_outputs.logits covers
             # one position. cross_entropy reads the model's own loss over the full

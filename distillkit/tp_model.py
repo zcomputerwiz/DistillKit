@@ -54,6 +54,12 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
     stream and the tied embedding/head stay.
     """
     resolved = [torch.device(d) for d in devices]
+    if hasattr(model, "_distillkit_tp_devices"):
+        raise ValueError("Model is already tensor parallel")
+    if getattr(model.config, "model_type", None) != "qwen3_5_text":
+        raise ValueError("Tensor parallelism currently supports qwen3_5_text only")
+    if any(hasattr(child, "_hf_hook") for child in model.modules()):
+        raise ValueError("Load without a device_map before applying tensor parallelism")
     if len(resolved) < 2:
         raise ValueError("tensor parallelism needs at least two devices")
     if not peer_capable(resolved):
@@ -81,13 +87,19 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
             layer.linear_attn = TensorParallelGatedDeltaNet(layer.linear_attn, resolved)
             counts["linear_attention"] += 1
 
+    model.config.use_cache = False
+    model._distillkit_tp_devices = tuple(str(d) for d in resolved)
+    # This is placement metadata, not accelerate dispatch hooks: prevent Trainer
+    # from moving the whole model to one device or wrapping it in DataParallel.
+    model.hf_device_map = {"": str(home_device), **{n: str(p.device) for n, p in model.named_parameters()}}
+
     report = sharded_parameter_report(model)
     LOG.info(
         "Tensor-parallel across %s: sharded %d MLPs, %d attention, %d gated-delta "
         "blocks; %.1f%% of parameters split, %.2f/%.2f GiB per card",
         [str(d) for d in resolved], counts["mlp"], counts["full_attention"],
         counts["linear_attention"], 100 * report["sharded_fraction"],
-        *report["gib_per_device"],
+        *(report["gib_per_device"] + [0.0])[:2],
     )
     return model
 

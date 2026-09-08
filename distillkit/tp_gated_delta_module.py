@@ -42,12 +42,16 @@ def _slice_linear(source: nn.Linear, rows: torch.Tensor, device) -> nn.Linear:
     # The plan's indices are built on CPU; index_select needs them beside the weight,
     # which shard_model has already moved to the home card.
     rows = rows.to(source.weight.device)
-    shard = nn.Linear(source.in_features, len(rows), bias=source.bias is not None)
+    shard = nn.Linear(source.in_features, len(rows), bias=source.bias is not None,
+                      device="meta", dtype=source.weight.dtype).to_empty(device=device)
     with torch.no_grad():
         shard.weight.copy_(source.weight.data.index_select(0, rows))
         if source.bias is not None:
             shard.bias.copy_(source.bias.data.index_select(0, rows))
-    return shard.to(device)
+    shard.weight.requires_grad_(source.weight.requires_grad)
+    if source.bias is not None:
+        shard.bias.requires_grad_(source.bias.requires_grad)
+    return shard
 
 
 class TensorParallelGatedDeltaNet(nn.Module):
@@ -84,8 +88,8 @@ class TensorParallelGatedDeltaNet(nn.Module):
             # Replicated: one shared head_v_dim weight, not per head.
             norms.append(copy.deepcopy(source.norm).to(device))
             local_heads = heads.to(source.A_log.device)
-            a_logs.append(nn.Parameter(source.A_log.data.index_select(0, local_heads).clone().to(device)))
-            dts.append(nn.Parameter(source.dt_bias.data.index_select(0, local_heads).clone().to(device)))
+            a_logs.append(nn.Parameter(source.A_log.data.index_select(0, local_heads).clone().to(device), requires_grad=source.A_log.requires_grad))
+            dts.append(nn.Parameter(source.dt_bias.data.index_select(0, local_heads).clone().to(device), requires_grad=source.dt_bias.requires_grad))
 
         self.in_proj_qkv = nn.ModuleList(qkv)
         self.in_proj_z = nn.ModuleList(z_proj)
@@ -168,12 +172,16 @@ def _slice_conv(source: nn.Conv1d, channels: torch.Tensor, device) -> nn.Conv1d:
     shard = nn.Conv1d(
         count, count, kernel_size=source.kernel_size[0], groups=count,
         padding=source.padding[0], bias=source.bias is not None,
-    )
+        device="meta", dtype=source.weight.dtype,
+    ).to_empty(device=device)
     with torch.no_grad():
         shard.weight.copy_(source.weight.data.index_select(0, channels))
         if source.bias is not None:
             shard.bias.copy_(source.bias.data.index_select(0, channels))
-    return shard.to(device)
+    shard.weight.requires_grad_(source.weight.requires_grad)
+    if source.bias is not None:
+        shard.bias.requires_grad_(source.bias.requires_grad)
+    return shard
 
 
 def _geometry(source: nn.Module):
@@ -188,6 +196,14 @@ def _geometry(source: nn.Module):
     return _Geometry()
 
 
+def replicated_parameter_groups(module: nn.Module):
+    for child in module.modules():
+        groups = getattr(child, "replicated_parameters", None)
+        if groups is not None:
+            yield from zip(*groups())
+
+
+@torch.no_grad()
 def sync_replicated_gradients(module: nn.Module) -> int:
     """All-reduce gradients of parameters replicated across ranks.
 
@@ -199,15 +215,29 @@ def sync_replicated_gradients(module: nn.Module) -> int:
     raise; the norm simply trains against a fraction of its gradient.
     """
     reduced = 0
-    for child in module.modules():
-        if not isinstance(child, TensorParallelGatedDeltaNet):
+    for group in replicated_parameter_groups(module):
+        grads = [p.grad for p in group]
+        if all(g is None for g in grads):
             continue
-        for group in zip(*child.replicated_parameters()):
-            grads = [p.grad for p in group]
-            if any(g is None for g in grads):
-                continue
-            totals = all_reduce(grads)
-            for parameter, total in zip(group, totals):
-                parameter.grad = total.detach()
-            reduced += 1
+        if any(g is None for g in grads):
+            raise RuntimeError("A tensor-parallel norm replica is missing its gradient")
+        totals = all_reduce(grads)
+        for parameter, total in zip(group, totals):
+            parameter.grad = total.detach()
+        reduced += 1
     return reduced
+
+
+@torch.no_grad()
+def clip_grad_norm(module: nn.Module, max_norm: float):
+    """Count each replicated norm once, then apply clipping to every copy."""
+    groups = list(replicated_parameter_groups(module))
+    duplicates = {id(p) for group in groups for p in group[1:]}
+    norm = torch.nn.utils.clip_grad_norm_(
+        [p for p in module.parameters() if id(p) not in duplicates], max_norm,
+    )
+    for group in groups:
+        if group[0].grad is not None:
+            for replica in group[1:]:
+                replica.grad.copy_(group[0].grad.to(replica.device))
+    return norm

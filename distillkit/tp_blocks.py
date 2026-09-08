@@ -106,6 +106,10 @@ class TensorParallelAttention(nn.Module):
             _clone_to(attention.k_norm, device) for device in self.devices
         )
 
+    def replicated_parameters(self):
+        """Both per-head norms receive partial gradients from each head shard."""
+        return [list(q.parameters()) + list(k.parameters()) for q, k in zip(self.q_norms, self.k_norms)]
+
     def forward(self, hidden_states, position_embeddings, attention_mask=None, **kwargs):
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
 

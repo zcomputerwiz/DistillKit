@@ -66,9 +66,9 @@ class ColumnParallelLinear(nn.Module):
         offset = 0
         for size, device in zip(sizes, self.devices):
             piece = slice(offset, offset + size)
-            weights.append(nn.Parameter(source.weight.data[piece].detach().clone().to(device)))
+            weights.append(nn.Parameter(source.weight.data[piece].detach().clone().to(device), requires_grad=source.weight.requires_grad))
             if source.bias is not None:
-                biases.append(nn.Parameter(source.bias.data[piece].detach().clone().to(device)))
+                biases.append(nn.Parameter(source.bias.data[piece].detach().clone().to(device), requires_grad=source.bias.requires_grad))
             offset += size
         self.shards = nn.ParameterList(weights)
         self.biases = nn.ParameterList(biases) if biases else None
@@ -116,12 +116,12 @@ class RowParallelLinear(nn.Module):
         for size, device in zip(sizes, self.devices):
             piece = slice(offset, offset + size)
             weights.append(
-                nn.Parameter(source.weight.data[:, piece].detach().clone().to(device))
+                nn.Parameter(source.weight.data[:, piece].detach().clone().to(device), requires_grad=source.weight.requires_grad)
             )
             offset += size
         self.shards = nn.ParameterList(weights)
         self.bias = (
-            nn.Parameter(source.bias.data.detach().clone().to(self.devices[0]))
+            nn.Parameter(source.bias.data.detach().clone().to(self.devices[0]), requires_grad=source.bias.requires_grad)
             if source.bias is not None
             else None
         )

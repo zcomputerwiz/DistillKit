@@ -427,6 +427,11 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         )
 
     model = load_student_model(config, tokenizer_vocab_size, signal_vocab_size)
+    if config.tensor_parallel:
+        from distillkit.tp_model import shard_model
+        if torch.cuda.device_count() < 2 or int(os.environ.get("WORLD_SIZE", "1")) != 1:
+            raise ValueError("Tensor parallel training requires two visible GPUs in one process")
+        shard_model(model, ["cuda:0", "cuda:1"])
     if is_sharded(model):
         # A single-process layer split needs no process group: Tensor.to(device) is
         # differentiable, so autograd moves activations forward and gradients back
