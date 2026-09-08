@@ -48,9 +48,16 @@ def chunked_head_loss(
     ``vocab_size`` truncates each chunk's logits to the teacher's vocabulary, matching
     the trainer's behaviour when the student's head is padded wider than the signal.
     """
-    seq_len = hidden_states.shape[1]
+    batch, seq_len = hidden_states.shape[0], hidden_states.shape[1]
     if chunk_length is None:
         chunk_length = seq_len
+    else:
+        # chunk_length counts positions, but a chunk's logits are
+        # [batch, chunk_length, vocab] -- its memory scales with the batch too. Read
+        # the configured value as a row budget at batch 1 and divide, or the same
+        # setting quietly allocates 4x more at batch 4: [4, 256, 248320] in fp32 is
+        # 970 MiB, which is what OOM'd this configuration twice.
+        chunk_length = max(1, chunk_length // max(1, batch))
 
     total = None
     for start in range(0, seq_len, chunk_length):

@@ -27,7 +27,7 @@ are the chronological evidence trail.
 - All four P2 code-review findings and all five Codex working-tree findings fixed, each
   with a regression test.
 
-**Test suite:** green — **210 passed** in the CUDA-enabled dev environment (≈37 s).
+**Test suite:** green — **233 passed** in the CUDA-enabled dev environment (≈40 s).
 One case (`test_sharded_step_matches_single_device_step`) skips unless two CUDA devices
 are visible.
 Under strict CPU-only forcing (`torch.cuda.is_available = False`) it is 127 passed + 1
@@ -71,6 +71,7 @@ regression), and two CUDA-parametrized cases are skipped.
 8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
    it should keep adapting rather than freezing at stage 1's value.
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
+10. Hybrid tensor parallelism - in progress, see "Hybrid tensor parallelism".
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -637,6 +638,146 @@ card 1, provided only one microbatch is in the head at a time.
 
 Card 1 has 6.1 GiB of margin for that. Card 0 had 0.7 GiB against its *reservation*,
 which is why the tap comes first.
+
+## Attention was on the math kernel (2026-09-07) — largest single win
+
+`sdpa_attention_forward` was allocating **4328 MiB per call** at sequence 4096, eight
+times per forward. The cause is a platform-dependent dispatch, not the model:
+
+transformers hands Qwen3.5's 16:4 query/KV head ratio to SDPA as `enable_gqa=True`
+instead of repeating the heads. `use_gqa_in_sdpa` gates that on "no attention mask and
+head_dim <= 256", and its comment says the point is to keep SDPA off the math kernel.
+That holds where a fused kernel implements the broadcast. This build has none -- it
+reports *"Torch was not compiled with flash attention"*, and the memory-efficient kernel
+refuses unequal head counts (*"both fused kernels require query, key and value to have
+the same num_heads"*). So the flag meant to avoid the math kernel is what selects it.
+
+| per attention call, sequence 4096 | forward | with backward |
+| --- | ---: | ---: |
+| `enable_gqa=True` (math kernel) | 2728 MiB | 4328 MiB |
+| KV expanded to 16 heads | 96 MiB | 249 MiB |
+
+`distillkit/gqa_dispatch.py` patches `use_gqa_in_sdpa` to return False, sending
+transformers down its own `repeat_kv` path. It **probes** whether any fused backend
+accepts a broadcast GQA call and patches only when none does, so a build that gains
+flash attention keeps upstream behaviour.
+
+On the real student at boundary 13, sequence 4096: card 0 **16.21 -> 13.68 GiB**, card 1
+**15.99 -> 12.92 GiB**. Memory became near-flat in sequence length (1024 costs
+13.50/12.13 against 4096's 13.68/12.92) because attention no longer materializes scores.
+
+## Where the memory goes now, and the split that follows
+
+Measured at sequence 4096, batch 1, full backbone trainable, boundary 7:
+
+| | card 0 | card 1 |
+| --- | ---: | ---: |
+| weights / gradients / AdamW8bit | 2.82 / 2.82 / 2.86 GiB | 5.19 / 5.19 / 5.27 GiB |
+| persistent total | 8.50 | 15.65 |
+| activations | 3.96 | 4.47 |
+
+Persistent state is 24.15 GiB across both cards against ~4 GiB of activations per card,
+so recompute tricks have little left to attack; the remaining levers are structural. It
+also showed the split was memory-*imbalanced*: card 1 sat 2.7 GiB from the cap while card
+0 had 10 GiB idle. Rebalanced to **boundary 13** (16.21/15.99 before the GQA fix,
+13.68/12.92 after), which leaves both cards ~9 GiB clear.
+
+Ruled out by measurement: bitsandbytes 0.50.2 has no 4-bit AdamW (8 and 32 only);
+optimizer-in-backward would free the 8 GiB gradient buffer but is incompatible with
+gradient accumulation; freezing the tied embeddings saves 2.55 GiB on the card that is no
+longer binding.
+
+## The folded head is conditional, not a win
+
+`chunked_head` projects `lm_head` inside the loss chunk loop instead of materializing
+`[batch, seq, 248320]` logits and their gradient. It is a memory-for-compute trade -- the
+head is recomputed during backward -- and which way it pays depends on what is binding:
+
+| | throughput | card 0 |
+| --- | ---: | ---: |
+| `chunked_head: true`, batch 1 | 955 tok/s | 13.50 GiB |
+| `chunked_head: false`, batch 1 | 997 tok/s | 15.16 GiB |
+
+4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
+`[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
+batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## Batching needs length grouping, which already existed
+
+Batch size looked like a free throughput lever (997 -> 1092 tok/s at batch 4, fixed
+length) and is a large net loss on this corpus: a batch pads to its longest member, and
+documents are median 545 / max 4096 tokens. Simulated over the real length distribution
+with HF's own sampler:
+
+| batch | random | grouped |
+| --- | --- | --- |
+| 2 | 28.8% waste, 747 tok/s | 2.5%, 1024 tok/s |
+| 4 | 49.7% waste, 549 tok/s | 3.5%, 1053 tok/s |
+
+An earlier note here concluded trl 0.25.1 had dropped `group_by_length`. It had not --
+it was **renamed**. The Trainer still builds `LengthGroupedSampler`, now selected by
+`train_sampling_strategy="group_by_length"`, and still reads `length_column_name`. The
+offline cache dataset now exposes a `length` column so the sampler does not reconstruct
+it by materializing every `input_ids` row.
+
+Two bugs surfaced enabling it, both fixed and worth keeping. The grouped sampler orders
+**longest-first**, so a batch of four ~4096-token documents arrives at step 0 rather than
+rarely -- useful (it fails fast), but it means `chunked_head` must be on. And
+`sparse_chunk_length` counts *positions* while a chunk's logits are
+`[batch, positions, vocab]`, so the same setting allocated 970 MiB at batch 4 against
+242 MiB at batch 1; it is now read as a row budget at batch 1 and divided by the batch --
+the same lesson `chunked_ce` already recorded in the opposite direction.
+
+**Grouped batching is nevertheless off, blocked by the allocator.** Three attempts: OOM
+at step 0 (no `chunked_head`), step 2 (position-counted chunk), and step 18 with 1.19 GiB
+requested against **6.12 GiB reserved but unallocated**. That last is fragmentation, not
+exhaustion: sorting by length gives every step a different shape and Windows has no
+`expandable_segments` to recover. The predicted gain was only ~1% anyway -- the padding
+saving (+6%) is nearly cancelled by the `chunked_head` recompute (-4.4%) that batching
+then forces -- so it is not worth fighting the allocator. The `length` column and the row
+budget stay; revisit if something else forces a larger effective batch, where the padding
+saving would no longer have to pay for the head.
+
+## What the memory work bought, end to end
+
+| | runtime | eval_loss |
+| --- | ---: | ---: |
+| v1: boundary 7, no folded head, no GQA fix | 1269 s | 0.5347 |
+| v2: tap + folded head + GQA fix + boundary 13 | **1263 s** | **0.5330** |
+
+**Throughput-neutral.** The stack bought headroom, not speed, and the isolated 10%
+microbatch gain from the GQA fix does not survive a corpus whose median document is 545
+tokens rather than 4096. Worth stating plainly because it was twice implied otherwise
+during the work.
+
+## Threading, re-tested at the balanced split
+
+The bounded threaded overlap was measured at 8.7% slower, but always at memory-forced
+splits where card 1 did 60-73% of the work. With attention fixed, boundary 18 became
+reachable in a preflight and the compute balance re-measured at 2047 vs 2015 ms, a 1.98x
+ceiling. Threaded there: **5.41 s against serial's 5.20 s** -- still slower. Balance
+raises what is available to overlap; it does not change what a design that serializes
+backward can take.
+
+Boundary 18 remains impractical anyway: it fits a preflight at 16.82 GiB and the real
+trainer peaks at 18.95 and OOMs at step 2 (21.39 GiB allocated, 871 MiB stranded). That
+is the third time a preflight has understated the real trainer by 2-4 GiB -- it omits
+gradient clipping's `foreach_norm` temporaries, the collator's on-GPU sidecar rows, and
+HF's own buffers. **Preflight numbers are not feasibility; only a real run is.**
+
+## NVLink: the driver routes it, and it is not a lever here
+
+Verified rather than assumed. `can_device_access_peer` is true both ways, and NVLink byte
+counters rise in step with a cross-device `.to()`, so the layer split has been using the
+bridge all along. The application never names an interconnect -- it asks for a peer copy
+and the driver routes it over whatever link exists. That is also why llama.cpp shows
+NVLink traffic in tensor-split mode: `GGML_CUDA_P2P` enables peer access and its tensor
+copies ride the bridge. Its `allreduce.cu` staging through pinned host memory is not a
+contradiction; that path is the fallback for machines *without* NVLink.
+
+Scale, though: the boundary payload is one 20 MB activation, 1.49 ms over NVLink against
+3.32 ms host-staged -- **0.05% of a ~4000 ms microbatch**. NVLink is decisive for ZeRO-2
+or tensor parallelism, which move gigabytes per step, and irrelevant to the layer split.
 
 ## Stage 2 runs: 4.3B trainable across two cards (2026-09-07)
 

@@ -168,3 +168,33 @@ def test_config_rejects_chunked_head_with_cross_entropy(tmp_path):
     payload["loss_functions"] = [{"function": "hs_cosine", "weight": 1.0}]
     with pytest.raises(ValueError, match="sparse divergence"):
         DistillationRunConfig.model_validate(payload)
+
+
+@pytest.mark.parametrize("batch", [1, 2, 4])
+def test_chunk_memory_is_budgeted_in_rows_not_positions(batch):
+    """A chunk's logits are [batch, chunk_length, vocab].
+
+    Reading the configured chunk_length as positions makes its memory scale with the
+    batch: [4, 256, 248320] in fp32 is 970 MiB against 242 MiB at batch 1. The value
+    is a row budget at batch 1, so the peak must stay flat as the batch grows.
+    """
+    hidden, head, ids, values = _fixture(batch=batch, seq=64)
+    calls = []
+    real_head = head.forward
+
+    def counting(x):
+        calls.append(x.shape[0] * x.shape[1])
+        return real_head(x)
+
+    head.forward = counting
+    chunked_head_loss(hidden, head, ids, values, None, 16, sparse_kl_div_inner)
+    head.forward = real_head
+    assert max(calls) <= 16, f"chunk grew to {max(calls)} rows at batch {batch}"
+
+
+def test_row_budget_does_not_change_the_value():
+    """Rescaling the chunk must not move the number it computes."""
+    hidden, head, ids, values = _fixture(batch=4, seq=64)
+    reference = accumulate_over_chunks(head(hidden), ids, values, None, None, sparse_kl_div_inner)
+    got = chunked_head_loss(hidden, head, ids, values, None, 16, sparse_kl_div_inner)
+    torch.testing.assert_close(got, reference, rtol=1e-5, atol=1e-6)

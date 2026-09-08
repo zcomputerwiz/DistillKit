@@ -171,11 +171,11 @@ chunked_cross_entropy: true
 #   chunked_head: true    955 tok/s   card 0 13.50 GiB
 #   chunked_head: false   997 tok/s   card 0 15.16 GiB
 #
-# 4.4% of throughput to save 1.66 GiB. That was the right trade before the
-# grouped-query fix -- it was the difference between OOM and fitting at sequence
-# 4096, and it is what makes a ZeRO-2 rank fit at full length. Turn it back on when
-# memory binds again: longer sequences, a larger batch, or data-parallel ranks that
-# each carry the whole model.
+# OFF at batch 1: it costs 4.4% of throughput (955 vs 997 tok/s) to save 1.66 GiB,
+# and memory is not the binding constraint since the grouped-query fix. Turn it back
+# on whenever what it eliminates grows -- it scales with batch x sequence, so at
+# [4, 4096, 248320] the logits are 7.6 GiB and their gradient another 7.6 GiB, and a
+# ZeRO-2 rank needs it to fit at full sequence length.
 chunked_head: false
 # 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
 # The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
@@ -187,12 +187,24 @@ training_args:
   remove_unused_columns: false
   dataloader_num_workers: 0
   optim: adamw_bnb_8bit
-  # Stays 1. Batching looks like a win at fixed length (997 -> 1092 tok/s at batch 4)
-  # and is a large net loss on this corpus, whose documents are median 545 and max
-  # 4096 tokens: a batch pads to its longest member, so simulated over the real length
-  # distribution batch 2 wastes 28.8% and batch 4 wastes 48.7%, for effective
-  # throughputs of 748 and 561 tok/s. trl 0.25.1 dropped group_by_length, so there is
-  # no length-grouped sampler to fix it; adding one would unlock the batch gain.
+  # Batch 4 only works with the grouped sampler below. A batch pads to its longest
+  # member, and this corpus is median 545 / max 4096 tokens, so simulated over the
+  # real length distribution with HF's own sampler:
+  #
+  #   batch 1                        0.0% waste    997 tok/s
+  #   batch 2 random / grouped      28.8% / 2.5%   747 / 1024 tok/s
+  #   batch 4 random / grouped      49.7% / 3.5%   549 / 1053 tok/s
+  #
+  # Randomly batched, 4 is a 45% loss; grouped it is a 6% gain.
+  # Stays 1. Batching needs length grouping to be worth anything on this corpus
+  # (median 545 / max 4096 tokens): randomly batched, 4 wastes 49.7% of padded
+  # tokens; grouped, 3.5%. But grouping then requires chunked_head, whose recompute
+  # cancels most of the padding saving, and sorting by length gives every step a
+  # different shape -- which fragmented the allocator into an OOM at step 18 with
+  # 6.12 GiB reserved but unallocated, and Windows has no expandable_segments to
+  # recover. Revisit `train_sampling_strategy: group_by_length` with batch 4 if
+  # something else forces a larger effective batch; the cache dataset already
+  # provides the `length` column that sampler wants.
   per_device_train_batch_size: 1
   gradient_accumulation_steps: 16
   gradient_checkpointing: true

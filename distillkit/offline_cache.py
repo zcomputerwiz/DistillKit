@@ -396,19 +396,26 @@ class OfflineTeacherCache:
     def iter_records(self, split: str = "train"):
         for doc_id in self.document_ids(split):
             tokens = self.read_document(doc_id, tokens_only=True)["input_ids"].tolist()
-            yield {"doc_id": doc_id, "input_ids": tokens, "attention_mask": [1] * len(tokens)}
+            # `length` feeds HF's LengthGroupedSampler (train_sampling_strategy=
+            # "group_by_length"), which otherwise reconstructs it by materializing
+            # every input_ids row. Batches pad to their longest member, and this
+            # corpus is median 545 / max 4096 tokens, so grouping cuts simulated
+            # padding waste at batch 4 from 49.7% to 3.5%. The collators select keys
+            # explicitly, so the extra column is inert for everything else.
+            yield {"doc_id": doc_id, "input_ids": tokens,
+                   "attention_mask": [1] * len(tokens), "length": len(tokens)}
 
     def to_dataset(self, split: str = "train"):
         from datasets import Dataset, Features, List, Value
 
         features = Features({"doc_id": Value("string"), "input_ids": List(Value("int64")),
-                             "attention_mask": List(Value("int64"))})
+                             "attention_mask": List(Value("int64")), "length": Value("int64")})
         if not self.document_ids(split):
             # from_generator rejects an empty generator even when features are
             # supplied; return an explicitly-typed empty dataset instead so
             # callers can test split emptiness with len().
             return Dataset.from_dict(
-                {"doc_id": [], "input_ids": [], "attention_mask": []},
+                {"doc_id": [], "input_ids": [], "attention_mask": [], "length": []},
                 features=features,
             )
         # A generator streams token records into Arrow; hidden arrays stay on disk.

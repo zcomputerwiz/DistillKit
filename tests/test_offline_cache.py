@@ -33,11 +33,11 @@ def test_train_only_cache_yields_empty_eval_dataset_with_schema(tmp_path):
 
     expected_features = Features(
         {"doc_id": Value("string"), "input_ids": List(Value("int64")),
-         "attention_mask": List(Value("int64"))}
+         "attention_mask": List(Value("int64")), "length": Value("int64")}
     )
     ds_eval = cache.to_dataset("eval")
     assert len(ds_eval) == 0
-    assert ds_eval.column_names == ["doc_id", "input_ids", "attention_mask"]
+    assert ds_eval.column_names == ["doc_id", "input_ids", "attention_mask", "length"]
     assert ds_eval.features == expected_features
 
     ds_train = cache.to_dataset("train")
@@ -45,6 +45,7 @@ def test_train_only_cache_yields_empty_eval_dataset_with_schema(tmp_path):
     assert ds_train[0]["doc_id"] == "doc-0"
     assert ds_train[0]["input_ids"] == list(range(8))
     assert ds_train[0]["attention_mask"] == [1] * 8
+    assert ds_train[0]["length"] == 8
 
 
 def test_eval_only_cache_yields_empty_train_dataset(tmp_path):
@@ -109,3 +110,55 @@ def test_concurrent_reads_survive_single_shard_lru_eviction(tmp_path, monkeypatc
             future.result()
     assert len(cache._maps) == 1
     cache.close()
+
+
+def test_dataset_exposes_length_for_the_grouped_sampler(tmp_path):
+    """HF's LengthGroupedSampler reads `length` if the column exists.
+
+    Without it the sampler reconstructs lengths by materializing every input_ids
+    row. The manifest already knows them, so the column is free -- and grouping is
+    what makes batching viable here: a batch pads to its longest member, and on a
+    corpus of median 545 / max 4096 tokens random batching at 4 wastes 49.7% of the
+    padded tokens against 3.5% when grouped.
+    """
+    import numpy as np
+
+    from distillkit.offline_cache import OfflineCacheWriter, OfflineTeacherCache
+
+    path = tmp_path / "cache"
+    writer = OfflineCacheWriter(path, tokenizer_hash="ab" * 32, anchor_layers=[1],
+                                hidden_size=8, vocab_size=32, sequence_length=16, top_k=2)
+    lengths = [5, 11, 7]
+    for index, n in enumerate(lengths):
+        writer.append(str(index), np.arange(1, n + 1, dtype=np.uint32),
+                      np.tile(np.arange(1, 3, dtype=np.uint32), (n, 1)),
+                      np.full((n, 2), -1.0, dtype=np.float16),
+                      np.full((n, 1, 8), 56, dtype=np.uint8), split="train")
+    writer.close()
+
+    dataset = OfflineTeacherCache(path).to_dataset("train")
+    assert "length" in dataset.column_names
+    assert dataset["length"] == lengths
+    assert [len(row) for row in dataset["input_ids"]] == lengths
+
+
+def test_empty_split_still_declares_the_length_column(tmp_path):
+    """The empty-split shortcut builds its schema by hand; it must not drift."""
+    import numpy as np
+
+    from distillkit.offline_cache import OfflineCacheWriter, OfflineTeacherCache
+
+    path = tmp_path / "cache"
+    writer = OfflineCacheWriter(path, tokenizer_hash="ab" * 32, anchor_layers=[1],
+                                hidden_size=8, vocab_size=32, sequence_length=16, top_k=2)
+    writer.append("only", np.arange(1, 4, dtype=np.uint32),
+                  np.tile(np.arange(1, 3, dtype=np.uint32), (3, 1)),
+                  np.full((3, 2), -1.0, dtype=np.float16),
+                  np.full((3, 1, 8), 56, dtype=np.uint8), split="train")
+    writer.close()
+
+    empty = OfflineTeacherCache(path).to_dataset("eval")
+    assert len(empty) == 0
+    assert set(empty.column_names) == set(
+        OfflineTeacherCache(path).to_dataset("train").column_names
+    )
