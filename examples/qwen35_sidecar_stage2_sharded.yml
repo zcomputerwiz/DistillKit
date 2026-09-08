@@ -68,16 +68,19 @@ model_kwargs:
   # and then card 1 died instead at 20.37 GiB allocated with only 0.83 GiB unallocated.
   # Both failures were marginal, about 1 GiB short, from opposite directions.
   #
-  # Settled at 7 layers on card 0, with the cap raised to 0.95 and the allocator told to
-  # collect under pressure. At 6 bytes per trainable parameter (bf16 weight + bf16 grad
-  # + AdamW8bit m/v), against 22.8 GiB allowed:
-  #   card 0: 0.636B embedding + 7 layers x 0.114B = 1.43B -> 8.6 GiB persistent
-  #           + ~8.2 GiB measured activations + fragmentation
-  #   card 1:              25 layers x 0.114B      = 2.84B -> 17.0 GiB persistent
-  #           + ~1 GiB activations + ~0.8 GiB fragmentation
-  # Card 0's activation cost barely moves with the split -- it is the head plus the 33
-  # hidden states accelerate's output hook copies here for the 2 that get read -- so
-  # persistent state is the only lever on it until those copies go away.
+  # Rebalanced to 13 once the anchor tap and the folded head removed card 0's head
+  # activations. Measured peak at sequence 4096, batch 1, full backbone trainable:
+  #
+  #   boundary  7:  card 0 12.46 GiB   card 1 20.12 GiB   <- card 1 nearly at the cap
+  #   boundary 11:  card 0 14.97 GiB   card 1 17.61 GiB
+  #   boundary 13:  card 0 16.21 GiB   card 1 15.99 GiB   <- both ~6.6 GiB clear
+  #
+  # At 7 the split was badly memory-imbalanced: card 1 held 25 layers and sat 2.7 GiB
+  # from the cap while card 0 had 10 GiB idle, which is what left no room for the
+  # fragmentation that killed earlier runs. Compute balance wants 18, but that OOMs --
+  # card 0 would hold 15.0 GiB of weights, gradients and AdamW8bit state for 18 layers
+  # plus the embeddings, and the activations do not fit on top. 13 is the memory
+  # optimum and happens to sit closer to compute balance than 7 did.
   #
   # embed_tokens and lm_head must share a device: tie_word_embeddings is true, so they
   # are one parameter. Splitting them fabricates a second copy that trains apart and
@@ -94,12 +97,12 @@ model_kwargs:
     model.layers.4: 0
     model.layers.5: 0
     model.layers.6: 0
-    model.layers.7: 1
-    model.layers.8: 1
-    model.layers.9: 1
-    model.layers.10: 1
-    model.layers.11: 1
-    model.layers.12: 1
+    model.layers.7: 0
+    model.layers.8: 0
+    model.layers.9: 0
+    model.layers.10: 0
+    model.layers.11: 0
+    model.layers.12: 0
     model.layers.13: 1
     model.layers.14: 1
     model.layers.15: 1
