@@ -16,6 +16,8 @@ the training-side version, which additionally has to survive gradient checkpoint
 
 from __future__ import annotations
 
+import threading
+
 import torch
 
 
@@ -91,6 +93,7 @@ class AnchorTap:
         self.indices = sorted(set(int(i) for i in indices))
         self._model = model
         self._captured: dict[int, torch.Tensor] = {}
+        self._owner: int | None = None
         self._handles = []
 
     def _hook(self, index: int):
@@ -99,12 +102,17 @@ class AnchorTap:
             # again during recompute, in backward. The first capture is the tensor
             # that is actually in the autograd graph and the one the loss already
             # consumed, so later firings must not replace it.
+            if threading.get_ident() != self._owner:
+                return
             if index not in self._captured:
                 self._captured[index] = _first_tensor(output)
 
         return capture
 
     def __enter__(self) -> AnchorTap:
+        if self._handles:
+            raise RuntimeError("AnchorTap cannot be entered twice")
+        self._owner = threading.get_ident()
         self._captured = {}
         for index in self.indices:
             module = anchor_module(self._model, index)
@@ -127,4 +135,4 @@ class AnchorTap:
 
     def clear(self) -> None:
         """Drop references so the captured activations can be freed."""
-        self._captured = {}
+        self._captured.clear()

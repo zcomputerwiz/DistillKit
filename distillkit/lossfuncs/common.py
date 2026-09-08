@@ -211,6 +211,7 @@ def accumulate_over_chunks(
                 chunk_ids,
                 chunk_values,
                 use_reentrant=False,
+                preserve_rng_state=False,  # deterministic loss; safe concurrent recompute
             )
         else:
             total = total + fn(chunk_logits, chunk_ids, chunk_values, cur_mask, *args, **kwargs)

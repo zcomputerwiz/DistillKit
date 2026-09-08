@@ -1,5 +1,7 @@
 # Copyright 2024 Charles O. Goddard
 
+import threading
+
 import torch
 from transformers import (
     PreTrainedModel,
@@ -74,6 +76,64 @@ class DistillationTrainer(SFTTrainer):
 
         self.model_accepts_loss_kwargs = False
         self._kept_bf16_outputs = False
+        self._loss_log_local = threading.local()
+        self._concurrent_pending = []
+        self._concurrent_runner = None
+
+    def train(self, *args, **kwargs):
+        try:
+            return super().train(*args, **kwargs)
+        finally:
+            self._concurrent_pending.clear()
+            self._concurrent_runner = None
+
+    def training_step(self, model, inputs, num_items_in_batch=None):
+        if self.config.concurrent_microbatches == 1:
+            return super().training_step(model, inputs, num_items_in_batch)
+        if self.accelerator.num_processes != 1 or self.accelerator.distributed_type.name != "NO":
+            raise ValueError("Concurrent training requires a single native process")
+        if self.accelerator.scaler is not None or self.accelerator.gradient_accumulation_steps != 1:
+            raise ValueError("Concurrent training requires unscaled native bf16/fp32 gradients")
+        if model is not self.model or self.compute_loss_func is not None:
+            raise ValueError("Concurrent training cannot use a distributed/compiled wrapper or custom loss callback")
+
+        # HF has already collected the full accumulation window and supplies its
+        # actual length (including a short final window). Earlier calls defer work;
+        # the final one returns the sum of normalized microbatch losses.
+        self._concurrent_pending.append(dict(inputs))
+        count = self.current_gradient_accumulation_steps
+        if len(self._concurrent_pending) < count:
+            return torch.zeros((), device=self.args.device)
+        batches, self._concurrent_pending = self._concurrent_pending, []
+        from distillkit.concurrent_training import ConcurrentMicrobatches
+
+        model.train()
+        model.config.use_cache = False
+        if hasattr(self.optimizer, "train"):
+            self.optimizer.train()
+        if not self._kept_bf16_outputs:
+            keep_bf16_forward_outputs(model)
+            self._kept_bf16_outputs = True
+        if self._concurrent_runner is None:
+            self._concurrent_runner = ConcurrentMicrobatches(model)
+
+        def forward_loss(batch):
+            self._loss_log_local.logs = []
+            try:
+                with self.compute_loss_context_manager():
+                    loss = self.compute_loss(model, self._prepare_inputs(batch))
+                return loss, self._loss_log_local.logs
+            finally:
+                del self._loss_log_local.logs
+
+        value, logs = self._concurrent_runner.run(
+            batches, forward_loss, warmup_first=not getattr(self, "_concurrent_warmed", False),
+        )
+        self._concurrent_warmed = True
+        for microbatch_logs in logs:
+            for entry in microbatch_logs:
+                self.log(entry)
+        return torch.tensor(value, device=self.args.device)
 
     def compute_loss(
         self,
@@ -179,12 +239,15 @@ class DistillationTrainer(SFTTrainer):
         for loss, weight in zip(losses, weights):
             total_loss = total_loss + loss.to(reduce_device) * weight
         total_loss = total_loss / sum(weights)
-        self.log(
-            {
+        metrics = {
                 f"distillation_loss/{idx + 1}_{loss_fn}": loss.item()
                 for idx, (loss, loss_fn) in enumerate(zip(losses, loss_fns))
             }
-        )
+        pending_logs = getattr(self._loss_log_local, "logs", None)
+        if pending_logs is None:
+            self.log(metrics)
+        else:
+            pending_logs.append(metrics)
         return total_loss
 
 

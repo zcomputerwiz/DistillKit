@@ -164,6 +164,9 @@ class OptimizerConfig(BaseModel):
 
 
 class DistillationRunConfig(BaseModel):
+    concurrent_microbatches: Literal[1, 2] = Field(
+        default=1, description="Opt-in bounded two-worker forward overlap on a GPU-sharded student.",
+    )
     project_name: str = Field(
         default="distillkit",
         description="Project name for logging.",
@@ -270,6 +273,19 @@ class DistillationRunConfig(BaseModel):
     @model_validator(mode="after")
     def validate_offline_and_sidecar(self):
         cached = isinstance(self.teacher, TeacherDatasetConfig) and self.teacher.cache_path
+        if self.concurrent_microbatches == 2:
+            if not cached or not self.optimizer or self.optimizer.strategy != "adamw":
+                raise ValueError("Concurrent training requires an offline cache and optimizer.strategy=adamw")
+            if self.optimizer.unfreeze_at_step:
+                raise ValueError("Concurrent training does not support mid-run unfreezing")
+            if any(self.training_args.get(k) for k in ("fp16", "deepspeed", "fsdp", "activation_offloading", "torch_compile")):
+                raise ValueError("Concurrent training requires native bf16/fp32 without distributed sharding")
+            if self.training_args.get("gradient_accumulation_steps", 1) < 2:
+                raise ValueError("Concurrent training needs gradient_accumulation_steps >= 2")
+            if self.training_args.get("gradient_checkpointing"):
+                options = self.training_args.get("gradient_checkpointing_kwargs") or {}
+                if options.get("use_reentrant", True) or options.get("preserve_rng_state", True):
+                    raise ValueError("Concurrent checkpoints require use_reentrant=False and preserve_rng_state=False")
         if not cached and self.dataset.train_dataset is None:
             raise ValueError("dataset.train_dataset or teacher.cache_path is required")
         if cached and (self.dataset.train_dataset or self.dataset.eval_dataset):

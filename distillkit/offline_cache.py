@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Iterable
@@ -281,6 +282,7 @@ class OfflineTeacherCache:
                 raise ValueError(f"Offline cache {name} mismatch: expected {value!r}, found {self.manifest.get(name)!r}")
         self.max_open_shards = _positive_int(max_open_shards, "max_open_shards")
         self._maps: OrderedDict[int, dict[str, np.memmap]] = OrderedDict()
+        self._read_lock = threading.Lock()
 
     def _validate_manifest(self):
         m = self.manifest
@@ -372,15 +374,18 @@ class OfflineTeacherCache:
         if doc_id not in self.documents:
             raise ValueError(f"Document ID {doc_id!r} is absent from offline cache")
         doc = self.documents[doc_id]
-        maps = self._open_shard(doc["shard"])
         result = {}
-        for name, array in maps.items():
-            if (name == "hidden_states" and not include_hidden_states) or (tokens_only and name != "input_ids"):
-                continue
-            view = array[doc["offset"]:doc["offset"] + doc["length"]]
-            if _array_hash(view) != doc["sha256"][name]:
-                raise ValueError(f"Corrupt offline cache {name} for document {doc_id!r}: checksum mismatch")
-            result[name] = np.array(view, copy=True)
+        # Hashing and NumPy copies release the GIL. A second reader must not evict
+        # and close this mmap while the first still holds a view into it.
+        with self._read_lock:
+            maps = self._open_shard(doc["shard"])
+            for name, array in maps.items():
+                if (name == "hidden_states" and not include_hidden_states) or (tokens_only and name != "input_ids"):
+                    continue
+                view = array[doc["offset"]:doc["offset"] + doc["length"]]
+                if _array_hash(view) != doc["sha256"][name]:
+                    raise ValueError(f"Corrupt offline cache {name} for document {doc_id!r}: checksum mismatch")
+                result[name] = np.array(view, copy=True)
         return result
 
     def document_ids(self, split: str | None = None) -> list[str]:
@@ -410,15 +415,21 @@ class OfflineTeacherCache:
         return Dataset.from_generator(self.iter_records, gen_kwargs={"split": split}, features=features)
 
     def close(self):
-        for arrays in self._maps.values():
-            for array in arrays.values():
-                array._mmap.close()
-        self._maps.clear()
+        with self._read_lock:
+            for arrays in self._maps.values():
+                for array in arrays.values():
+                    array._mmap.close()
+            self._maps.clear()
 
     def __getstate__(self):
         state = self.__dict__.copy()
         state["_maps"] = OrderedDict()
+        state.pop("_read_lock", None)
         return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._read_lock = threading.Lock()
 
     def __enter__(self):
         return self

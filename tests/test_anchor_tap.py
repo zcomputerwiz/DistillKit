@@ -151,3 +151,40 @@ def test_hidden_state_loss_does_not_assume_anchor_zero_is_present():
     )
     loss = compute_hs_loss("cosine", outputs, signal, None, hsm)
     assert torch.isfinite(loss)
+
+
+def test_concurrent_forwards_do_not_capture_into_each_other():
+    """A pipelined step runs two microbatches at once through the same modules.
+
+    The hooks live on modules shared by the whole model, so without per-thread
+    capture each forward would overwrite the other's anchors and both microbatches
+    would train against whichever tensor landed last.
+    """
+    import threading
+
+    model = _model()
+    batches = {
+        "a": torch.randint(0, 64, (1, 8)),
+        "b": torch.randint(0, 64, (1, 8)),
+    }
+    captured = {}
+    barrier = threading.Barrier(2)
+
+    def run(name):
+        with AnchorTap(model, [NUM_LAYERS]) as tap:
+            barrier.wait()          # force the two forwards to interleave
+            model(input_ids=batches[name], return_dict=True)
+            captured[name] = tap.states()[NUM_LAYERS]
+
+    threads = [threading.Thread(target=run, args=(name,)) for name in batches]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    for name, ids in batches.items():
+        expected = model(input_ids=ids, return_dict=True, output_hidden_states=True)
+        torch.testing.assert_close(
+            captured[name], expected.hidden_states[NUM_LAYERS], rtol=0, atol=0,
+            msg=lambda m, n=name: f"thread {n} captured another thread's state: {m}",
+        )

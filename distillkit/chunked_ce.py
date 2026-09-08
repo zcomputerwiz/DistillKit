@@ -99,7 +99,9 @@ def chunked_causal_lm_loss(
         logits_chunk = flat_logits[start:stop]
         labels_chunk = flat_labels[start:stop]
         if logits_chunk.requires_grad:
-            part = checkpoint(chunk_sum, logits_chunk, labels_chunk, use_reentrant=False)
+            # This computation is deterministic; restoring global RNG from worker
+            # threads would race with other in-flight checkpoint recomputations.
+            part = checkpoint(chunk_sum, logits_chunk, labels_chunk, use_reentrant=False, preserve_rng_state=False)
         else:
             part = chunk_sum(logits_chunk, labels_chunk)
         total = part if total is None else total + part
