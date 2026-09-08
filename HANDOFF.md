@@ -34,16 +34,31 @@ converted student in `student-hf`.
 
 ## What remains
 
-1. **The 5M-token pilot, at least two seeds per arm.** This is the research question
-   everything above was built to answer, and it has not been run. The 1M result
-   justifies it; the spread says one seed per arm cannot settle it. Steps: capture 5M
-   tokens of teacher logits and anchor hidden states (`sample_transformers.py`; the 1M
-   capture ran at ~550 tokens/s, so budget about 2.5 hours and ~5x the 1M cache's disk),
-   then stage 1 sidecar and control from `examples/qwen35_sidecar_1m.yml` and
-   `..._1m_control.yml` with the new cache path and two `seed` values each, then stage 2
-   chained from the better arm. Stage 1 freezes the backbone and is not the bottleneck;
-   if it is worth speeding up, `tensor_parallel: true` applies to it as well
-   (`shard_model` preserves `requires_grad`), but then `chunked_head: true` is mandatory.
+1. **The 5M-token pilot -- set up, capture running, arms not yet run.** This is the
+   research question everything else was built to answer.
+
+   - Corpus: `capture-data/run5m.jsonl`, 5,598 documents / 4,999,608 tokens, median 537,
+     the same length shape as the 1M corpus.
+   - Cache: `teacher-cache-5m`, ~52 GB, anchors 8 and 64, top-k 64, eval-every 20.
+     Captured at **batch 1** and it must stay that way -- see PROGRESS, "The teacher
+     capture cannot be batched". Actual rate ~857 tok/s, ~1.5 h.
+   - Arms: `examples/qwen35_sidecar_5m_{s42,s43,control_s42,control_s43}.yml`, generated
+     from the 1M configs and diffed against them, so sidecar and control differ *only* in
+     `sidecar.enabled`. Tensor parallel, sortish batching at 4 x 4 (effective batch 16,
+     as in the 1M arms), identical sampling in all four so the sampler offset is
+     common-mode. `dataset.seed` is 42 everywhere; only `training_args.seed` varies.
+   - Run them with `python scratch/run_5m_pilot.py` (sequential -- each arm uses both
+     GPUs; it refuses to start until the capture's manifest exists, skips finished arms,
+     and stops on the first failure). `--summary` prints the table and both paired
+     differences. **Run `--smoke` first**: stage 1 with tensor parallelism and sortish
+     batching is a combination no completed run has used.
+   - Reading the result: the 1M effect was -0.0448. Order-seed variance on a fixed
+     configuration is 0.0005, but two seeds *bound* arm-to-arm wobble rather than
+     establish it -- look at the spread between the two paired differences before
+     trusting the mean.
+   - One inherited choice worth revisiting: `warmup_steps: 20` came from the 1M config
+     where it was 28% of 72 steps; at 5M it is ~6% of ~332. Kept absolute rather than
+     silently rescaled.
 
 2. **Resume a tensor-parallel run from a real `checkpoint-*` directory.** Export is
    verified (keys, shapes, dtypes, one-card load, finite logits -- see PROGRESS,
