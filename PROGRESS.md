@@ -943,6 +943,84 @@ head is recomputed during backward -- and which way it pays depends on what is b
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
 
+## The teacher capture cannot be batched, and does not need to be (2026-09-08)
+
+Batching was worth 1.5-1.6x on the student, so the same question was put to the capture.
+The answer is no, for a reason worth recording, and the practical news is better anyway.
+
+### Where capture time goes
+
+Measured with `scratch/capture_profile.py` on the real teacher and corpus:
+
+| phase | share |
+| --- | ---: |
+| forward | **97.5%** |
+| top-k over the 248,320-wide vocabulary | 2.2% |
+| fp8 anchor conversion | 0.4% |
+
+The cache writer runs at 47,000 tok/s equivalent (497 MB/s), nowhere near binding. Two
+plausible optimizations died here: raising `logit_chunk_tokens` above its default of 64
+makes the top-k *slower* (0.093 -> 0.140 s at 1024), and there is nothing outside the
+forward worth touching.
+
+The starvation is real -- batch 1 at this corpus's median 537 tokens runs 719 tok/s
+against a ~1350 tok/s plateau reached from about 2048 tokens up, the same curve the
+student showed. It just cannot be collected.
+
+### Batching changes what the teacher says
+
+| | max abs logit delta | top-1 agreement |
+| --- | ---: | ---: |
+| teacher 27B, int8, batch 1 vs 4 | 12-24 | 0.88-0.94 |
+| student 4B, bf16, batch 1 vs 4 | 0.32 | 0.98-0.99 |
+
+Against a median top1-top2 gap of 3.4, moving a logit by 24 is not rounding. Three
+controls localize it. It is not padding: batching documents of *equal* length with no
+padding at all is just as bad. It is not nondeterminism: the same document duplicated
+within one batch gives bit-identical rows. And it is 40-70x worse in int8 than bf16.
+
+The mechanism is LLM.int8()'s outlier decomposition. Columns whose activations exceed
+`threshold` (6.0 here) are computed in fp16 and the rest in int8, and that column set is
+chosen per *call*, so the other rows of a batch change which columns a given row takes.
+Setting `threshold=0` makes batched and unbatched output **bit-identical** -- 0.0000
+logit difference, 1.0000 agreement -- which confirms it exactly.
+
+### Selective upcasting: a cascade, not a hotspot
+
+Divergence compounds through 64 layers, so the useful measurement is where it is
+*injected*: modules whose input is still bit-identical but whose output is not.
+`scratch/int8_batch_sensitivity.py` finds four, all in layer 0's `linear_attn`
+(`in_proj_a/b/qkv/z`). Neutralizing those does not fix it -- it moves the onset to layer
+2's `mlp.down_proj`, then 5, 6, 7, then layer 8's `linear_attn`, with top-1 agreement
+flat across the whole iteration (0.9219 -> 0.9336 after twelve modules). Every downstream
+int8 layer with outlier-prone activations keeps injecting more; "first onset" only finds
+where it starts. Fixing it properly means neutralizing all 496 modules, which is the
+global switch.
+
+And the global switch is too expensive. At batch 1, `threshold=0` against the reference:
+
+| | |
+| --- | --- |
+| top-1 agreement | 0.85-0.89 |
+| **top-64 set overlap** | **0.77-0.80** |
+
+The top-64 set *is* the cached signal, so that is a 21-23% change to the training data,
+to gain 1.9x on a job now measured in hours. A per-batch correction term cannot rescue
+it either: the correction depends on which documents share the batch, so computing it
+requires the batch-1 forward it would replace.
+
+**Capture stays at batch 1 with outlier handling on.** The existing 1M cache is
+consistent with that, and so is the 5M one.
+
+### The recorded throughput was stale
+
+The real win needed no code. PROGRESS recorded the 1M capture at ~220 tok/s, which would
+put 5M at 6.3 hours. The same code measured now does 673 tok/s on median-length documents
+and projects ~900 tok/s integrated over the real length distribution -- about **1.5
+hours** for 5M. The likeliest explanation is that the 1M capture predates the
+grouped-query attention fix, which was the largest single win in this project and is
+installed at import in `sample_transformers`.
+
 ## Batching: throughput is set by tokens per microbatch, not by batch size (2026-09-08)
 
 The single most mispriced knob in this project. Batching was written off twice on a
