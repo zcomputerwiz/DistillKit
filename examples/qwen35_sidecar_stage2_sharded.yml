@@ -157,6 +157,11 @@ optimizer:
 use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
 functionary_packing: false
 chunked_cross_entropy: true
+# Project lm_head inside the loss chunk loop instead of materializing
+# [1, 4096, 248320] logits (1.89 GiB) and their gradient (1.89 GiB again). Identical
+# loss and gradients; measured to drop this model's single-card peak at sequence 4096
+# from OOM to 20.02 GiB.
+chunked_head: true
 # 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
 # The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
 # -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.

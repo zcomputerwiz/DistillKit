@@ -77,3 +77,27 @@ def chunked_head_loss(
             part = compute(chunk_hidden, chunk_ids, chunk_values)
         total = part if total is None else total + part
     return total
+
+
+class HeadContext:
+    """The head, its input, and the vocabulary to truncate to.
+
+    Carries what a loss needs to project logits for itself. ``hidden_states`` is the
+    model's post-norm output -- ``lm_head``'s input -- captured by the anchor tap.
+    """
+
+    def __init__(self, hidden_states, head, vocab_size=None, chunk_length=None):
+        self.hidden_states = hidden_states
+        self.head = head
+        self.vocab_size = vocab_size
+        self.chunk_length = chunk_length
+
+    @property
+    def device(self):
+        return self.head.weight.device
+
+    def accumulate(self, fn, target_ids, target_values, mask, *args, **kwargs):
+        return chunked_head_loss(
+            self.hidden_states, self.head, target_ids, target_values, mask,
+            self.chunk_length, fn, *args, vocab_size=self.vocab_size, **kwargs,
+        )

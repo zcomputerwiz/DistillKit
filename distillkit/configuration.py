@@ -167,6 +167,14 @@ class DistillationRunConfig(BaseModel):
     concurrent_microbatches: Literal[1, 2] = Field(
         default=1, description="Opt-in bounded two-worker forward overlap on a GPU-sharded student.",
     )
+    chunked_head: bool = Field(
+        default=False,
+        description=(
+            "Project lm_head inside the loss chunk loop instead of materializing "
+            "[batch, seq, vocab] logits. Saves 1.89 GiB plus its gradient at sequence "
+            "4096 over a 248,320-wide head, for identical loss and gradients."
+        ),
+    )
     project_name: str = Field(
         default="distillkit",
         description="Project name for logging.",
@@ -273,6 +281,14 @@ class DistillationRunConfig(BaseModel):
     @model_validator(mode="after")
     def validate_offline_and_sidecar(self):
         cached = isinstance(self.teacher, TeacherDatasetConfig) and self.teacher.cache_path
+        if self.chunked_head:
+            # The forward runs with logits_to_keep=1, so student_outputs.logits covers
+            # one position. cross_entropy reads the model's own loss over the full
+            # head, which cannot be computed from that.
+            if any(f.function.value == "cross_entropy" for f in self.loss_functions):
+                raise ValueError("chunked_head is incompatible with the cross_entropy loss")
+            if not any(f.function.value in ("kl", "jsd", "tvd") for f in self.loss_functions):
+                raise ValueError("chunked_head needs a sparse divergence loss to fold the head into")
         if self.concurrent_microbatches == 2:
             if not cached or not self.optimizer or self.optimizer.strategy != "adamw":
                 raise ValueError("Concurrent training requires an offline cache and optimizer.strategy=adamw")

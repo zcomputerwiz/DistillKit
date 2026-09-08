@@ -106,4 +106,5 @@ training_args:
   gradient_checkpointing_kwargs:
     use_reentrant: false
     preserve_rng_state: false
+chunked_head: true
 concurrent_microbatches: 2

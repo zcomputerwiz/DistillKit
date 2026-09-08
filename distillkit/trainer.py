@@ -9,6 +9,7 @@ from transformers import (
 from trl import SFTTrainer
 
 from distillkit.anchor_tap import AnchorTap
+from distillkit.chunked_head import HeadContext
 from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
@@ -76,6 +77,13 @@ class DistillationTrainer(SFTTrainer):
 
         self.model_accepts_loss_kwargs = False
         self._kept_bf16_outputs = False
+        self.chunked_head = bool(getattr(config, "chunked_head", False))
+        # The head loop reuses whatever chunk length the sparse divergence was tuned
+        # with; they are the same positions either way.
+        self._head_chunk_length = next(
+            (f.sparse_chunk_length for f in config.loss_functions
+             if getattr(f, "sparse_chunk_length", None)), None,
+        )
         self._loss_log_local = threading.local()
         self._concurrent_pending = []
         self._concurrent_runner = None
@@ -170,14 +178,23 @@ class DistillationTrainer(SFTTrainer):
         model_inputs = {k: inputs[k] for k in forwarded if k in inputs}
         if self.config.sidecar is not None:
             model_inputs["sidecar_enabled"] = self.config.sidecar.enabled
-        if self.need_hidden_states:
+        # The post-norm state is lm_head's input, so folding the head into the loss
+        # needs it tapped whether or not a hidden-state loss asked for it.
+        if self.chunked_head:
+            model_inputs["logits_to_keep"] = 1
+        if self.need_hidden_states or self.chunked_head:
             # Not output_hidden_states=True: that retains all 33 states and, on a
             # device-mapped model, accelerate's output hook copies every one of them to
             # the input device -- ~0.7 GiB retained plus the same again copied, plus
             # gradients for the copies, to serve the two anchors the loss reads. Hooks
             # on just those two modules give the same tensors, on the card that made
             # them, with no copy.
-            anchors = [student for student, _ in self.hidden_state_mapping.layer_mapping]
+            anchors = [
+                student for student, _ in
+                (self.hidden_state_mapping.layer_mapping if self.need_hidden_states else [])
+            ]
+            if self.chunked_head:
+                anchors.append(self.model.config.num_hidden_layers)
             with AnchorTap(model, anchors) as tap:
                 student_outputs = model(**model_inputs, return_dict=True)
             student_outputs.hidden_states = tap.states()
@@ -191,8 +208,9 @@ class DistillationTrainer(SFTTrainer):
             student_outputs.loss = student_outputs.loss.mean()
         if student_outputs.logits.shape[-1] < self.true_vocab_size:
             raise ValueError("Student vocabulary is smaller than the teacher signal vocabulary")
-        if student_outputs.logits.shape[-1] != self.true_vocab_size:
-            # truncate any extra logits from padding
+        if not self.chunked_head and student_outputs.logits.shape[-1] != self.true_vocab_size:
+            # truncate any extra logits from padding. Under chunked_head the losses
+            # truncate each chunk instead, since these logits are one position wide.
             student_outputs.logits = student_outputs.logits[..., : self.true_vocab_size]
 
         total_loss = self.total_distillation_loss(
@@ -215,17 +233,31 @@ class DistillationTrainer(SFTTrainer):
             return_hidden_states=self.need_hidden_states,
         )
 
+        head_context = None
+        if self.chunked_head:
+            base = self.accelerator.unwrap_model(self.model)
+            head_context = HeadContext(
+                student_outputs.hidden_states[base.config.num_hidden_layers],
+                base.get_output_embeddings(),
+                vocab_size=self.true_vocab_size,
+                chunk_length=self._head_chunk_length,
+            )
+
         losses = []
         loss_fns = []
         weights = []
         for idx, loss_fn in enumerate(self.loss_functions):
             cfg = self.config.loss_functions[idx]
+            extra = {}
+            if head_context is not None and loss_fn.accepts_head_context():
+                extra["head_context"] = head_context
             loss = loss_fn(
                 student_outputs,
                 signal,
                 mask=valid_mask,
                 hidden_state_mapping=self.hidden_state_mapping,
                 num_items_in_batch=num_items_in_batch,
+                **extra,
             )
             losses.append(loss)
             loss_fns.append(cfg.function.value)

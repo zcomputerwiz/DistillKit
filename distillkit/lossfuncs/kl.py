@@ -195,6 +195,13 @@ class KLDLoss(LossFunctionBase):
         self.chunk_length = sparse_chunk_length
 
     @override
+    def accepts_head_context(self) -> bool:
+        # Only the sparse path: dense_kl_div needs the teacher's full logits, which a
+        # cached top-k signal never has, and materializing the student's to match is
+        # exactly what this avoids.
+        return True
+
+    @override
     def __call__(
         self,
         student_outputs: CausalLMOutput,
@@ -202,7 +209,26 @@ class KLDLoss(LossFunctionBase):
         mask: torch.Tensor | None = None,
         hidden_state_mapping: HiddenStateMapping | None = None,
         num_items_in_batch: int | None = None,
+        head_context=None,
     ) -> torch.Tensor:
+        if head_context is not None and not isinstance(signal, DenseSignal):
+            if num_items_in_batch is None:
+                num_items_in_batch = (
+                    mask.float().sum() if mask is not None
+                    else head_context.hidden_states.shape[0] * head_context.hidden_states.shape[1]
+                )
+            device = head_context.device
+            res = head_context.accumulate(
+                sparse_kl_div_inner,
+                signal.sparse_ids.to(device),
+                signal.sparse_values.to(device),
+                None if mask is None else mask.to(device),
+                missing=self.missing,
+                log_target=signal.log_values,
+                temperature=self.temperature,
+                target_generation_temperature=signal.generation_temperature,
+            )
+            return res * (self.temperature**2) / num_items_in_batch
         if num_items_in_batch is None:
             if mask is not None:
                 num_items_in_batch = mask.float().sum()

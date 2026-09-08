@@ -117,3 +117,54 @@ def test_never_materializes_the_full_vocabulary_logits():
         f"folding saved only {materialized - folded:.0f} MB of the "
         f"{full_logits_mb:.0f} MB logits tensor"
     )
+
+
+def test_kl_loss_matches_with_and_without_head_context():
+    """The trainer hands KLDLoss a HeadContext instead of full logits.
+
+    Both routes must produce the same number, or the memory saving is a silent
+    change to what the run optimizes.
+    """
+    from types import SimpleNamespace
+
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.kl import KLDLoss
+    from distillkit.signals import SparseSignal
+
+    hidden, head, ids, values = _fixture(seq=48)
+    signal = SparseSignal(
+        sparse_ids=ids, sparse_values=values, log_values=True,
+        generation_temperature=1.0, hidden_states=None, vocab_size=VOCAB,
+    )
+    mask = torch.ones(1, 48, 1, dtype=torch.bool)
+    loss_fn = KLDLoss(temperature=1.0, sparse_chunk_length=16)
+    assert loss_fn.accepts_head_context()
+
+    materialized = loss_fn(SimpleNamespace(logits=head(hidden)), signal, mask=mask)
+    folded = loss_fn(
+        SimpleNamespace(logits=head(hidden[:, -1:])), signal, mask=mask,
+        head_context=HeadContext(hidden, head, vocab_size=VOCAB, chunk_length=16),
+    )
+    torch.testing.assert_close(folded, materialized, rtol=1e-5, atol=1e-6)
+
+
+def test_config_rejects_chunked_head_with_cross_entropy(tmp_path):
+    """cross_entropy reads the model's own loss over the full head.
+
+    Under chunked_head the forward runs with logits_to_keep=1, so that loss cannot
+    be computed -- fail at config time rather than at step 0 of a long run.
+    """
+    from distillkit.configuration import DistillationRunConfig
+
+    payload = {
+        "model": "x", "dataset": {}, "chunked_head": True, "sequence_length": 8,
+        "teacher": {"kind": "dataset", "cache_path": str(tmp_path)},
+        "output_path": str(tmp_path / "out"),
+        "loss_functions": [{"function": "cross_entropy", "weight": 1.0}],
+    }
+    with pytest.raises(ValueError, match="cross_entropy"):
+        DistillationRunConfig.model_validate(payload)
+
+    payload["loss_functions"] = [{"function": "hs_cosine", "weight": 1.0}]
+    with pytest.raises(ValueError, match="sparse divergence"):
+        DistillationRunConfig.model_validate(payload)

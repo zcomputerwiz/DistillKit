@@ -235,6 +235,15 @@ class LossFunctionBase(ABC):
         """
         return False
 
+    def accepts_head_context(self) -> bool:
+        """True if this loss can project the head itself, one chunk at a time.
+
+        A loss that says yes is handed a ``HeadContext`` and must not read
+        ``student_outputs.logits``: the trainer runs the forward with
+        ``logits_to_keep=1``, so those logits cover a single position.
+        """
+        return False
+
     @abstractmethod
     def __init__(self, **kwargs) -> None: ...
 
