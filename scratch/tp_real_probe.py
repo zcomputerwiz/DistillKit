@@ -12,6 +12,12 @@ import torch
 
 from distillkit.configuration import DistillationRunConfig
 from distillkit.main import load_student_model
+from distillkit.anchor_tap import AnchorTap
+from distillkit.chunked_head import HeadContext
+from distillkit.hsd_mapping import HiddenStateMapping
+from distillkit.lossfuncs.hidden_state import compute_hs_loss
+from distillkit.lossfuncs.kl import KLDLoss
+from distillkit.signals import SparseSignal
 from distillkit.tp_model import shard_model, sharded_parameter_report, sync_replicated_gradients
 
 import sys
@@ -25,9 +31,7 @@ for index in range(torch.cuda.device_count()):
 
 model = load_student_model(cfg, 248077, 248320)
 model = shard_model(model, ["cuda:0", "cuda:1"])
-# Gradient checkpointing is OFF: the custom autograd Functions interact badly with
-# non-reentrant checkpointing ("trying to save more tensors during recomputation").
-# Tensor parallelism halves activations on its own, so measure whether it is needed.
+model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 model.config.use_cache = False  # training does this; without checkpointing nothing else will
 model.train()
 
@@ -42,15 +46,33 @@ input_ids = torch.randint(0, 248000, (1, SEQ), device="cuda:0")
 ngram_raw = torch.zeros(1, SEQ, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
 
 
+hsm = HiddenStateMapping(model, 5120, cfg.layer_mapping)
+anchors = [a for a, _ in cfg.layer_mapping] + [model.config.num_hidden_layers]
+mask = torch.ones(1, SEQ, 1, dtype=torch.bool, device="cuda:0")
+signal = SparseSignal(
+    sparse_ids=torch.randint(0, 248320, (1, SEQ, 64), device="cuda:0"),
+    sparse_values=torch.log_softmax(torch.randn(1, SEQ, 64, device="cuda:0"), -1),
+    log_values=True, generation_temperature=1.0,
+    hidden_states=(torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16),
+                   torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16)),
+    vocab_size=248320,
+)
+
+
 def step():
-    # Non-reentrant checkpointing stops recomputing once it has recovered every saved
-    # tensor. A sharded module produces tensors on two devices and the recompute
-    # visits them in a different order, tripping that assertion; recompute the whole
-    # region instead. It is a context manager, not a setter.
+    """The same losses the layer-split baseline was measured with, or the
+    comparison is meaningless: chunked KL over the 248,320-wide vocabulary plus
+    the hidden-state cosine, with the head folded into the loss chunk loop."""
     with torch.autocast("cuda", dtype=torch.bfloat16):
-        out = model(input_ids=input_ids, ngram_raw=ngram_raw, sidecar_enabled=True,
-                    return_dict=True, logits_to_keep=1)
-        loss = out.logits.float().pow(2).mean()
+        with AnchorTap(model, anchors) as tap:
+            out = model(input_ids=input_ids, ngram_raw=ngram_raw, sidecar_enabled=True,
+                        return_dict=True, logits_to_keep=1)
+        out.hidden_states = tap.states()
+        kl = KLDLoss(temperature=1.0, sparse_chunk_length=256)(
+            out, signal, mask=mask, hidden_state_mapping=hsm,
+            head_context=HeadContext(out.hidden_states[model.config.num_hidden_layers],
+                                     model.lm_head, vocab_size=248320, chunk_length=256))
+        loss = 0.7 * kl + 0.3 * compute_hs_loss("cosine", out, signal, mask, hsm)
     loss.backward()
     sync_replicated_gradients(model)
     model.zero_grad(set_to_none=True)
