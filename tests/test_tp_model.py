@@ -127,21 +127,39 @@ def test_parameters_actually_land_on_both_cards():
     report = sharded_parameter_report(model)
     first, second = report["gib_per_device"]
     assert second > 0, "card 1 holds nothing; nothing was sharded"
-    # Card 0 additionally carries the tied embeddings, so exact balance is not
-    # expected -- but card 1 should hold a substantial share of the layer weights.
-    assert second > 0.25 * first, f"card 1 holds only {second:.3f} against {first:.3f} GiB"
+    # The tied embedding is parked on card 1, which holds no norms, so card 1 now
+    # comes out heavier by about that parameter rather than lighter by it.
+    assert second > first, f"card 1 holds {second:.3g} against {first:.3g} GiB"
 
 
 @TWO_GPUS
-def test_residual_stream_stays_on_the_home_card():
-    """The outer model is untouched, so embeddings, norms and head stay home."""
+def test_residual_stream_stays_home_and_the_tied_embedding_moves():
+    """Norms stay on the home card; the one big whole parameter goes to the other
+    card, stays a single tied tensor under its stock names, and no caller notices."""
     model = shard_model(_model(), ["cuda:0", "cuda:1"])
-    home = torch.device("cuda", 0)
-    assert model.get_input_embeddings().weight.device == home
+    home, other = torch.device("cuda", 0), torch.device("cuda", 1)
     assert model.model.norm.weight.device == home
     for layer in model.model.layers:
         assert layer.input_layernorm.weight.device == home
         assert layer.post_attention_layernorm.weight.device == home
+
+    embed, head = model.get_input_embeddings(), model.get_output_embeddings()
+    assert embed.weight.device == other and head.weight is embed.weight
+    assert model.hf_device_map["lm_head.weight"] == model.hf_device_map["model.embed_tokens.weight"] == "cuda:1"
+    assert {"model.embed_tokens.weight", "lm_head.weight"} <= set(model.state_dict())
+
+    logits = model(input_ids=torch.randint(0, 64, (1, 8), device=home)).logits
+    assert logits.device == home
+    logits.float().square().mean().backward()
+    assert embed.weight.grad is not None and embed.weight.grad.device == other
+
+
+@TWO_GPUS
+def test_embedding_can_be_pinned_home():
+    model = shard_model(_model(), ["cuda:0", "cuda:1"], embedding_device="cuda:0")
+    assert model.get_input_embeddings().weight.device == torch.device("cuda", 0)
+    with pytest.raises(ValueError, match="one of the tensor-parallel devices"):
+        shard_model(_model(), ["cuda:0", "cuda:1"], embedding_device="cpu")
 
 
 @TWO_GPUS

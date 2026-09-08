@@ -48,6 +48,9 @@ def chunked_head_loss(
     ``vocab_size`` truncates each chunk's logits to the teacher's vocabulary, matching
     the trainer's behaviour when the student's head is padded wider than the signal.
     """
+    # The head may live on another card (tensor parallelism parks the tied embedding
+    # off the home card). Move its input over once and keep every chunk there.
+    hidden_states = hidden_states.to(head.weight.device)
     batch, seq_len = hidden_states.shape[0], hidden_states.shape[1]
     if chunk_length is None:
         chunk_length = seq_len

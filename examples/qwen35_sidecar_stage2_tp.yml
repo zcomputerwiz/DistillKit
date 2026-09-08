@@ -73,14 +73,6 @@ use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the loa
 functionary_packing: false
 chunked_cross_entropy: true
 chunked_head: true
-#   chunked_head: false   997 tok/s   card 0 15.16 GiB
-#
-# OFF at batch 1: it costs 4.4% of throughput (955 vs 997 tok/s) to save 1.66 GiB,
-# and memory is not the binding constraint since the grouped-query fix. Turn it back
-# on whenever what it eliminates grows -- it scales with batch x sequence, so at
-# [4, 4096, 248320] the logits are 7.6 GiB and their gradient another 7.6 GiB, and a
-# ZeRO-2 rank needs it to fit at full sequence length.
-chunked_head: false
 # 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
 # The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
 # -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.

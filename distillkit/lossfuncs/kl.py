@@ -212,30 +212,27 @@ class KLDLoss(LossFunctionBase):
         head_context=None,
     ) -> torch.Tensor:
         if head_context is not None and not isinstance(signal, DenseSignal):
+            # Move the mask before counting from it: the count divides a result that
+            # lives on the head's card, and 0-dim tensors on two CUDA devices do not mix.
+            device = head_context.device
+            if mask is not None:
+                mask = mask.to(device)
             if num_items_in_batch is None:
                 num_items_in_batch = (
                     mask.float().sum() if mask is not None
                     else head_context.hidden_states.shape[0] * head_context.hidden_states.shape[1]
                 )
-            device = head_context.device
             res = head_context.accumulate(
                 sparse_kl_div_inner,
                 signal.sparse_ids.to(device),
                 signal.sparse_values.to(device),
-                None if mask is None else mask.to(device),
+                mask,
                 missing=self.missing,
                 log_target=signal.log_values,
                 temperature=self.temperature,
                 target_generation_temperature=signal.generation_temperature,
             )
             return res * (self.temperature**2) / num_items_in_batch
-        if num_items_in_batch is None:
-            if mask is not None:
-                num_items_in_batch = mask.float().sum()
-            else:
-                num_items_in_batch = (
-                    student_outputs.logits.shape[0] * student_outputs.logits.shape[1]
-                )
         # The signal and the mask are built on the batch's device; on a student split
         # across GPUs the head -- and therefore the logits -- can be on a different
         # one. The sparse tensors are [batch, seq, k] with k around 64, so pulling
@@ -243,6 +240,13 @@ class KLDLoss(LossFunctionBase):
         logits_device = student_outputs.logits.device
         if mask is not None:
             mask = mask.to(logits_device)
+        if num_items_in_batch is None:
+            if mask is not None:
+                num_items_in_batch = mask.float().sum()
+            else:
+                num_items_in_batch = (
+                    student_outputs.logits.shape[0] * student_outputs.logits.shape[1]
+                )
         if isinstance(signal, DenseSignal):
             res = dense_kl_div(
                 student_outputs.logits,

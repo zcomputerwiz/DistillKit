@@ -35,6 +35,29 @@ def test_matches_projecting_the_whole_sequence_first(chunk):
     torch.testing.assert_close(got, reference, rtol=1e-5, atol=1e-6)
 
 
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="needs two CUDA devices")
+def test_head_on_another_card_gives_the_same_loss_and_gradients():
+    """Tensor parallelism parks the head off the home card; the loss must follow the
+    weight there and the hidden-state gradient must come back."""
+    hidden, head, ids, values = _fixture()
+    reference_hidden = hidden.clone().requires_grad_(True)
+    chunked_head_loss(reference_hidden, head, ids, values, None, 16, sparse_kl_div_inner).backward()
+    reference_weight_grad = head.weight.grad.clone()
+    head.weight.grad = None
+
+    remote_head = head.to("cuda:1")
+    remote_hidden = hidden.to("cuda:0").requires_grad_(True)
+    got = chunked_head_loss(
+        remote_hidden, remote_head, ids.to("cuda:1"), values.to("cuda:1"), None, 16,
+        sparse_kl_div_inner,
+    )
+    assert got.device == torch.device("cuda", 1)
+    got.backward()
+    assert remote_hidden.grad.device == torch.device("cuda", 0)
+    torch.testing.assert_close(remote_hidden.grad.cpu(), reference_hidden.grad, rtol=1e-4, atol=1e-6)
+    torch.testing.assert_close(remote_head.weight.grad.cpu(), reference_weight_grad, rtol=1e-4, atol=1e-6)
+
+
 @pytest.mark.parametrize("chunk", [None, 8, 16])
 def test_gradients_match_through_both_the_head_and_the_hidden_state(chunk):
     """The recompute has to rebuild the projection, not just the reduction."""
@@ -146,6 +169,37 @@ def test_kl_loss_matches_with_and_without_head_context():
         head_context=HeadContext(hidden, head, vocab_size=VOCAB, chunk_length=16),
     )
     torch.testing.assert_close(folded, materialized, rtol=1e-5, atol=1e-6)
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="needs two CUDA devices")
+def test_kl_loss_divides_on_the_heads_card():
+    """The mask arrives on the batch's card; the divisor built from it must follow the
+    result to the head's card, or two 0-dim CUDA tensors refuse to divide."""
+    from types import SimpleNamespace
+
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.kl import KLDLoss
+    from distillkit.signals import SparseSignal
+
+    hidden, head, ids, values = _fixture(seq=48)
+    mask = torch.ones(1, 48, 1, dtype=torch.bool)
+    mask[0, :5] = False  # so the divisor is not just the sequence length
+    loss_fn = KLDLoss(temperature=1.0, sparse_chunk_length=16)
+
+    def signal(device):
+        return SparseSignal(
+            sparse_ids=ids.to(device), sparse_values=values.to(device), log_values=True,
+            generation_temperature=1.0, hidden_states=None, vocab_size=VOCAB,
+        )
+
+    reference = loss_fn(SimpleNamespace(logits=head(hidden)), signal("cpu"), mask=mask)
+    head.to("cuda:1")
+    remote = loss_fn(
+        SimpleNamespace(logits=None), signal("cuda:0"), mask=mask.to("cuda:0"),
+        head_context=HeadContext(hidden.to("cuda:0"), head, vocab_size=VOCAB, chunk_length=16),
+    )
+    assert remote.device == torch.device("cuda", 1)
+    torch.testing.assert_close(remote.cpu(), reference, rtol=1e-4, atol=1e-6)
 
 
 def test_config_rejects_chunked_head_with_cross_entropy(tmp_path):
