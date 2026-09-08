@@ -64,9 +64,10 @@ Knobs whose right value depends on what is binding, not on taste:
 - `chunked_head`: off at batch 1 (costs 4.4%), **required** at batch 4 or for a
   data-parallel rank at full sequence length, where the logits it removes are 7.6 GiB
   plus the same again in gradient.
-- `per_device_train_batch_size`: 1. Batching needs length grouping to be worth
-  anything here, and grouping then fragments the allocator. See "Batching needs length
-  grouping".
+- `per_device_train_batch_size`: **4 with `train_sampling_strategy: group_by_length`**
+  under tensor parallelism. Throughput is set by tokens per microbatch, not batch size,
+  and this corpus is median 547 tokens -- at batch 1 most microbatches run at under half
+  the GPU's rate. See "Batching: throughput is set by tokens per microbatch".
 - `tensor_parallel: true` needs `chunked_head: true`, `gradient_checkpointing_kwargs:
   {use_reentrant: false}` and no `model_kwargs.device_map`;
   `examples/qwen35_sidecar_stage2_tp.yml` has all three. Under tensor parallelism the
@@ -97,6 +98,9 @@ Knobs whose right value depends on what is binding, not on taste:
    sidecar, concentrated entirely in the KL term.
 3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
    the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
+4b. **Batching**: grouped batch 4 is projected to cut microbatch compute 1.61x and is
+   the largest remaining throughput lever. See "Batching: throughput is set by tokens
+   per microbatch".
 4a. **The 5M-token pilot is now the top open item.** Everything below it is
    infrastructure that is finished; this is the question the infrastructure was for.
    See "What remains" in `HANDOFF.md` for the steps.
@@ -938,41 +942,94 @@ head is recomputed during backward -- and which way it pays depends on what is b
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
 
-## Batching needs length grouping, which already existed
+## Batching: throughput is set by tokens per microbatch, not by batch size (2026-09-08)
 
-Batch size looked like a free throughput lever (997 -> 1092 tok/s at batch 4, fixed
-length) and is a large net loss on this corpus: a batch pads to its longest member, and
-documents are median 545 / max 4096 tokens. Simulated over the real length distribution
-with HF's own sampler:
+The single most mispriced knob in this project. Batching was written off twice on a
+throughput model that assumed a **fixed cost per token**, so the only thing batching
+could change was padding waste. Measured on the tensor-parallel student, the per-token
+cost is not fixed at all:
 
-| batch | random | grouped |
-| --- | --- | --- |
-| 2 | 28.8% waste, 747 tok/s | 2.5%, 1024 tok/s |
-| 4 | 49.7% waste, 549 tok/s | 3.5%, 1053 tok/s |
+| tokens per microbatch | shape | tok/s |
+| ---: | --- | ---: |
+| 512 | 1 x 512 | **744** |
+| 1024 | 1 x 1024 | 1340 |
+| 2048 | 4 x 512 | 1636 |
+| 4096 | 1 x 4096 | 1592 |
+| 4096 | 4 x 1024 | 1724 |
+| 4096 | 8 x 512 | **1756** |
+| 16384 | 4 x 4096 | 1698 |
 
-An earlier note here concluded trl 0.25.1 had dropped `group_by_length`. It had not --
-it was **renamed**. The Trainer still builds `LengthGroupedSampler`, now selected by
-`train_sampling_strategy="group_by_length"`, and still reads `length_column_name`. The
-offline cache dataset now exposes a `length` column so the sampler does not reconstruct
-it by materializing every `input_ids` row.
+Throughput plateaus near **1700 tok/s from about 2048 tokens up** and falls off a cliff
+below it: a 512-token microbatch runs at 43% of the plateau. The GPU is starved, not
+busy. Three readings make the shape unmistakable -- the same 4096 tokens cost the same
+whether they arrive as one long sequence or eight short ones (1592 vs 1756 tok/s, the
+*batched* form slightly ahead), and 4 x 4096 = 16384 tokens still runs at the plateau,
+so nothing degrades at the top end either.
 
-Two bugs surfaced enabling it, both fixed and worth keeping. The grouped sampler orders
-**longest-first**, so a batch of four ~4096-token documents arrives at step 0 rather than
-rarely -- useful (it fails fast), but it means `chunked_head` must be on. And
-`sparse_chunk_length` counts *positions* while a chunk's logits are
-`[batch, positions, vocab]`, so the same setting allocated 970 MiB at batch 4 against
-242 MiB at batch 1; it is now read as a row budget at batch 1 and divided by the batch --
-the same lesson `chunked_ce` already recorded in the opposite direction.
+**This corpus is median 547 tokens, 76% under 1024.** At batch 1 every document is its
+own microbatch, so most of the epoch runs in the starved regime. That is the finding:
+batching here is not about padding, it is about giving the GPU enough work to fill.
 
-**Grouped batching is nevertheless off, blocked by the allocator.** Three attempts: OOM
-at step 0 (no `chunked_head`), step 2 (position-counted chunk), and step 18 with 1.19 GiB
-requested against **6.12 GiB reserved but unallocated**. That last is fragmentation, not
-exhaustion: sorting by length gives every step a different shape and Windows has no
-`expandable_segments` to recover. The predicted gain was only ~1% anyway -- the padding
-saving (+6%) is nearly cancelled by the `chunked_head` recompute (-4.4%) that batching
-then forces -- so it is not worth fighting the allocator. The `length` column and the row
-budget stay; revisit if something else forces a larger effective batch, where the padding
-saving would no longer have to pay for the head.
+Simulated over the real length distribution with HF's own longest-first sampler:
+
+| batch (grouped) | projected microbatch compute | speedup | padding waste |
+| --- | ---: | ---: | ---: |
+| 1 | 951 s | -- | 0% |
+| 2 | 672 s | 1.42x | 0.2% |
+| 4 | **592 s** | **1.61x** | 0.6% |
+| 8 | 580 s | 1.64x | 1.5% |
+
+Batch 4 takes nearly all of the available gain; batch 8 adds 2% and does not fit the
+full-length groups. Note how small the padding waste is once grouped -- the thing the
+old model spent all its attention on is worth well under a percent, while the thing it
+did not model is worth 61%.
+
+### Why the earlier verdict was wrong, and what to take from it
+
+The note this replaces concluded "the predicted gain was only ~1% anyway -- the padding
+saving (+6%) is nearly cancelled by the `chunked_head` recompute (-4.4%)". Both of those
+numbers were real measurements. The error was the frame around them: they were measured
+**at fixed sequence length**, where the GPU is already saturated and batching genuinely
+buys only the padding back. Generalizing that to a corpus of 547-token documents assumed
+the very thing that is false.
+
+The lesson worth keeping is not about batching. It is that a benchmark measured at one
+shape does not license a conclusion at another, and that "cost per token" is a modelling
+assumption to be checked rather than a unit. Everything else in that note was correct and
+survives: `group_by_length` was **renamed**, not dropped (`train_sampling_strategy=
+"group_by_length"`, still reading `length_column_name`); the cache exposes a `length`
+column so the sampler does not materialize every `input_ids` row; the sampler orders
+longest-first, so the most expensive groups arrive at step 0 and `chunked_head` must be
+on; and `sparse_chunk_length` counts positions while a chunk's logits are
+`[batch, positions, vocab]`, so it is read as a row budget at batch 1 and divided by the
+batch.
+
+### The memory that makes it possible
+
+Batch scaling at full sequence length, steady state with AdamW8bit present
+(`scratch/tp_optimizer_probe.py 4096 <batch>`), against the 22.80 GiB cap:
+
+| batch x 4096 | backward peak | reserved |
+| --- | ---: | ---: |
+| 1 | 13.25 / 12.62 | 14.63 / 13.57 |
+| 2 | 14.11 / 12.87 | 15.74 / 14.27 |
+| 4 | 16.15 / 13.87 | 17.94 / 15.34 |
+| 8 | OOM | -- |
+
+Batch 8 fails on **fragmentation, not capacity**: 18.18 GiB allocated with 4.19 GiB
+reserved but unallocated, and Windows has no `expandable_segments` to recover. Batch 4's
+worst case is a group of four full-length documents, exactly the 16384-token shape
+measured above, and it is the largest group the sampler can build from this corpus.
+
+This is what the tensor-parallel memory work actually bought. The layer split's earlier
+attempt at grouped batching OOM'd at step 18 with 6.12 GiB reserved but unallocated;
+tensor parallelism leaves about 5 GiB more headroom, and longest-first ordering allocates
+the largest blocks first, which is the friendly direction for a fragmenting allocator.
+`examples/qwen35_sidecar_stage2_batch4.yml` is batch 4 grouped with
+`gradient_accumulation_steps` cut 16 -> 4, holding the effective batch at 16 so the loss
+stays comparable with the batch-1 run's 0.5329.
+
+«BATCH4_RESULT»
 
 ## What the memory work bought, end to end
 

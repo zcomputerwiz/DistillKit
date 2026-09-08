@@ -22,6 +22,7 @@ from distillkit.tp_model import shard_model, sharded_parameter_report, sync_repl
 
 import sys
 SEQ = int(sys.argv[1]) if len(sys.argv) > 1 else 1024
+BATCH = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 cfg = DistillationRunConfig.model_validate(
     yaml.safe_load(open("examples/qwen35_sidecar_stage2_sharded.yml"))
 )
@@ -42,19 +43,19 @@ for device, value in report["bytes_per_device"].items():
     print("  %-8s %6.2f GiB of weights" % (device, value / 1024**3))
 
 sidecar = model.model.layers[cfg.sidecar.layer_index].sidecar
-input_ids = torch.randint(0, 248000, (1, SEQ), device="cuda:0")
-ngram_raw = torch.zeros(1, SEQ, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
+input_ids = torch.randint(0, 248000, (BATCH, SEQ), device="cuda:0")
+ngram_raw = torch.zeros(BATCH, SEQ, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
 
 
 hsm = HiddenStateMapping(model, 5120, cfg.layer_mapping)
 anchors = [a for a, _ in cfg.layer_mapping] + [model.config.num_hidden_layers]
-mask = torch.ones(1, SEQ, 1, dtype=torch.bool, device="cuda:0")
+mask = torch.ones(BATCH, SEQ, 1, dtype=torch.bool, device="cuda:0")
 signal = SparseSignal(
-    sparse_ids=torch.randint(0, 248320, (1, SEQ, 64), device="cuda:0"),
-    sparse_values=torch.log_softmax(torch.randn(1, SEQ, 64, device="cuda:0"), -1),
+    sparse_ids=torch.randint(0, 248320, (BATCH, SEQ, 64), device="cuda:0"),
+    sparse_values=torch.log_softmax(torch.randn(BATCH, SEQ, 64, device="cuda:0"), -1),
     log_values=True, generation_temperature=1.0,
-    hidden_states=(torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16),
-                   torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16)),
+    hidden_states=(torch.randn(BATCH, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16),
+                   torch.randn(BATCH, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16)),
     vocab_size=248320,
 )
 
@@ -92,7 +93,8 @@ for index in range(2):
 elapsed = (time.perf_counter() - start) / 3
 
 print("")
-print("forward+backward: %.3f s per %d-token microbatch" % (elapsed, SEQ))
+print("forward+backward: %.3f s per microbatch of %d x %d = %d tokens (%.0f tok/s)"
+      % (elapsed, BATCH, SEQ, BATCH * SEQ, BATCH * SEQ / elapsed))
 for index in range(2):
     print("  card %d peak %6.2f GiB  reserved %6.2f GiB" % (
         index,

@@ -65,18 +65,16 @@ converted student in `student-hf`.
    `flash_attn_func` instead. The 24 GatedDeltaNet layers are unaffected (FLA kernels).
    Expect memory first, speed second: attention is 5.4% of parameters.
 
-4. **Batching -- this is where the microbatch speedup converts.** Tensor parallelism
-   made a 4096-token microbatch 1.54x faster but the epoch only 1.06x, because a step
-   is mostly the things the split does not touch (16 microbatches' worth of clipping
-   over 795 tensors, the optimizer update, the collator, evaluation). Batching amortizes
-   those over more tokens, and the freed memory is what makes it possible.
-   Steady state leaves about 8 GiB per card. Activations on card 0 were
-   ~4.4 GiB at batch 1, so `per_device_train_batch_size: 2` at sequence 4096 should fit
-   (the folded head's chunk budget is in rows, so it does not grow). Batching is only
-   worth it with length grouping, which already exists: `train_sampling_strategy:
-   group_by_length` and the cache's `length` column (see PROGRESS "Batching needs length
-   grouping, which already existed"). Measured earlier: batch 4 with grouping fragmented
-   the allocator without `chunked_head`; with it on, re-measure under tensor parallelism.
+4. **Batching -- measured, configured, and the largest remaining throughput lever.**
+   Throughput on this student is set by *tokens per microbatch*, not batch size: 744
+   tok/s at 512 tokens, 1340 at 1024, and a plateau near 1700 from 2048 up. This corpus
+   is median 547 tokens, so at batch 1 most microbatches run the GPU at under half its
+   rate. `examples/qwen35_sidecar_stage2_batch4.yml` is batch 4 with `group_by_length`
+   and accumulation cut 16 -> 4 (effective batch unchanged, so the loss stays comparable
+   with 0.5329). Projected 1.61x on microbatch compute at 0.6% padding waste. Batch 8
+   fits neither the full-length groups nor the allocator. Watch reserved-but-unallocated
+   in the per-step vram metrics: the layer split's attempt at this died of fragmentation
+   at step 18. See PROGRESS, "Batching: throughput is set by tokens per microbatch".
 
 5. **MTP head.** Conventions resolved from llama.cpp; implementation
    pending ("MTP: reference resolved, implementation pending" in PROGRESS). Under tensor

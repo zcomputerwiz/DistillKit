@@ -6,7 +6,11 @@ present during every step after the first. This runs two full steps and reports 
 peak of each phase separately, because the first step has no optimizer state yet and
 understates every later one by about 4 GiB.
 
-    python scratch/tp_optimizer_probe.py 4096
+    python scratch/tp_optimizer_probe.py 4096 [batch]
+
+The batch argument answers "can per_device_train_batch_size go up?". Batches pad to
+their longest member (``data.py``), so the case to measure is a length-grouped batch of
+full-length sequences -- the most expensive group the sampler can build, not the mean.
 
 Numbers recorded in PROGRESS.md ("Where the tied embedding lives, measured three ways")
 came from this script.
@@ -28,6 +32,7 @@ from distillkit.signals import SparseSignal
 from distillkit.tp_model import shard_model, sync_replicated_gradients
 
 SEQ = int(sys.argv[1]) if len(sys.argv) > 1 else 4096
+BATCH = int(sys.argv[2]) if len(sys.argv) > 2 else 1
 cfg = DistillationRunConfig.model_validate(
     yaml.safe_load(open("examples/qwen35_sidecar_stage2_tp.yml"))
 )
@@ -40,7 +45,7 @@ model = shard_model(model, ["cuda:0", "cuda:1"])
 model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
 model.config.use_cache = False
 model.train()
-print("cap %.2f GiB per card" % cap)
+print("cap %.2f GiB per card | batch %d x seq %d" % (cap, BATCH, SEQ))
 print("weights            %6.2f / %6.2f GiB" % tuple(torch.cuda.memory_allocated(i) / 1024**3 for i in range(2)))
 
 import bitsandbytes as bnb  # noqa: E402
@@ -50,15 +55,15 @@ optimizer = bnb.optim.AdamW8bit([p for p in model.parameters() if p.requires_gra
 hsm = HiddenStateMapping(model, 5120, cfg.layer_mapping)
 anchors = [a for a, _ in cfg.layer_mapping] + [model.config.num_hidden_layers]
 sidecar = model.model.layers[cfg.sidecar.layer_index].sidecar
-ids = torch.randint(0, 248000, (1, SEQ), device="cuda:0")
-mask = torch.ones(1, SEQ, 1, dtype=torch.bool, device="cuda:0")
-raw = torch.zeros(1, SEQ, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
+ids = torch.randint(0, 248000, (BATCH, SEQ), device="cuda:0")
+mask = torch.ones(BATCH, SEQ, 1, dtype=torch.bool, device="cuda:0")
+raw = torch.zeros(BATCH, SEQ, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
 signal = SparseSignal(
-    sparse_ids=torch.randint(0, 248320, (1, SEQ, 64), device="cuda:0"),
-    sparse_values=torch.log_softmax(torch.randn(1, SEQ, 64, device="cuda:0"), -1),
+    sparse_ids=torch.randint(0, 248320, (BATCH, SEQ, 64), device="cuda:0"),
+    sparse_values=torch.log_softmax(torch.randn(BATCH, SEQ, 64, device="cuda:0"), -1),
     log_values=True, generation_temperature=1.0,
-    hidden_states=(torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16),
-                   torch.randn(1, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16)),
+    hidden_states=(torch.randn(BATCH, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16),
+                   torch.randn(BATCH, SEQ, 5120, device="cuda:0", dtype=torch.bfloat16)),
     vocab_size=248320,
 )
 
