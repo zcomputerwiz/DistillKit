@@ -193,3 +193,84 @@ def test_norm_scale_can_still_move_in_bfloat16():
     # And the deviation is faithfully reflected in the effective scale.
     scale = (1.0 + module.norm_key.weight.float())
     assert abs(scale.mean().item() - 1.001) < 1e-4
+
+
+def _student(variant):
+    from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+
+    config = Qwen3_5TextConfig(
+        vocab_size=64, hidden_size=32, intermediate_size=64, num_hidden_layers=4,
+        num_attention_heads=4, num_key_value_heads=2, head_dim=8, linear_key_head_dim=8,
+        linear_value_head_dim=8, linear_num_key_heads=2, linear_num_value_heads=4,
+        linear_conv_kernel_dim=4, full_attention_interval=2, tie_word_embeddings=True,
+        max_position_embeddings=64, pad_token_id=0, eos_token_id=3, use_cache=False,
+    )
+    config.sidecar_num_heads, config.sidecar_head_dim = 4, 32
+    config.sidecar_variant = variant
+    torch.manual_seed(0)
+    return Qwen35SidecarForCausalLM(config).eval()
+
+
+def _raw(model, batch=2, seq=6):
+    sidecar = model.model.layers[model.config.sidecar_layer_index].sidecar
+    return torch.zeros(batch, seq, sidecar.num_heads, sidecar.bytes_per_head, dtype=torch.uint8)
+
+
+def test_variant_selects_the_ple_module_and_loads_inert():
+    """Retrofitting onto a trained backbone must not perturb it, so an enabled sidecar
+    at initialisation has to be indistinguishable from a disabled one."""
+    from distillkit.models.qwen35_sidecar import _NGramSidecar, _PLENGramSidecar
+
+    model = _student("ple")
+    sidecar = model.model.layers[model.config.sidecar_layer_index].sidecar
+    assert isinstance(sidecar, _PLENGramSidecar)
+    assert isinstance(_student("gated_residual").model.layers[1].sidecar, _NGramSidecar)
+
+    ids = torch.randint(0, 64, (2, 6))
+    raw = _raw(model)
+    with torch.no_grad():
+        enabled = model(input_ids=ids, ngram_raw=raw, sidecar_enabled=True).logits
+        disabled = model(input_ids=ids, ngram_raw=raw, sidecar_enabled=False).logits
+    torch.testing.assert_close(enabled, disabled, rtol=0, atol=0)
+
+
+def test_stage1_freezing_leaves_exactly_the_ple_module_trainable():
+    """The attribute is still named `sidecar`, so _auxiliary_parameter_ids recognises it
+    and no optimizer change is needed to train this variant."""
+    from distillkit.optimizers import freeze_backbone_for_stage1
+
+    model = _student("ple")
+    freeze_backbone_for_stage1(model)
+    trainable = [n for n, p in model.named_parameters() if p.requires_grad]
+    assert len(trainable) == 6, trainable
+    assert all(".sidecar.ple." in name for name in trainable), trainable
+
+
+def test_rejects_an_unknown_variant():
+    with pytest.raises(ValueError, match="sidecar_variant"):
+        _student("something_else")
+
+
+def test_norms_survive_from_pretrained_reinitialisation(tmp_path):
+    """from_pretrained re-initialises missing parameters, and its default for a
+    norm-shaped weight is ones. Under upstream's (1 + w) that is a scale of 2.0, so the
+    retrofit would start by doubling every normalised value. Caught on a real load, not
+    by constructing the module directly."""
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+
+    source = _student("gated_residual")          # a checkpoint with no ple.* keys at all
+    source.save_pretrained(tmp_path)
+    config = source.config
+    config.sidecar_variant = "ple"
+    model = Qwen35SidecarForCausalLM.from_pretrained(tmp_path, config=config)
+
+    ple = model.model.layers[config.sidecar_layer_index].sidecar.ple
+    for name in ("norm_key", "norm_query", "norm_conv"):
+        weight = getattr(ple, name).weight
+        assert weight.abs().max().item() == 0.0, (
+            "%s came back at scale %.3f; the deviation parameterisation expects 0"
+            % (name, 1.0 + weight.abs().max().item())
+        )
+    assert ple.value_proj.weight.abs().max().item() == 0.0

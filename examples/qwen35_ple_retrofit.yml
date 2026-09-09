@@ -1,0 +1,201 @@
+# Stage-1 sidecar distillation: Qwen3.8-27B teacher -> Qwen3.5-4B student.
+#
+# The 1M-token cache supplies BOTH the training data and the teacher signal, so no
+# dataset paths appear here. Anchors 8 and 64 in the cache were chosen for float8
+# headroom (5.1x and 6.7x); layers 55-59 overflow unscaled fp8 and 16-48 sit at only
+# 2.0-2.8x, which is thin over a million tokens.
+#
+# Stage 1 freezes the backbone so only the sidecar trains -- roughly 65.5M of 4.27B
+# parameters. That is the point of the run: with the backbone fixed, any change in
+# loss is attributable to the n-gram features rather than to extra optimisation.
+# Pair this with `qwen35_sidecar_1m_control.yml`, which is byte-identical except
+# `sidecar.enabled: false`, and compare.
+#
+# NOTE: run this with BOTH cards visible and no CUDA_VISIBLE_DEVICES pin.
+#
+# The explicit device_map below is what makes that safe. Without a map and with both
+# cards visible, HF Trainer wraps the model in nn.DataParallel, which gathers every
+# replica's [batch, seq, 248320] logits onto GPU 0 and OOMs -- a 248k-wide head makes
+# that gather the bottleneck. A device map instead sets is_model_parallel, which forces
+# _n_gpu to 1 and keeps DataParallel out entirely.
+# Run:
+#   python -m distillkit.main examples/qwen35_sidecar_1m.yml -v
+
+# The stage-2 chained backbone, the best this project has produced (eval_loss 0.5262).
+# It was trained with the OLD sidecar active, so it has already adapted to one -- this
+# run is not a clean comparison of the two designs, it is a test of whether the new one
+# functions and improves on a fully trained backbone.
+model: D:/DeepThought/Projects/HybridModel/runs/sidecar-stage2-chained
+output_path: D:/DeepThought/Projects/HybridModel/runs/ple-retrofit
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  # Both splits come from the capture manifest; the eval holdout was carved out in
+  # the same pass so it cannot drift from the training stream.
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  # Both arms run split across the two cards. On one card this run peaks at 15.16 GiB
+  # of live tensors under a 22.08 GiB cap, and the control arm died anyway: the 3.79 GiB
+  # contiguous request for the logits gradient could not be placed against 4.04 GiB of
+  # reserved-but-unallocated fragmentation. The allocator's own remedy is unavailable
+  # here -- PyTorch warns "expandable_segments not supported on this platform" on
+  # Windows -- so the fix is to stop running at the edge. Split, the same step peaks at
+  # 10.29 GiB on card 0 and 9.58 GiB on card 1.
+  #
+  # This is one process with no NCCL and no process group: Tensor.to(device) is
+  # differentiable, so autograd moves activations forward and gradients back itself.
+  #
+  # The map has to name every module. A compact form leaning on prefixes
+  # ({"model": 1} plus a few overrides) is accepted by from_pretrained and then places
+  # tensors wrongly -- accelerate hooks at the granularity of the keys given, so an
+  # override nested inside a mapped subtree never gets its own input alignment and the
+  # forward dies with "found at least two devices".
+  #
+  # embed_tokens and lm_head share card 0: tie_word_embeddings is true, so they are one
+  # parameter. main.py rejects a map that separates them.
+  device_map:
+    model.embed_tokens: 0
+    model.rotary_emb: 0
+    model.norm: 0
+    lm_head: 0
+    model.layers.0: 0
+    model.layers.1: 0
+    model.layers.2: 0
+    model.layers.3: 0
+    model.layers.4: 0
+    model.layers.5: 0
+    model.layers.6: 0
+    model.layers.7: 0
+    model.layers.8: 0
+    model.layers.9: 1
+    model.layers.10: 1
+    model.layers.11: 1
+    model.layers.12: 1
+    model.layers.13: 1
+    model.layers.14: 1
+    model.layers.15: 1
+    model.layers.16: 1
+    model.layers.17: 1
+    model.layers.18: 1
+    model.layers.19: 1
+    model.layers.20: 1
+    model.layers.21: 1
+    model.layers.22: 1
+    model.layers.23: 1
+    model.layers.24: 1
+    model.layers.25: 1
+    model.layers.26: 1
+    model.layers.27: 1
+    model.layers.28: 1
+    model.layers.29: 1
+    model.layers.30: 1
+    model.layers.31: 1
+
+sidecar:
+  # Shard 2 of the Unsloth GGUF carries per_layer_token_embd.weight (IQ4_NL, 28.8 GB).
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  # Resident costs 28.8 GB of RAM and ~20 s at startup, but a cold mmap gather is
+  # ~2.8 s per batch versus ~8 ms warm -- 80% of a step versus 0.4%. Requires
+  # dataloader_num_workers 0 so workers cannot each copy the table.
+  resident: true
+  prefault: true
+  layer_index: 1   # matches Flash-Next's ple_layer_ids (one-indexed [2])
+  num_branches: 4  # ignored by the ple variant, which has no branches
+  # Flash-Next's own integration: the gate is a query-key dot product between the
+  # residual stream and the n-gram embedding, not free parameters that must discover
+  # selectivity. The 5M pilot found the old design's projection trained (0 -> 4.007)
+  # while its gate did not (gate_1_mean 0.5001 -> 0.5013).
+  variant: ple
+
+# Student hidden_states index -> anchor position in the cache (not the teacher's
+# layer id). Teacher anchor 8 of 64 is 12.5% depth -> student layer 4; anchor 64 is
+# the final post-norm state -> student layer 32.
+layer_mapping:
+  - [4, 0]
+  - [32, 1]
+
+loss_functions:
+  # cross_entropy is deliberately absent. It is the only loss that reads
+  # student_outputs.loss, so omitting it makes requires_model_loss false and the model
+  # skips its 248,320-wide cross-entropy entirely -- forward and backward. Keeping it
+  # cost a 3.79 GiB fp32 gradient over the full logits and OOM'd on long documents.
+  # KL is the teacher-alignment term anyway; ground-truth CE can come back in stage 2.
+  # The teacher-alignment term: match the full distribution, not just the argmax.
+  - function: kl
+    weight: 0.7
+    temperature: 1.0
+    missing_probability_handling: zero
+    # Without this the KL term takes a full fp32 log_softmax over the 248,320-wide
+    # vocabulary in one go: 4.07 GB at sequence 4096, held for backward. Chunked and
+    # checkpointed it is ~0.5 GB.
+    sparse_chunk_length: 256
+  # Representation alignment. Cosine rather than MSE because the student's projected
+  # 5120-d states have no reason to match the teacher's scale, only its direction.
+  - function: hs_cosine
+    weight: 0.3
+
+optimizer:
+  strategy: hybrid          # Muon on 2D matrices, AdamW on embeddings/norms/gates
+  freeze_backbone: true     # stage 1: sidecar + gated residual only
+  unfreeze_at_step: null    # keep the probe clean; stage 2 is a separate run
+  log_every_n_steps: 25     # gate activations and W_x/W_h norms -> W&B/TensorBoard
+
+use_flash_attention: false  # no Windows wheels; bf16 is set explicitly below
+functionary_packing: false  # qwen3_5 hits monkey_patch_packing's else-raise anyway
+chunked_cross_entropy: true
+# Required once a microbatch holds four sequences: the logits this removes are
+# [4, seq, 248320]. At batch 1 it cost 4.4% and was left off.
+chunked_head: true
+# Length-group each microbatch and shuffle the batch order. Throughput is set by tokens
+# per microbatch, not batch size, and this corpus is median 537 tokens -- at batch 1 most
+# microbatches run the GPU at under half its rate. HF's group_by_length buys the same
+# speed for 0.0176 of eval_loss; sortish costs 0.0084. Every arm here samples
+# identically, so that offset is common-mode and cancels in sidecar minus control.
+sortish_batching: true
+max_vram_fraction: 0.95     # batch 4 wants the headroom
+
+training_args:
+  bf16: true                     # fp32 distillation projections need autocast
+  remove_unused_columns: false   # or doc_id / ngram_raw are dropped before the collator
+  dataloader_num_workers: 0      # required by sidecar.resident
+  # sequence_length must stay 4096 to match the cache's truncation rule, but that is
+  # not the padded batch length: the collator pads to the longest document in each
+  # batch, and documents average ~870 tokens.
+  # No group_by_length: trl 0.25.1's SFTConfig dropped that field (only
+  # length_column_name survives), so batch 2 eats some padding waste. Both arms eat
+  # the same waste, so the comparison is unaffected.
+  # Batch 2 pushed the working set to 24.3 GB dedicated + 19.7 GB SPILLED to shared
+  # system memory: 100% GPU utilisation at 133 W with a 0% memory controller, and
+  # 200 tok/s instead of 1428. Batch 1 keeps it resident; effective batch is unchanged.
+  # 4 x 4 keeps the effective batch at 16, exactly what the 1M arms used, so these
+  # results stay comparable with them.
+  per_device_train_batch_size: 4
+  length_column_name: length
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  num_train_epochs: 1
+  learning_rate: 1.0e-4
+  # Constant LR on purpose: a cosine schedule tuned for a long run decays differently
+  # over 1M tokens and would not predict anything about the full run.
+  lr_scheduler_type: constant_with_warmup
+  warmup_steps: 20
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 50
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42

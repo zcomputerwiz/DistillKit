@@ -95,6 +95,10 @@ class _PLERMSNorm(nn.Module):
         super().__init__()
         self.eps = eps
         self.weight = nn.Parameter(torch.zeros(dim))
+        # from_pretrained re-initialises parameters missing from the checkpoint, and its
+        # default for a norm-shaped weight is ones -- which under (1 + w) is a scale of
+        # 2.0, not 1.0. Mark it so _SidecarWeightInit restores the zero.
+        self._sidecar_weight_init = "zero"
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = x.float()

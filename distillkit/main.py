@@ -253,6 +253,7 @@ def load_student_model(
         text_config = getattr(stock_config, "text_config", stock_config)
         text_config.sidecar_layer_index = config.sidecar.layer_index
         text_config.sidecar_num_branches = config.sidecar.num_branches
+        text_config.sidecar_variant = config.sidecar.variant
         extra_kwargs["config"] = text_config
     model = auto_cls.from_pretrained(
         config.train_model,

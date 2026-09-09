@@ -147,6 +147,15 @@ class SidecarConfig(BaseModel):
     prefault: bool = True
     layer_index: int = Field(default=1, ge=0)
     num_branches: int = Field(default=4, ge=1)
+    variant: Literal["gated_residual", "ple"] = Field(
+        default="gated_residual",
+        description=(
+            "gated_residual: the original design -- features added ungated, then a "
+            "learned multi-branch gate on the sum. ple: Flash-Next's integration, where "
+            "the gate is a query-key dot product between the stream and the n-gram "
+            "embedding. num_branches is ignored by ple, which has no branches."
+        ),
+    )
 
     @model_validator(mode="after")
     def require_table(self):

@@ -28,6 +28,7 @@ from distillkit.gated_residual import GatedResidual
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
+from distillkit.ple_sidecar import PLESidecar
 
 # flash-linear-attention, when installed, is bound by transformers at import time with
 # no device check, and its Triton kernels reject CPU tensors. Restore per-call
@@ -47,6 +48,7 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         "sidecar_num_branches": 4,
         "sidecar_gate_init_std": 0.02,
         "sidecar_per_channel_gate": True,
+        "sidecar_variant": "gated_residual",
     }
     for name, value in defaults.items():
         if not hasattr(config, name):
@@ -57,6 +59,8 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         raise ValueError("sidecar_num_heads must be positive")
     if config.sidecar_head_dim <= 0 or config.sidecar_head_dim % IQ4NL_BLOCK:
         raise ValueError("sidecar_head_dim must be a positive multiple of 32")
+    if config.sidecar_variant not in ("gated_residual", "ple"):
+        raise ValueError("sidecar_variant must be 'gated_residual' or 'ple'")
     if config.sidecar_num_branches < 1 or config.sidecar_gate_init_std < 0:
         raise ValueError("sidecar branches must be positive and gate init std nonnegative")
 
@@ -123,10 +127,54 @@ class _NGramSidecar(nn.Module):
         return self.gated_residual(hidden_states)
 
 
+class _PLENGramSidecar(nn.Module):
+    """Flash-Next's PLE integration over this fork's dequantized n-gram rows.
+
+    Deliberately keeps the attribute name ``sidecar`` on the decoder layer, so
+    ``_auxiliary_parameter_ids`` still recognises it and stage-1 freezing leaves exactly
+    this module trainable without any change to the optimizer.
+    """
+
+    def __init__(self, config: Qwen3_5TextConfig):
+        super().__init__()
+        self.num_heads = config.sidecar_num_heads
+        self.bytes_per_head = config.sidecar_head_dim // IQ4NL_BLOCK * IQ4NL_TYPE_SIZE
+        self.dequant = IQ4NLDequant(out_dtype=torch.float32)
+        self.ple = PLESidecar(
+            config.hidden_size,
+            config.sidecar_num_heads * config.sidecar_head_dim,
+            rms_norm_eps=config.rms_norm_eps,
+        )
+
+    def forward(self, hidden_states, ngram_raw, sidecar_enabled=True):
+        if not sidecar_enabled:
+            # The control arm: the module is bypassed entirely rather than fed zeros,
+            # because a zero n-gram row is still a row the gate would score.
+            return hidden_states
+        expected = (*hidden_states.shape[:2], self.num_heads, self.bytes_per_head)
+        if ngram_raw is None:
+            raise ValueError("ngram_raw is required while sidecar_enabled=True")
+        if ngram_raw.dtype != torch.uint8 or tuple(ngram_raw.shape) != expected:
+            raise ValueError(f"ngram_raw must be uint8 with shape {expected}")
+        raw = ngram_raw.to(device=hidden_states.device, non_blocking=True)
+        features = self.dequant(raw).flatten(-2)
+        return self.ple(hidden_states, features)
+
+    def gate_report(self, hidden_states, ngram_raw):
+        raw = ngram_raw.to(device=hidden_states.device, non_blocking=True)
+        return self.ple.gate_report(hidden_states, self.dequant(raw).flatten(-2))
+
+
+def _build_sidecar(config: Qwen3_5TextConfig) -> nn.Module:
+    if config.sidecar_variant == "ple":
+        return _PLENGramSidecar(config)
+    return _NGramSidecar(config)
+
+
 class _SidecarDecoderLayer(Qwen3_5DecoderLayer):
     def __init__(self, config, layer_idx):
         super().__init__(config, layer_idx)
-        self.sidecar = _NGramSidecar(config) if layer_idx == config.sidecar_layer_index else None
+        self.sidecar = _build_sidecar(config) if layer_idx == config.sidecar_layer_index else None
 
     def forward(self, hidden_states, *args, ngram_raw=None, sidecar_enabled=True, **kwargs):
         if self.sidecar is not None:
