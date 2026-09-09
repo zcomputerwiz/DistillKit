@@ -96,15 +96,18 @@ Knobs whose right value depends on what is binding, not on taste:
 1. ~~Real-corpus teacher capture~~ - **done**: 1,014,574 tokens cached.
 2. ~~Compare the 1M sidecar and control arms~~ - **done**: -0.0448 eval_loss for the
    sidecar, concentrated entirely in the KL term.
-3. 5M-token pilot -- the 1M comparison justifies it. Run at least two seeds per arm:
-   the single-arm run-to-run spread is 0.017, about 38% of the measured effect.
+3. ~~5M-token pilot~~ - **done, and the effect largely washed out**: -0.0027 mean
+   against a 0.0032 seed spread, where 1M measured -0.0448. Sidecar ahead in 14 of 14
+   paired evaluations, so the sign is consistent and the magnitude is not established.
+   See "The 5M pilot".
 4b. ~~Batching~~ - **measured, and mostly fixed**: batch 4 is ~1.5-1.6x, and
    `sortish_batching` cuts its loss cost from 0.0176 to 0.0084 at the same speed.
    Order-seed variance is 0.0005, so the residual is real. Decide per-arm before the
    pilot, not during it. See "Batching: throughput is set by tokens per microbatch".
-4a. **The 5M-token pilot is now the top open item.** Everything below it is
-   infrastructure that is finished; this is the question the infrastructure was for.
-   See "What remains" in `HANDOFF.md` for the steps.
+4a. **The gate is the top open item.** The pilot showed the sidecar projection trains
+   while the gated residual sits at its initialisation, so the architecture is half
+   wired. Two candidates: a separate, higher learning rate for the gate (item 8), and
+   re-reading how Flash-Next actually integrates its per-layer table.
 4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
    runs". The thin margins recorded there (22.12 / 21.45 GiB against 22.80 allowed) are
@@ -942,6 +945,75 @@ head is recomputed during backward -- and which way it pays depends on what is b
 4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## The 5M pilot: the sidecar helps, and the 1M number overstated it 8x (2026-09-08)
+
+The question the whole project was built to answer, run at last: four stage-1 arms,
+sidecar and control at two seeds each, on a 4.75M-token cache with a 295-document
+holdout. Every arm ran the 1M recipe unchanged except for batching.
+
+| arm | `train_runtime` | `eval_loss` |
+| --- | ---: | ---: |
+| sidecar, seed 42 | 4915 s | **0.2924** |
+| control, seed 42 | 4781 s | 0.2967 |
+| sidecar, seed 43 | 4853 s | **0.2898** |
+| control, seed 43 | 4750 s | 0.2909 |
+
+Paired differences **-0.0043** and **-0.0011**: mean **-0.0027**, seed spread **0.0032**.
+
+### It did not replicate at scale
+
+| | effect | as a share of control |
+| --- | ---: | ---: |
+| 1M | -0.0448 | 7.2% |
+| **5M** | **-0.0027** | **0.9%** |
+
+Eight times smaller in relative terms, and **the spread between the two seeds exceeds the
+mean effect**. By the reading written into `scratch/run_5m_pilot.py` before any result was
+seen -- read the spread before the mean -- the endpoint measurement does not establish the
+effect. The 1M comparison, one seed per arm, was overconfident, exactly as the note
+recording it warned it might be.
+
+### The sign, however, is perfectly consistent
+
+The sidecar is ahead in **14 of 14 paired evaluations**, both seeds, every checkpoint:
+
+| eval | seed 42 | seed 43 |
+| ---: | ---: | ---: |
+| 1 | -0.0156 | -0.0251 |
+| 2 | -0.0192 | -0.0197 |
+| 3 | -0.0015 | -0.0214 |
+| 4 | -0.0064 | -0.0166 |
+| 5 | -0.0020 | -0.0100 |
+| 6 | -0.0020 | -0.0073 |
+| 7 | -0.0043 | -0.0011 |
+
+Fourteen of fourteen is not what noise looks like, though the evaluations within a run
+are not independent so this is not a clean sign test. The shape is unambiguous: the
+sidecar's advantage is **front-loaded and erodes monotonically**, worth about 0.02 early
+and 0.002 by the end. It behaves like a warm start that more data eventually supplies by
+itself.
+
+### Two trivial explanations ruled out, and one real finding
+
+**The sidecar trained.** `W_side_proj` weight norm moved 0 -> 4.007 from its zero
+initialisation, and the sidecar arms ran ~130 s slower than their controls. It is not
+bypassed.
+
+**The gate did not.** `gate_1_mean` went 0.5001 -> 0.5013, `W_x_norm` 88.68 -> 88.74,
+saturation ~0.07. The gated residual is sitting where it was initialised, passing a fixed
+half of the sidecar's contribution rather than learning *when* to use it. That is the one
+component demonstrably not earning its keep, and it is the most actionable thing the
+pilot produced.
+
+### What this does and does not license
+
+It does not license "the sidecar works" at the strength the 1M number suggested. It does
+not license abandoning it either: a consistent front-loaded gain with an inert gate is a
+description of an architecture that is half-wired, not one that does nothing. The
+defensible next steps are the gate's learning rate (item 8) and a faithful re-reading of
+how Flash-Next integrates its per-layer table, rather than more seeds of the same
+configuration.
 
 ## The teacher capture cannot be batched, and does not need to be (2026-09-08)
 

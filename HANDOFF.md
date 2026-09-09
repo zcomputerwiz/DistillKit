@@ -34,31 +34,21 @@ converted student in `student-hf`.
 
 ## What remains
 
-1. **The 5M-token pilot -- set up, capture running, arms not yet run.** This is the
-   research question everything else was built to answer.
+1. **The gate, not more seeds.** The 5M pilot is done (PROGRESS, "The 5M pilot"):
+   sidecar minus control is -0.0027 with a 0.0032 seed spread, against -0.0448 at 1M.
+   The sidecar is ahead in 14 of 14 paired evaluations, so the sign is solid and the
+   magnitude is not. The diagnostic that matters: `W_side_proj` trained (0 -> 4.007)
+   while the gated residual did not (`gate_1_mean` 0.5001 -> 0.5013), so the gate passes
+   a fixed half of the sidecar rather than learning when to use it. Running more seeds of
+   the same configuration would measure the same half-wired architecture more precisely.
+   Two things worth doing instead: give the gate its own higher learning rate, and
+   re-read how Flash-Next integrates its per-layer table before assuming this design
+   matches it.
 
-   - Corpus: `capture-data/run5m.jsonl`, 5,598 documents / 4,999,608 tokens, median 537,
-     the same length shape as the 1M corpus.
-   - Cache: `teacher-cache-5m`, ~52 GB, anchors 8 and 64, top-k 64, eval-every 20.
-     Captured at **batch 1** and it must stay that way -- see PROGRESS, "The teacher
-     capture cannot be batched". Actual rate ~857 tok/s, ~1.5 h.
-   - Arms: `examples/qwen35_sidecar_5m_{s42,s43,control_s42,control_s43}.yml`, generated
-     from the 1M configs and diffed against them, so sidecar and control differ *only* in
-     `sidecar.enabled`. Tensor parallel, sortish batching at 4 x 4 (effective batch 16,
-     as in the 1M arms), identical sampling in all four so the sampler offset is
-     common-mode. `dataset.seed` is 42 everywhere; only `training_args.seed` varies.
-   - Run them with `python scratch/run_5m_pilot.py` (sequential -- each arm uses both
-     GPUs; it refuses to start until the capture's manifest exists, skips finished arms,
-     and stops on the first failure). `--summary` prints the table and both paired
-     differences. **Run `--smoke` first**: stage 1 with tensor parallelism and sortish
-     batching is a combination no completed run has used.
-   - Reading the result: the 1M effect was -0.0448. Order-seed variance on a fixed
-     configuration is 0.0005, but two seeds *bound* arm-to-arm wobble rather than
-     establish it -- look at the spread between the two paired differences before
-     trusting the mean.
-   - One inherited choice worth revisiting: `warmup_steps: 20` came from the 1M config
-     where it was 28% of 72 steps; at 5M it is ~6% of ~332. Kept absolute rather than
-     silently rescaled.
+   Artifacts: cache `teacher-cache-5m` (5,303 train / 295 eval documents, holdout carved
+   in the manifest -- see the fix note there), configs
+   `examples/qwen35_sidecar_5m_{s42,s43,control_s42,control_s43}.yml`, runner
+   `scratch/run_5m_pilot.py --summary`, logs `runs/{sidecar,control}-5m-s4{2,3}.log`.
 
 2. **Resume a tensor-parallel run from a real `checkpoint-*` directory.** Export is
    verified (keys, shapes, dtypes, one-card load, finite logits -- see PROGRESS,
