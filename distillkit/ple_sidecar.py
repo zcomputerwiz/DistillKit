@@ -47,6 +47,17 @@ appear below. Everything else -- the signed-sqrt, the sigmoid, the dilation, the
 around the convolution, the ordering of the norms -- is transcribed rather than
 reinterpreted.
 
+**The norms.** Upstream's ``Qwen4ExpTextRMSNorm`` stores a zero-initialised weight and
+scales by ``(1 + w)``; ``nn.RMSNorm`` stores a ones-initialised weight and scales by
+``w``. Measured, these are the same function: the forward is bit-identical at
+initialisation in both fp32 and bf16, the gradients are bit-identical for a shared input,
+and ``nn.RMSNorm`` already accumulates in fp32 exactly as upstream's explicit ``.float()``
+does. The parameterisations differ in one respect only -- **weight decay**, which pulls
+upstream's scale toward 1 and torch's toward 0. This fork never decays them, because
+``mixed_parameter_groups`` assigns decay by ``parameter.ndim >= 2`` and these are 1-D;
+``tests/test_ple_sidecar.py`` pins that, since the equivalence would break silently if it
+changed.
+
 ``value_proj`` is zero-initialised so the module is exactly the identity at load, which
 matters when retrofitting onto a frozen, already-trained backbone. That does mean the
 gate sees no gradient on the very first step, exactly as the old design did -- but unlike

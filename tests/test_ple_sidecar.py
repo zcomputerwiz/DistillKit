@@ -131,3 +131,44 @@ def test_rejects_degenerate_shapes(bad):
     kwargs = {"hidden_size": HIDDEN, "feature_dim": FEATURES, **bad}
     with pytest.raises(ValueError):
         PLESidecar(kwargs.pop("hidden_size"), kwargs.pop("feature_dim"), **kwargs)
+
+
+def test_right_padding_cannot_disturb_real_positions():
+    """Upstream masks padding before the convolution; we do not, because our collator
+    right-pads and the convolution is causal, so padding sits strictly after every real
+    token. This proves that rather than assuming it -- it is the case that would break
+    silently now that arms train at batch 4."""
+    module = _module()
+    with torch.no_grad():
+        module.value_proj.weight.normal_(std=0.05)
+        module.conv1d.weight.normal_(std=0.5)
+    hidden, features = _inputs(batch=1)
+    real = 7
+
+    unpadded = module(hidden[:, :real], features[:, :real])
+    junk_features = features.clone()
+    junk_features[:, real:] = 50.0        # arbitrary garbage in the padded tail
+    padded = module(hidden, junk_features)
+
+    torch.testing.assert_close(padded[:, :real], unpadded, rtol=0, atol=0)
+
+
+def test_norm_weights_are_excluded_from_weight_decay():
+    """The port uses nn.RMSNorm (scale w, ones-init) where upstream uses scale (1 + w),
+    zero-init. Those are the same function under every operation except weight decay,
+    which would pull torch's scale toward 0 and upstream's toward 1. This fork decays
+    only parameters with ndim >= 2, which is what keeps them equivalent."""
+    from distillkit.optimizers import mixed_parameter_groups
+
+    model = torch.nn.Module()
+    model.ple = _module()
+    decayed = {
+        name for group in mixed_parameter_groups(model) if group["decay"]
+        for name in group["param_names"]
+    }
+    norm_weights = [n for n, p in model.named_parameters() if "norm_" in n]
+    assert norm_weights, "fixture should contain the PLE norms"
+    assert not (set(norm_weights) & decayed), (
+        "RMSNorm weights are being decayed; the port is no longer equivalent to "
+        "upstream's (1 + w) parameterisation"
+    )
