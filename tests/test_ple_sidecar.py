@@ -274,3 +274,47 @@ def test_norms_survive_from_pretrained_reinitialisation(tmp_path):
             % (name, 1.0 + weight.abs().max().item())
         )
     assert ple.value_proj.weight.abs().max().item() == 0.0
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="autocast needs CUDA here")
+def test_output_dtype_survives_autocast():
+    """Every real run trains under autocast, and these tests did not. `sum` is on
+    autocast's fp32 promotion list, so the gate comes back fp32; multiplying a bf16 value
+    by it promotes the whole value path, which escapes this module and propagates through
+    the model until it meets a bf16 weight -- which is exactly how the first retrofit run
+    died, in lm_head, far from here."""
+    module = PLESidecar(HIDDEN, FEATURES).to(torch.bfloat16).cuda()
+    with torch.no_grad():
+        module.value_proj.weight.normal_(std=0.02)
+    hidden = torch.randn(1, SEQ, HIDDEN, dtype=torch.bfloat16, device="cuda")
+    features = torch.randn(1, SEQ, FEATURES, dtype=torch.bfloat16, device="cuda")
+
+    assert module(hidden, features).dtype == torch.bfloat16
+    with torch.autocast("cuda", dtype=torch.bfloat16):
+        assert module(hidden, features).dtype == torch.bfloat16, (
+            "autocast promoted the output; it will poison the residual stream"
+        )
+
+
+def test_the_output_grows_smoothly_rather_than_jumping():
+    """The identity must not be a knife-edge. norm_conv renormalises its input to unit
+    RMS, so with a randomly initialised convolution the branch contributes at full scale
+    the moment value_proj leaves zero -- which destroyed a frozen backbone on the first
+    real run. Zeroing the convolution as well makes the contribution proportional to
+    value_proj instead."""
+    module = _module()
+    hidden, features = _inputs(batch=1)
+    stream = hidden.pow(2).mean().sqrt().item()
+
+    magnitudes = []
+    for std in (1e-6, 1e-4, 1e-2):
+        with torch.no_grad():
+            module.value_proj.weight.normal_(std=std)
+        magnitudes.append((module(hidden, features) - hidden).abs().max().item())
+
+    assert magnitudes[0] < 0.01 * stream, (
+        "a near-zero value_proj injected %.4f into a stream of RMS %.3f" % (magnitudes[0], stream)
+    )
+    assert magnitudes[1] < 0.2 * stream
+    # Proportional, not saturated: a 100x larger value must give a far larger output.
+    assert magnitudes[2] > 10 * magnitudes[1]

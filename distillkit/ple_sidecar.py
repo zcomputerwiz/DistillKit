@@ -144,10 +144,21 @@ class PLESidecar(nn.Module):
             hidden_size, hidden_size, kernel_size=conv_kernel_size,
             groups=hidden_size, dilation=self.conv_dilation, bias=False,
         )
-        # Exactly the identity at initialisation: retrofitting onto a trained backbone
-        # must not perturb it on step 0.
-        nn.init.zeros_(self.value_proj.weight)
-        self.value_proj._sidecar_weight_init = "zero"
+        # Exactly the identity at initialisation, and -- unlike upstream -- *smoothly*
+        # so. Zeroing value_proj alone makes the identity a knife-edge: norm_conv
+        # renormalises whatever it receives to unit RMS, so the convolution branch
+        # contributes at full scale the instant value_proj leaves zero, regardless of how
+        # small it is. Measured on a stream of RMS 1.01, a value_proj at std 1e-4 already
+        # injected 0.64 and at 1e-2 injected 1.84 -- larger than the stream it is meant to
+        # nudge. Upstream can afford that because it trains the whole model jointly and
+        # the backbone co-adapts; a retrofit onto a frozen backbone cannot, and the first
+        # run of this module confirmed it (eval_loss 2.157 after two steps against the
+        # backbone's own 0.5262). Zeroing the convolution too makes silu(conv(.)) exactly
+        # zero, so the output starts as gated_value alone and both branches grow from
+        # nothing.
+        for zeroed in (self.value_proj, self.conv1d):
+            nn.init.zeros_(zeroed.weight)
+            zeroed._sidecar_weight_init = "zero"
 
     def _short_conv(self, gated: torch.Tensor) -> torch.Tensor:
         """Causal dilated depthwise convolution, left-padded so position t sees only <= t."""
@@ -166,7 +177,13 @@ class PLESidecar(nn.Module):
         # Signed square root: compresses the dot product's range without losing its sign,
         # so a strongly disagreeing n-gram is suppressed rather than merely unamplified.
         gate = gate.abs().clamp_min(1e-6).sqrt() * gate.sign()
-        gated_value = torch.sigmoid(gate) * value
+        # Back to the stream's dtype before it touches the value. Under autocast the
+        # reduction above is promoted to fp32 -- `sum` is on autocast's fp32 list -- and
+        # multiplying a bf16 value by an fp32 gate promotes the whole value path, which
+        # then propagates out of this module and through the rest of the model until
+        # something meets a bf16 weight. Computing the gate itself in fp32 is wanted, a
+        # 2560-wide dot product deserves it; carrying that width outward is not.
+        gated_value = torch.sigmoid(gate).to(value.dtype) * value
 
         output = gated_value + self._short_conv(self.norm_conv(gated_value))
         return hidden_states + output
