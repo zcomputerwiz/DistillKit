@@ -948,6 +948,103 @@ head is recomputed during backward -- and which way it pays depends on what is b
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
 
+## The objective this project tunes against does not measure the thing it wants (2026-09-09)
+
+The sidecar learning-rate sweep produced a monotonic `eval_loss` improvement, 0.5445 at
+the backbone's rate down to 0.3435 at 1e-3, better than anything this project had
+produced. It does not survive contact with any other measurement.
+
+### The confound I built
+
+`optimizer.sidecar_lr` raises the rate for everything `_auxiliary_parameter_ids` matches,
+and that set includes **`distillation_projections`** -- free linear maps whose only
+purpose is to compute the hidden-state term of the loss. Their norms moved in step with
+the rate:
+
+| `sidecar_lr` | projection norms |
+| --- | --- |
+| 1e-5 | 58.426 / 58.421 |
+| 1e-4 | 58.541 / 58.422 |
+| 5e-4 | 53.477 / 59.621 |
+| 1e-3 | 48.241 / 63.330 |
+
+Static at the base rate, ten units apart at 1e-3. Raising the rate let the loss-shaping
+layer shape the loss. The fix is to scope `sidecar_lr` to the architecture -- sidecar,
+PLE, gated residual -- and hold the projections fixed across any sweep.
+
+**A correction to how that was first reported.** I decomposed the improvement using the
+`distillation_loss/1_kl` and `2_hs_cosine` values from the logs and concluded the KL was
+flat while the hidden-state term collapsed. Those are *training-step* values and do not
+reconstruct the evaluation total: 0.7 x 0.4345 + 0.3 x 0.9844 = 0.5995 against an
+`eval_loss` of 0.5445, and 0.3906 against 0.3435 at 1e-3. The projection-norm evidence
+above stands on its own, but the component split was not measured on the evaluation pass
+and the trainer does not currently log one. Adversarial review caught the arithmetic.
+
+### What upstream actually validates against
+
+From the Flash-Next tech report, which was read rather than assumed:
+
+* **§2.3.2, p.15**: "The out-of-domain uncheatable PPL changes little across budgets, and
+  downstream benchmarks show no clear improvement over the MoE-only baseline." Table 8
+  puts numbers on it -- loss reaches its optimum at 10x vocabulary (1.197 against 1.202
+  at none) while uncheatable PPL sits flat at 5.54-5.59 across every budget.
+* **§2.3.2, p.15**: "Loss decreases monotonically as the N-gram vocabulary grows, while
+  downstream performance does not follow the same trend."
+* **Table 7, p.14**: no n-gram gives loss 1.585 and benchmark average 45.44; layer 2 gives
+  1.541 and 47.94; layers 2+25 give **1.540 and 47.75** -- the lowest loss is not the best
+  average.
+
+So loss and quality diverge in their own measurements, repeatedly, and they never tune on
+loss alone. Note the report does **not** define or reproduce the uncheatable corpus and
+explicitly calls it out-of-domain; arbitrary uncached text is in the same spirit but is
+not the same thing.
+
+**There is no gate statistic anywhere in the report.** No gate mean, variance, entropy,
+open-fraction or selectivity threshold for the PLE. A regime table circulated in this
+session citing the report for `gate_std` bands is unsupported; `gate_std` is this fork's
+own telemetry, and its ~0.20 initial value is derivable arithmetic (0.2033 analytically,
+scale-invariant from hidden 512 to 5120) rather than anything upstream published.
+
+### Upstream does split the optimizer, differently than I guessed
+
+**§3.1, p.16**: "We apply Muon to the two-dimensional weights that genuinely act as linear
+maps: ... and the key/value projection in N-gram embedding layers." And: "Finally, the
+n-gram embedding table runs on Adam with weight decay disabled." The GR low-rank
+projections get AdamW, attributed to "their very elongated shape".
+
+| parameter | upstream treatment |
+| --- | --- |
+| n-gram lookup table | Adam, weight decay disabled |
+| n-gram key/value projections | Muon |
+| GR's two low-rank projections | AdamW |
+
+So separate treatment for these parameters is upstream practice, not an invention -- but
+by *parameter kind*, not by the blanket "auxiliary" grouping this fork uses.
+
+### First independent measurement, and it is not encouraging
+
+Cross-entropy on 64 documents (45,069 tokens) that appear in no cache manifest, with the
+sidecar enabled and then bypassed:
+
+| checkpoint | sidecar on | sidecar bypassed | sidecar costs |
+| --- | ---: | ---: | ---: |
+| `student-hf` | 1.0205 | 1.0205 | +0.0000 |
+| `gr-stage1-1m` | 1.0205 | 1.0205 | +0.0000 |
+| `ple-stage1-1m` | 1.3231 | 1.0205 | **+0.3026** |
+| `lr-sweep-base` | 1.5543 | 0.9628 | +0.5915 |
+| `lr-sweep-1e3` | 1.5696 | 0.9476 | **+0.6220** |
+
+The bypassed column is identical across the three stage-1 rows, which is the harness
+self-checking: stage 1 freezes the backbone, so those checkpoints share `student-hf`'s.
+Beyond that the reading is bad -- the PLE sidecar costs 0.30 nats at stage 1 and 0.59 at
+stage 2, and the damage grows with the learning rate the distillation objective preferred.
+
+Two reasons not to bank it yet. `gr-stage1-1m` reports +0.0000 for a sidecar whose
+`W_side_proj` demonstrably trained to norm 2.077, which is not credible and means the
+harness may not be exercising that path. And this evaluator gathers n-gram rows directly
+rather than through `SidecarDataCollator`, so evaluation and training can differ. A
+proper suite is being built; these numbers are a warning, not a verdict.
+
 ## The PLE port, and the sidecar learning rate stage 2 never had (2026-09-09)
 
 The 5M pilot's diagnosis was that the sidecar's projection trained while its gate did

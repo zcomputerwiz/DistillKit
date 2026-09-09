@@ -34,24 +34,25 @@ converted student in `student-hf`.
 
 ## What remains
 
-1. **Finish the sidecar learning-rate sweep, then run the matched control.** Stage 2 at
-   the backbone's 1e-5 does not move the sidecar at all -- `value_norm` was identical to
-   five significant figures across fifty logged steps -- so every stage-2 comparison this
-   project has run compared *frozen* sidecars. `optimizer.sidecar_lr` gives them their
-   own rate, and the sweep so far (stage 2 from `ple-stage1-1m`, 1M cache, backbone 1e-5):
-   1e-5 -> 0.5445 with no movement, 5e-5 -> 0.5191, 1e-4 -> 0.4947, 5e-4 -> **0.4720**,
-   1e-3 pending. `python scratch/run_lr_sweep.py --summary`.
+1. **Stop tuning against distillation loss.** The sweep of `optimizer.sidecar_lr`
+   improved `eval_loss` monotonically to 0.3435, and none of it survives an independent
+   check. Two reasons, both recorded in PROGRESS under "The objective this project tunes
+   against": `sidecar_lr` also raises the rate on `distillation_projections`, which exist
+   only to compute the hidden-state term and whose norms moved 58.4 -> 48.2/63.3 with it;
+   and cross-entropy on documents no cache has seen says the sidecar *costs* 0.30 nats at
+   stage 1 and 0.62 at stage 2, worsening as that learning rate rises.
 
-   Two things to do next, in order. **(a)** Run the gated_residual arm through stage 2 at
-   the chosen rate from `gr-stage1-1m`, which exists. Every PLE number above is currently
-   compared against 0.5262 from a differently-configured historical run; only a matched
-   control makes the comparison mean anything. **(b)** Then the 5M version of whichever
-   design wins, using `examples/qwen35_{ple,gr}_stage2_5m.yml` with `sidecar_lr` added.
+   Upstream never tunes on loss alone -- out-of-domain "uncheatable PPL" plus nine
+   benchmarks, and their own Table 7 has the lowest-loss configuration losing on
+   benchmark average. A proper evaluation suite (independent-text NLL plus a likelihood-
+   scored MMLU/ARC screen, with sidecar-enabled / bypassed / pre-retrofit comparisons and
+   paired bootstrap intervals) is the prerequisite for any further tuning. Until it
+   exists, no sweep result means anything.
 
-   Watch three things per run, not just loss: whether `value_norm` moved, whether
-   `gate_std` survived (a gate collapsing to a constant is a scale, not a selector), and
-   whether a high rate diverges. `gate_std` was 0.1502 at 5e-4 against 0.1811 at base, so
-   it is drifting down as the rate rises.
+   Two specific things to fix while building it: scope `sidecar_lr` to the architecture
+   and hold the projections fixed, and explain why `gr-stage1-1m` shows a sidecar worth
+   exactly +0.0000 when its `W_side_proj` trained to norm 2.077 -- either that is real or
+   the harness is not exercising it.
 
 2. **Resume a tensor-parallel run from a real `checkpoint-*` directory.** Export is
    verified (keys, shapes, dtypes, one-card load, finite logits -- see PROGRESS,
