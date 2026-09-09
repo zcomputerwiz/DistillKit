@@ -295,8 +295,38 @@ class DistillationRunConfig(BaseModel):
     def validate_offline_and_sidecar(self):
         cached = isinstance(self.teacher, TeacherDatasetConfig) and self.teacher.cache_path
         if self.tensor_parallel:
-            if not cached or not self.optimizer or self.optimizer.strategy != "adamw":
-                raise ValueError("Tensor parallel training requires an offline cache and optimizer.strategy=adamw")
+            if not cached or not self.optimizer:
+                raise ValueError("Tensor parallel training requires an offline cache")
+            if self.optimizer.strategy != "adamw" and not (
+                self.optimizer.freeze_backbone and self.optimizer.unfreeze_at_step is None
+            ):
+                # Muon and tensor parallelism are incompatible two ways over, and both
+                # matter only for parameters that actually receive updates.
+                #
+                # Routing: mixed_parameter_groups identifies Muon's matrices with
+                # isinstance(module, nn.Linear). Column- and row-parallel weights are
+                # nn.Parameter inside an nn.ParameterList and so fall through to AdamW
+                # while the config still says "hybrid" -- but the sharded GatedDeltaNet
+                # projections are built by _slice_linear and *are* nn.Linear, so they
+                # still route to Muon. Tensor parallelism thus yields an inconsistent
+                # mixture rather than a clean fallback, which is worse than either.
+                #
+                # Mathematics: even with the routing fixed, Newton-Schulz
+                # orthogonalization does not commute with slicing, so Muon on a shard is
+                # not the shard of Muon on the whole matrix.
+                #
+                # With the backbone frozen for the whole run, neither applies: every
+                # Muon-routed parameter is sharded and frozen, and every trainable one
+                # (sidecar, gated residual, distillation projections) is auxiliary and
+                # goes to AdamW, so "hybrid" is exactly AdamW-on-auxiliary. Stage 1
+                # measured 0.0M trainable parameters in the Muon group against 65.5M in
+                # AdamW's; tests/test_optimizers.py pins that invariant, because this
+                # relaxation is unsound the moment it stops holding.
+                raise ValueError(
+                    "Tensor parallel training requires optimizer.strategy=adamw, or "
+                    "strategy=hybrid with freeze_backbone and no unfreeze_at_step "
+                    "(where Muon receives no trainable parameter)"
+                )
             if self.concurrent_microbatches != 1:
                 raise ValueError("Tensor parallelism cannot be combined with concurrent_microbatches")
             if self.model_kwargs.get("device_map") is not None:
