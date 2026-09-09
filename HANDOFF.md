@@ -34,21 +34,24 @@ converted student in `student-hf`.
 
 ## What remains
 
-1. **The gate, not more seeds.** The 5M pilot is done (PROGRESS, "The 5M pilot"):
-   sidecar minus control is -0.0027 with a 0.0032 seed spread, against -0.0448 at 1M.
-   The sidecar is ahead in 14 of 14 paired evaluations, so the sign is solid and the
-   magnitude is not. The diagnostic that matters: `W_side_proj` trained (0 -> 4.007)
-   while the gated residual did not (`gate_1_mean` 0.5001 -> 0.5013), so the gate passes
-   a fixed half of the sidecar rather than learning when to use it. Running more seeds of
-   the same configuration would measure the same half-wired architecture more precisely.
-   Two things worth doing instead: give the gate its own higher learning rate, and
-   re-read how Flash-Next integrates its per-layer table before assuming this design
-   matches it.
+1. **Finish the sidecar learning-rate sweep, then run the matched control.** Stage 2 at
+   the backbone's 1e-5 does not move the sidecar at all -- `value_norm` was identical to
+   five significant figures across fifty logged steps -- so every stage-2 comparison this
+   project has run compared *frozen* sidecars. `optimizer.sidecar_lr` gives them their
+   own rate, and the sweep so far (stage 2 from `ple-stage1-1m`, 1M cache, backbone 1e-5):
+   1e-5 -> 0.5445 with no movement, 5e-5 -> 0.5191, 1e-4 -> 0.4947, 5e-4 -> **0.4720**,
+   1e-3 pending. `python scratch/run_lr_sweep.py --summary`.
 
-   Artifacts: cache `teacher-cache-5m` (5,303 train / 295 eval documents, holdout carved
-   in the manifest -- see the fix note there), configs
-   `examples/qwen35_sidecar_5m_{s42,s43,control_s42,control_s43}.yml`, runner
-   `scratch/run_5m_pilot.py --summary`, logs `runs/{sidecar,control}-5m-s4{2,3}.log`.
+   Two things to do next, in order. **(a)** Run the gated_residual arm through stage 2 at
+   the chosen rate from `gr-stage1-1m`, which exists. Every PLE number above is currently
+   compared against 0.5262 from a differently-configured historical run; only a matched
+   control makes the comparison mean anything. **(b)** Then the 5M version of whichever
+   design wins, using `examples/qwen35_{ple,gr}_stage2_5m.yml` with `sidecar_lr` added.
+
+   Watch three things per run, not just loss: whether `value_norm` moved, whether
+   `gate_std` survived (a gate collapsing to a constant is a scale, not a selector), and
+   whether a high rate diverges. `gate_std` was 0.1502 at 5e-4 against 0.1811 at base, so
+   it is drifting down as the rate rises.
 
 2. **Resume a tensor-parallel run from a real `checkpoint-*` directory.** Export is
    verified (keys, shapes, dtypes, one-card load, finite logits -- see PROGRESS,
@@ -127,6 +130,14 @@ converted student in `student-hf`.
   saves an empty sentinel and unpacks it first. A new collective must do the same or
   fail intermittently with "recomputed values have different values".
 - **`pytest | tail` masks the exit code.** Run pytest bare, or check `PIPESTATUS`.
+- **A module can be correct on the happy path and broken everywhere else.** Four bugs in
+  the PLE port were each invisible under fp32, batch 1, a constructor, or a fresh model:
+  bf16 could not represent the norm scale's updates, autocast promoted the gate's
+  reduction to fp32, the identity-at-init was a knife-edge, and `from_pretrained`
+  re-initialised the norms to the wrong constant. The identity test passed throughout,
+  because a zero `value_proj` masks everything downstream of it.
+- **Editing `distillkit/` while a multi-run driver is going changes the later runs.**
+  Each stage launches a fresh subprocess. Use a worktree, or stop the driver.
 - **A test fixture whose size divides evenly by the batch size hides tail-batch bugs.**
   That is how a 1.4% -> 23.8% padding regression shipped in the first sortish sampler.
   Parametrize dataset sizes that do *not* divide.

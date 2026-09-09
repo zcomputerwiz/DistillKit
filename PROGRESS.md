@@ -104,10 +104,11 @@ Knobs whose right value depends on what is binding, not on taste:
    `sortish_batching` cuts its loss cost from 0.0176 to 0.0084 at the same speed.
    Order-seed variance is 0.0005, so the residual is real. Decide per-arm before the
    pilot, not during it. See "Batching: throughput is set by tokens per microbatch".
-4a. **The gate is the top open item.** The pilot showed the sidecar projection trains
-   while the gated residual sits at its initialisation, so the architecture is half
-   wired. Two candidates: a separate, higher learning rate for the gate (item 8), and
-   re-reading how Flash-Next actually integrates its per-layer table.
+4a. ~~The gate~~ - **both candidates done and both were right.** Flash-Next's
+   integration is ported (`ple_sidecar.py`) and its computed gate moves where the
+   learned one never did; and stage 2's single learning rate was keeping the sidecar
+   frozen, which `optimizer.sidecar_lr` fixes for -0.07 of eval_loss so far. See "The
+   PLE port". What remains is the matched control at the chosen rate.
 4. ~~Stage 2 sharding integration~~ - **done, and run**: 4.298B trainable parameters
    across both cards in 1269 s, eval_loss 0.5347, checkpoint verified. See "Stage 2
    runs". The thin margins recorded there (22.12 / 21.45 GiB against 22.80 allowed) are
@@ -120,8 +121,9 @@ Knobs whose right value depends on what is binding, not on taste:
    off. See "Threaded microbatch overlap". A real gain needs the explicit stage
    schedule, whose ceiling is bounded by the reachable split rather than the balanced
    one.
-8. Give the sidecar its own parameter group at a higher learning rate in stage 2, if
-   it should keep adapting rather than freezing at stage 1's value.
+8. ~~Give the sidecar its own parameter group at a higher learning rate in stage 2~~ -
+   **done, and it was not optional**: at the backbone's 1e-5 the sidecar does not move
+   at all. `optimizer.sidecar_lr`; see "Stage 2 had never trained a sidecar at all".
 9. MTP head - conventions now resolved from llama.cpp; implementation pending.
 10. ~~Hybrid tensor parallelism~~ - **done and through a full epoch**: 98.5% of
     parameters sharded, 1193 s against the layer split's 1263 s, eval_loss 0.5329
@@ -945,6 +947,104 @@ head is recomputed during backward -- and which way it pays depends on what is b
 4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## The PLE port, and the sidecar learning rate stage 2 never had (2026-09-09)
+
+The 5M pilot's diagnosis was that the sidecar's projection trained while its gate did
+not. Flash-Next answers that question in its own model, so the answer was transcribed
+rather than invented: `distillkit/ple_sidecar.py` ports
+`Qwen4ExpTextPLELayer`. The configurations already lined up exactly -- their
+`ple_layer_ids: [2]` one-indexed is our `sidecar_layer_index: 1`, and `ngram_size: 3`
+with `heads_per_ngram: 8` gives 16 heads of 160 dimensions, which is precisely the
+`sidecar_num_heads` x `sidecar_head_dim` table this fork already reads. Our dequantized
+feature vector *is* their `ple_embedding` output.
+
+The substantive difference is that the gate is not a parameter. It is a dot product
+between a query read off the residual stream and a key read off the n-gram embedding,
+signed-sqrt compressed through a sigmoid, followed by a depthwise convolution dilated by
+`ngram_size`. Selectivity exists from the first step rather than having to be discovered.
+
+### Four bugs, none of which the happy path could show
+
+Recorded because the pattern is the point: every one was invisible under fp32, batch 1, a
+constructor, or a fresh model, and the identity-at-init test passed throughout because a
+zero `value_proj` masks everything downstream.
+
+* **`nn.RMSNorm` cannot learn here.** Upstream stores a zero-initialised weight and scales
+  by `(1 + w)`; torch stores the scale directly. Identical at initialisation, which is
+  what made the substitution look free. But **bf16 spacing near 1.0 is 0.0078**, so a
+  scale stored directly cannot represent a deviation below ~0.004, and at this fork's
+  1e-4 the norms would have sat frozen at exactly 1.0. The run later measured
+  `norm_conv_deviation` at 0.0061 -- inside the range that would have been lost.
+* **Autocast promotes the gate.** `sum` is on autocast's fp32 list, so the reduction came
+  back fp32 and the bf16 value multiply promoted with it. That escaped the module and
+  killed the first run inside `lm_head`, far from the cause.
+* **The identity was a knife-edge.** Zeroing `value_proj` alone is not enough, because
+  `norm_conv` renormalises to unit RMS and the convolution branch then fires at full scale
+  the instant the value moves -- 0.64 into a stream of RMS 1.01 at std 1e-4. Upstream can
+  afford that because it trains jointly; a frozen retrofit cannot. The convolution is
+  zero-initialised too.
+* **`from_pretrained` re-initialises missing norms to ones**, which under `(1 + w)` is a
+  scale of 2.0. Only a real checkpoint load shows it; the constructor zeroes them.
+
+### The retrofit that could not work, and why
+
+Bolting the port onto the best existing backbone (`sidecar-stage2-chained`, 0.5262) gave
+2.184. Not the port's fault: with `learning_rate: 0`, so the module stayed exactly the
+identity, it still gave 2.184. The `sidecar` attribute holds **two** things -- the n-gram
+projection and a trained `GatedResidual` whose `W_x`/`W_h` norms are 88.6 -- and swapping
+variants deletes the latter. Disabling the sidecar only stops the n-gram input, which is
+why that probe gave 0.53 while the variant swap gave 2.18. A fresh backbone was needed.
+
+### Stage 1: the gate moves, and the loss is worse
+
+Both designs, identical curriculum, fresh student, frozen backbone, 1M cache:
+
+| | `train_runtime` | final `eval_loss` |
+| --- | ---: | ---: |
+| gated_residual | 747.9 s | **0.5921** |
+| ple | 746.4 s | 0.7739 |
+
+The control reproduces the historical 1M stage-1 arm (0.5853), so tensor parallelism,
+batch 4 and sortish were roughly neutral and the deficit is the design. But the telemetry
+says the mechanism works, over the same run:
+
+| | control | ple |
+| --- | --- | --- |
+| projection | `W_side_proj` 0 -> **2.077** | `value_norm` 0 -> **3.147** |
+| gate | `gate_1_mean` 0.5001 -> **0.5007** | `gate_mean` 0.516 -> **0.711** |
+| selectivity | `gate_saturation` 0.0586 -> **0.0586** | `gate_std` **0.163**, 83% open / 10% shut |
+
+The control's gate is inert to four decimal places for the second time; PLE's moves
+decisively and still discriminates between tokens. **The mechanism works and the stage-1
+loss is worse** -- PLE starts as an exact identity with *both* branches at zero, where
+`W_side_proj` injects features immediately.
+
+### Stage 2 had never trained a sidecar at all
+
+Watching stage 2 with the new telemetry showed `value_norm`, `conv_norm` and all three
+norm deviations identical **to five significant figures** across fifty logged steps,
+while the model around them trained normally. PROGRESS already recorded the same thing
+for the old design -- the chained sidecar went 2.1055 -> 2.1077 across an entire epoch --
+but as a curiosity rather than a defect. It is a defect: stage 2's 1e-5 does not move
+these parameters, so every stage-2 comparison this project has run was really *which
+frozen sidecar a backbone can adapt around best*.
+
+`optimizer.sidecar_lr` fixes it, and the sweep says the effect is large. Stage 2 from the
+PLE stage-1 checkpoint, 1M cache, backbone at 1e-5 throughout:
+
+| `sidecar_lr` | `eval_loss` | `value_norm` | `gate_std` | vs base |
+| --- | ---: | --- | ---: | ---: |
+| 1e-5 (backbone rate) | 0.5445 | 3.176 -> 3.176 (**does not move**) | 0.1811 | -- |
+| 5e-5 | 0.5191 | 3.176 -> 3.223 | 0.1797 | -0.0254 |
+| 1e-4 | 0.4947 | 3.176 -> 3.342 | 0.1788 | -0.0498 |
+| 5e-4 | **0.4720** | 3.176 -> 5.020 | 0.1502 | **-0.0725** |
+| 1e-3 | *running* | | | |
+
+Monotonic so far, `gate_std` holding, and the base row is the diagnosis restated: at the
+backbone's rate the sidecar is a fixed function. For scale, the old design chained into
+stage 2 at 1M reached 0.5262, so 1e-4 and 5e-4 are both well past it -- though that
+number came from a different configuration and the matched control has not been run yet.
 
 ## The 5M pilot: the sidecar helps, and the 1M number overstated it 8x (2026-09-08)
 
