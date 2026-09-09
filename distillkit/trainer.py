@@ -418,9 +418,12 @@ def _apply_sidecar_lr(optimizer, model, sidecar_lr):
     """
     if sidecar_lr is None:
         return optimizer
-    from distillkit.optimizers import _auxiliary_parameter_ids
+    from distillkit.optimizers import architecture_parameter_ids
 
-    auxiliary = _auxiliary_parameter_ids(model)
+    # Architecture only. The distillation projections are auxiliary too, but they exist
+    # solely to compute the hidden-state term; giving them a raised rate lets them fit
+    # their own objective, which is the confound that made the first sweep meaningless.
+    auxiliary = architecture_parameter_ids(model)
     moved: dict[float, list] = {}
     for group in optimizer.param_groups:
         kept = []

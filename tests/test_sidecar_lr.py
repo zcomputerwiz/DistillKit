@@ -58,11 +58,11 @@ def test_every_parameter_still_belongs_to_exactly_one_group():
 
 
 def test_the_sidecar_gets_its_rate_and_the_backbone_keeps_the_run_s():
-    from distillkit.optimizers import _auxiliary_parameter_ids
+    from distillkit.optimizers import architecture_parameter_ids
 
     model = _Model()
     optimizer = _optimizer(model)
-    auxiliary = _auxiliary_parameter_ids(model)
+    auxiliary = architecture_parameter_ids(model)
     _apply_sidecar_lr(optimizer, model, SIDECAR_LR)
 
     groups = _by_id(optimizer)
@@ -119,3 +119,27 @@ def test_config_refuses_the_combination_that_cannot_work():
     with pytest.raises(ValueError, match="requires strategy=adamw"):
         OptimizerConfig(strategy="hybrid", sidecar_lr=1e-4)
     OptimizerConfig(strategy="hybrid")            # no override: still fine
+
+
+def test_the_loss_scaffolding_keeps_the_backbone_rate():
+    """The distillation projections exist only to compute the hidden-state term. Raising
+    their rate lets them fit their own objective -- measured: their norms went 58.4/58.4
+    at the base rate to 48.2/63.3 at 1e-3 while eval_loss improved monotonically and
+    independent cross-entropy did not. They must not follow the sidecar's rate."""
+    from distillkit.optimizers import _auxiliary_parameter_ids, architecture_parameter_ids
+
+    model = _Model()
+    optimizer = _optimizer(model)
+    projections = {id(p) for p in model.distillation_projections.parameters()}
+    assert projections <= _auxiliary_parameter_ids(model), "fixture must be auxiliary"
+    assert not (projections & architecture_parameter_ids(model)), (
+        "the projections are still counted as architecture; sidecar_lr would raise them"
+    )
+
+    _apply_sidecar_lr(optimizer, model, SIDECAR_LR)
+    groups = _by_id(optimizer)
+    for name, parameter in model.named_parameters():
+        if "distillation_projections" in name:
+            assert groups[id(parameter)]["lr"] == BACKBONE_LR, name
+    # And the architecture still gets the override, or the fix removed the feature.
+    assert groups[id(model.sidecar.weight)]["lr"] == SIDECAR_LR

@@ -50,8 +50,41 @@ def validate_optimizer_backend(
         )
 
 
+def _loss_scaffolding_parameter_ids(model: nn.Module) -> set[int]:
+    """Parameters that exist only to *compute* the loss, not to be part of the model.
+
+    The distillation projections map a student anchor onto the teacher's width so a
+    cosine can be taken. They are discarded at export and change no prediction. That
+    makes them the one group a learning-rate override must never touch: raising their
+    rate lets them fit their own term of the objective, which is precisely what happened
+    when `sidecar_lr` was first swept -- their norms went 58.4/58.4 to 48.2/63.3 as the
+    rate rose, and `eval_loss` improved monotonically while independent cross-entropy did
+    not.
+    """
+    result = set()
+    for name, module in model.named_modules():
+        if "distillation_projections" in name.split("."):
+            result.update(id(p) for p in module.parameters())
+    return result
+
+
+def architecture_parameter_ids(model: nn.Module) -> set[int]:
+    """The auxiliary parameters that are genuinely part of the model.
+
+    Everything `_auxiliary_parameter_ids` finds, minus the loss scaffolding: the sidecar,
+    the PLE module and the gated residual, all of which survive export and change what the
+    model predicts.
+    """
+    return _auxiliary_parameter_ids(model) - _loss_scaffolding_parameter_ids(model)
+
+
 def _auxiliary_parameter_ids(model: nn.Module) -> set[int]:
-    """Identify architecture/projection weights by module ownership, not shape."""
+    """Identify architecture/projection weights by module ownership, not shape.
+
+    Includes the loss scaffolding, deliberately: stage-1 freezing must leave the
+    distillation projections trainable or the hidden-state term cannot be learned at all.
+    Use `architecture_parameter_ids` where the scaffolding must be excluded.
+    """
     result = set()
     stage1_names = getattr(model, "stage1_parameter_names", None)
     if callable(stage1_names):
