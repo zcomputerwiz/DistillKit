@@ -394,5 +394,44 @@ class HybridDistillationTrainer(DistillationTrainer):
                 eps=self.args.adam_epsilon, weight_decay=self.args.weight_decay,
             )
         else:
-            return super().create_optimizer()
+            self.optimizer = super().create_optimizer()
+        _apply_sidecar_lr(
+            self.optimizer, self.accelerator.unwrap_model(self.model),
+            getattr(self.config.optimizer, "sidecar_lr", None),
+        )
         return self.optimizer
+
+
+def _apply_sidecar_lr(optimizer, model, sidecar_lr):
+    """Give the sidecar its own learning rate, leaving the backbone on the run's.
+
+    Stage 2 runs the backbone at 1e-5, which moves the sidecar barely at all: the
+    chained run's ``W_side_proj`` went 2.1055 -> 2.1077 across an entire epoch, and the
+    PLE module's weights did not change to five significant figures over fifty logged
+    steps. The backbone then adapts around a sidecar that is effectively frozen, which
+    is not what "unlocking both" was supposed to mean.
+
+    Splits the auxiliary parameters out of whichever groups HF put them in, preserving
+    each group's weight decay, and re-adds them at ``sidecar_lr``. Done inside
+    ``create_optimizer`` so the scheduler, built afterwards, records the right
+    ``initial_lr`` per group and scales them proportionally.
+    """
+    if sidecar_lr is None:
+        return optimizer
+    from distillkit.optimizers import _auxiliary_parameter_ids
+
+    auxiliary = _auxiliary_parameter_ids(model)
+    moved: dict[float, list] = {}
+    for group in optimizer.param_groups:
+        kept = []
+        for parameter in group["params"]:
+            if id(parameter) in auxiliary:
+                moved.setdefault(group.get("weight_decay", 0.0), []).append(parameter)
+            else:
+                kept.append(parameter)
+        group["params"] = kept
+    for weight_decay, params in moved.items():
+        optimizer.add_param_group(
+            {"params": params, "lr": sidecar_lr, "weight_decay": weight_decay}
+        )
+    return optimizer

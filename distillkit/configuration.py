@@ -167,9 +167,33 @@ class SidecarConfig(BaseModel):
 class OptimizerConfig(BaseModel):
     strategy: Literal["hybrid", "adamw"] = "hybrid"
     muon_lr: float | None = Field(default=None, gt=0)
+    sidecar_lr: float | None = Field(
+        default=None, gt=0,
+        description=(
+            "Learning rate for the sidecar, gate and distillation projections only, "
+            "leaving the backbone on training_args.learning_rate. Stage 2's 1e-5 moves "
+            "them barely at all -- the chained run's W_side_proj went 2.1055 -> 2.1077 "
+            "across an entire epoch, and the PLE module's norms did not move to five "
+            "significant figures -- so the backbone adapts around a sidecar that is "
+            "effectively frozen. Only meaningful with strategy=adamw; under hybrid the "
+            "auxiliary parameters already have their own routing and MixedMuonAdamW "
+            "refuses added groups."
+        ),
+    )
     freeze_backbone: bool = True
     unfreeze_at_step: int | None = Field(default=None, ge=1)
     log_every_n_steps: int = Field(default=100, ge=1)
+
+
+    @model_validator(mode="after")
+    def sidecar_lr_needs_adamw(self):
+        if self.sidecar_lr is not None and self.strategy != "adamw":
+            raise ValueError(
+                "optimizer.sidecar_lr requires strategy=adamw; MixedMuonAdamW refuses "
+                "added parameter groups, and under hybrid the auxiliary parameters are "
+                "already routed to AdamW as their own bucket"
+            )
+        return self
 
 
 class DistillationRunConfig(BaseModel):
