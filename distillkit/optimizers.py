@@ -14,6 +14,7 @@ from torch import nn
 from transformers import TrainerCallback
 
 from distillkit.gated_residual import GatedResidual
+from distillkit.ple_sidecar import PLESidecar
 
 
 def validate_optimizer_backend(
@@ -318,6 +319,8 @@ def architecture_metrics(model: nn.Module) -> dict[str, float]:
     report = {}
     for name, module in model.named_modules():
         if isinstance(module, GatedResidual):
+            report.update(module.gate_report(prefix=f"architecture/{name}"))
+        if isinstance(module, PLESidecar):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if name.split(".")[-1] == "W_side_proj" and isinstance(module, nn.Linear):
             report[f"architecture/{name}/weight_norm"] = module.weight.float().norm().item()

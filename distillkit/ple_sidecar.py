@@ -130,6 +130,9 @@ class PLESidecar(nn.Module):
             raise ValueError("conv_kernel_size and ngram_size must be positive")
         self.hidden_size = hidden_size
         self.feature_dim = feature_dim
+        # Stashed during training forwards for gate_report(), the same way
+        # GatedResidual does it, so reporting needs no data and no second forward.
+        self._last_gate_stats: torch.Tensor | None = None
         # Upstream dilates the short convolution by ngram_size so a position sees the
         # same phase of adjacent n-grams; the state it needs is (K-1)*dilation wide.
         self.conv_dilation = ngram_size
@@ -183,25 +186,45 @@ class PLESidecar(nn.Module):
         # then propagates out of this module and through the rest of the model until
         # something meets a bf16 weight. Computing the gate itself in fp32 is wanted, a
         # 2560-wide dot product deserves it; carrying that width outward is not.
-        gated_value = torch.sigmoid(gate).to(value.dtype) * value
+        gate = torch.sigmoid(gate)
+        if self.training:
+            # Four reductions over [batch, seq, 1], kept as tensors so nothing
+            # synchronises here; gate_report calls .item() at logging cadence instead.
+            with torch.no_grad():
+                flat = gate.detach().float()
+                self._last_gate_stats = torch.stack([
+                    flat.mean(), flat.std(),
+                    (flat > 0.6).float().mean(), (flat < 0.4).float().mean(),
+                ])
+        gated_value = gate.to(value.dtype) * value
 
         output = gated_value + self._short_conv(self.norm_conv(gated_value))
         return hidden_states + output
 
     @torch.no_grad()
-    def gate_report(self, hidden_states: torch.Tensor, features: torch.Tensor) -> dict:
-        """Gate statistics, for the same reason the old module reported them: if the gate
-        does not move off its initial distribution the architecture is inert."""
-        features = features.to(dtype=hidden_states.dtype)
-        key_normed = self.norm_key(self.key_proj(features))
-        query_normed = self.norm_query(hidden_states)
-        raw = (key_normed * query_normed).sum(dim=-1) / math.sqrt(self.hidden_size)
-        gate = torch.sigmoid(raw.abs().clamp_min(1e-6).sqrt() * raw.sign()).float()
-        return {
-            "ple/gate_mean": gate.mean().item(),
-            "ple/gate_std": gate.std().item(),
-            "ple/gate_frac_open": (gate > 0.6).float().mean().item(),
-            "ple/gate_frac_shut": (gate < 0.4).float().mean().item(),
-            "ple/value_norm": self.value_proj.weight.norm().item(),
-            "ple/key_norm": self.key_proj.weight.norm().item(),
+    def gate_report(self, prefix: str = "ple") -> dict:
+        """Scalars for the same question the old design's report answered: is this
+        thing learning, and is its gate doing anything?
+
+        ``value_norm`` and ``conv_norm`` start at exactly zero, and the norms store a
+        deviation so they start at zero too -- any nonzero value is movement. The gate
+        statistics matter differently here: a computed gate cannot sit at its
+        initialisation the way a learned one can, but it can still return nearly the
+        same number for every token, which is a constant scale rather than a selector.
+        ``gate_std`` is what separates those, and it is the number to watch.
+        """
+        report = {
+            f"{prefix}/value_norm": self.value_proj.weight.float().norm().item(),
+            f"{prefix}/key_norm": self.key_proj.weight.float().norm().item(),
+            f"{prefix}/conv_norm": self.conv1d.weight.float().norm().item(),
         }
+        for name in ("norm_key", "norm_query", "norm_conv"):
+            weight = getattr(self, name).weight.float()
+            report[f"{prefix}/{name}_deviation"] = weight.abs().max().item()
+        if self._last_gate_stats is not None:
+            mean, std, open_, shut = self._last_gate_stats.tolist()
+            report[f"{prefix}/gate_mean"] = mean
+            report[f"{prefix}/gate_std"] = std
+            report[f"{prefix}/gate_frac_open"] = open_
+            report[f"{prefix}/gate_frac_shut"] = shut
+        return report

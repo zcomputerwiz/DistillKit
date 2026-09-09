@@ -57,17 +57,53 @@ def test_value_projection_receives_gradient_immediately():
 
 def test_the_gate_responds_to_agreement_between_stream_and_ngram():
     """The whole reason for the port: selectivity is computed, not learned."""
-    module = _module()
+    module = _module().train()
     with torch.no_grad():
         module.value_proj.weight.normal_(std=0.02)
     hidden, features = _inputs()
 
-    aligned = module.gate_report(hidden, features)
+    module(hidden, features)
+    aligned = module.gate_report()
     # Flip the features' sign: every dot product flips, so the gate must move the
     # opposite way. A gate that ignored its inputs would not budge.
-    opposed = module.gate_report(hidden, -features)
+    module(hidden, -features)
+    opposed = module.gate_report()
     assert abs(aligned["ple/gate_mean"] - opposed["ple/gate_mean"]) > 1e-6
     assert aligned["ple/gate_std"] > 0, "a constant gate is the failure being fixed"
+
+
+def test_gate_report_needs_no_data_and_reaches_the_trainer():
+    """architecture_metrics recognises only GatedResidual and W_side_proj by default, so
+    without this a PLE run logs nothing at all -- and the gate is the whole point."""
+    from distillkit.optimizers import architecture_metrics
+
+    module = _module().train()
+    empty = module.gate_report()
+    assert empty["ple/value_norm"] == 0.0, "value_proj starts at exactly zero"
+    assert empty["ple/conv_norm"] == 0.0, "the convolution starts at exactly zero"
+    assert "ple/gate_mean" not in empty, "nothing has run yet, so there is no gate to report"
+
+    hidden, features = _inputs()
+    module(hidden, features)
+    assert "ple/gate_mean" in module.gate_report()
+
+    model = torch.nn.Module()
+    model.sidecar = module
+    metrics = architecture_metrics(model)
+    assert any(k.endswith("/gate_std") for k in metrics), sorted(metrics)
+    assert any(k.endswith("/value_norm") for k in metrics), sorted(metrics)
+
+
+def test_gate_statistics_are_only_stashed_while_training():
+    """Mirrors GatedResidual: evaluation must not overwrite what training recorded."""
+    module = _module().train()
+    hidden, features = _inputs()
+    module(hidden, features)
+    during_training = module.gate_report()["ple/gate_mean"]
+
+    module.eval()
+    module(hidden, -features)
+    assert module.gate_report()["ple/gate_mean"] == during_training
 
 
 def test_the_convolution_is_causal():
