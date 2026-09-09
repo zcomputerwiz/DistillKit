@@ -154,10 +154,8 @@ def test_right_padding_cannot_disturb_real_positions():
 
 
 def test_norm_weights_are_excluded_from_weight_decay():
-    """The port uses nn.RMSNorm (scale w, ones-init) where upstream uses scale (1 + w),
-    zero-init. Those are the same function under every operation except weight decay,
-    which would pull torch's scale toward 0 and upstream's toward 1. This fork decays
-    only parameters with ndim >= 2, which is what keeps them equivalent."""
+    """Upstream's (1 + w) parameterisation makes decay pull the scale toward 1; this
+    fork decays only ndim >= 2, so these 1-D weights are untouched either way."""
     from distillkit.optimizers import mixed_parameter_groups
 
     model = torch.nn.Module()
@@ -168,7 +166,30 @@ def test_norm_weights_are_excluded_from_weight_decay():
     }
     norm_weights = [n for n, p in model.named_parameters() if "norm_" in n]
     assert norm_weights, "fixture should contain the PLE norms"
-    assert not (set(norm_weights) & decayed), (
-        "RMSNorm weights are being decayed; the port is no longer equivalent to "
-        "upstream's (1 + w) parameterisation"
+    assert not (set(norm_weights) & decayed)
+
+
+def test_norm_scale_can_still_move_in_bfloat16():
+    """The reason these are not nn.RMSNorm. bf16 spacing near 1.0 is 0.0078, so a scale
+    stored directly cannot represent a deviation smaller than ~0.004 -- at this fork's
+    1e-4 learning rate the norms would sit frozen at exactly 1.0. Storing the deviation
+    puts it near zero, where the same update survives.
+    """
+    module = _module().to(torch.bfloat16)
+    hidden, features = _inputs()
+    hidden, features = hidden.bfloat16(), features.bfloat16()
+    before = module(hidden, features).clone()
+
+    with torch.no_grad():                      # an update the size of one optimizer step
+        for norm in (module.norm_key, module.norm_query, module.norm_conv):
+            norm.weight += torch.full_like(norm.weight, 1e-3)
+        module.value_proj.weight.normal_(std=0.02)
+
+    assert module.norm_key.weight.float().abs().max() > 0, (
+        "a 1e-3 update to the norm weight was rounded away; the scale is unlearnable"
     )
+    assert not torch.equal(module(hidden, features), before)
+
+    # And the deviation is faithfully reflected in the effective scale.
+    scale = (1.0 + module.norm_key.weight.float())
+    assert abs(scale.mean().item() - 1.001) < 1e-4

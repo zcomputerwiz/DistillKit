@@ -47,16 +47,23 @@ appear below. Everything else -- the signed-sqrt, the sigmoid, the dilation, the
 around the convolution, the ordering of the norms -- is transcribed rather than
 reinterpreted.
 
-**The norms.** Upstream's ``Qwen4ExpTextRMSNorm`` stores a zero-initialised weight and
-scales by ``(1 + w)``; ``nn.RMSNorm`` stores a ones-initialised weight and scales by
-``w``. Measured, these are the same function: the forward is bit-identical at
-initialisation in both fp32 and bf16, the gradients are bit-identical for a shared input,
-and ``nn.RMSNorm`` already accumulates in fp32 exactly as upstream's explicit ``.float()``
-does. The parameterisations differ in one respect only -- **weight decay**, which pulls
-upstream's scale toward 1 and torch's toward 0. This fork never decays them, because
-``mixed_parameter_groups`` assigns decay by ``parameter.ndim >= 2`` and these are 1-D;
-``tests/test_ple_sidecar.py`` pins that, since the equivalence would break silently if it
-changed.
+**The norms, and why they are not ``nn.RMSNorm``.** Upstream stores a zero-initialised
+weight and scales by ``(1 + w)`` computed in fp32; ``nn.RMSNorm`` stores a
+ones-initialised weight and scales by ``w`` directly. At initialisation these are
+bit-identical and their gradients match exactly, which is what made the substitution look
+free. It is not. **bfloat16 spacing near 1.0 is 0.0078**, so a scale stored directly
+cannot represent a learned deviation smaller than about 0.004 -- at this fork's 1e-4
+learning rate every update to those weights would round away and the norms would sit
+frozen at exactly 1.0. Storing the deviation instead puts it near zero, where bf16
+spacing is ~1e-40 and the same update survives intact:
+
+    delta 1e-3  ->  scale w    1.000000 (lost)      scale 1+w    1.000999 (kept)
+    delta 1e-4  ->  scale w    1.000000 (lost)      scale 1+w    1.000100 (kept)
+
+That is the identical failure mode this port exists to fix -- a parameter that cannot
+move -- so ``_PLERMSNorm`` reproduces upstream's parameterisation rather than
+substituting torch's. It also happens to make weight decay pull the scale toward 1 rather
+than toward 0, though this fork decays only ``ndim >= 2`` so that never applied.
 
 ``value_proj`` is zero-initialised so the module is exactly the identity at load, which
 matters when retrofitting onto a frozen, already-trained backbone. That does mean the
@@ -74,6 +81,25 @@ from torch import nn
 from torch.nn import functional as F
 
 __all__ = ["PLESidecar"]
+
+
+class _PLERMSNorm(nn.Module):
+    """Upstream's ``Qwen4ExpTextRMSNorm`` at ``group_size == dim``.
+
+    Stores the *deviation* from unit scale and normalises in fp32, both of which matter
+    in bf16 -- see the module docstring. Equivalent to ``nn.RMSNorm`` in fp32, not in
+    bf16 once the weight has moved.
+    """
+
+    def __init__(self, dim: int, eps: float = 1e-6):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.zeros(dim))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = x.float()
+        out = out * torch.rsqrt(out.pow(2).mean(-1, keepdim=True) + self.eps)
+        return (out * (1.0 + self.weight.float())).type_as(x)
 
 
 class PLESidecar(nn.Module):
@@ -107,9 +133,9 @@ class PLESidecar(nn.Module):
 
         self.key_proj = nn.Linear(feature_dim, hidden_size, bias=False)
         self.value_proj = nn.Linear(feature_dim, hidden_size, bias=False)
-        self.norm_key = nn.RMSNorm(hidden_size, eps=rms_norm_eps)
-        self.norm_query = nn.RMSNorm(hidden_size, eps=rms_norm_eps)
-        self.norm_conv = nn.RMSNorm(hidden_size, eps=rms_norm_eps)
+        self.norm_key = _PLERMSNorm(hidden_size, eps=rms_norm_eps)
+        self.norm_query = _PLERMSNorm(hidden_size, eps=rms_norm_eps)
+        self.norm_conv = _PLERMSNorm(hidden_size, eps=rms_norm_eps)
         self.conv1d = nn.Conv1d(
             hidden_size, hidden_size, kernel_size=conv_kernel_size,
             groups=hidden_size, dilation=self.conv_dilation, bias=False,
