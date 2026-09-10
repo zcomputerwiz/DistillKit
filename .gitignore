@@ -161,3 +161,11 @@ cython_debug/
 
 # Local multi-GB lookup benchmark data; keep benchmark scripts reviewable.
 /scratch/*.u8
+
+# Evaluation tests need writable caches under the workspace sandbox.
+/scratch/eval-test-temp-*/
+/scratch/eval-suite-temp-*/
+/scratch/eval-datasets-cache/
+/scratch/eval-pytest-cache/
+/scratch/independent-eval/*.partial
+/scratch/independent-eval/*.tmp

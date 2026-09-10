@@ -1,0 +1,85 @@
+{
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\gr-stage1-1m",
+  "split": "screen",
+  "bundle_sha256": "a71d56e41ffa208b60b8e14cb20501e38ffc58188f2de324a1826f2a825f299e",
+  "tokenizer_sha256": "cc4ac36668961751f10c10901159d3fb3263507a4c24f4760833f9d21901849f",
+  "task_sha256": {
+    "nll": "5d8b7569e1d8fb16c3bfe0f79f015274c1d8db463c3a578418167e58fa97cc31"
+  },
+  "audit": {
+    "variant": "gated_residual",
+    "adapter_tensor_count": 7,
+    "adapter_exact_match": true,
+    "adapter_norms": {
+      "model.layers.1.sidecar.W_side_proj.weight": 2.1004693508148193,
+      "model.layers.1.sidecar.gated_residual.W_h.weight": 88.08351135253906,
+      "model.layers.1.sidecar.gated_residual.W_x.bias": 0.08404248207807541,
+      "model.layers.1.sidecar.gated_residual.W_x.weight": 88.07592010498047,
+      "model.layers.1.sidecar.gated_residual.branches.0.weight": 2.052556276321411,
+      "model.layers.1.sidecar.gated_residual.branches.1.weight": 2.052459955215454,
+      "model.layers.1.sidecar.gated_residual.branches.2.weight": 2.0526533126831055
+    },
+    "ignored_loss_only_keys": [
+      "distillation_projections.0.weight",
+      "distillation_projections.1.weight"
+    ],
+    "config_sha256": "37643da7dd0c67bfac6c5881ebff8b13b3d3112ba51f0fb4fe6be9f7e5746b1c"
+  },
+  "probe": {
+    "sidecar_calls": [
+      {
+        "enabled": true,
+        "raw_present": true,
+        "residual_max": 0.2421875
+      },
+      {
+        "enabled": false,
+        "raw_present": true,
+        "residual_max": 0.236328125
+      }
+    ],
+    "enabled_minus_bypassed_logits_max": 3.3046875
+  },
+  "dtype": "bfloat16",
+  "device": "cuda:0",
+  "complete": true,
+  "records": {
+    "nll": [
+      {
+        "id": "1c88d10fed8e5d7929bd8237e00cc804",
+        "modes": {
+          "enabled": {
+            "sum_nll": 819.0535888671875,
+            "tokens": 437
+          },
+          "bypassed": {
+            "sum_nll": 716.2667846679688,
+            "tokens": 437
+          },
+          "full_bypass": {
+            "sum_nll": 396.876708984375,
+            "tokens": 437
+          }
+        }
+      },
+      {
+        "id": "1fa0c7a3b9b650269df134fc3cc4ab9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 811.3089599609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 705.1761474609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 377.04522705078125,
+            "tokens": 511
+          }
+        }
+      }
+    ]
+  },
+  "elapsed_seconds": 11.218000000000757
+}
