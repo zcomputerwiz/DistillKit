@@ -14,6 +14,7 @@ from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunk
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
+from distillkit.lossfuncs.hidden_state import last_anchor_report
 from distillkit.signals import OnlineSignalSource, SignalSource, TeacherSignal
 
 
@@ -350,6 +351,10 @@ class DistillationTrainer(SFTTrainer):
                 f"distillation_loss/{idx + 1}_{loss_fn}": loss.item()
                 for idx, (loss, loss_fn) in enumerate(zip(losses, loss_fns))
             }
+        # The aggregate hidden-state term is a mean over anchors, so it cannot say
+        # which anchor is doing anything. Both are logged for the same reason the
+        # architecture metrics are: a term that never moves needs to be visible.
+        metrics.update(last_anchor_report())
         pending_logs = getattr(self._loss_log_local, "logs", None)
         if pending_logs is None:
             self.log(metrics)

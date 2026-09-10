@@ -11,6 +11,7 @@ import argparse
 from contextlib import contextmanager
 import hashlib
 import json
+import re
 import os
 from pathlib import Path
 import threading
@@ -101,6 +102,57 @@ def benchmark_record(task, row, tokenizer, max_length):
             "source_id": row.get("id"), "prompt": prompt, "choice_text": choices}
 
 
+# The held-out corpus is chat-formatted, and roughly half of a 512-token window is
+# prompt: median 180 tokens of near-identical system boilerplate plus the question,
+# and 19 of 384 documents never reach the assistant turn at all. Scoring the whole
+# window measures "how well does this model predict a fixed system prompt" as much as
+# anything else, which is not the question. These spans let the same forward pass be
+# reported per role.
+ROLE_MARKER = re.compile(r"<\|im_start\|>(\w+)\n")
+# Every assistant turn in this corpus opens with an empty reasoning block and 83% then
+# open a second one. It is a template artifact present in 100% of turns, so it is
+# counted as template rather than as anything the model was asked to produce.
+EMPTY_THINK = re.compile(r"\A<think>\s*</think>\s*")
+ROLES = ("system", "user", "assistant", "template")
+
+
+def role_spans(text, offsets):
+    """Token index ranges per role, from character offsets.
+
+    Offsets rather than re-tokenising prefixes: a token that straddles a role boundary
+    would otherwise be counted twice or not at all, and the answer would be off by a
+    token per turn in a way nothing would notice.
+    """
+    boundaries = [(m.start(), m.end(), m.group(1)) for m in ROLE_MARKER.finditer(text)]
+    if not boundaries:
+        return {"assistant": [[0, len(offsets)]]}
+    char_roles = []
+    for index, (start, end, role) in enumerate(boundaries):
+        stop = boundaries[index + 1][0] if index + 1 < len(boundaries) else len(text)
+        role = role if role in ROLES else "template"
+        char_roles.append((start, end, "template"))          # the <|im_start|>role\n itself
+        body_start = end
+        if role == "assistant":
+            empty = EMPTY_THINK.match(text[end:stop])
+            if empty:
+                char_roles.append((end, end + empty.end(), "template"))
+                body_start = end + empty.end()
+        char_roles.append((body_start, stop, role))
+
+    spans = {role: [] for role in ROLES}
+    for token, (start, stop) in enumerate(offsets):
+        if stop <= start:          # special tokens carry an empty offset
+            continue
+        for low, high, role in char_roles:
+            if low <= start < high:
+                if spans[role] and spans[role][-1][1] == token:
+                    spans[role][-1][1] = token + 1
+                else:
+                    spans[role].append([token, token + 1])
+                break
+    return {role: ranges for role, ranges in spans.items() if ranges}
+
+
 def read_benchmark(path, dataset, config):
     if path:
         obj = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -118,10 +170,13 @@ def prepare(args):
     unseen = unseen_records(args.documents, manifests)
     docs = []
     for row in unseen:
-        ids = tokenizer.encode(row["text"], add_special_tokens=True)
+        encoded = tokenizer(row["text"], add_special_tokens=True, return_offsets_mapping=True)
+        ids = encoded["input_ids"]
         if len(ids) >= args.min_document_tokens:
-            docs.append({"id": row["id"], "task": "nll", "ids": ids[:args.document_tokens],
-                         "text_sha256": digest(row["text"])})
+            keep = args.document_tokens
+            spans = role_spans(row["text"], encoded["offset_mapping"][:keep])
+            docs.append({"id": row["id"], "task": "nll", "ids": ids[:keep],
+                         "roles": spans, "text_sha256": digest(row["text"])})
     banks = {"nll": docs}
     if not args.text_only:
         for task, source, dataset, config in [
@@ -262,10 +317,25 @@ def score_sequences(model, features, collator, mode, device):
         indexes = [lookup[p] for p in range(start - 1, len(feature["ids"]) - 1)]
         target = torch.tensor(feature["ids"][start:], device=device)
         selected = logits[i, indexes].float()
-        loss = F.cross_entropy(selected, target, reduction="sum").item()
+        per_token = F.cross_entropy(selected, target, reduction="none")
+        loss = per_token.sum().item()
         if not np.isfinite(loss):
             raise ValueError("non-finite next-token NLL")
-        results.append({"sum_nll": loss, "tokens": len(target)})
+        record = {"sum_nll": loss, "tokens": len(target)}
+        roles = feature.get("roles")
+        if roles:
+            # A position's loss belongs to the role of the token it predicts, which is
+            # `start + offset`, not the position itself.
+            values = per_token.cpu().numpy()
+            record["by_role"] = {}
+            for role, ranges in roles.items():
+                picked = [index for low, high in ranges
+                          for index in range(max(low, start), min(high, len(feature["ids"])))]
+                if not picked:
+                    continue
+                taken = values[[index - start for index in picked]]
+                record["by_role"][role] = {"sum_nll": float(taken.sum()), "tokens": len(picked)}
+        results.append(record)
     return results
 
 
@@ -407,6 +477,40 @@ def compare_results(result, reference, draws=10000):
                                         denominators, draws=draws)
                 rows.append({"checkpoint": Path(result["checkpoint"]).name, "task": task, "metric": metric,
                              "comparison": mode + (" - " + other if other else ""), **stats})
+        if task == "nll":
+            rows.extend(_role_rows(result, values, comparisons, draws))
+    return rows
+
+
+def _role_rows(result, values, comparisons, draws):
+    """The same comparisons restricted to each role.
+
+    Documents contribute to a role only where they have tokens in it -- 19 of 384 never
+    reach the assistant turn inside a 512-token window -- so each role reports its own
+    document count and the intervals are not interchangeable across roles.
+    """
+    available = sorted({role for record in values["enabled"]
+                        for role in record.get("by_role", {})})
+    rows = []
+    for role in available:
+        keep = [index for index, record in enumerate(values["enabled"])
+                if record.get("by_role", {}).get(role, {}).get("tokens")]
+        if not keep:
+            continue
+        counts = [values["enabled"][index]["by_role"][role]["tokens"] for index in keep]
+
+        def series(mode):
+            return [values[mode][index]["by_role"][role]["sum_nll"] for index in keep]
+
+        if any([values[mode][index]["by_role"][role]["tokens"] for index in keep] != counts
+               for mode in values):
+            raise ValueError(f"role {role}: target counts differ between arms")
+        for mode, other in comparisons:
+            stats = paired_interval(series(mode), series(other) if other else None,
+                                    counts, draws=draws)
+            rows.append({"checkpoint": Path(result["checkpoint"]).name, "task": "nll",
+                         "metric": "nll@" + role,
+                         "comparison": mode + (" - " + other if other else ""), **stats})
     return rows
 
 
