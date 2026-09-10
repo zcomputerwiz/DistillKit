@@ -11,6 +11,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
+from distillkit.fused import fused
+
 
 # Below this a saved tensor is bookkeeping (RNG state, scalars), not a stream.
 _OFFLOAD_MIN_BYTES = 16 * 1024**2
@@ -118,10 +120,32 @@ def branch_norm(x, norm, gain_delta):
     return _BranchNorm.apply(x, gain, norm.eps)
 
 
+@fused
 def collapse_residual(states: torch.Tensor) -> torch.Tensor:
     """Mean over branches, expressed around branch zero for exact BF16 identity."""
     reference = states[..., 0, :]
     return reference + (states - reference.unsqueeze(-2)).mean(dim=-2)
+
+
+@fused
+def _combine(normalized, gate_logits, write_logits, read_offset, lambda_read,
+             write_offset, lambda_write, read_index):
+    """Both gates, the corrected read and the write weights, from the routing logits.
+
+    Eager, this is a sigmoid, a broadcast multiply-add, a second broadcast multiply
+    and a reduction, each reading and writing a full `[batch, tokens, branches,
+    hidden]` tensor -- four kernels and three 84 MB intermediates at batch 2 x 4096.
+    Fused, none of the intermediates is written.
+
+    The one-hot read is taken directly rather than as a weighted sum, so at
+    initialisation `correction` is exactly zero and the value is exactly branch
+    `read_index` of the normalised stream.
+    """
+    read_gate = torch.sigmoid(gate_logits).unflatten(-1, normalized.shape[-2:])
+    correction = read_offset.unsqueeze(-1) + lambda_read * read_gate
+    value = normalized[..., read_index, :] + (correction * normalized).sum(-2)
+    weights = (1 + write_offset) + lambda_write * torch.sigmoid(write_logits)
+    return value, weights
 
 
 class WidenedResidual(nn.Module):
@@ -180,15 +204,11 @@ Random dynamic projections allow the zero-initialized lambdas to learn immediate
         # second [B,T,n,d] copy of the input. n is a power of two in practice and the
         # scaling is exact; at initialisation both gates are multiplied by zero anyway.
         scale = 1 / self.num_branches
-        read_gate = self.W_up(F.silu(self.W_down(flattened) * scale)).sigmoid_()
-        read_gate = read_gate.unflatten(-1, (self.num_branches, self.hidden_size))
-        write_gate = (self.W_write(flattened) * scale).sigmoid_()
-        # The one-hot read is taken directly rather than as a weighted sum, so at
-        # initialisation the correction term is exactly zero and the arithmetic is
-        # bit-identical to the unwidened path.
-        correction = self.read_offset.unsqueeze(-1) + self.lambda_read * read_gate
-        value = normalized[..., self.read_index, :] + (correction * normalized).sum(-2)
-        weights = (1 + self.write_offset) + self.lambda_write * write_gate
+        gate_logits = self.W_up(F.silu(self.W_down(flattened) * scale))
+        write_logits = self.W_write(flattened) * scale
+        value, weights = _combine(
+            normalized, gate_logits, write_logits, self.read_offset, self.lambda_read,
+            self.write_offset, self.lambda_write, self.read_index)
         return value.contiguous(), weights
 
     def write(self, states, output, weights):

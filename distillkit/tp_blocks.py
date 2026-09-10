@@ -24,9 +24,19 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
+from distillkit.fused import fused
 from distillkit.tensor_parallel import all_reduce, replicate
 from distillkit.tp_linear import ColumnParallelLinear, RowParallelLinear, split_sizes
+
+
+@fused
+def _swiglu(gate, up):
+    """One kernel for the activation and the gate, and the activation's output is
+    recomputed in backward rather than held: the intermediate is half the MLP width
+    per shard, which is 80 MB a layer at batch 2 x 4096."""
+    return F.silu(gate) * up
 
 
 class TensorParallelMLP(nn.Module):
@@ -41,6 +51,10 @@ class TensorParallelMLP(nn.Module):
         super().__init__()
         self.devices = [torch.device(d) for d in devices]
         self.act_fn = mlp.act_fn
+        # Qwen3.5 is SwiGLU. Anything else keeps the module's own activation rather
+        # than being silently replaced by one that happens to be fusable.
+        self._is_silu = isinstance(mlp.act_fn, nn.SiLU) or getattr(
+            mlp.act_fn, "__name__", None) == "silu"
         self.gate_proj = ColumnParallelLinear(mlp.gate_proj, self.devices)
         self.up_proj = ColumnParallelLinear(mlp.up_proj, self.devices)
         # reduce_only: the residual stream is on the home card, so producing a
@@ -53,7 +67,10 @@ class TensorParallelMLP(nn.Module):
         copies = replicate(x, self.devices)
         gates = self.gate_proj(x, copies)
         ups = self.up_proj(x, copies)
-        hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
+        if self._is_silu:
+            hidden = [_swiglu(g, u) for g, u in zip(gates, ups)]
+        else:
+            hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
         return self.down_proj(hidden)[0]
 
 

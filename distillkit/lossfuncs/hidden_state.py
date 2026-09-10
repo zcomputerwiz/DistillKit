@@ -4,6 +4,7 @@ from torch.utils.checkpoint import checkpoint
 from transformers.modeling_outputs import CausalLMOutput
 from typing_extensions import override
 
+from distillkit.fused import fused
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs.common import (
     LossFunctionBase,
@@ -31,11 +32,21 @@ def _anchor_sum(kind, student_h, teacher_h, layer_mask, projection):
     teacher_h = teacher_h.to(device=student_h.device, dtype=student_h.dtype)
     layer_mask = layer_mask.to(student_h.device)
     if kind == "mse":
-        return (((student_h - teacher_h) ** 2) * layer_mask).sum()
+        return _masked_mse(student_h, teacher_h, layer_mask)
     if kind != "cosine":
         raise RuntimeError(f"Unimplemented hidden state loss type {repr(kind)}")
+    return _masked_cosine(student_h, teacher_h, layer_mask)
+
+
+@fused
+def _masked_cosine(student_h, teacher_h, layer_mask):
     cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1)
     return ((1 - cosine_sim) * layer_mask.squeeze(-1)).sum()
+
+
+@fused
+def _masked_mse(student_h, teacher_h, layer_mask):
+    return (((student_h - teacher_h) ** 2) * layer_mask).sum()
 
 
 def _accumulate_anchor(kind, student_h, teacher_h, layer_mask, projection, chunk_rows):
