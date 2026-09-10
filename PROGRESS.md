@@ -1027,6 +1027,93 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## The flat gate was scale, not learning rate (2026-09-10)
+
+The first direction-gated run left `gate_std` at 0.03475 against upstream's 0.080-0.228,
+and the obvious next move was a learning-rate sweep for the gate. It would have been
+eighty minutes spent on the wrong knob.
+
+**The arithmetic.** The gate divides by `sqrt(hidden_size)`, which is the attention
+convention and assumes *both* operands have norm `sqrt(d)`. Upstream gets that for free
+because it RMS-normalises its key. A raw learned vector does not: at `gate_init_std`
+0.02 its norm is about 1.0 against 50.6, so the pre-activation was **50x too small**.
+Simulated on random unit-RMS queries:
+
+| `gate_init_std` | `||g_k||` | resulting gate std |
+| --- | ---: | ---: |
+| **0.02 (what ran)** | 1.00 | **0.0313** |
+| 0.1 | 5.11 | 0.0697 |
+| 0.5 | 25.86 | 0.1494 |
+| 1.0 | 49.85 | 0.2067 |
+
+The run measured 0.0348 against a predicted 0.0313. **The gate was not failing to learn;
+it was structurally unable to select.**
+
+**And a sweep could not have found it.** AdamW's step is about `lr` per element whatever
+the gradient's size, so 72 steps at 1e-4 move each element by at most 0.0072, while the
+gap to a selective scale is about 1.0 per element -- 140x the entire step budget, needing
+`lr` near 0.014 to close, which would have wrecked everything else sharing the optimizer.
+Every arm of that sweep would have come back flat and the conclusion would have been
+"gates do not help here", which is false.
+
+**The fix is construction, not a hyperparameter.** The direction is RMS-normalised to
+`sqrt(d)` and a learned per-direction `sharpness` (initialised at 1.0) carries the
+magnitude. Selectivity is now independent of the initialisation across a 500x range --
+gate std 0.273 / 0.286 / 0.286 at init 0.002 / 0.02 / 1.0 -- and `tests/` pins that so it
+cannot silently regress.
+
+### The rerun
+
+| | first gated run | after the scale fix |
+| --- | ---: | ---: |
+| `gate_std` | 0.03475 | **0.1899** |
+| `gate_frac_open` | 0 | **0.5302** |
+| `gate_frac_shut` | 0 | **0.3376** |
+| `eval_loss` | 0.7081 | **0.6711** |
+
+53% of tokens above 0.6 and 34% below 0.4: it admits and refuses instead of sitting at a
+constant 0.5. `eval_loss` by step: 2.3745, 1.8729, 1.2264, 0.9431, 0.8242, 0.7390,
+0.6909, 0.6711 -- ahead of the transcription at every matched step.
+
+Scored on assistant tokens, 384 documents:
+
+| | enabled | bypassed |
+| --- | ---: | ---: |
+| `widened-ple-stage1-1m` vs the student | +0.030562 [+0.026052, +0.034943] | -0.001874 |
+| `widened-plegated-stage1-1m` vs the student | **+0.025921 [+0.021969, +0.029771]** | -0.001746 |
+
+| gated minus the transcription | | |
+| --- | ---: | --- |
+| enabled | **-0.004642 [-0.006325, -0.002963]** | gated better |
+| bypassed | +0.000128 [-0.000035, +0.000292] | spans zero |
+
+| the sidecar's own cost | enabled - bypassed |
+| --- | ---: |
+| `widened-ple-stage1-1m` | +0.032436 [+0.028300, +0.036439] |
+| `widened-plegated-stage1-1m` | **+0.027667 [+0.024094, +0.031201]** |
+
+Best arm so far on every measure, and the bypassed comparison spanning zero says the
+difference is the adapter rather than the run.
+
+### An open thread: the gate parameters did not train
+
+The trained checkpoint has `sharpness` at **exactly** 1.0 on all four values -- bit
+identical to its initialisation -- and `gate` at norm 2.0121 against 2.024 at init, about
+what weight decay alone accounts for. `value_proj` went 0 to 3.1605 and `conv1d` 0 to
+0.2783 over the same run.
+
+In isolation both gate tensors receive gradients of order 1e3, and one AdamW step at
+1e-4 moves each by 1e-4, so 72 steps should drift about 0.007. They are in
+`_auxiliary_parameter_ids`, `freeze_backbone_for_stage1` does not freeze them, and
+`mixed_parameter_groups` routes them to AdamW. Something in the real run prevents the
+update anyway.
+
+**So the improvement above is initialisation, not learning.** The gate is selective from
+step zero because the geometry is now right, and it stayed wherever it started. If the
+blockage is real and fixable there is more available here than has been measured.
+Unruled-out candidates: the gradient-checkpointing interaction, the tensor-parallel path,
+`sync_replicated_gradients`, the Muon/AdamW split, and gradient clipping.
+
 ## The direction-gated sidecar: better, still not good (2026-09-10)
 
 `examples/qwen35_widened_plegated_stage1_1m.yml` against `widened-ple-stage1-1m`, which
