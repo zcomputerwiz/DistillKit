@@ -1,0 +1,74 @@
+[
+  {
+    "config": "examples/qwen35_widened_ple_stage2_5m.yml",
+    "batch": 2,
+    "sequence": 4096,
+    "allocator": "garbage_collection_threshold:0.8",
+    "peak_gib": [
+      12.587,
+      11.933
+    ],
+    "reserved_gib": [
+      17.121,
+      14.975
+    ],
+    "stranded_gib": [
+      8.688,
+      6.958
+    ]
+  },
+  {
+    "config": "examples/qwen35_widened_ple_stage2_5m.yml",
+    "batch": 2,
+    "sequence": 4096,
+    "allocator": "garbage_collection_threshold:0.8,roundup_power2_divisions:16",
+    "peak_gib": [
+      12.725,
+      12.194
+    ],
+    "reserved_gib": [
+      17.109,
+      15.014
+    ],
+    "stranded_gib": [
+      8.594,
+      6.807
+    ]
+  },
+  {
+    "config": "examples/qwen35_widened_ple_stage2_5m.yml",
+    "batch": 2,
+    "sequence": 4096,
+    "allocator": "garbage_collection_threshold:0.8,roundup_power2_divisions:8,max_split_size_mb:512",
+    "peak_gib": [
+      13.16,
+      12.402
+    ],
+    "reserved_gib": [
+      17.719,
+      15.555
+    ],
+    "stranded_gib": [
+      8.893,
+      7.253
+    ]
+  },
+  {
+    "config": "examples/qwen35_widened_ple_stage2_5m.yml",
+    "batch": 2,
+    "sequence": 4096,
+    "allocator": "roundup_power2_divisions:16",
+    "peak_gib": [
+      12.739,
+      12.204
+    ],
+    "reserved_gib": [
+      17.137,
+      14.768
+    ],
+    "stranded_gib": [
+      8.615,
+      6.562
+    ]
+  }
+]

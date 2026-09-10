@@ -52,10 +52,96 @@ def offload_stream_boundaries(peer, every: int = 2):
         yield
 
 
+class _BranchNorm(torch.autograd.Function):
+    """RMSNorm and the per-branch gain, holding only what backward actually needs.
+
+    `Qwen3_5RMSNorm` materialises four full-width fp32 tensors for a bf16 input, and
+    autograd keeps two of them alive until backward: the fp32 copy of the input, for
+    the square, and the normalised value, for the weight multiply. In the widened read
+    that happens once per branch, twice per layer, and again on every checkpoint
+    recompute. At batch 2 x 4096 with two branches it is about 670 MB held per widened
+    layer while that layer's backward runs, which is the largest single item in the
+    recompute working set and where the batch-4 run ran out of memory.
+
+    This saves the bf16 input -- which the residual stream is holding anyway -- plus a
+    `[..., 1]` reciprocal standard deviation, and differentiates the closed form:
+
+        y = g * x * r,   r = rsqrt(mean(x^2) + eps)
+        dL/dx = r*g*dy - (r^3 / n) * x * sum(dy * g * x)
+        dL/dg = sum over leading dims of dy * x * r
+
+    Forward is bit-identical to the module's own, because `x * rstd` promotes bf16 to
+    fp32 inside the multiply kernel rather than materialising a cast copy first. The
+    backward is the same quantity to fp32 rounding rather than the same sequence of
+    operations. `tests/test_widened_norm.py` pins both against the module.
+    """
+
+    @staticmethod
+    def forward(ctx, x, gain, eps):
+        # fp32 is a floor, not the compute type: .float() on a float64 input would
+        # silently discard half its mantissa, which gradcheck is entitled to notice.
+        compute = torch.promote_types(x.dtype, torch.float32)
+        variance = x.to(compute).pow(2).mean(-1, keepdim=True)
+        rstd = torch.rsqrt(variance + eps)
+        ctx.save_for_backward(x, gain, rstd)
+        # bf16 * fp32 promotes inside the multiply kernel, so the cast copy of x that
+        # the module holds until backward is never materialised at all.
+        return ((x * rstd) * gain).to(x.dtype)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x, gain, rstd = ctx.saved_tensors
+        width = x.shape[-1]
+        grad = grad_output.to(rstd.dtype)
+        scaled = grad * gain
+        inner = (scaled * x).sum(-1, keepdim=True)
+        grad_x = rstd * scaled - (rstd.pow(3) / width) * inner * x
+        grad_gain = None
+        if ctx.needs_input_grad[1]:
+            grad_gain = (grad * x * rstd).sum(dim=tuple(range(grad.ndim - 1)))
+        return grad_x.to(x.dtype), grad_gain, None
+
+
+def branch_norm(x, norm, gain_delta):
+    """`norm(x) * (1 + gain_delta)`, computed without the module's fp32 copies.
+
+    Falls back to the module whenever it is not the zero-centred RMSNorm this assumes,
+    so a change upstream degrades to the slow path rather than to wrong arithmetic.
+    """
+    from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5RMSNorm
+
+    if not isinstance(norm, Qwen3_5RMSNorm):
+        return norm(x) * (1 + gain_delta)
+    # Folding the gain into the weight drops one full-width multiply and one rounding.
+    # At initialisation the gain is exactly zero, so this is exactly `1 + weight`.
+    gain = (1.0 + norm.weight.float()) * (1.0 + gain_delta.float())
+    return _BranchNorm.apply(x, gain, norm.eps)
+
+
 def collapse_residual(states: torch.Tensor) -> torch.Tensor:
     """Mean over branches, expressed around branch zero for exact BF16 identity."""
     reference = states[..., 0, :]
     return reference + (states - reference.unsqueeze(-2)).mean(dim=-2)
+
+
+def _combine(normalized, gate_logits, write_logits, read_offset, lambda_read,
+             write_offset, lambda_write, read_index):
+    """Both gates, the corrected read and the write weights, from the routing logits.
+
+    Eager, this is a sigmoid, a broadcast multiply-add, a second broadcast multiply
+    and a reduction, each reading and writing a full `[batch, tokens, branches,
+    hidden]` tensor -- four kernels and three 84 MB intermediates at batch 2 x 4096.
+    Fused, none of the intermediates is written.
+
+    The one-hot read is taken directly rather than as a weighted sum, so at
+    initialisation `correction` is exactly zero and the value is exactly branch
+    `read_index` of the normalised stream.
+    """
+    read_gate = torch.sigmoid(gate_logits).unflatten(-1, normalized.shape[-2:])
+    correction = read_offset.unsqueeze(-1) + lambda_read * read_gate
+    value = normalized[..., read_index, :] + (correction * normalized).sum(-2)
+    weights = (1 + write_offset) + lambda_write * torch.sigmoid(write_logits)
+    return value, weights
 
 
 class WidenedResidual(nn.Module):
@@ -100,26 +186,25 @@ Random dynamic projections allow the zero-initialized lambdas to learn immediate
         self.branch_gain_delta.zero_()
 
     def read(self, states, norm):
-        # One branch at a time keeps the norm's fp32 temporaries [B,T,d]-sized rather
-        # than [B,T,n,d]; Windows has no expandable_segments, so a backward that
-        # churns big odd-sized blocks strands gigabytes of reserved-but-unallocated
-        # pool. The branch views are already contiguous in the normalized dimension.
-        normalized = torch.stack([norm(branch) for branch in states.unbind(-2)], dim=-2)
-        normalized = normalized * (1 + self.branch_gain_delta)
+        # One branch at a time keeps the temporaries [B,T,d]-sized rather than
+        # [B,T,n,d]; Windows has no expandable_segments, so a backward that churns big
+        # odd-sized blocks strands gigabytes of reserved-but-unallocated pool. The
+        # branch views are already contiguous in the normalized dimension, and the
+        # per-branch gain rides along with the norm, so the [B,T,n,d] stack is written
+        # once instead of being read back and multiplied whole.
+        normalized = torch.stack(
+            [branch_norm(branch, norm, gain) for branch, gain
+             in zip(states.unbind(-2), self.branch_gain_delta)], dim=-2)
         flattened = normalized.flatten(-2)
         # Linear is homogeneous, so 1/n applies to the narrow output instead of a
         # second [B,T,n,d] copy of the input. n is a power of two in practice and the
         # scaling is exact; at initialisation both gates are multiplied by zero anyway.
         scale = 1 / self.num_branches
-        read_gate = self.W_up(F.silu(self.W_down(flattened) * scale)).sigmoid_()
-        read_gate = read_gate.unflatten(-1, (self.num_branches, self.hidden_size))
-        write_gate = (self.W_write(flattened) * scale).sigmoid_()
-        # The one-hot read is taken directly rather than as a weighted sum, so at
-        # initialisation the correction term is exactly zero and the arithmetic is
-        # bit-identical to the unwidened path.
-        correction = self.read_offset.unsqueeze(-1) + self.lambda_read * read_gate
-        value = normalized[..., self.read_index, :] + (correction * normalized).sum(-2)
-        weights = (1 + self.write_offset) + self.lambda_write * write_gate
+        gate_logits = self.W_up(F.silu(self.W_down(flattened) * scale))
+        write_logits = self.W_write(flattened) * scale
+        value, weights = _combine(
+            normalized, gate_logits, write_logits, self.read_offset, self.lambda_read,
+            self.write_offset, self.lambda_write, self.read_index)
         return value.contiguous(), weights
 
     def write(self, states, output, weights):

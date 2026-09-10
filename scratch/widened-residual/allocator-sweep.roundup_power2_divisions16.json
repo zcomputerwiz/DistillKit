@@ -1,0 +1,185 @@
+{
+  "load": {
+    "seconds": 5.363,
+    "peak_gib": [
+      9.223,
+      4.059
+    ],
+    "live_gib": [
+      4.12,
+      4.059
+    ],
+    "reserved_gib": [
+      9.229,
+      4.061
+    ]
+  },
+  "step1/forward": {
+    "seconds": 2.033,
+    "peak_gib": [
+      6.285,
+      5.742
+    ],
+    "live_gib": [
+      5.739,
+      5.318
+    ],
+    "reserved_gib": [
+      9.623,
+      6.129
+    ]
+  },
+  "step1/kl": {
+    "seconds": 0.211,
+    "peak_gib": [
+      6.042,
+      5.62
+    ],
+    "live_gib": [
+      5.739,
+      5.318
+    ],
+    "reserved_gib": [
+      9.623,
+      6.371
+    ]
+  },
+  "step1/hidden_state": {
+    "seconds": 0.04,
+    "peak_gib": [
+      5.846,
+      5.318
+    ],
+    "live_gib": [
+      5.739,
+      5.318
+    ],
+    "reserved_gib": [
+      9.623,
+      6.371
+    ]
+  },
+  "step1/backward": {
+    "seconds": 4.742,
+    "peak_gib": [
+      11.777,
+      9.174
+    ],
+    "live_gib": [
+      8.513,
+      8.079
+    ],
+    "reserved_gib": [
+      12.766,
+      10.367
+    ]
+  },
+  "step1/optimizer": {
+    "seconds": 0.626,
+    "peak_gib": [
+      12.736,
+      12.201
+    ],
+    "live_gib": [
+      8.601,
+      8.206
+    ],
+    "reserved_gib": [
+      13.104,
+      12.299
+    ]
+  },
+  "step2/forward": {
+    "seconds": 1.377,
+    "peak_gib": [
+      10.516,
+      9.887
+    ],
+    "live_gib": [
+      9.97,
+      9.456
+    ],
+    "reserved_gib": [
+      14.197,
+      12.379
+    ]
+  },
+  "step2/kl": {
+    "seconds": 0.198,
+    "peak_gib": [
+      10.274,
+      9.76
+    ],
+    "live_gib": [
+      9.97,
+      9.456
+    ],
+    "reserved_gib": [
+      14.197,
+      12.621
+    ]
+  },
+  "step2/hidden_state": {
+    "seconds": 0.016,
+    "peak_gib": [
+      10.077,
+      9.456
+    ],
+    "live_gib": [
+      9.97,
+      9.456
+    ],
+    "reserved_gib": [
+      14.197,
+      12.621
+    ]
+  },
+  "step2/backward": {
+    "seconds": 4.692,
+    "peak_gib": [
+      16.003,
+      13.3
+    ],
+    "live_gib": [
+      12.739,
+      12.204
+    ],
+    "reserved_gib": [
+      17.137,
+      14.768
+    ]
+  },
+  "step2/optimizer": {
+    "seconds": 0.197,
+    "peak_gib": [
+      12.739,
+      12.204
+    ],
+    "live_gib": [
+      8.601,
+      8.206
+    ],
+    "reserved_gib": [
+      17.137,
+      14.768
+    ]
+  },
+  "summary": {
+    "config": "examples/qwen35_widened_ple_stage2_5m.yml",
+    "batch": 2,
+    "sequence": 4096,
+    "allocator": "roundup_power2_divisions:16",
+    "peak_gib": [
+      12.739,
+      12.204
+    ],
+    "reserved_gib": [
+      17.137,
+      14.768
+    ],
+    "stranded_gib": [
+      8.615,
+      6.562
+    ]
+  }
+}

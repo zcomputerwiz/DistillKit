@@ -83,7 +83,8 @@ def measure(config_path, steps):
     cfg = DistillationRunConfig.model_validate(yaml.safe_load(Path(config_path).read_text()))
     batch = cfg.training_args["per_device_train_batch_size"]
     sequence = cfg.sequence_length
-    chunk = next(f.get("sparse_chunk_length") for f in cfg.loss_functions if f["function"] == "kl")
+    chunk = next(getattr(f, "sparse_chunk_length", None)
+                 for f in cfg.loss_functions if f.function == "kl")
 
     record = {}
     torch.manual_seed(42)

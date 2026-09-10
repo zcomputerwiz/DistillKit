@@ -556,7 +556,12 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         elif config.sidecar.prefault:
             table.prefault()
         collator = SidecarDataCollator(base_collator, table)
-    callbacks = []
+    from distillkit.optimizers import ReleaseEvalCacheCallback
+
+    # Evaluation carves the allocator's pool into its own shapes, and Windows cannot
+    # defragment; this belongs to every run, not just the ones with an optimizer
+    # section. See ReleaseEvalCacheCallback.
+    callbacks = [ReleaseEvalCacheCallback()]
     if config.optimizer:
         from distillkit.optimizers import (
             validate_optimizer_backend, freeze_backbone_for_stage1,

@@ -9,6 +9,8 @@ is separate (https://pytorch.org/blog/using-muon-optimizer-with-deepspeed/).
 from collections.abc import Iterable
 from typing import Any
 
+import gc
+
 import torch
 from torch import nn
 from transformers import TrainerCallback
@@ -397,6 +399,27 @@ def memory_metrics(model: nn.Module) -> dict[str, float]:
         bool(getattr(model, "is_gradient_checkpointing", False))
     )
     return report
+
+
+class ReleaseEvalCacheCallback(TrainerCallback):
+    """Return the allocator's pool after each evaluation.
+
+    Evaluation runs at `per_device_eval_batch_size` with its own shapes, so it carves
+    the pool into blocks training cannot reuse, and Windows has no
+    `expandable_segments` to undo that. Measured on the widened stage-2 run, card 0's
+    peak went 14.78 GiB at step 5 to 17.17 GiB right after the step-50 evaluation
+    while the live set barely moved.
+
+    Freeing between *training* steps was measured and does nothing -- a backward
+    fragments its own pool from the inside -- so this fires only where two different
+    shape regimes meet.
+    """
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        gc.collect()
+        for index in range(torch.cuda.device_count()):
+            with torch.cuda.device(index):
+                torch.cuda.empty_cache()
 
 
 class ArchitectureMetricsCallback(TrainerCallback):
