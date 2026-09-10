@@ -77,11 +77,14 @@ configuration. The loader rejects missing or mismatched architecture settings fo
 a widened checkpoint, avoiding silently discarded or reinitialized routes. A stock
 Transformers model class is not the loader for a trained widened checkpoint.
 
-The existing independent-evaluation CLI does not yet select this model class; its
-strict unexpected-key check rejects widened checkpoints. No quality claim is made
-from the smoke losses. Future quality comparisons must use the independent text
-and benchmark scoring with the correct widened loader, rather than distillation
-loss or a stock class that omits routing.
+`independent_eval.load_checkpoint` selects this class from the checkpoint's own
+`residual_stream_enabled`, and verifies every routing tensor against the saved
+safetensors before scoring -- 519 on the trainer smoke checkpoint, 512 routing plus
+the 7 the sidecar contributes. Loading a widened checkpoint with the stock class
+would drop all of them and report the backbone's own score as the architecture's.
+
+No quality claim is made from the smoke losses. Quality comparisons must use the
+independent text and benchmark scoring, not distillation loss.
 
 ## Verification commands
 

@@ -17,6 +17,7 @@ from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
 from distillkit.sidecar_collator import SidecarDataCollator
 from test_sidecar_collator import TinyTable, make_hasher
 from test_sidecar_model import tiny_config
+from distillkit.widened_residual import WidenedResidual
 
 
 def test_evaluation_uses_real_collator_and_eos_padding(monkeypatch):
@@ -65,6 +66,37 @@ def test_saved_variant_and_adapter_values_survive_evaluator_loading(tmp_path, va
     json.dumps(audit, allow_nan=False)
     probe = plumbing_probe(loaded, raw_collator, {"ids": [5, 7, 8, 9]}, "cpu")
     assert probe["enabled_minus_bypassed_logits_max"] > 0, "a trained adapter must reach measured logits"
+
+
+def test_widened_checkpoint_loads_through_its_own_class(tmp_path):
+    """A widened checkpoint carries routing in every layer, and the stock class has
+    nowhere to put it. Loading one with the wrong class would drop 512 trained tensors
+    and report the backbone's own score as the architecture's."""
+    from test_widened_residual import tiny_config as widened_config
+    from distillkit.models import Qwen35WidenedForCausalLM
+
+    torch.manual_seed(11)
+    source = Qwen35WidenedForCausalLM(widened_config()).eval()
+    for module in source.modules():
+        if isinstance(module, WidenedResidual):
+            with torch.no_grad():
+                module.lambda_read.fill_(.3)
+                module.write_offset.normal_(0, .1)
+                module.W_up.weight.normal_(0, .05)
+    ids = torch.tensor([[5, 8, 9, 3, 10, 12]])
+    with torch.inference_mode():
+        expected = source(input_ids=ids, use_cache=False).logits
+    source.save_pretrained(tmp_path)
+
+    loaded, audit = load_checkpoint(tmp_path)
+    assert type(loaded) is Qwen35WidenedForCausalLM
+    assert audit["residual_branches"] == 2
+    # Two routers per layer, eight tensors each; none may be silently reinitialised.
+    assert audit["adapter_tensor_count"] == 2 * source.config.num_hidden_layers * 8
+    assert audit["adapter_exact_match"]
+    json.dumps(audit, allow_nan=False)
+    with torch.inference_mode():
+        assert torch.equal(loaded(input_ids=ids, use_cache=False).logits, expected)
 
 
 def test_loading_rejects_the_sketches_gr_to_ple_mismatch(tmp_path):

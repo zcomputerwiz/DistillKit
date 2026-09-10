@@ -179,31 +179,42 @@ def load_checkpoint(path, device="cpu", dtype=torch.float32):
     from transformers import AutoConfig
     from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
     from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+    from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
 
     path = Path(path)
     config = AutoConfig.from_pretrained(path, local_files_only=True)
     config = getattr(config, "text_config", config)
+    widened = bool(getattr(config, "residual_stream_enabled", False))
+    # Everything the architecture adds to the stock checkpoint is verified below, so
+    # a widened model's routing counts as adapter weight exactly like a sidecar does.
+    adapter_marks = (".sidecar.", ".attn_residual.", ".mlp_residual.") if widened else (".sidecar.",)
     stored = {}
     for file in sorted(path.glob("model*.safetensors")):
         with safe_open(file, framework="pt") as handle:
             for key in handle.keys():
-                if ".sidecar." in key:
+                if any(mark in key for mark in adapter_marks):
                     stored[key] = handle.get_tensor(key)
     declared = "Qwen35SidecarForCausalLM" in (config.architectures or [])
-    has_sidecar = declared or bool(stored)
+    has_sidecar = widened and getattr(config, "residual_stream_sidecar", False)
+    has_sidecar = has_sidecar or (not widened and (declared or bool(stored)))
     if has_sidecar and (not stored or not hasattr(config, "sidecar_variant")):
         raise ValueError("sidecar checkpoint is missing its adapter weights or saved variant")
-    cls = Qwen35SidecarForCausalLM if has_sidecar else Qwen3_5ForCausalLM
+    if widened:
+        cls = Qwen35WidenedForCausalLM
+    else:
+        cls = Qwen35SidecarForCausalLM if has_sidecar else Qwen3_5ForCausalLM
     model, info = cls.from_pretrained(path, config=config, local_files_only=True,
                                       dtype=dtype, output_loading_info=True, attn_implementation="sdpa")
     validate_loading(info, has_sidecar)
-    actual = {k: v for k, v in model.state_dict().items() if ".sidecar." in k}
+    actual = {k: v for k, v in model.state_dict().items()
+              if any(mark in k for mark in adapter_marks)}
     if set(actual) != set(stored):
         raise ValueError("saved adapter keys do not match instantiated architecture")
     for key in actual:
         if not torch.equal(actual[key].cpu(), stored[key].to(dtype=actual[key].dtype)):
             raise ValueError(f"adapter tensor failed exact checkpoint verification: {key}")
     audit = {"variant": getattr(config, "sidecar_variant", None) if has_sidecar else None,
+             "residual_branches": config.residual_stream_num_branches if widened else 1,
              "adapter_tensor_count": len(stored), "adapter_exact_match": True,
              "adapter_norms": {k: v.float().norm().item() for k, v in stored.items()},
              "ignored_loss_only_keys": sorted(info.get("unexpected_keys", [])),

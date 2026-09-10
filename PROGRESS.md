@@ -137,10 +137,11 @@ Knobs whose right value depends on what is binding, not on taste:
 
 **The two open items, in order:**
 
-A. **Teach `independent_eval` to load widened checkpoints.** Its strict unexpected-key
-   check rejects them, so the widening cannot yet be scored on the only metric this
-   project trusts. Everything else is blocked behind this, because `eval_loss` has
-   already been shown not to measure the thing we want.
+A. ~~Teach `independent_eval` to load widened checkpoints~~ - **done**: it selects the
+   class from the checkpoint's own `residual_stream_enabled` and verifies all 519
+   architecture tensors against the saved safetensors before scoring. What remains is
+   to actually run it on a trained widened checkpoint; `eval_loss` has already been
+   shown not to measure the thing we want, so that is the only verdict worth having.
 
 B. **Then decide what the adapters are actually for.** Codex's independent evaluation
    says every adapter built so far *hurts* held-out NLL with all intervals excluding
@@ -1058,11 +1059,11 @@ cache with the sidecar collator, runs 12.6-13.2 s/step at 17.40 / 18.58 GiB on c
 ### What is not established
 
 **Nothing here is a quality result.** The probe losses are plumbing checks on synthetic
-teacher tensors. `independent_eval` does not yet select the widened model class -- its
-strict unexpected-key check rejects widened checkpoints -- so the widening has not been
-measured against the one metric this project trusts, and given that *every* adapter so
-far has hurt held-out NLL, that measurement is the next thing that matters, not another
-`eval_loss` comparison.
+teacher tensors, and no widened checkpoint has been trained past three smoke steps.
+`independent_eval` now loads the widened class and verifies all 519 architecture tensors
+exactly, so the measurement is unblocked -- but given that *every* adapter so far has
+hurt held-out NLL, running it on a real widened run is the next thing that matters, not
+another `eval_loss` comparison.
 
 ## The objective this project tunes against does not measure the thing it wants (2026-09-09)
 
