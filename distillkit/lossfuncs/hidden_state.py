@@ -4,7 +4,6 @@ from torch.utils.checkpoint import checkpoint
 from transformers.modeling_outputs import CausalLMOutput
 from typing_extensions import override
 
-from distillkit.fused import fused
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs.common import (
     LossFunctionBase,
@@ -38,13 +37,17 @@ def _anchor_sum(kind, student_h, teacher_h, layer_mask, projection):
     return _masked_cosine(student_h, teacher_h, layer_mask)
 
 
-@fused
+# Deliberately not compiled. These run inside `_accumulate_anchor`'s checkpoint, and
+# a compiled region inside a non-reentrant checkpoint frame breaks its early-stop
+# machinery when the frame is entered from a worker thread: the concurrent-microbatch
+# path raised `_StopRecomputationError` with "target_frame.early_stop is set". The
+# memory here comes from the checkpoint rather than from fusing four cheap kernels,
+# so there is nothing to trade away.
 def _masked_cosine(student_h, teacher_h, layer_mask):
     cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1)
     return ((1 - cosine_sim) * layer_mask.squeeze(-1)).sum()
 
 
-@fused
 def _masked_mse(student_h, teacher_h, layer_mask):
     return (((student_h - teacher_h) ** 2) * layer_mask).sum()
 

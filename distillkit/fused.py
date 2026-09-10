@@ -27,6 +27,7 @@ from __future__ import annotations
 import functools
 import logging
 import os
+import threading
 
 import torch
 
@@ -61,6 +62,17 @@ def _on_cuda(args, kwargs) -> bool:
     return False
 
 
+def _on_main_thread() -> bool:
+    """Compile on the main thread only.
+
+    A compiled region inside a non-reentrant checkpoint frame breaks that frame's
+    early-stop machinery when it is entered from a worker thread -- the same class of
+    problem `AllReduce._save_recompute_barrier` already works around. The concurrent
+    microbatch path is opt-in and measured slower, so it simply runs eager.
+    """
+    return threading.current_thread() is threading.main_thread()
+
+
 def fused(fn):
     """Compile ``fn``, falling back to it permanently if that ever fails.
 
@@ -72,7 +84,7 @@ def fused(fn):
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        if state["failed"] or not _on_cuda(args, kwargs):
+        if state["failed"] or not _on_cuda(args, kwargs) or not _on_main_thread():
             return fn(*args, **kwargs)
         if state["compiled"] is None:
             usable, reason = compile_available()
