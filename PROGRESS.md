@@ -1027,6 +1027,88 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## The direction-gated sidecar: better, still not good (2026-09-10)
+
+`examples/qwen35_widened_plegated_stage1_1m.yml` against `widened-ple-stage1-1m`, which
+is matched in every other respect -- same widening at n_r=2, same 1M cache, same anchors
+and weights. The only difference is the sidecar. 384 documents, 156,565 assistant tokens,
+paired percentile bootstrap.
+
+| assistant-only NLL, against the pre-retrofit student | enabled | bypassed |
+| --- | ---: | ---: |
+| `widened-ple-stage1-1m` (the transcription) | +0.030562 [+0.026052, +0.034943] | -0.001874 |
+| `widened-plegated-stage1-1m` (directions) | **+0.026624 [+0.022719, +0.030409]** | -0.001885 |
+
+| gated minus the transcription | | |
+| --- | ---: | --- |
+| enabled | **-0.003938 [-0.005448, -0.002380]** | gated better |
+| bypassed | -0.000011 [-0.000169, +0.000143] | spans zero |
+
+**The gated variant is better by 0.0039 nats with the interval excluding zero, and the
+two backbones are indistinguishable when the sidecar is bypassed** -- which is the
+control that says the difference is the adapter and not the run.
+
+It is also cheaper by every other measure: 26.2M fewer parameters, 79.9% fewer multiplies
+in the layer, 12.7 GiB a card against the transcription's peak, and 15m24s for the run.
+`eval_loss` was ahead at every matched step and finished 0.7081 against 0.7262 -- but
+that is the training objective, and see below for why it is the wrong thing to celebrate.
+
+### The sidecar still costs, and that is the whole story
+
+| what the sidecar itself costs, within its own arm | enabled - bypassed |
+| --- | ---: |
+| `widened-ple-stage1-1m` | +0.032436 [+0.028300, +0.036439] |
+| `widened-plegated-stage1-1m` | +0.028509 [+0.024955, +0.031959] |
+
+Turning the sidecar on still makes the model **worse at generating** by 0.0285 nats.
+Every arm this project has trained does this. Set that against what the capacity probe
+says the table holds -- a purely linear read, no gate, no backbone adaptation, worth
+**-0.0539** nats on the same kind of tokens -- and the gap is about **0.083 nats between
+what the table can give and what training extracts.**
+
+That gap is the result. It is not an architecture problem: this run changed the
+architecture substantially, in the direction the measurements pointed, and moved 0.0039
+of 0.083. The remaining 95% is the objective.
+
+### The gate did not gate
+
+Over the whole run:
+
+| | start | end |
+| --- | ---: | ---: |
+| `gate_direction_norm_0` / `_1` | 1.440 / 1.404 | 1.453 / 1.414 |
+| `gate_std` | 0.03551 | 0.03475 |
+| `gate_mean` | 0.4958 | 0.5030 |
+| `value_norm` | 0 | 3.013 |
+| `conv_norm` | 0 | 0.2769 |
+
+The value trained hard; the directions moved about 0.01 in norm and `gate_std` did not
+widen at all. `gate_frac_open` and `gate_frac_shut` stayed at 0 throughout, so every gate
+sat inside the 0.4-0.6 band for the entire run: **a constant scale of about 0.5, not a
+selector.** This is the failure `gate_report` exists to catch, and it is the same one the
+original `GatedResidual` had.
+
+So the -0.0039 improvement is **not** evidence that per-branch admission works. The
+likelier attribution is what was removed: `key_proj` and `norm_key` are 26.2M parameters
+that start near zero and have to learn to decode a table encoded by a different model,
+and not having them lets the value path train cleanly. The gate contributed a constant.
+
+Why it did not move is straightforward. `dL/dg` is proportional to the value, which is
+exactly zero at initialisation and small for the first steps, and the directions share
+one learning rate with everything else in the sidecar. The two things to try are a
+gate-specific learning rate and warming the value before the directions are unfrozen --
+in that order, because the first is one line.
+
+### One evaluator bug this surfaced
+
+`plumbing_probe` asserts one sidecar call per residual branch, which is right for a
+sidecar applied to each branch in turn and wrong for one that reads the whole stream. It
+does not produce a wrong number when it is wrong -- it refuses to evaluate, with
+"evaluation silently bypassed the sidecar or failed to forward its data/flag". The
+`{"complete": false}` marker written before loading meant the failed attempt could not
+leave a stale success behind, which is the hardening integrated earlier today doing
+exactly its job.
+
 ## Codex on hyper-connections versus gates: four corrections (2026-09-10)
 
 Codex reviewed the restructuring and the hyper-connections-versus-gates decision. Four

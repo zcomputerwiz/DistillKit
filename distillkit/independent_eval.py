@@ -375,9 +375,13 @@ def plumbing_probe(model, collator, feature, device):
                          "residual_max": (output - args[0]).float().abs().max().item()})
 
     # A widened layer applies the sidecar to each residual branch in turn, so one
-    # forward is one call per branch rather than one call.
-    per_forward = (model.config.residual_stream_num_branches
-                   if getattr(model.config, "residual_stream_enabled", False) else 1)
+    # forward is one call per branch rather than one call -- unless the sidecar reads
+    # the whole widened stream itself, which the direction-gated variant does precisely
+    # so that admission can differ per branch. That one is called once.
+    per_forward = 1
+    if (getattr(model.config, "residual_stream_enabled", False)
+            and not getattr(sidecar, "reads_widened_stream", False)):
+        per_forward = model.config.residual_stream_num_branches
     handle = sidecar.register_forward_hook(hook)
     batch = {k: v.to(device) for k, v in collator([feature]).items()}
     position = torch.tensor([len(feature["ids"]) - 2], device=device)

@@ -212,3 +212,41 @@ def test_the_gated_variant_refuses_a_single_stream():
     config.sidecar_variant = "ple_gated"
     with pytest.raises(ValueError, match="widened residual"):
         _set_sidecar_defaults(config)
+
+
+def test_the_plumbing_probe_counts_one_call_for_a_stream_reading_sidecar():
+    """The probe expects one sidecar call per branch, which is wrong for this variant.
+
+    It is called once with the whole widened stream, precisely so admission can differ
+    per branch. Getting this wrong does not produce a wrong number -- it refuses to
+    evaluate at all, with a message about silently bypassing the sidecar.
+    """
+    from distillkit.independent_eval import plumbing_probe
+    from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
+    from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_TYPE_SIZE
+
+    torch.manual_seed(0)
+    config = _widened_config()
+    model = Qwen35WidenedForCausalLM(config).eval()
+    bytes_per_head = config.sidecar_head_dim // IQ4NL_BLOCK * IQ4NL_TYPE_SIZE
+
+    def collator(features):
+        ids = torch.tensor([f["ids"] for f in features])
+        return {"input_ids": ids,
+                "attention_mask": torch.ones_like(ids),
+                # Not zeros: an all-zero IQ4_NL block dequantizes to a zero row, the
+                # value would be zero however well trained, and the probe's
+                # enabled-minus-bypassed check would pass for the wrong reason. Small
+                # byte values keep the block's fp16 scale finite and positive.
+                "ngram_raw": torch.randint(1, 16, (len(features), ids.shape[1],
+                                                   config.sidecar_num_heads, bytes_per_head),
+                                           dtype=torch.uint8)}
+
+    with torch.no_grad():
+        model.model.layers[config.sidecar_layer_index].sidecar.ple.value_proj.weight.normal_(std=0.1)
+    report = plumbing_probe(model, collator, {"ids": [1, 2, 3, 4, 5, 6]}, "cpu")
+    assert report["branch_calls_per_forward"] == 1, report["branch_calls_per_forward"]
+    assert len(report["sidecar_calls"]) == 2, report["sidecar_calls"]
+    assert report["sidecar_calls"][0]["enabled"] and report["sidecar_calls"][0]["raw_present"]
+    assert not report["sidecar_calls"][1]["enabled"]
+    assert report["enabled_minus_bypassed_logits_max"] > 0, "a trained value must change the logits"
