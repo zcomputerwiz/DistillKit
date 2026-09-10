@@ -1069,13 +1069,40 @@ The parking is real and exactly as large as advertised: **1.259 GiB off the home
 the end of the forward, 2.461 GiB with every boundary parked.** And the peak does not
 move -- 10.218 against 10.219 GiB, and 10.179 even when 2.5 GiB is parked.
 
-**The peak is set during backward, not at the end of the forward.** Whatever is binding
-is the recompute working set of a single layer, so relieving the stored boundaries
-cannot raise the ceiling. This does not retract the batch-4 result -- that was measured
-under the full objective, where the logit and optimizer pressure sits elsewhere -- but
-it does mean the offload is not what buys headroom at this shape, and it costs about
-0.8 s on the first step it runs. It is a candidate for removal, and the measurement that
-would settle it is the same probe under the real loss rather than a synthetic one.
+Under this synthetic loss the peak is set somewhere the stored boundaries do not reach,
+which made the offload look like pure overhead. **That reading was wrong, and G3 below
+is why**: it is an artefact of measuring memory under a loss that does not exist in any
+config. Keep the gradient result -- that part is sound -- and take the peak numbers from
+G3 instead.
+
+## G3: under the real objective the offload earns its place (2026-09-10)
+
+`scratch/g3_peak_probe.py` fixes both things that made the earlier memory numbers
+unrepresentative. `memory_phases.py` steps and zeroes the gradients on every backward
+while production runs `gradient_accumulation_steps: 8`, and `g2_offload_probe.py` used a
+synthetic loss with none of the objective's real pressure. This runs the configured
+objective -- sparse top-k KL through the chunked head plus the chunked hidden-state
+cosine -- across a full eight-microbatch window, with a warmup step first so
+bitsandbytes' 8-bit moments are resident in both arms rather than only the second.
+
+| arm | peak home | peak peer | window |
+| --- | ---: | ---: | ---: |
+| offload | 16.781 | 15.141 | 50.17 s |
+| no offload | **17.951** | 13.772 | 49.71 s |
+
+**1.171 GiB off the home card's peak, 1.369 GiB onto the peer's, for 0.46 s in fifty --
+under 1%.** The cards end up 16.78 against 15.14 rather than 17.95 against 13.77, which
+is the balance the offload was written to produce. It stays.
+
+Two details worth keeping. The peak is reached at microbatch **2**, not 1, and does not
+move for the remaining six -- so a probe that measures a single backward reports a
+number about 1.4 GiB low, and one that measures three is already representative. And
+live memory sits flat at 12.84 GiB across the whole window: the gradient buffers are
+allocated once and accumulated in place, so the accumulation depth costs nothing beyond
+that first microbatch.
+
+At batch 2 the home card peaks at 17.95 GiB of 24, which is the headroom the batch-4
+attempt did not have.
 
 ## Half the screen was prompt, and the sidecar was wrecking the prompt (2026-09-10)
 
