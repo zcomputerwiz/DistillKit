@@ -32,6 +32,9 @@ score widened-ple-stage1-1m ../runs/widened-ple-stage1-1m --table "$TABLE"
 score ple-stage1-1m ../runs/ple-stage1-1m --table "$TABLE"
 score gr-stage1-1m ../runs/gr-stage1-1m --table "$TABLE"
 score lr-sweep-1e3 ../runs/lr-sweep-1e3 --table "$TABLE"
+# The stage-2 pair: identical but for the residual_stream section.
+score widened-ple-stage2-5m ../runs/widened-ple-stage2-5m --table "$TABLE"
+score ple-control-stage2-5m ../runs/ple-control-stage2-5m --table "$TABLE"
 
 "$PY" -m distillkit.independent_eval report \
     --reference "$OUT/w384-student-hf.json" \

@@ -130,11 +130,10 @@ Knobs whose right value depends on what is binding, not on taste:
     against 0.5330, export verified as a stock checkpoint. 1.54x per microbatch but
     1.06x per epoch -- see "Hybrid tensor parallelism" for why, and what it buys.
 11. ~~Widen the residual stream to Flash-Next's multi-branch form~~ - **built,
-    verified, and it is the first change that helps**: exact bit-identical logits at
-    initialisation, and **-0.0258 nats/token** on 384 independent documents with the
-    interval entirely below zero. The sidecar still costs +0.44 to +0.54 and costs
-    slightly *more* with the widening, so the two are independent effects. Stage 2 is
-    running. See "The first change that helps held-out text".
+    verified, measured, and it loses.** Exact bit-identical logits at initialisation,
+    and against a matched control it is worse at every comparison: +0.0476 at stage 1,
+    +0.0106 enabled and +0.0045 bypassed at stage 2, all intervals excluding zero, for
+    about 30% more per update and ~3 GiB. See "Stage 2 settles it".
 
 **The two open items, in order:**
 
@@ -144,13 +143,14 @@ A. ~~Teach `independent_eval` to load widened checkpoints~~ - **done**: it selec
    to actually run it on a trained widened checkpoint; `eval_loss` has already been
    shown not to measure the thing we want, so that is the only verdict worth having.
 
-B. **Then decide what the n-gram sidecar is actually for.** The widening question is
-   answered for stage 1 and the answer is yes, -0.0258 nats/token. The sidecar
-   question is answered too, and the answer is still no: +0.4430 unwidened, +0.5046
-   widened, both intervals far from zero, on top of a backbone the widening improved.
-   Nothing so far has made the n-gram table pay for itself on text the cache never
-   saw, and the widening has now ruled out "the residual stream was too narrow" as
-   the explanation.
+B. **Decide what the n-gram sidecar is actually for.** The widening is answered and
+   the answer is no. The sidecar is answered too, and more sharply than before: it
+   cost +0.4430 at stage 1 and **+0.8871** at stage 2, because stage 2 is the first
+   run in which it actually trained. Every configuration tried so far makes held-out
+   text worse, and the widening has now ruled out "the residual stream was too
+   narrow" as the explanation. Meanwhile the backbone underneath keeps improving --
+   -0.0356 with the adapter bypassed -- so the distillation itself is working and the
+   n-gram table is what is not.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -969,6 +969,134 @@ head is recomputed during backward -- and which way it pays depends on what is b
 4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## Stage 2 settles it: the widening does not earn its place (2026-09-10)
+
+The matched stage-2 pair is done. Both arms ran 5M tokens with the backbone unlocked
+and `sidecar_lr: 1e-4`, identical but for the `residual_stream` block, at microbatch 2
+with accumulation 8 so the effective batch is the same. 384 independent documents,
+175,526 tokens.
+
+### Arm against arm, paired
+
+The report compares every checkpoint to the stock student, which is the right frame for
+"does this adapter hurt" and the wrong one for "does this arm beat that one". The
+curriculum is built out of matched pairs, so `scratch/paired_arms.py` compares them
+directly, same documents, pairing preserved. Negative favours the widened arm:
+
+| comparison | widened minus control | 95% CI |
+| --- | ---: | --- |
+| stage 1, sidecar enabled | **+0.047554** | [+0.042420, +0.052820] |
+| stage 2, sidecar enabled | **+0.010598** | [+0.008191, +0.013122] |
+| stage 2, sidecar bypassed | **+0.004470** | [+0.003600, +0.005346] |
+
+Three comparisons, three intervals excluding zero, all on the wrong side. **The widening
+is worse than its control everywhere a control exists.** It costs about 30% more per
+update and roughly 3 GiB, and it does not buy anything.
+
+### So what was the -0.0258 at stage 1?
+
+`widened-stage1-1m` -- the widening alone, frozen backbone, no sidecar -- scored
+**-0.025844** against `student-hf`, and that is still the only negative number this
+project has produced. But its control was `student-hf` itself, which is to say *no
+trainable parameters at all*. Against a real control the widening loses, so the honest
+reading of that arm is "42.6M free parameters trained on a million tokens of teacher
+distillation move the model slightly toward the teacher", not "a wider residual stream
+helps". Any adapter of that size might have done it; the experiment cannot distinguish
+them, because the arm that would distinguish them is exactly the paired comparison
+above.
+
+### What the stage-2 pair does establish
+
+| | enabled | bypassed | sidecar costs |
+| --- | ---: | ---: | ---: |
+| `ple-control-stage2-5m` | 2.002003 | 1.114960 | +0.887043 |
+| `widened-ple-stage2-5m` | 2.012600 | 1.119430 | +0.893171 |
+| `student-hf` | 1.150513 | 1.150513 | 0 |
+
+* **Unlocking the backbone helps.** Both bypassed backbones beat the stock student --
+  -0.0356 and -0.0311 -- which reproduces `lr-sweep-1e3`'s -0.0928 on a longer run.
+* **Training the sidecar makes it much worse.** The n-gram adapter cost +0.44 at stage 1
+  and costs **+0.89** here, after 5M tokens at a learning rate that actually moves it.
+  Giving the sidecar the rate it needed to train at all is what made it twice as
+  damaging.
+* The best model this project has is a stage-2 backbone **with the adapter switched
+  off**.
+
+`eval_loss` said the two arms were tied and slightly favoured the control anyway
+(0.4311 widened against 0.4298), which is the first time it has agreed with the
+independent measurement about anything. It still ranked the stage-1 arms exactly
+backwards.
+
+## Making the widened path cheaper, and what did not work (2026-09-10)
+
+Measured on the real stage-2 configuration with `scratch/memory_phases.py`, which
+reports peak, live and reserved per phase rather than arithmetic on a traceback:
+
+| phase, card 0 | before | after |
+| --- | ---: | ---: |
+| hidden-state loss, peak | 11.051 GiB | **9.989** |
+| backward, peak | 16.549 GiB | **15.849** |
+| backward, reserved | 18.270 GiB | 17.855 |
+
+**-0.70 GiB off the backward peak**, which is the phase that owns the high-water mark
+and the one that ran out of memory at batch 4. Two changes did it.
+
+* **The widened read stopped holding fp32 copies of every branch.** `Qwen3_5RMSNorm`
+  materialises four full-width fp32 tensors for a bf16 input and autograd keeps two of
+  them until backward: measured with saved-tensor hooks, **10.01 bytes held per element
+  of a 2-byte input**. `branch_norm` holds the bf16 input the residual stream is holding
+  anyway plus one fp32 reciprocal per row -- **2.01 bytes**, a factor of five -- and
+  differentiates the closed form. The forward stays bit-identical, because `x * rstd`
+  with x in bf16 and rstd in fp32 promotes inside the multiply kernel rather than
+  materialising a cast copy. Three other rewrites were tried and rejected on exactness:
+  `linalg.vector_norm`'s variance differs on ~50 elements per 1.3M, squaring in bf16 on
+  1.2-6.5%, and `F.rms_norm` on 26%.
+* **The hidden-state loss is chunked.** It was the last unchunked path -- each anchor
+  projected 2560 to 5120 and kept that output live alongside the cosine's temporaries,
+  twice over. -1.06 GiB.
+
+### torch.compile works here and is still unusable
+
+Worth recording precisely, because most of this project's performance work has been
+shaped by what Windows lacks and this is not one of those cases. **Triton 3.8 and nvcc
+are installed and both inductor and a hand-written Triton kernel produce correct CUDA
+results on this machine.**
+
+It cannot be used anyway, for a structural reason. Every region worth fusing is inside a
+non-reentrant gradient checkpoint -- the widened read and the branch collapse inside the
+checkpointed decoder layer, the hidden-state cosine inside the chunk's own checkpoint.
+A compiled function inside such a frame makes the recompute save a different set of
+tensors than the forward did, because the first call traces and later calls run the
+compiled artifact, and the frame fails its consistency check:
+
+    saved metadata:      {'shape': torch.Size([4608, 2560]), ...}
+    recomputed metadata: {'shape': torch.Size([2, 4096, 4608]), ...}
+
+The test suite did not catch it; the phase probe did, on the real configuration, and
+`DISTILLKIT_COMPILE=0` made the same run pass. Warming the compile beforehand would hide
+it until the first guard failure, hours into a run. There was also no speedup to protect:
+**12.76 s/update baseline against 12.78 compiled** at batch 4.
+
+A related failure on the way there: a compiled region inside a checkpoint entered from a
+*worker thread* raised `_StopRecomputationError` with "target_frame.early_stop is set" --
+the same class of problem `AllReduce._save_recompute_barrier` already works around.
+
+### Also measured and dead
+
+The allocator sweep. Windows ignores `expandable_segments`, so how blocks are rounded and
+split is the only lever left, and none of it matters here:
+
+| allocator | reserved, card 0 |
+| --- | ---: |
+| `garbage_collection_threshold:0.8` | **17.12 GiB** |
+| `+ roundup_power2_divisions:16` | 17.11 |
+| `roundup_power2_divisions:16` alone | 17.14 |
+| `+ roundup_power2_divisions:8,max_split_size_mb:512` | 17.72 |
+
+The configuration already in use is the best of the four. Together with the earlier
+finding that `empty_cache()` between training steps does nothing, the pool's waste is
+generated inside a single backward and cannot be tuned away from outside.
 
 ## The first change that helps held-out text, and it is not the sidecar (2026-09-09)
 
