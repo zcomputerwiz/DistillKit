@@ -1027,6 +1027,137 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## What upstream's PLE gate is actually signalling (2026-09-10)
+
+The shuffled-pairing probe above found a small separation and I read two things into it
+that do not hold up. Both are corrected here, and the corrected version says something
+more useful than the original claim did.
+
+### Correction 1: the across-document control was barely a control
+
+I argued the *harder* within-document control separating more than the across-document
+one was evidence against a content-matching gate. It is evidence about the corpus. Every
+document opens with the same system prompt, so at the same position index most documents
+carry the same token: **17.2% of positions are token-identical across all 32 documents,
+and agreement in the first 128 positions is 51.3%.** Rolling features across documents
+leaves those positions untouched, so it is a *weaker* shuffle than rolling within a
+document, not an easier question. The ordering is an artefact.
+
+### Correction 2: stream 0's reversed sign is not evidence of anything
+
+It is a -0.012 shift on a gate whose key-dependence turns out to be 5% of its variance.
+That is second-order noise, not anti-alignment.
+
+### What the probe should have asked
+
+It held the query fixed and permuted the key, so it could only see the gate's dependence
+on the table. The gate has two inputs. Permuting each side separately
+(`scratch/ple_gate_decomposition.py`, 32 documents, 14,495 positions) attributes the
+variance:
+
+| stream | gate | query alone | key alone | the *average* row instead of the real one |
+| --- | ---: | ---: | ---: | ---: |
+| 0 | 0.6887 +- 0.0803 | **0.439** | 0.053 | 0.646 |
+| 1 | 0.4821 +- 0.2282 | **0.882** | 0.000 | 0.932 |
+| 2 | 0.4921 +- 0.1680 | **0.453** | 0.024 | 0.670 |
+| 3 | 0.4903 +- 0.1698 | **0.713** | 0.008 | 0.824 |
+
+**44-88% of the gate is the residual stream; 0-5% is the n-gram row.** Replace every
+position's row with the average row and 65-93% of the gate survives, with the
+distribution essentially unchanged -- stream 1 goes from 0.4821 +- 0.2282 to
+0.4808 +- 0.2274.
+
+### Why, and it is a property of the table rather than of our backbone
+
+After `key_proj` and the grouped RMS norm the keys are nearly collinear. Mean cosine to
+the mean key, and mean pairwise cosine:
+
+| stream | cosine to the mean key | mean pairwise cosine |
+| --- | ---: | ---: |
+| 0 | 0.9693 | 0.9396 |
+| 1 | 0.9778 | 0.9561 |
+| 2 | 0.8998 | 0.8095 |
+| 3 | 0.9745 | 0.9497 |
+
+Every n-gram row lands in almost the same direction, so there is nothing for a query to
+*match against*. This is a fact about `key_proj` and the table, not about this student's
+residual basis, so it holds for upstream too.
+
+**Upstream's gate is not a relevance match. It is admission control**: a fixed linear
+functional of the normalised residual direction, `sigmoid(signed_sqrt(q . k_bar / sqrt(d)))`,
+with a small row-dependent perturbation on top. The mechanism the port's docstring
+describes -- "whether a token's n-gram entry is used depends on whether it agrees with
+what the stream already carries" -- is the architecture's shape, but it is not what the
+trained weights converged to.
+
+### And it is not tracking anything obvious
+
+Regressing the gate on what the stream could be encoding at that depth, R^2:
+
+| stream | \|stream\| | position | role | backbone entropy | token NLL | all together |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0.000 | 0.008 | 0.014 | 0.008 | 0.006 | 0.021 |
+| 1 | 0.000 | 0.008 | 0.015 | 0.011 | 0.008 | 0.024 |
+| 2 | 0.012 | 0.000 | 0.004 | 0.000 | 0.001 | 0.019 |
+| 3 | 0.000 | 0.001 | 0.002 | 0.004 | 0.002 | 0.010 |
+
+The interesting negative is **entropy**: a gate that opened where the backbone is unsure
+would be asking for lexical help, and would be worth reproducing whatever basis it was
+learned in. It does not -- correlation +0.09 at best. Nor norm, position, or role. It is
+a learned direction in the stream that none of the obvious covariates explain, and on our
+backbone it is reading whatever our model happens to put in those coordinates.
+
+### What this changes
+
+* **Do not build key-query matching and expect selectivity from it.** Upstream's own
+  trained weights show it collapsing to a scalar read off the stream. The port's design
+  note -- that a computed gate cannot sit at its initialisation the way a learned one can
+  -- is still right about *gradient*, but the thing it converges to is not a matcher.
+* **The row's content enters through `value_proj`, not through the gate.** That is where
+  the effort belongs, and it is consistent with the capacity probe: a purely linear read
+  of the table, with no gate at all, is worth 0.047 nats on assistant tokens.
+* The earlier conclusion stands but for a better reason. Not "the basis does not
+  transfer" -- **the trained gate is a constant plus a 5% correction**, so there was never
+  much in it to transfer.
+
+## The table holds 0.047 nats the objective is not asking for (2026-09-10)
+
+`scratch/table_capacity_probe.py` removes the teacher entirely and asks the table
+directly. The backbone is frozen, the only trainable thing is one matrix, and the loss is
+ground-truth cross entropy on assistant tokens::
+
+    logits = lm_head(final_hidden + W(features))       # W: 2560 -> 2560, zero-init
+
+At `W = 0` this is exactly the student, so the baseline is free and exact. The control is
+the same training against features rolled across documents, which measures how much a
+linear map onto 248,320 logits can fit from any correlated input.
+
+512 training documents, 192 evaluation documents, all from the 1,602 the teacher-cache
+manifests establish as unseen, disjoint slices:
+
+| arm | eval NLL | vs baseline | \|W\| |
+| --- | ---: | ---: | ---: |
+| baseline (`W = 0`) | 0.4888 | -- | 0 |
+| **table** | **0.4348** | **-0.0539** | 87.90 |
+| shuffled control | 0.4820 | -0.0067 | 51.00 |
+
+**+0.0472 nats over the control, 11% of the baseline**, from a linear read with no gate,
+no non-linearity and no backbone adaptation. And it has not saturated: at 24k training
+tokens the gain was 0.019, at 190k it is 0.047.
+
+Set that against every trained arm, which *costs* 0.02 to 0.04 nats on the same kind of
+tokens. The table is not the problem. **The objective is** -- exactly as the structural
+confound predicted, since the teacher has no table and the KL's optimum is a student
+whose sidecar is silent.
+
+### One thing this turned up about the corpus
+
+`heldout.jsonl` is a pool, not a split: all 5,598 training documents are among its 7,200.
+Nothing is wrong with the evaluations -- `independent_eval prepare` requires
+`--manifests` and `unseen_records` raises without them, which is where "1,505 eligible
+unseen documents" comes from -- but any new script reading that file directly must apply
+the same filter, and this one does.
+
 ## G1/G2: the GPU checks Codex asked for (2026-09-10)
 
 **G1, real-model identity under tensor parallelism.** `widened_residual_probe.py

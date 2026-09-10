@@ -1,0 +1,156 @@
+{
+  "hc_count": 4,
+  "documents": 32,
+  "tokens": 14495,
+  "streams": [
+    {
+      "stream": 0,
+      "gate_mean": 0.6886770129203796,
+      "gate_std": 0.08033943176269531,
+      "query_only_r2": 0.4387053892395585,
+      "key_only_r2": 0.05311303554557534,
+      "both_permuted_r2": 2.3678788019114357e-06,
+      "mean_key_r2": 0.6460881905302109,
+      "mean_key_gate_mean": 0.6959906816482544,
+      "mean_key_gate_std": 0.06327835470438004,
+      "r2_from_stream_norm": 0.0001971721649169922,
+      "r2_from_position": 0.008375287055969238,
+      "r2_from_role": 0.014026224613189697,
+      "r2_from_entropy": 0.008431732654571533,
+      "r2_from_token_nll": 0.006467700004577637,
+      "r2_from_norm_position_role": 0.014320433139801025,
+      "r2_from_everything": 0.02080446481704712,
+      "correlation_with_entropy": 0.09182428568601608,
+      "gate_by_role": {
+        "template": {
+          "mean": 0.70170658826828,
+          "tokens": 409
+        },
+        "system": {
+          "mean": 0.7038931250572205,
+          "tokens": 3620
+        },
+        "user": {
+          "mean": 0.6866697072982788,
+          "tokens": 2864
+        },
+        "assistant": {
+          "mean": 0.6814865469932556,
+          "tokens": 7602
+        }
+      }
+    },
+    {
+      "stream": 1,
+      "gate_mean": 0.4820910692214966,
+      "gate_std": 0.2281520515680313,
+      "query_only_r2": 0.8816133390906202,
+      "key_only_r2": 0.0001971225882950534,
+      "both_permuted_r2": 1.2736668661078988e-05,
+      "mean_key_r2": 0.9319757168151597,
+      "mean_key_gate_mean": 0.48076918721199036,
+      "mean_key_gate_std": 0.22736233472824097,
+      "r2_from_stream_norm": 2.6226043701171875e-06,
+      "r2_from_position": 0.007573723793029785,
+      "r2_from_role": 0.015141904354095459,
+      "r2_from_entropy": 0.011415958404541016,
+      "r2_from_token_nll": 0.008003294467926025,
+      "r2_from_norm_position_role": 0.016881048679351807,
+      "r2_from_everything": 0.02380824089050293,
+      "correlation_with_entropy": 0.10684571415185928,
+      "gate_by_role": {
+        "template": {
+          "mean": 0.4148729741573334,
+          "tokens": 409
+        },
+        "system": {
+          "mean": 0.5044182538986206,
+          "tokens": 3620
+        },
+        "user": {
+          "mean": 0.5206074118614197,
+          "tokens": 2864
+        },
+        "assistant": {
+          "mean": 0.4605647325515747,
+          "tokens": 7602
+        }
+      }
+    },
+    {
+      "stream": 2,
+      "gate_mean": 0.4920842945575714,
+      "gate_std": 0.16802704334259033,
+      "query_only_r2": 0.4533269077477975,
+      "key_only_r2": 0.024363606256141646,
+      "both_permuted_r2": 2.7017746863054965e-05,
+      "mean_key_r2": 0.6704350543685713,
+      "mean_key_gate_mean": 0.49178943037986755,
+      "mean_key_gate_std": 0.15695632994174957,
+      "r2_from_stream_norm": 0.012280881404876709,
+      "r2_from_position": 0.00024271011352539062,
+      "r2_from_role": 0.004032611846923828,
+      "r2_from_entropy": 0.0001004338264465332,
+      "r2_from_token_nll": 0.0008042454719543457,
+      "r2_from_norm_position_role": 0.0178413987159729,
+      "r2_from_everything": 0.019225716590881348,
+      "correlation_with_entropy": -0.010020882822573185,
+      "gate_by_role": {
+        "template": {
+          "mean": 0.48977500200271606,
+          "tokens": 409
+        },
+        "system": {
+          "mean": 0.5012046098709106,
+          "tokens": 3620
+        },
+        "user": {
+          "mean": 0.5068151354789734,
+          "tokens": 2864
+        },
+        "assistant": {
+          "mean": 0.48231571912765503,
+          "tokens": 7602
+        }
+      }
+    },
+    {
+      "stream": 3,
+      "gate_mean": 0.4903078079223633,
+      "gate_std": 0.1698085516691208,
+      "query_only_r2": 0.7126463932146443,
+      "key_only_r2": 0.00760700967498279,
+      "both_permuted_r2": 4.222551849208619e-05,
+      "mean_key_r2": 0.8243466559547983,
+      "mean_key_gate_mean": 0.4929869472980499,
+      "mean_key_gate_std": 0.16580191254615784,
+      "r2_from_stream_norm": 4.273653030395508e-05,
+      "r2_from_position": 0.0007877945899963379,
+      "r2_from_role": 0.001979053020477295,
+      "r2_from_entropy": 0.003703474998474121,
+      "r2_from_token_nll": 0.001659989356994629,
+      "r2_from_norm_position_role": 0.00562816858291626,
+      "r2_from_everything": 0.009886085987091064,
+      "correlation_with_entropy": 0.06085582450032234,
+      "gate_by_role": {
+        "template": {
+          "mean": 0.533669650554657,
+          "tokens": 409
+        },
+        "system": {
+          "mean": 0.49021413922309875,
+          "tokens": 3620
+        },
+        "user": {
+          "mean": 0.4913633465766907,
+          "tokens": 2864
+        },
+        "assistant": {
+          "mean": 0.4876217544078827,
+          "tokens": 7602
+        }
+      }
+    }
+  ],
+  "quality_evaluation": false
+}

@@ -23,6 +23,13 @@ zero.
 Scored on assistant tokens only, for the reason the response-only bundle exists: prompt
 prediction dominates whole-window numbers and is not what the model is for.
 
+`heldout.jsonl` is a *pool*, not a split -- all 5,598 training documents are inside its
+7,200 -- so eligibility comes from the teacher-cache manifests exactly as
+`independent_eval prepare` establishes it. Both slices here are drawn from the unseen
+remainder and are disjoint from each other, so the eval documents are new to the
+backbone and to the readout alike. The absolute NLL is still not comparable to the
+reply-bundle arms: different documents, different lengths.
+
     python scratch/table_capacity_probe.py --output scratch/gpu-checks/table-capacity.json
 """
 
@@ -48,6 +55,8 @@ DEFAULT_GGUF = os.path.join(
 )
 DEFAULT_STUDENT = str((ROOT / ".." / "student-hf").resolve())
 DEFAULT_DOCUMENTS = str((ROOT / ".." / "capture-data" / "heldout.jsonl").resolve())
+DEFAULT_MANIFESTS = [str((ROOT / ".." / name / "manifest.json").resolve())
+                     for name in ("teacher-cache-1m", "teacher-cache-5m")]
 
 
 class _PadCollator:
@@ -111,6 +120,7 @@ def main():
     parser.add_argument("--gguf", default=DEFAULT_GGUF)
     parser.add_argument("--student", default=DEFAULT_STUDENT)
     parser.add_argument("--documents", default=DEFAULT_DOCUMENTS)
+    parser.add_argument("--manifests", nargs="+", default=DEFAULT_MANIFESTS)
     parser.add_argument("--train-docs", type=int, default=512)
     parser.add_argument("--eval-docs", type=int, default=128)
     parser.add_argument("--tokens", type=int, default=1024)
@@ -135,17 +145,18 @@ def main():
     pad_id = tokenizer.pad_token_id
     if pad_id is None:
         pad_id = tokenizer.eos_token_id
-    documents = []
-    with open(args.documents, encoding="utf-8") as handle:
-        for line in handle:
-            text = json.loads(line).get("text", "")
-            if text:
-                documents.append(text)
-            if len(documents) >= args.train_docs + args.eval_docs:
-                break
-    train_docs = documents[:args.train_docs]
-    eval_docs = documents[args.train_docs:args.train_docs + args.eval_docs]
-    print("documents: %d train, %d eval" % (len(train_docs), len(eval_docs)))
+    from distillkit.independent_eval import unseen_records
+
+    unseen = unseen_records(args.documents, args.manifests)
+    if len(unseen) < args.train_docs + args.eval_docs:
+        raise SystemExit("only %d unseen documents; asked for %d"
+                         % (len(unseen), args.train_docs + args.eval_docs))
+    # Eval taken from the far end so a smaller --train-docs does not silently move which
+    # documents are scored, which would make two runs of this probe incomparable.
+    train_docs = [record["text"] for record in unseen[:args.train_docs]]
+    eval_docs = [record["text"] for record in unseen[-args.eval_docs:]]
+    print("documents: %d train, %d eval, from %d unseen"
+          % (len(train_docs), len(eval_docs), len(unseen)))
 
     table = GGUFNGramTable(args.gguf)
     collator = SidecarDataCollator(_PadCollator(pad_id), table, NGramHasher())

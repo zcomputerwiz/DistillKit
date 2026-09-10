@@ -1,0 +1,25 @@
+{
+  "train_docs": 512,
+  "eval_docs": 192,
+  "tokens": 1024,
+  "lr": 0.001,
+  "epochs": 1,
+  "baseline_nll": 0.48875547982589074,
+  "eval_assistant_tokens": 69143,
+  "table": {
+    "eval_nll": 0.4348368054866039,
+    "delta_vs_baseline": -0.05391867433928682,
+    "readout_norm": 87.89502716064453,
+    "train_tokens": 190615,
+    "seconds": 265.97499220000464
+  },
+  "shuffled_control": {
+    "eval_nll": 0.48201324221020403,
+    "delta_vs_baseline": -0.006742237615686708,
+    "readout_norm": 50.99589920043945,
+    "train_tokens": 190615,
+    "seconds": 147.24918459999026
+  },
+  "table_gain_over_control": 0.04717643672360011,
+  "quality_evaluation": true
+}
