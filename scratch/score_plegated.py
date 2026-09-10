@@ -17,11 +17,11 @@ from pathlib import Path
 import numpy as np
 
 BASE = Path("scratch/independent-eval")
-ARMS = {
-    "student-hf": "reply-student-hf.json",
-    "widened-ple-stage1-1m": "reply-widened-ple-stage1-1m.json",
-    "widened-plegated-stage1-1m": "reply-widened-plegated-stage1-1m.json",
-}
+BASELINE = "student-hf"
+CONTROL = "widened-ple-stage1-1m"
+# Every arm is scored against the transcription. Add a name here once its reply bundle
+# exists; the file name follows from it. An arm that is not there yet is skipped.
+ARMS = (BASELINE, CONTROL, "widened-plegated-stage1-1m", "widened-plegated-fp32-stage1-1m")
 
 
 def load(path, role="assistant"):
@@ -46,22 +46,26 @@ def paired(left, right, tokens, draws=10000, seed=0):
 
 def main():
     loaded = {}
-    for name, filename in ARMS.items():
-        path = BASE / filename
+    for name in ARMS:
+        path = BASE / ("reply-%s.json" % name)
         if not path.exists():
-            print("missing %s" % path)
-            return 1
+            if name in (BASELINE, CONTROL):
+                print("missing %s" % path)
+                return 1
+            print("skipping %s (no reply bundle yet)" % name)
+            continue
         loaded[name] = load(path)
+    treatments = [name for name in ARMS if name != BASELINE and name in loaded]
 
-    reference_ids, _, reference_tokens = loaded["student-hf"]
+    reference_ids, _, reference_tokens = loaded[BASELINE]
     for name, (ids, _, tokens) in loaded.items():
         assert ids == reference_ids, "%s scored different documents" % name
         assert (tokens == reference_tokens).all(), "%s has different assistant spans" % name
     print("%d documents, %d assistant tokens\n" % (len(reference_ids), reference_tokens.sum()))
 
-    base = loaded["student-hf"][1]["enabled"]
+    base = loaded[BASELINE][1]["enabled"]
     print("against the pre-retrofit student:")
-    for name in ("widened-ple-stage1-1m", "widened-plegated-stage1-1m"):
+    for name in treatments:
         _, modes, tokens = loaded[name]
         for mode in ("enabled", "bypassed"):
             if mode not in modes:
@@ -69,18 +73,22 @@ def main():
             estimate, low, high = paired(modes[mode], base, tokens)
             print("  %-28s %-9s %+.6f [%+.6f, %+.6f]" % (name, mode, estimate, low, high))
 
-    print("\ngated minus the transcription it replaces:")
-    _, gated, tokens = loaded["widened-plegated-stage1-1m"]
-    _, control, _ = loaded["widened-ple-stage1-1m"]
-    for mode in ("enabled", "bypassed"):
-        if mode not in gated or mode not in control:
+    _, control, _ = loaded[CONTROL]
+    for name in treatments:
+        if name == CONTROL:
             continue
-        estimate, low, high = paired(gated[mode], control[mode], tokens)
-        verdict = "gated better" if high < 0 else ("control better" if low > 0 else "spans zero")
-        print("  %-9s %+.6f [%+.6f, %+.6f]  %s" % (mode, estimate, low, high, verdict))
+        print("\n%s minus the transcription it replaces:" % name)
+        _, gated, tokens = loaded[name]
+        for mode in ("enabled", "bypassed"):
+            if mode not in gated or mode not in control:
+                continue
+            estimate, low, high = paired(gated[mode], control[mode], tokens)
+            verdict = ("gated better" if high < 0
+                       else "control better" if low > 0 else "spans zero")
+            print("  %-9s %+.6f [%+.6f, %+.6f]  %s" % (mode, estimate, low, high, verdict))
 
     print("\nwhat the sidecar itself costs, within each arm:")
-    for name in ("widened-ple-stage1-1m", "widened-plegated-stage1-1m"):
+    for name in treatments:
         _, modes, tokens = loaded[name]
         if "bypassed" not in modes:
             continue

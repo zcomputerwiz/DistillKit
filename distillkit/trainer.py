@@ -47,6 +47,7 @@ class DistillationTrainer(SFTTrainer):
             lf.requires_hidden_states() for lf in self.loss_functions
         )
         self.need_model_loss = any(lf.requires_model_loss() for lf in self.loss_functions)
+        self.need_token_targets = any(lf.requires_token_targets() for lf in self.loss_functions)
 
         # The stock causal-LM loss keeps a full fp32 copy of the logits alive for
         # backward. Over a 248k-wide head that measured 2.84 GB where the chunked
@@ -322,11 +323,20 @@ class DistillationTrainer(SFTTrainer):
         losses = []
         loss_fns = []
         weights = []
+        assistant_mask = None
+        if getattr(self, "need_token_targets", False):
+            from distillkit.lossfuncs.cross_entropy import assistant_token_mask
+            assistant_mask = assistant_token_mask(
+                inputs["input_ids"], inputs.get("attention_mask"), self.processing_class,
+            )
         for idx, loss_fn in enumerate(self.loss_functions):
             cfg = self.config.loss_functions[idx]
             extra = {}
             if head_context is not None and loss_fn.accepts_head_context():
                 extra["head_context"] = head_context
+            if loss_fn.requires_token_targets():
+                extra.update(labels=inputs["labels"], assistant_mask=assistant_mask,
+                             attention_mask=inputs.get("attention_mask"))
             loss = loss_fn(
                 student_outputs,
                 signal,

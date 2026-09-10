@@ -14,6 +14,7 @@ from distillkit.missing_probability import MissingProbabilityHandling
 
 class LossFunction(str, Enum):
     CROSS_ENTROPY = "cross_entropy"
+    ASSISTANT_CROSS_ENTROPY = "assistant_cross_entropy"
     KL = "kl"
     JSD = "jsd"
     TVD = "tvd"
@@ -395,14 +396,20 @@ class DistillationRunConfig(BaseModel):
             raise ValueError(
                 "sortish_batching replaces train_sampling_strategy; set one or the other"
             )
+        if any(f.function == LossFunction.ASSISTANT_CROSS_ENTROPY for f in self.loss_functions):
+            if not self.chunked_head:
+                raise ValueError("assistant_cross_entropy requires chunked_head")
+            if (self.functionary_packing or self.dataset.prepacked
+                    or self.training_args.get("packing") or self.training_args.get("padding_free")):
+                raise ValueError("assistant_cross_entropy requires unpacked documents")
         if self.chunked_head:
             # The forward runs with logits_to_keep=1, so student_outputs.logits covers
             # one position. cross_entropy reads the model's own loss over the full
             # head, which cannot be computed from that.
             if any(f.function.value == "cross_entropy" for f in self.loss_functions):
                 raise ValueError("chunked_head is incompatible with the cross_entropy loss")
-            if not any(f.function.value in ("kl", "jsd", "tvd") for f in self.loss_functions):
-                raise ValueError("chunked_head needs a sparse divergence loss to fold the head into")
+            if not any(f.function.value in ("kl", "jsd", "tvd", "assistant_cross_entropy") for f in self.loss_functions):
+                raise ValueError("chunked_head needs a sparse divergence or assistant_cross_entropy loss to fold the head into")
         if self.concurrent_microbatches == 2:
             if not cached or not self.optimizer or self.optimizer.strategy != "adamw":
                 raise ValueError("Concurrent training requires an offline cache and optimizer.strategy=adamw")

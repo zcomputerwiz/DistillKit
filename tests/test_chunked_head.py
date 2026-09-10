@@ -252,3 +252,203 @@ def test_row_budget_does_not_change_the_value():
     reference = accumulate_over_chunks(head(hidden), ids, values, None, None, sparse_kl_div_inner)
     got = chunked_head_loss(hidden, head, ids, values, None, 16, sparse_kl_div_inner)
     torch.testing.assert_close(got, reference, rtol=1e-5, atol=1e-6)
+
+
+class _CharacterTokenizer:
+    """Explicit offsets, so role and causal-shift expectations are hand checkable."""
+    def decode(self, ids, **kwargs):
+        return "".join(chr(i) for i in ids)
+
+    def __call__(self, text, **kwargs):
+        return {"input_ids": list(map(ord, text)),
+                "offset_mapping": [(i, i+1) for i in range(len(text))]}
+
+
+def test_assistant_spans_exclude_headers_empty_think_user_and_padding():
+    from distillkit.lossfuncs.cross_entropy import assistant_token_mask
+    text = ("<|im_start|>system\nS<|im_end|>\n<|im_start|>user\nU<|im_end|>\n"
+            "<|im_start|>assistant\n<think>\n</think>\n\nABC<|im_end|>\n"
+            "<|im_start|>user\nV<|im_end|>\n<|im_start|>assistant\nDE")
+    ids = torch.tensor([[0, 0] + list(map(ord, text)) + [0]])
+    attention = ids.ne(0)
+    got = assistant_token_mask(ids, attention, _CharacterTokenizer())
+    expected = torch.zeros_like(attention)
+    start = 2 + text.index("ABC")
+    stop = 2 + text.index("<|im_start|>user\nV")
+    expected[:, start:stop] = True
+    expected[:, -3:-1] = True  # DE, excluding final padding
+    assert torch.equal(got, expected)
+
+
+def test_assistant_mask_refuses_inexact_roundtrip():
+    from distillkit.lossfuncs.cross_entropy import assistant_token_mask
+    class Wrong(_CharacterTokenizer):
+        def __call__(self, text, **kwargs):
+            result = super().__call__(text, **kwargs)
+            result['input_ids'][0] += 1
+            return result
+    with pytest.raises(ValueError, match="match input_ids exactly"):
+        assistant_token_mask(torch.tensor([[65, 66]]), None, Wrong())
+
+
+@pytest.mark.parametrize("chunk", [1, 3, 64])
+def test_assistant_ce_matches_dense_value_and_gradients(chunk):
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.cross_entropy import AssistantCrossEntropyLoss
+    torch.manual_seed(83)
+    head = torch.nn.Linear(5, 11, bias=False)
+    hidden = torch.randn(2, 6, 5, requires_grad=True)
+    labels = torch.tensor([[0, 1, 2, 3, -100, 5], [6, 7, 8, 9, 10, 0]])
+    assistant = torch.tensor([[0, 0, 1, 1, 1, 1], [0, 1, 1, 0, 1, 1]], dtype=torch.bool)
+    attention = torch.tensor([[0, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 0]])
+    # Explicit predictor positions: first row 1,2,4; second row 0,1,3.
+    expected = torch.nn.functional.cross_entropy(
+        head(hidden)[[0,0,0,1,1,1], [1,2,4,0,1,3]], torch.tensor([2,3,5,7,8,10]))
+    ref_grads = torch.autograd.grad(expected, (hidden,head.weight))
+    loss_fn = AssistantCrossEntropyLoss(sparse_chunk_length=chunk)
+    got = loss_fn(None, None, head_context=HeadContext(hidden,head,vocab_size=9),
+                  labels=labels, assistant_mask=assistant, attention_mask=attention)
+    grads = torch.autograd.grad(got, (hidden,head.weight))
+    torch.testing.assert_close(got, expected)
+    for a,b in zip(grads,ref_grads): torch.testing.assert_close(a,b)
+    assert not loss_fn.requires_model_loss()
+    assert loss_fn.requires_token_targets() and loss_fn.accepts_head_context()
+
+
+def test_assistant_ce_empty_region_is_differentiable_zero_without_head():
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.cross_entropy import AssistantCrossEntropyLoss
+    hidden = torch.randn(1, 4, 5, requires_grad=True)
+    head = torch.nn.Linear(5, 11, bias=False)
+    def forbidden(x): raise AssertionError("empty assistant region projected the head")
+    head.forward = forbidden
+    result = AssistantCrossEntropyLoss()(None,None,head_context=HeadContext(hidden,head),
+        labels=torch.ones(1,4,dtype=torch.long), assistant_mask=torch.zeros(1,4,dtype=torch.bool))
+    assert result.item() == 0
+    result.backward()
+    assert torch.count_nonzero(hidden.grad) == 0
+
+
+def test_assistant_ce_configuration_is_opt_in_and_uses_loss_registry(tmp_path):
+    from distillkit.configuration import DistillationRunConfig
+    from distillkit.trainer import create_loss_func
+    payload = dict(model="x",dataset={},chunked_head=True,sequence_length=8,
+        teacher={"kind":"dataset","cache_path":str(tmp_path)},output_path=str(tmp_path/'out'),
+        loss_functions=[{"function":"assistant_cross_entropy","weight":1.,"sparse_chunk_length":4}])
+    config = DistillationRunConfig.model_validate(payload)
+    assert create_loss_func(config.loss_functions[0]).name() == 'assistant_cross_entropy'
+    payload['chunked_head'] = False
+    with pytest.raises(ValueError,match='requires chunked_head'):
+        DistillationRunConfig.model_validate(payload)
+    payload['chunked_head'] = True
+    payload['training_args'] = {'packing':True}
+    with pytest.raises(ValueError,match='unpacked'):
+        DistillationRunConfig.model_validate(payload)
+
+
+def test_trainer_assistant_ce_shares_chunked_forward_and_preserves_existing_kl():
+    import threading
+    from types import SimpleNamespace
+    from test_sidecar_model import tiny_config
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+    from distillkit.trainer import DistillationTrainer, create_loss_func
+    from distillkit.configuration import LossFunctionConfig
+    from distillkit.signals import SparseSignal
+    from distillkit.lossfuncs.cross_entropy import assistant_token_mask
+    torch.manual_seed(31)
+    config = tiny_config()
+    config.vocab_size = 128
+    model = Qwen35SidecarForCausalLM(config).eval()
+    text = '<|im_start|>user\nU<|im_start|>assistant\nAB'
+    ids = torch.tensor([list(map(ord,text))])
+    mask = torch.ones_like(ids)
+    signal = SparseSignal(sparse_ids=torch.ones(1,len(text),1,dtype=torch.long),
+        sparse_values=torch.zeros(1,len(text),1), log_values=True,
+        generation_temperature=1., hidden_states=None,vocab_size=128)
+    cfgs = [LossFunctionConfig(function='kl',weight=.7,temperature=1.,sparse_chunk_length=4)]
+    trainer = SimpleNamespace(model=model, need_hidden_states=False, need_model_loss=False,
+        need_token_targets=False, _kept_bf16_outputs=True, chunked_head=True,
+        true_vocab_size=128, hidden_state_mapping=None, _head_chunk_length=4,
+        processing_class=_CharacterTokenizer(), accelerator=SimpleNamespace(unwrap_model=lambda x:x),
+        signal_source=SimpleNamespace(get_signal=lambda *a,**kw:signal),
+        _loss_log_local=threading.local(),log=lambda *a:None,
+        config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),sidecar=SimpleNamespace(enabled=False),
+                               loss_functions=cfgs),loss_functions=[create_loss_func(cfgs[0])])
+    trainer.total_distillation_loss = lambda *a,**kw: DistillationTrainer.total_distillation_loss(trainer,*a,**kw)
+    calls = []
+    original = model.forward
+    def observed(**kwargs):
+        calls.append(kwargs)
+        return original(**kwargs)
+    model.forward = observed
+    inputs = dict(input_ids=ids,attention_mask=mask)
+    before = DistillationTrainer.compute_loss(trainer,model,dict(inputs))
+    repeated = DistillationTrainer.compute_loss(trainer,model,dict(inputs))
+    torch.testing.assert_close(repeated,before,rtol=0,atol=0)
+    cfgs.append(LossFunctionConfig(function='assistant_cross_entropy',weight=.3,sparse_chunk_length=4))
+    trainer.loss_functions.append(create_loss_func(cfgs[1]))
+    trainer.need_token_targets = True
+    combined = DistillationTrainer.compute_loss(trainer,model,dict(inputs))
+    assert all(c['logits_to_keep']==1 and 'labels' not in c for c in calls)
+    dense = original(**inputs, use_cache=False, sidecar_enabled=False).logits
+    selected = assistant_token_mask(ids,mask,_CharacterTokenizer())[:,1:]
+    ce = torch.nn.functional.cross_entropy(dense[:,:-1][selected],ids[:,1:][selected])
+    torch.testing.assert_close(combined,.7*before+.3*ce,rtol=1e-5,atol=1e-6)
+    combined.backward()
+    assert torch.isfinite(model.get_input_embeddings().weight.grad).all()
+
+
+@pytest.mark.skipif(torch.cuda.device_count() < 2, reason="needs two CUDA devices")
+def test_assistant_ce_vocab_shards_match_dense():
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.cross_entropy import AssistantCrossEntropyLoss
+    from distillkit.tp_vocab import VocabParallelEmbedding, VocabParallelHead
+    torch.manual_seed(91)
+    embedding = torch.nn.Embedding(64, 16).cuda()
+    hidden = torch.randn(1, 9, 16,device='cuda:0',requires_grad=True)
+    labels = torch.tensor([[0,3,31,32,63,1,44,9,21]],device='cuda:0')
+    mask = torch.tensor([[0,1,1,0,1,1,0,1,1]],device='cuda:0',dtype=torch.bool)
+    dense = torch.nn.Linear(16,64,bias=False).cuda()
+    dense.weight.data.copy_(embedding.weight)
+    fn = AssistantCrossEntropyLoss(3)
+    expected = fn(None,None,head_context=HeadContext(hidden,dense),labels=labels,assistant_mask=mask)
+    ref_h,ref_w = torch.autograd.grad(expected,(hidden,dense.weight))
+    head = VocabParallelHead(VocabParallelEmbedding(embedding,['cuda:0','cuda:1']))
+    got = fn(None,None,head_context=HeadContext(hidden,head),labels=labels,assistant_mask=mask)
+    grads = torch.autograd.grad(got,(hidden,*head.shards))
+    torch.testing.assert_close(got,expected)
+    torch.testing.assert_close(grads[0],ref_h)
+    torch.testing.assert_close(torch.cat([g.to('cuda:0') for g in grads[1:]]),ref_w)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs CUDA")
+def test_assistant_ce_peak_memory_is_bounded_across_vocabulary_sizes():
+    from distillkit.chunked_head import HeadContext
+    from distillkit.lossfuncs.cross_entropy import AssistantCrossEntropyLoss
+    peaks = []
+    for vocab in (16_000,64_000):
+        hidden = torch.randn(1,513,16,device='cuda',requires_grad=True)
+        head = torch.nn.Linear(16,vocab,bias=False,device='cuda').requires_grad_(False)
+        labels = torch.randint(vocab,(1,513),device='cuda')
+        assistant = torch.ones_like(labels,dtype=torch.bool)
+        def measure(fn):
+            hidden.grad = None
+            torch.cuda.synchronize(); torch.cuda.empty_cache(); torch.cuda.reset_peak_memory_stats()
+            before = torch.cuda.memory_allocated()
+            fn().backward(); torch.cuda.synchronize()
+            return torch.cuda.max_memory_allocated()-before
+        dense = measure(lambda: torch.nn.functional.cross_entropy(
+            head(hidden[:,:-1]).flatten(0,1),labels[:,1:].flatten()))
+        # A row budget plus a byte ceiling limits projected activation memory.
+        chunked = measure(lambda: AssistantCrossEntropyLoss(32)(None,None,
+            head_context=HeadContext(hidden,head), labels=labels,assistant_mask=assistant))
+        full = 512*vocab*4
+        print(f"vocab={vocab}: dense peak={dense/2**20:.2f} MiB, "
+              f"assistant chunked peak={chunked/2**20:.2f} MiB")
+        assert dense >= full
+        assert chunked < dense-full
+        assert chunked < full/2
+        peaks.append((dense,chunked))
+        del hidden,head,labels,assistant
+    # Increasing vocab 4x must not add a sequence-wide logits allocation.
+    assert peaks[1][1]-peaks[0][1] < (peaks[1][0]-peaks[0][0])/2

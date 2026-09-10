@@ -1,5 +1,5 @@
 from distillkit.lossfuncs.common import LossFunctionBase
-from distillkit.lossfuncs.cross_entropy import CrossEntropyLoss
+from distillkit.lossfuncs.cross_entropy import CrossEntropyLoss, AssistantCrossEntropyLoss
 from distillkit.lossfuncs.hidden_state import HiddenStateCosineLoss, HiddenStateMSELoss
 from distillkit.lossfuncs.hingeloss import HingeLoss, sparse_hinge_loss
 from distillkit.lossfuncs.jsd import JSDLoss, sparse_js_div
@@ -20,6 +20,7 @@ ALL_LOSS_CLASSES = [
     HiddenStateCosineLoss,
     HiddenStateMSELoss,
     CrossEntropyLoss,
+    AssistantCrossEntropyLoss,
 ]
 
 __all__ = [
@@ -37,6 +38,7 @@ __all__ = [
     "HiddenStateCosineLoss",
     "HiddenStateMSELoss",
     "CrossEntropyLoss",
+    "AssistantCrossEntropyLoss",
     "LossFunctionBase",
     "ALL_LOSS_CLASSES",
 ]

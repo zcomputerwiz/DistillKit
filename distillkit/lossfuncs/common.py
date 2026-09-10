@@ -252,6 +252,10 @@ class LossFunctionBase(ABC):
         """
         return False
 
+    def requires_token_targets(self) -> bool:
+        """Whether the trainer must supply labels and an assistant-token mask."""
+        return False
+
     @abstractmethod
     def __init__(self, **kwargs) -> None: ...
 
