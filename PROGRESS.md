@@ -970,6 +970,119 @@ head is recomputed during backward -- and which way it pays depends on what is b
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
 
+## Half the screen was prompt, and the sidecar was wrecking the prompt (2026-09-10)
+
+The held-out corpus is chat-formatted and the screen scored each document's first 512
+tokens, so it had been measuring instruction-block prediction as much as anything else.
+Partitioned: 87,940 assistant tokens against 83,046 of system and user, with 21 of 384
+documents never reaching the assistant turn at all.
+
+The replacement bundle keeps the prompt in the window as context -- a continuation has
+to be conditioned on its question -- and scores only assistant positions, requiring at
+least 64 of them per document: **384 documents, 156,565 assistant tokens.**
+
+### Where the damage actually was
+
+`widened-ple-stage1-1m` against `student-hf`, one forward pass, partitioned:
+
+| role | tokens | baseline NLL | delta | relative |
+| --- | ---: | ---: | ---: | ---: |
+| system | 43,597 | 2.2625 | +0.4574 | +20.2% |
+| **user** | 44,329 | 1.3548 | **+1.3854** | **+102.3%** |
+| **assistant** | 156,565 | 0.5039 | **+0.0306** | **+6.1%** |
+| template | 5,546 | 0.2809 | +0.3702 | +131.8% |
+
+**A 45x difference between user turns and assistant turns.** Every independent number
+this project reported before today was dominated by the adapter destroying its ability
+to predict prompt text while barely touching what the model generates.
+
+That also explains the MMLU/ARC null, and less interestingly than first thought. It is
+not upstream's loss-versus-benchmark decoupling. The benchmarks score continuations, the
+adapter costs +0.031 nats there, and that is simply too small to move accuracy. **We were
+measuring the wrong tokens.**
+
+Note baseline difficulty does not predict the damage: `system` has the highest baseline
+NLL and the *least* relative damage, `template` the lowest and the most. A depth story
+does not explain a *role* asymmetry either -- the sidecar fires at layer 1 for every
+token regardless of whose turn it is. The untested hypothesis is that damage tracks how
+much of a prediction is carried by local lexical cues rather than long-range context.
+
+### Every arm, scored on responses only
+
+Delta against `student-hf`, assistant tokens, 10,000 paired resamples:
+
+| arm | assistant delta | 95% CI | whole-window delta, for scale |
+| --- | ---: | --- | ---: |
+| **`widened-stage1-1m`** (widening, no sidecar) | **-0.002953** | [-0.004207, -0.001782] | -0.0258 |
+| `ple-stage1-1m` | +0.018113 | [+0.014317, +0.021808] | +0.4430 |
+| `gr-stage1-1m` | +0.026501 | [+0.021344, +0.031386] | +0.5360 |
+| `widened-ple-stage2-5m` | +0.027250 | [+0.015492, +0.037888] | +0.8621 |
+| `ple-control-stage2-5m` | +0.028366 | [+0.016629, +0.039022] | +0.8515 |
+| `widened-ple-stage1-1m-anchor32` | +0.030166 | [+0.025746, +0.034377] | -- |
+| `widened-ple-stage1-1m` | +0.030562 | [+0.026039, +0.034933] | +0.4906 |
+| `lr-sweep-1e3` | +0.043783 | [+0.034996, +0.051966] | +0.6849 |
+
+Three things survive the rescaling and one does not.
+
+* **Every adapter still hurts**, and the ordering is roughly preserved, but the
+  magnitudes collapse by 15x to 30x. The honest statement is now "+0.02 to +0.04 nats on
+  generated text", not "+0.44 to +0.89".
+* **`widened-stage1-1m` is still the only arm that improves**, -0.002953 with the
+  interval below zero. Small -- 0.6% of a 0.504 baseline -- but the sign holds on both
+  measurements.
+* **Both stage-2 backbones improve responses with the adapter bypassed**, by about 0.007
+  nats. The distillation is working; the adapter is what costs.
+* **What does not survive: "training the sidecar made it twice as damaging."** On the
+  whole window stage 2 was +0.85 against stage 1's +0.44. On responses it is +0.028
+  against +0.018. Most of that doubling was prompt tokens.
+
+### The intermediate anchor: dead, and it was hurting the prompt
+
+Per-anchor telemetry, added because the aggregate is a mean over anchors and cannot say
+which one works. The two-anchor control re-run:
+
+| anchor | first -> last | cosine similarity reached |
+| --- | --- | ---: |
+| anchor 4 (intermediate) | 1.0080 -> 0.8906 | 0.109 |
+| anchor 32 (final) | 1.0000 -> 0.6172 | 0.383 |
+
+Anchor 4 moves 0.117 across an entire run and ends essentially orthogonal. Dropping it
+(`qwen35_widened_ple_stage1_1m_anchor32.yml`, weights 0.8235 : 0.1765 to hold the
+KL-to-anchor ratio) gives, paired against its control:
+
+| role | anchor32-only minus two-anchor |
+| --- | ---: |
+| **assistant** | **-0.000396 [-0.001424, +0.000635]** -- spans zero |
+| system | -0.099239 [-0.103138, -0.095248] |
+| user | -0.419559 [-0.448957, -0.392054] |
+
+So the intermediate anchor was **actively damaging prompt prediction and doing nothing
+for responses either way**. Removing it is free; it is not an improvement.
+
+### The confound underneath all of it
+
+The teacher is the dense 27B -- `hidden_size: 5120`, `anchor_layers: [8, 64]`, no n-gram
+table. The sidecar exists only in the student, ported from a different model. So the
+hidden-state loss asks the student's layer-4 state, which carries n-gram features
+injected at layer 1, to match a teacher state that never had them: **the optimum at that
+anchor is to cancel the sidecar by layer 4**, and anchor 4's 0.109 is that optimum being
+reached, not a failure to learn.
+
+The KL term has the same property. Matching the teacher's output distribution means the
+sidecar must not change the output. **The optimum of the entire objective is a student
+whose sidecar contributes nothing.** An n-gram table can only win by reaching the same
+behaviour more cheaply -- which is upstream's framing, the table substituting for
+parameters -- and this loss cannot express that. It can only measure deviation from a
+model that does not have one.
+
+### A calibration number
+
+The two-anchor control was re-run byte-identically, same seed, only to add telemetry:
+`eval_loss` 0.7317 against the original 0.7262. That 0.0055 is the drift from the
+memory work (chunked hidden-state loss reorders the reduction, `branch_norm` changes the
+backward), against an order-seed variance of 0.0005. **Any `eval_loss` difference below
+about 0.006 is now unresolvable against code changes.**
+
 ## Stage 2 settles it: the widening does not earn its place (2026-09-10)
 
 The matched stage-2 pair is done. Both arms ran 5M tokens with the backbone unlocked
