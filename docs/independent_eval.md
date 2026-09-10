@@ -1,5 +1,44 @@
 # Independent checkpoint evaluation
 
+## Bounded four-checkpoint rerun (2026-09-10)
+
+From the repository root, run:
+
+```powershell
+powershell -File scratch/run_independent_screen.ps1 -OutputDirectory scratch/eval-screen
+```
+
+This prepares 128 unseen documents (up to 512 tokens, each carrying at least 64
+assistant tokens), 128 MMLU questions and
+128 ARC-Challenge questions per split, checks two screening items per task first,
+then evaluates student-hf, gr-stage1-1m, ple-stage1-1m and lr-sweep-1e3. It evaluates
+only the screening split. Use `-Documents` and `-Questions` to reduce the budget;
+each checkpoint process has a 540-second watchdog. `-Device cuda:1` selects the
+second card without hiding either GPU. A failed evaluation now invalidates any
+previous success at its output path before loading, so rerun failures cannot
+silently reuse stale scores. Keep prior results under a different output directory.
+
+`report --stage1-checkpoints gr-stage1-1m ple-stage1-1m` includes explicit
+per-document frozen-backbone checks in `stage1_self_checks`. It reports GR's
+complete-adapter bypass for this check, and still retains its actual False-flag
+ablation in all metric comparisons. `normalization_disagreements` counts questions
+whose predictions differ across raw/token/character normalization for every arm;
+all three accuracies and their paired intervals are always emitted.
+
+Fresh results and loading probes are in `scratch/eval-20260910/`; see `RESULTS.md`
+there. **Read the `nll@assistant` rows, not the aggregate.** That screen was prepared
+without `--min-assistant-tokens`, so its headline NLL is a whole-window number, and a
+whole-window number on this chat corpus is roughly half instruction-block prediction:
+partitioned, the same adapters cost +0.03 nats on assistant tokens against +1.39 on
+user turns, a 45x difference. The runner now passes the flag; the committed results
+predate it. Those numbers fill in the benchmark rows the historical
+`scratch/independent-eval/RESULTS.md` left unscored -- they do not supersede the
+response-only bundle, which remains the measurement to judge arms on.
+
+Only `RESULTS.md` and the loading audit are committed from that directory. The bundle
+and per-checkpoint result files are 12 MB of JSON and are ignored, as the earlier
+result dumps are.
+
 The probe expects one sidecar call per residual branch, so a widened checkpoint
 reports `branch_calls_per_forward` alongside `sidecar_calls`; `load_checkpoint`
 selects the widened model class from the checkpoint's own `residual_stream_enabled`

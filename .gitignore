@@ -180,3 +180,10 @@ cython_debug/
 /scratch/independent-eval/*.nll.json
 /scratch/independent-eval/*.mmlu.json
 /scratch/independent-eval/*.arc.json
+
+# Screen outputs: keep RESULTS.md and the loading audit, ignore the 12 MB of JSON.
+/scratch/eval-20260910/*.json
+/scratch/eval-20260910/*.json.partial
+/scratch/eval-20260910/*.log
+!/scratch/eval-20260910/legacy-loading-audit.json
+/scratch/eval-screen/

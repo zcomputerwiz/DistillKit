@@ -1,0 +1,25 @@
+{
+  "saved_variant": "gated_residual",
+  "legacy_forced_variant": "ple",
+  "missing_keys": [
+    "model.layers.1.sidecar.ple.conv1d.weight",
+    "model.layers.1.sidecar.ple.key_proj.weight",
+    "model.layers.1.sidecar.ple.norm_conv.weight",
+    "model.layers.1.sidecar.ple.norm_key.weight",
+    "model.layers.1.sidecar.ple.norm_query.weight",
+    "model.layers.1.sidecar.ple.value_proj.weight"
+  ],
+  "unexpected_keys": [
+    "distillation_projections.0.weight",
+    "distillation_projections.1.weight",
+    "model.layers.1.sidecar.W_side_proj.weight",
+    "model.layers.1.sidecar.gated_residual.W_h.weight",
+    "model.layers.1.sidecar.gated_residual.W_x.bias",
+    "model.layers.1.sidecar.gated_residual.W_x.weight",
+    "model.layers.1.sidecar.gated_residual.branches.0.weight",
+    "model.layers.1.sidecar.gated_residual.branches.1.weight",
+    "model.layers.1.sidecar.gated_residual.branches.2.weight"
+  ],
+  "fresh_ple_value_proj_norm": 0.0,
+  "fresh_ple_conv_norm": 0.0
+}

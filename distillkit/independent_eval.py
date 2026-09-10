@@ -196,7 +196,8 @@ def prepare(args):
             banks[task] = list({r["id"]: r for r in bank}.values())
     bundle = {"protocol": "independent-eval-v1", "tokenizer": str(Path(args.tokenizer).resolve()),
               "tokenizer_sha256": digest(tokenizer.backend_tokenizer.to_str()),
-              "pad_token_id": tokenizer.pad_token_id or tokenizer.eos_token_id,
+              "pad_token_id": (tokenizer.eos_token_id if tokenizer.pad_token_id is None
+                               else tokenizer.pad_token_id),
               "unseen_document_count": len(unseen), "eligible_document_count": len(docs),
               "manifests": {str(p.resolve()): hashlib.sha256(p.read_bytes()).hexdigest() for p in manifests},
               "source": {"mmlu": "cais/mmlu all test", "arc": "allenai/ai2_arc ARC-Challenge test"},
@@ -303,6 +304,8 @@ def complete_bypass(model, active):
 
 
 def forward_logits(model, batch, mode, positions):
+    if mode not in ("enabled", "bypassed", "full_bypass"):
+        raise ValueError(f"unknown evaluation mode: {mode}")
     has_sidecar = hasattr(model.config, "sidecar_variant")
     kwargs = dict(batch, use_cache=False, logits_to_keep=positions)
     if has_sidecar:
@@ -394,6 +397,9 @@ def plumbing_probe(model, collator, feature, device):
 
 def evaluate(args):
     started = time.monotonic()
+    # A failed rerun must not leave yesterday's successful scores at today's output
+    # path. Reports reject this marker even if loading fails before the first batch.
+    write_json(args.output, {"complete": False, "checkpoint": str(Path(args.checkpoint).resolve())})
     # A stalled kernel must not turn this bounded evaluation into an overnight job.
     timer = threading.Timer(args.max_seconds, lambda: os._exit(124))
     timer.daemon = True
@@ -529,15 +535,39 @@ def report(args):
     reference = json.loads(Path(args.reference).read_text(encoding="utf-8"))
     if reference["audit"]["variant"] is not None:
         raise ValueError("pre-retrofit reference must be a stock checkpoint")
-    rows = []
+    rows, checks, disagreements = [], [], []
     for path in args.results:
-        rows.extend(compare_results(json.loads(Path(path).read_text(encoding="utf-8")), reference, args.bootstrap))
+        result = json.loads(Path(path).read_text(encoding="utf-8"))
+        rows.extend(compare_results(result, reference, args.bootstrap))
+        if Path(result["checkpoint"]).name in args.stage1_checkpoints:
+            checks.append(stage1_self_check(result, reference))
+        for task, records in result["records"].items():
+            if task == "nll":
+                continue
+            for mode in records[0]["modes"]:
+                disagreements.append({"checkpoint": Path(result["checkpoint"]).name,
+                                      "task": task, "mode": mode, "questions": len(records),
+                                      "count": sum(r["modes"][mode]["normalization_disagrees"]
+                                                   for r in records)})
     write_json(args.output, {"bootstrap": "paired percentile; documents for token-weighted NLL, questions for accuracy",
-                             "draws": args.bootstrap, "rows": rows})
+                             "draws": args.bootstrap, "rows": rows, "stage1_self_checks": checks,
+                             "normalization_disagreements": disagreements})
     print("checkpoint | task/metric | comparison | estimate [95% CI]")
     for row in rows:
         print(f"{row['checkpoint']} | {row['task']}/{row['metric']} | {row['comparison']} | "
               f"{row['estimate']:+.6f} [{row['ci95'][0]:+.6f}, {row['ci95'][1]:+.6f}]")
+
+
+def stage1_self_check(result, reference):
+    """Verify frozen-backbone parity separately from the GR flag-only ablation."""
+    compare_results(result, reference, draws=1)
+    records, refs = result["records"]["nll"], reference["records"]["nll"]
+    mode = "full_bypass" if result["audit"]["variant"] == "gated_residual" else "bypassed"
+    errors = [abs(r["modes"][mode]["sum_nll"] - s["modes"]["enabled"]["sum_nll"])
+              for r, s in zip(records, refs)]
+    return {"checkpoint": Path(result["checkpoint"]).name, "mode": mode,
+            "documents": len(errors), "max_document_sum_nll_difference": max(errors),
+            "exact_match": all(error == 0 for error in errors)}
 
 
 def main():
@@ -575,6 +605,8 @@ def main():
     rep.add_argument("--results", nargs="+", required=True)
     rep.add_argument("--output", required=True)
     rep.add_argument("--bootstrap", type=int, default=10000)
+    rep.add_argument("--stage1-checkpoints", nargs="*", default=[],
+                     help="checkpoint basenames expected to share the pre-retrofit backbone")
     rep.set_defaults(func=report)
     args = parser.parse_args()
     args.func(args)

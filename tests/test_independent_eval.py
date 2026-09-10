@@ -12,6 +12,7 @@ from distillkit.independent_eval import (
     continuation_tokens, load_checkpoint, make_collator, paired_interval,
     partition, plumbing_probe, score_sequences, select_split, unseen_records,
     validate_loading,
+    evaluate, forward_logits, stage1_self_check,
 )
 from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
 from distillkit.sidecar_collator import SidecarDataCollator
@@ -265,3 +266,43 @@ def test_reporting_rejects_unpaired_ids_and_partial_results():
     changed = {**ref, "task_sha256": {"nll": "b"}}
     with pytest.raises(ValueError, match="records differ"):
         compare_results(changed, ref)
+
+
+def test_unknown_mode_cannot_silently_become_a_bypass():
+    with pytest.raises(ValueError, match="unknown evaluation mode"):
+        forward_logits(FixedLogits(), {}, "enabeld", torch.tensor([0]))
+
+
+def test_failed_rerun_invalidates_previous_success(tmp_path, monkeypatch):
+    output = tmp_path / "result.json"
+    output.write_text(json.dumps({"complete": True, "checkpoint": "yesterday"}))
+    bundle = tmp_path / "bundle.json"
+    bundle.write_text(json.dumps({"splits": {"screen": {"nll": [{"ids": [1, 2]}]}}}))
+
+    def broken_load(*args):
+        raise ValueError("adapter failed exact verification")
+
+    monkeypatch.setattr("distillkit.independent_eval.load_checkpoint", broken_load)
+    args = SimpleNamespace(output=output, checkpoint=tmp_path, max_seconds=30,
+                           bundle=bundle, split="screen", tasks=["nll"], limit=0, device="cpu")
+    with pytest.raises(ValueError, match="adapter failed"):
+        evaluate(args)
+    result = json.loads(output.read_text())
+    assert not result["complete"], "a failed adapter load must never leave a reportable stale success"
+    with pytest.raises(ValueError, match="incomplete"):
+        compare_results(result, result)
+
+
+def test_stage1_check_uses_complete_gr_bypass_and_exposes_drift():
+    reference = {"checkpoint": "student", "complete": True, "split": "screen",
+                 "tokenizer_sha256": "a", "task_sha256": {"nll": "b"},
+                 "records": {"nll": [{"id": "one", "modes": {
+                     "enabled": {"sum_nll": 2., "tokens": 2}}}]}}
+    result = {**reference, "checkpoint": "gr", "audit": {"variant": "gated_residual"},
+              "records": {"nll": [{"id": "one", "modes": {
+                  "enabled": {"sum_nll": 4., "tokens": 2},
+                  "bypassed": {"sum_nll": 3., "tokens": 2},
+                  "full_bypass": {"sum_nll": 2., "tokens": 2}}}]}}
+    assert stage1_self_check(result, reference)["exact_match"], "GR's False flag retains trained branches"
+    result["records"]["nll"][0]["modes"]["full_bypass"]["sum_nll"] = 2.1
+    assert not stage1_self_check(result, reference)["exact_match"], "backbone drift must remain visible"
