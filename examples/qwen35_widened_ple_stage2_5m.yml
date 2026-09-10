@@ -1,0 +1,147 @@
+# Stage 2: widening plus PLE sidecar, backbone unlocked, 5M cache.
+#
+# Continues qwen35_widened_ple_stage1_1m.yml. Paired with
+# qwen35_ple_control_stage2_5m.yml, which is this run without the widening.
+#
+# Stage 2 is where the interesting measurement lives: lr-sweep-1e3's *bypassed*
+# backbone beat student-hf by -0.0894 nats/token, so unlocking the backbone helps
+# held-out text even when the adapter bolted to it does not. Whether the widening
+# lets the adapter keep that gain instead of reversing it is the whole question.
+#
+# Run:
+#   python -m distillkit.main examples/qwen35_widened_ple_stage2_5m.yml -v
+
+model: D:/DeepThought/Projects/HybridModel/runs/widened-ple-stage1-1m
+output_path: D:/DeepThought/Projects/HybridModel/runs/widened-ple-stage2-5m
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+# No model_kwargs.device_map: tensor parallelism owns placement. shard_model splits
+# 83.6% of parameters across both cards and leaves the residual stream, the tied
+# embeddings and the head on card 0.
+tensor_parallel: true
+
+sidecar:
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  resident: true
+  prefault: true
+  layer_index: 1
+  num_branches: 4
+  variant: ple
+
+# Anchor 4 is layer 3's output and anchor 32 is the post-norm state. Both projections
+# are built on card 0 regardless of the map: accelerate's root hook returns the whole
+# output tuple to the input device.
+
+# The retrofit under test. Two persistent residual branches with an
+# identity-initialised Hyper-Connections read/write at every attention and MLP
+# subblock: at step zero the logits are bit-identical to the unwidened student, so
+# anything this run measures is what the routing learned, not damage from the graft.
+# n_r=2 rather than 3 or 4 for margin -- 42.6M routing parameters and the smallest
+# memory bill. See docs/widened_residual.md.
+residual_stream:
+  num_branches: 2
+  lowrank: 64
+layer_mapping:
+  - [4, 0]
+  - [32, 1]
+
+loss_functions:
+  - function: kl
+    weight: 0.7
+    temperature: 1.0
+    missing_probability_handling: zero
+    sparse_chunk_length: 256
+  - function: hs_cosine
+    weight: 0.3
+
+optimizer:
+  # Not `hybrid`: Muon's Newton-Schulz iterations would run on 4.27B parameters here,
+  # and the memory win in stage 2 comes from 8-bit moments. adamw defers to
+  # training_args.optim, which selects bitsandbytes below. bnb keeps each state tensor
+  # on its parameter's own card, so the split holds through the optimizer.
+  strategy: adamw
+  freeze_backbone: false
+  unfreeze_at_step: null
+  # The architecture does not move at the backbone's rate: measured, a stage-2 run at
+  # 1e-5 left the sidecar's weights identical to five significant figures across fifty
+  # logged steps. Both arms get the same override so the comparison stays matched, and
+  # 1e-4 rather than the 5e-4 the eval_loss sweep preferred -- that sweep is the run
+  # whose adapter did the most damage on independent text.
+  sidecar_lr: 1.0e-4
+  log_every_n_steps: 1     # diagnostic: per-step VRAM until the split is settled
+# ON, unlike the layer-split config. Tensor parallelism halves every layer but leaves
+# the residual stream, the tied embeddings and the head on card 0, so the head's
+# working set is the binding constraint there rather than layer weights. Without this
+# the run OOM'd at step 4 asking for the 1.89 GiB materialized logits, with card 0 at
+# 20.52 GiB. Folded, the same step peaks at 12.22 GiB.
+use_flash_attention: false  # no Windows wheels; training_args.bf16 sets the load dtype
+functionary_packing: false
+chunked_cross_entropy: true
+sortish_batching: true
+chunked_head: true
+# 0.92 left 1.9 GiB of the card unused while both arms were failing by about 1 GiB.
+# The cap exists to turn a silent WDDM spill into a loud OOM, and 0.95 still does that
+# -- measured context overhead on this box is ~0.6 GiB, so 22.8 GiB allowed of 24.
+max_vram_fraction: 0.95     # applied to every visible device
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: adamw_bnb_8bit
+  # Batch 4 only works with the grouped sampler below. A batch pads to its longest
+  # member, and this corpus is median 545 / max 4096 tokens, so simulated over the
+  # real length distribution with HF's own sampler:
+  #
+  #   batch 1                        0.0% waste    997 tok/s
+  #   batch 2 random / grouped      28.8% / 2.5%   747 / 1024 tok/s
+  #   batch 4 random / grouped      49.7% / 3.5%   549 / 1053 tok/s
+  #
+  # Randomly batched, 4 is a 45% loss; grouped it is a 6% gain.
+  # Stays 1. Batching needs length grouping to be worth anything on this corpus
+  # (median 545 / max 4096 tokens): randomly batched, 4 wastes 49.7% of padded
+  # tokens; grouped, 3.5%. But grouping then requires chunked_head, whose recompute
+  # cancels most of the padding saving, and sorting by length gives every step a
+  # different shape -- which fragmented the allocator into an OOM at step 18 with
+  # 6.12 GiB reserved but unallocated, and Windows has no expandable_segments to
+  # recover. Revisit `train_sampling_strategy: group_by_length` with batch 4 if
+  # something else forces a larger effective batch; the cache dataset already
+  # provides the `length` column that sampler wants.
+  per_device_train_batch_size: 4
+  length_column_name: length
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  # Required, and checked at config time. Reentrant checkpointing does not carry the
+  # saved-tensor barrier that stops the two device workers recomputing one frame
+  # concurrently; see AllReduce._save_recompute_barrier.
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  num_train_epochs: 1
+  # An order of magnitude below stage 1: that run only moved 65.5M sidecar parameters
+  # against a fixed backbone, and reusing its 1e-4 on the full backbone would wash out
+  # what the frozen-backbone arm established.
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 50
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42
