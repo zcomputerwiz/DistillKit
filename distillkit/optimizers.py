@@ -17,6 +17,7 @@ from transformers import TrainerCallback
 
 from distillkit.gated_residual import GatedResidual
 from distillkit.widened_residual import WidenedResidual
+from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
 from distillkit.ple_sidecar import PLESidecar
 
 
@@ -356,7 +357,7 @@ def architecture_metrics(model: nn.Module) -> dict[str, float]:
     for name, module in model.named_modules():
         if isinstance(module, (GatedResidual, WidenedResidual)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
-        if isinstance(module, PLESidecar):
+        if isinstance(module, (PLESidecar, DirectionGatedPLESidecar)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if name.split(".")[-1] == "W_side_proj" and isinstance(module, nn.Linear):
             report[f"architecture/{name}/weight_norm"] = module.weight.float().norm().item()
