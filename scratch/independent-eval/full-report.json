@@ -1,0 +1,4290 @@
+{
+  "bootstrap": "paired percentile; documents for token-weighted NLL, questions for accuracy",
+  "draws": 10000,
+  "rows": [
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.6865046656235112,
+      "ci95": [
+        1.6157613712825816,
+        1.7587485737065554
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.5331894827944716,
+      "ci95": [
+        1.4661925269879215,
+        1.6010161352225258
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "full_bypass",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.15331518282903958,
+      "ci95": [
+        0.14036483303436623,
+        0.16721558292428917
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.5359919735274873,
+      "ci95": [
+        0.4994630236670696,
+        0.5744189185155462
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.3826767906984478,
+      "ci95": [
+        0.357176477423082,
+        0.4090363705958081
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - full_bypass",
+      "estimate": 0.5359919735274873,
+      "ci95": [
+        0.4994630236670696,
+        0.5744189185155462
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "full_bypass",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        -0.015625,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - full_bypass",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "full_bypass",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        -0.015625,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - full_bypass",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "full_bypass",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        -0.015625,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - full_bypass",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03515625,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.52734375,
+      "ci95": [
+        0.46484375,
+        0.58984375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "full_bypass",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0234375,
+      "ci95": [
+        0.00390625,
+        0.046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.01953125,
+      "ci95": [
+        -0.0078125,
+        0.046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - full_bypass",
+      "estimate": 0.01953125,
+      "ci95": [
+        -0.0078125,
+        0.046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.5,
+      "ci95": [
+        0.44140625,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.55078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "full_bypass",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.0078125,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.015625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        -0.01953125,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - full_bypass",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.015625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.51171875,
+      "ci95": [
+        0.453125,
+        0.57421875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.51171875,
+      "ci95": [
+        0.453125,
+        0.57421875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "full_bypass",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        -0.015625,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03125,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03125,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - full_bypass",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03125,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.8354255251433882,
+      "ci95": [
+        1.7664762415096147,
+        1.9047423906211398
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.0577201736770279,
+      "ci95": [
+        0.9992697447935656,
+        1.1171169208165852
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.7777053514663604,
+      "ci95": [
+        0.738997354853729,
+        0.8174831011809816
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.6849128330473644,
+      "ci95": [
+        0.6419296367371317,
+        0.7297458928719104
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.09279251841899602,
+      "ci95": [
+        -0.1018442512776929,
+        -0.08406550891993858
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.71875,
+      "ci95": [
+        0.6640625,
+        0.7734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.69921875,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.03515625,
+      "ci95": [
+        -0.078125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.03125,
+      "ci95": [
+        -0.07421875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.015625,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.71875,
+      "ci95": [
+        0.6640625,
+        0.7734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.69921875,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.03515625,
+      "ci95": [
+        -0.078125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.03125,
+      "ci95": [
+        -0.07421875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.015625,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.71875,
+      "ci95": [
+        0.6640625,
+        0.7734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.69921875,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.03515625,
+      "ci95": [
+        -0.078125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.03125,
+      "ci95": [
+        -0.07421875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.015625,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.43359375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.02734375,
+        0.04296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.04296875,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.0390625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.48828125,
+      "ci95": [
+        0.4296875,
+        0.55078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.5,
+      "ci95": [
+        0.44140625,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.04697265624999991,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.04296875,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.01171875,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.51953125,
+      "ci95": [
+        0.45703125,
+        0.58203125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.03125,
+        0.0390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.03515625,
+        0.04296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        -0.015625,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 2.0020027446215454,
+      "ci95": [
+        1.928547294669645,
+        2.0761491517153217
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1149597285326664,
+      "ci95": [
+        1.0586310438849116,
+        1.1724505427118306
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.8870430160888791,
+      "ci95": [
+        0.8418767925126593,
+        0.9343571910368103
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.8514900525255217,
+      "ci95": [
+        0.7998365432594409,
+        0.9047073712851579
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.03555296356335742,
+      "ci95": [
+        -0.048467872811122505,
+        -0.02291947880413291
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03515625,
+        0.02734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03515625,
+        0.02734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.7421875,
+      "ci95": [
+        0.6875,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.03515625,
+        0.02734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.51171875,
+      "ci95": [
+        0.44921875,
+        0.57421875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.5,
+      "ci95": [
+        0.4375,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.01171875,
+      "ci95": [
+        -0.0078125,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.0390625,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.51171875,
+      "ci95": [
+        0.44921875,
+        0.57421875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.43359375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.015625,
+      "ci95": [
+        -0.01171875,
+        0.046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.01953125,
+      "ci95": [
+        -0.015625,
+        0.0546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.51953125,
+      "ci95": [
+        0.45703125,
+        0.58203125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.53125,
+      "ci95": [
+        0.46875,
+        0.59375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-control-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.015625,
+      "ci95": [
+        -0.0078125,
+        0.0390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.5935207631346393,
+      "ci95": [
+        1.5210784851630421,
+        1.6664103576801683
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.4430080710386155,
+      "ci95": [
+        0.4173797845745913,
+        0.46952806200242414
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.4430080710386155,
+      "ci95": [
+        0.4173797845745913,
+        0.46952806200242414
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.4296875,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.5,
+      "ci95": [
+        0.4375,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.01171875,
+        0.02734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.01171875,
+        0.02734375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.4453125,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.6553792527851443,
+      "ci95": [
+        1.5815825487379442,
+        1.7296217130534153
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1349723794793545,
+      "ci95": [
+        1.0695590037200888,
+        1.2012149189591577
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.5204068733057898,
+      "ci95": [
+        0.4928296953143585,
+        0.5487176582816384
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.5048665606891204,
+      "ci95": [
+        0.47713434369621177,
+        0.5334219210629317
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.015540312616669414,
+      "ci95": [
+        -0.016557722722815863,
+        -0.014537244467118989
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.73828125,
+      "ci95": [
+        0.68359375,
+        0.79296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.73828125,
+      "ci95": [
+        0.68359375,
+        0.79296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.73828125,
+      "ci95": [
+        0.68359375,
+        0.79296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.03515625,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.5,
+      "ci95": [
+        0.4375,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.43359375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.015625,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.03125,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.01171875,
+      "ci95": [
+        -0.02734375,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.43359375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.5,
+      "ci95": [
+        0.44140625,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.015625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.01171875,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0078125,
+      "ci95": [
+        0.0,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.4375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.51171875,
+      "ci95": [
+        0.44921875,
+        0.57421875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.04296875,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.01953125,
+      "ci95": [
+        -0.046875,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 2.012632897562407,
+      "ci95": [
+        1.93877031012993,
+        2.086930650532848
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.117740109990911,
+      "ci95": [
+        1.0614200855987854,
+        1.1751409097398569
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.894892787571496,
+      "ci95": [
+        0.8492522307460892,
+        0.9419144978777854
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.8621202054663832,
+      "ci95": [
+        0.810519627689632,
+        0.9155021294876599
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.03277258210511281,
+      "ci95": [
+        -0.04553606822701213,
+        -0.020276180264896467
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.703125,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.015625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.703125,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.015625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.75390625,
+      "ci95": [
+        0.703125,
+        0.8046875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.74609375,
+      "ci95": [
+        0.69140625,
+        0.796875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.015625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.03515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.02734375,
+        0.01953125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.484375,
+      "ci95": [
+        0.421875,
+        0.546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.4765625,
+      "ci95": [
+        0.4140625,
+        0.5390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0078125,
+      "ci95": [
+        -0.0078125,
+        0.0234375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0234375,
+      "ci95": [
+        -0.05859375,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.03125,
+      "ci95": [
+        -0.06640625,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.49609375,
+      "ci95": [
+        0.4375,
+        0.55859375
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.47265625,
+      "ci95": [
+        0.41015625,
+        0.53515625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0234375,
+      "ci95": [
+        0.0078125,
+        0.04296875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.00390625,
+      "ci95": [
+        -0.01953125,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.01953125,
+      "ci95": [
+        -0.046875,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.5,
+      "ci95": [
+        0.4375,
+        0.5625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.0234375,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-ple-stage2-5m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.02734375,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.1228075280545988,
+      "ci95": [
+        1.058190844774153,
+        1.1884933334083194
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1228075280545988,
+      "ci95": [
+        1.058190844774153,
+        1.1884933334083194
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.02770516404142495,
+      "ci95": [
+        -0.029979854503934675,
+        -0.025393168974072917
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.02770516404142495,
+      "ci95": [
+        -0.029979854503934675,
+        -0.025393168974072917
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.734375,
+      "ci95": [
+        0.6796875,
+        0.7890625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.75,
+      "ci95": [
+        0.6953125,
+        0.80078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "mmlu",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.015625,
+      "ci95": [
+        -0.0390625,
+        0.00390625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "pre_retrofit",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.4453125,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.00390625,
+      "ci95": [
+        -0.0234375,
+        0.01171875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed",
+      "estimate": 0.50390625,
+      "ci95": [
+        0.44140625,
+        0.56640625
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.4921875,
+      "ci95": [
+        0.43359375,
+        0.5546875
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.01171875,
+      "ci95": [
+        -0.00390625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_token_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.01171875,
+      "ci95": [
+        -0.00390625,
+        0.03125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.44921875,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed",
+      "estimate": 0.5078125,
+      "ci95": [
+        0.44921875,
+        0.5703125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "pre_retrofit",
+      "estimate": 0.515625,
+      "ci95": [
+        0.45703125,
+        0.578125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.0234375,
+        0.0078125
+      ],
+      "units": 256
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "arc",
+      "metric": "acc_char_norm",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0078125,
+      "ci95": [
+        -0.0234375,
+        0.0078125
+      ],
+      "units": 256
+    }
+  ]
+}

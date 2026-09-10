@@ -53,7 +53,7 @@ def unseen_records(path, manifests):
         raise ValueError("cache manifests are required to establish unseen document IDs")
     used = set()
     for manifest in manifests:
-        used.update(str(d["doc_id"]) for d in json.loads(Path(manifest).read_text())["documents"])
+        used.update(str(d["doc_id"]) for d in json.loads(Path(manifest).read_text(encoding="utf-8"))["documents"])
     records, seen_ids, seen_text = [], set(), set()
     with Path(path).open(encoding="utf-8") as handle:
         for line in handle:
@@ -411,12 +411,12 @@ def compare_results(result, reference, draws=10000):
 
 
 def report(args):
-    reference = json.loads(Path(args.reference).read_text())
+    reference = json.loads(Path(args.reference).read_text(encoding="utf-8"))
     if reference["audit"]["variant"] is not None:
         raise ValueError("pre-retrofit reference must be a stock checkpoint")
     rows = []
     for path in args.results:
-        rows.extend(compare_results(json.loads(Path(path).read_text()), reference, args.bootstrap))
+        rows.extend(compare_results(json.loads(Path(path).read_text(encoding="utf-8")), reference, args.bootstrap))
     write_json(args.output, {"bootstrap": "paired percentile; documents for token-weighted NLL, questions for accuracy",
                              "draws": args.bootstrap, "rows": rows})
     print("checkpoint | task/metric | comparison | estimate [95% CI]")

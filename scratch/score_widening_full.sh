@@ -35,7 +35,7 @@ score() {  # score <name> <checkpoint-under-runs-or-path> [extra args]
 import json, sys
 from pathlib import Path
 stem = Path(sys.argv[1])
-parts = [json.loads(Path(f"{stem}.{task}.json").read_text()) for task in ("nll", "mmlu", "arc")]
+parts = [json.loads(Path(f"{stem}.{task}.json").read_text(encoding="utf-8")) for task in ("nll", "mmlu", "arc")]
 merged = dict(parts[0])
 merged["records"] = {task: part["records"][task] for task, part in zip(("nll", "mmlu", "arc"), parts)}
 merged["task_sha256"] = {k: v for part in parts for k, v in part["task_sha256"].items()}
@@ -59,5 +59,5 @@ score ple-control-stage2-5m ../runs/ple-control-stage2-5m --table "$TABLE"
 
 "$PY" -m distillkit.independent_eval report \
     --reference "$OUT/full-student-hf.json" \
-    --results $(ls "$OUT"/full-*.json | grep -v '\.\(nll\|mmlu\|arc\)\.json$' | grep -v full-report.json) \
+    --results $(ls "$OUT"/full-*.json | grep -vE '\.(nll|mmlu|arc)\.json$|full-(bundle|report)') \
     --output "$OUT/full-report.json" 2>&1 | tail -80

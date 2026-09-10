@@ -1,0 +1,6581 @@
+{
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\gr-stage1-1m",
+  "split": "screen",
+  "bundle_sha256": "d6a011d9710518b4f4812b5bf9d7fa3ea1dafd72fb08577a3cf6708636d1cfb3",
+  "tokenizer_sha256": "cc4ac36668961751f10c10901159d3fb3263507a4c24f4760833f9d21901849f",
+  "task_sha256": {
+    "nll": "3d97e084be400e9b4215d78a7c6daf83f8ed15d4135886f527754697e4e37dde"
+  },
+  "audit": {
+    "variant": "gated_residual",
+    "residual_branches": 1,
+    "adapter_tensor_count": 7,
+    "adapter_exact_match": true,
+    "adapter_norms": {
+      "model.layers.1.sidecar.W_side_proj.weight": 2.1004693508148193,
+      "model.layers.1.sidecar.gated_residual.W_h.weight": 88.08351135253906,
+      "model.layers.1.sidecar.gated_residual.W_x.bias": 0.08404248207807541,
+      "model.layers.1.sidecar.gated_residual.W_x.weight": 88.07592010498047,
+      "model.layers.1.sidecar.gated_residual.branches.0.weight": 2.052556276321411,
+      "model.layers.1.sidecar.gated_residual.branches.1.weight": 2.052459955215454,
+      "model.layers.1.sidecar.gated_residual.branches.2.weight": 2.0526533126831055
+    },
+    "ignored_loss_only_keys": [
+      "distillation_projections.0.weight",
+      "distillation_projections.1.weight"
+    ],
+    "config_sha256": "37643da7dd0c67bfac6c5881ebff8b13b3d3112ba51f0fb4fe6be9f7e5746b1c"
+  },
+  "probe": {
+    "sidecar_calls": [
+      {
+        "enabled": true,
+        "raw_present": true,
+        "residual_max": 0.2421875
+      },
+      {
+        "enabled": false,
+        "raw_present": true,
+        "residual_max": 0.236328125
+      }
+    ],
+    "branch_calls_per_forward": 1,
+    "enabled_minus_bypassed_logits_max": 3.3046875
+  },
+  "dtype": "bfloat16",
+  "device": "cuda:0",
+  "complete": true,
+  "records": {
+    "nll": [
+      {
+        "id": "1c88d10fed8e5d7929bd8237e00cc804",
+        "modes": {
+          "enabled": {
+            "sum_nll": 819.0535888671875,
+            "tokens": 437
+          },
+          "bypassed": {
+            "sum_nll": 716.2667846679688,
+            "tokens": 437
+          },
+          "full_bypass": {
+            "sum_nll": 396.876708984375,
+            "tokens": 437
+          }
+        }
+      },
+      {
+        "id": "1fa0c7a3b9b650269df134fc3cc4ab9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 811.3089599609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 705.1761474609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 377.04522705078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eec6419dba44b0c528531bee3b6ab74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 711.1644287109375,
+            "tokens": 442
+          },
+          "bypassed": {
+            "sum_nll": 614.1656494140625,
+            "tokens": 442
+          },
+          "full_bypass": {
+            "sum_nll": 336.2978515625,
+            "tokens": 442
+          }
+        }
+      },
+      {
+        "id": "1ea40d8a7c4b2636644ff07a61d90ad8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 858.4599609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 751.0997314453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 429.43389892578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "230b9d09eba77d3bba635b3069752c24",
+        "modes": {
+          "enabled": {
+            "sum_nll": 675.9190673828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 632.3658447265625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 479.71417236328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20dcde0ea7bb1db4c192d5a425eedd14",
+        "modes": {
+          "enabled": {
+            "sum_nll": 612.4230346679688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 535.8258056640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 327.8310546875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2323fdb3b702137f379546cd2467b2a5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 551.0716552734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 519.050537109375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 439.1741943359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2239b7474c7e25d5920914e71eb3eb63",
+        "modes": {
+          "enabled": {
+            "sum_nll": 368.20782470703125,
+            "tokens": 351
+          },
+          "bypassed": {
+            "sum_nll": 325.5731201171875,
+            "tokens": 351
+          },
+          "full_bypass": {
+            "sum_nll": 237.5696258544922,
+            "tokens": 351
+          }
+        }
+      },
+      {
+        "id": "22fffd62e15ac26b8fb43e429af8bae6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 965.4503173828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 882.9513549804688,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 566.1116333007812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21bb69e9db5e74b7859fe1c934afe506",
+        "modes": {
+          "enabled": {
+            "sum_nll": 738.162353515625,
+            "tokens": 436
+          },
+          "bypassed": {
+            "sum_nll": 656.8659057617188,
+            "tokens": 436
+          },
+          "full_bypass": {
+            "sum_nll": 359.3544921875,
+            "tokens": 436
+          }
+        }
+      },
+      {
+        "id": "1f139af8cc5352e4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 993.744873046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 940.042724609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 900.4002075195312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ee78ff77a4a39cf9858ee679542b8aa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 857.9425048828125,
+            "tokens": 493
+          },
+          "bypassed": {
+            "sum_nll": 761.7933349609375,
+            "tokens": 493
+          },
+          "full_bypass": {
+            "sum_nll": 474.5769958496094,
+            "tokens": 493
+          }
+        }
+      },
+      {
+        "id": "238a891afe4d419a1453f9ba3b4e9e8f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 394.8990783691406,
+            "tokens": 257
+          },
+          "bypassed": {
+            "sum_nll": 343.121826171875,
+            "tokens": 257
+          },
+          "full_bypass": {
+            "sum_nll": 223.09548950195312,
+            "tokens": 257
+          }
+        }
+      },
+      {
+        "id": "227db29c45708a61ff0ae57145930e2d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1365.301025390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1369.6534423828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1333.317626953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20f7fb187fbc70c991e9e818b7e8ac46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 365.10760498046875,
+            "tokens": 380
+          },
+          "bypassed": {
+            "sum_nll": 324.3643798828125,
+            "tokens": 380
+          },
+          "full_bypass": {
+            "sum_nll": 231.52255249023438,
+            "tokens": 380
+          }
+        }
+      },
+      {
+        "id": "1e65013257ed1b65b8eb4343b3034ba2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 465.83514404296875,
+            "tokens": 283
+          },
+          "bypassed": {
+            "sum_nll": 422.2729187011719,
+            "tokens": 283
+          },
+          "full_bypass": {
+            "sum_nll": 301.88323974609375,
+            "tokens": 283
+          }
+        }
+      },
+      {
+        "id": "1e616cc9960aeb4d184520a402c52910",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1308.159423828125,
+            "tokens": 319
+          },
+          "bypassed": {
+            "sum_nll": 1026.654296875,
+            "tokens": 319
+          },
+          "full_bypass": {
+            "sum_nll": 729.6317138671875,
+            "tokens": 319
+          }
+        }
+      },
+      {
+        "id": "2331687318325234e268f9c0ed58528a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 920.8201904296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 842.8211669921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 597.5718994140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20bc2085b4b48d85bb0d32d711c388e0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 454.3580322265625,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 429.5413818359375,
+            "tokens": 397
+          },
+          "full_bypass": {
+            "sum_nll": 365.4354248046875,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "226ade2101a266b45ad2bb05813e3a81",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.9231872558594,
+            "tokens": 399
+          },
+          "bypassed": {
+            "sum_nll": 417.9313049316406,
+            "tokens": 399
+          },
+          "full_bypass": {
+            "sum_nll": 291.16485595703125,
+            "tokens": 399
+          }
+        }
+      },
+      {
+        "id": "23e59ec752a889eb3926b87e4dda80bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 773.87646484375,
+            "tokens": 468
+          },
+          "bypassed": {
+            "sum_nll": 676.25439453125,
+            "tokens": 468
+          },
+          "full_bypass": {
+            "sum_nll": 385.6554260253906,
+            "tokens": 468
+          }
+        }
+      },
+      {
+        "id": "20d01de9de941efe4a10674e64d9ab4a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1472.453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1464.4913330078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1435.9208984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e89220548440e661fd54ac4089afca3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1476.9908447265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1478.117431640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1417.719970703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2101be5131c1f729ca668e13139f5663",
+        "modes": {
+          "enabled": {
+            "sum_nll": 376.5046081542969,
+            "tokens": 204
+          },
+          "bypassed": {
+            "sum_nll": 339.0311279296875,
+            "tokens": 204
+          },
+          "full_bypass": {
+            "sum_nll": 242.2583770751953,
+            "tokens": 204
+          }
+        }
+      },
+      {
+        "id": "1e9a2c034427ff183ae1b3ada0a36554",
+        "modes": {
+          "enabled": {
+            "sum_nll": 564.2688598632812,
+            "tokens": 422
+          },
+          "bypassed": {
+            "sum_nll": 491.0224914550781,
+            "tokens": 422
+          },
+          "full_bypass": {
+            "sum_nll": 303.3548278808594,
+            "tokens": 422
+          }
+        }
+      },
+      {
+        "id": "1fe12ac56ff14110b17384ec679480a6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 825.571533203125,
+            "tokens": 421
+          },
+          "bypassed": {
+            "sum_nll": 729.0126953125,
+            "tokens": 421
+          },
+          "full_bypass": {
+            "sum_nll": 404.436767578125,
+            "tokens": 421
+          }
+        }
+      },
+      {
+        "id": "1ea9088154a7073cc465e6a32fbca08b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 863.0440673828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 751.003173828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 414.9239196777344,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1efc1d0319cffef18dc2bbfab7014bd9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 675.917236328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 626.0914306640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 487.91796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fd8d92d2f28ee1756bdd18edd9c516a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 832.9432373046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 725.3729858398438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 438.26690673828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "246b597fb52afa334b5cfced1d61f7d3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 539.9641723632812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 449.331298828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 287.276611328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e32258f88b7dee3e33ecb1f9e1d7f16",
+        "modes": {
+          "enabled": {
+            "sum_nll": 380.55902099609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 359.02825927734375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 314.46527099609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21beb2868bcd90bf41a0c6ce5f1c1ea3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 636.2821044921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 596.8719482421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 460.1344299316406,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2442ffe403f0af3c3eac82a3a98ce6b4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 710.6085205078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 681.73486328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 589.900634765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "221f1654da2d49045631d00d142819cd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1548.8985595703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1512.46044921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1450.629638671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1df907895c7436aaf3949a9ad9030576",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1233.7392578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1094.413818359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 656.84228515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d58201864abe1f494bae9f9b975208d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 933.7515869140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 813.1039428710938,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 438.75830078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22a5fdf0b25c6a9337a57931e9a86b9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 443.5990295410156,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 414.6460266113281,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 368.0389404296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e7ff05249b54afe7f991a8038766cc2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1420.7181396484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1390.7559814453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1378.568359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21e0b5281d603f460a82833103bbfe8a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 847.9752197265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 747.5484619140625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 522.9645385742188,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e2420b3c7c74f348b8bf308d386e6b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1521.421630859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1533.8289794921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1395.950927734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "237b2cb8843ae4c84e952f8bf2903274",
+        "modes": {
+          "enabled": {
+            "sum_nll": 921.5546264648438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 869.7921142578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 671.0966796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2479ba76935b7f61b80d4edd23e0b2a1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 969.86669921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 846.9168701171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 444.9176940917969,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eaef392555b1b829e13d1ea025af29c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 397.93310546875,
+            "tokens": 276
+          },
+          "bypassed": {
+            "sum_nll": 359.0115661621094,
+            "tokens": 276
+          },
+          "full_bypass": {
+            "sum_nll": 247.58566284179688,
+            "tokens": 276
+          }
+        }
+      },
+      {
+        "id": "1f53f73799f6326bb5720607bfae4661",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1505.8802490234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1505.317626953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1386.2235107421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "224ee7ca0631aabf697c91c57c5974f6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 505.4002685546875,
+            "tokens": 415
+          },
+          "bypassed": {
+            "sum_nll": 455.0711669921875,
+            "tokens": 415
+          },
+          "full_bypass": {
+            "sum_nll": 311.896484375,
+            "tokens": 415
+          }
+        }
+      },
+      {
+        "id": "1d65e295fb73822ba63a98121da7b22b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 486.8050537109375,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 445.525634765625,
+            "tokens": 397
+          },
+          "full_bypass": {
+            "sum_nll": 305.2164001464844,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "202a43d50465021053cf1091ffbaf4d5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 393.67108154296875,
+            "tokens": 361
+          },
+          "bypassed": {
+            "sum_nll": 354.09112548828125,
+            "tokens": 361
+          },
+          "full_bypass": {
+            "sum_nll": 259.0963134765625,
+            "tokens": 361
+          }
+        }
+      },
+      {
+        "id": "1df55141c3613421",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1079.5966796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1033.94091796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 979.5107421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20813d488b824240",
+        "modes": {
+          "enabled": {
+            "sum_nll": 841.7059326171875,
+            "tokens": 345
+          },
+          "bypassed": {
+            "sum_nll": 834.3181762695312,
+            "tokens": 345
+          },
+          "full_bypass": {
+            "sum_nll": 796.427734375,
+            "tokens": 345
+          }
+        }
+      },
+      {
+        "id": "22e17f0c933997c39509a30430a7013b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 771.160400390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 700.8729248046875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 451.1536865234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "227c3b8ba050164808f79645e442d4c0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 591.931640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 559.4395751953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 488.69293212890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202f5c43eb8fca58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1727.289306640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1655.667724609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1367.326171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d21bd9524ad3553b3cded86f8b36a6b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1065.8720703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 963.7242431640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 590.5069580078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2480e8fc87a78fff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 857.8165283203125,
+            "tokens": 312
+          },
+          "bypassed": {
+            "sum_nll": 812.9493408203125,
+            "tokens": 312
+          },
+          "full_bypass": {
+            "sum_nll": 736.9736938476562,
+            "tokens": 312
+          }
+        }
+      },
+      {
+        "id": "1cf48eea817e987f997dc25153cdf3ef",
+        "modes": {
+          "enabled": {
+            "sum_nll": 952.345947265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 888.1639404296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 661.1685791015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23d81067abfdd7beb0b3a94f0382d905",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1383.469970703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1174.5517578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 557.7607421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24358a1ab96e9e7cf925aa024f6cc4bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.5435791015625,
+            "tokens": 409
+          },
+          "bypassed": {
+            "sum_nll": 455.9364929199219,
+            "tokens": 409
+          },
+          "full_bypass": {
+            "sum_nll": 391.75390625,
+            "tokens": 409
+          }
+        }
+      },
+      {
+        "id": "2004e77b2ee755e82637785fe21bc09e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 441.4740295410156,
+            "tokens": 302
+          },
+          "bypassed": {
+            "sum_nll": 423.40313720703125,
+            "tokens": 302
+          },
+          "full_bypass": {
+            "sum_nll": 381.26580810546875,
+            "tokens": 302
+          }
+        }
+      },
+      {
+        "id": "20ed690c6d6c0819f17d0fe2f6dea4a1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 536.736328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 503.2435302734375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 406.04327392578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2410a390309338e5a243430eba84c796",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1047.53515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 920.90478515625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 584.0302734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fea4bd53359ddf7ad0293f55907e103",
+        "modes": {
+          "enabled": {
+            "sum_nll": 683.6495361328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 649.4140625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 514.0665283203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21c0a7ae9f0a924f7124013a8c27996f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 684.58740234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 605.7633056640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 370.84576416015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dd9639abf88606e9ab6193e240f4d0b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 594.821533203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 541.54150390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 439.34564208984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e62d2458d28718bdcc33829ead6fb58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1128.588623046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 984.4046630859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 588.4290771484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "201ce4da3feb63e47b572af8b7d0d703",
+        "modes": {
+          "enabled": {
+            "sum_nll": 610.1233520507812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 531.6444091796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 441.1920166015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21c2657194330b79f084926f80bdae0a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 430.07623291015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 376.0491943359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 257.42425537109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "244b30439d519a608b64c634f051ef83",
+        "modes": {
+          "enabled": {
+            "sum_nll": 642.6024169921875,
+            "tokens": 439
+          },
+          "bypassed": {
+            "sum_nll": 568.345703125,
+            "tokens": 439
+          },
+          "full_bypass": {
+            "sum_nll": 326.10833740234375,
+            "tokens": 439
+          }
+        }
+      },
+      {
+        "id": "218426a7e23109467b46845a6bd0615d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 541.771728515625,
+            "tokens": 446
+          },
+          "bypassed": {
+            "sum_nll": 495.87261962890625,
+            "tokens": 446
+          },
+          "full_bypass": {
+            "sum_nll": 358.34375,
+            "tokens": 446
+          }
+        }
+      },
+      {
+        "id": "20b0e209d2d204932ce6370a563db7b7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 822.53662109375,
+            "tokens": 461
+          },
+          "bypassed": {
+            "sum_nll": 736.562255859375,
+            "tokens": 461
+          },
+          "full_bypass": {
+            "sum_nll": 406.57672119140625,
+            "tokens": 461
+          }
+        }
+      },
+      {
+        "id": "20eb2de293c38d271e7c54cbb0562b1e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 394.6368408203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 345.3315734863281,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 226.44422912597656,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f0fc5f23c1d0b08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1734.812255859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1649.212646484375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1372.8582763671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20103b63b2aeb104953d02370e1ba4d1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 942.7901611328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 815.4640502929688,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 479.89056396484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "249a768d16086fe47b3176867db7e0aa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 534.1984252929688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 476.3558654785156,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 356.2183532714844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e54d1eb4badd0fbfb29515b94bb23ce",
+        "modes": {
+          "enabled": {
+            "sum_nll": 790.651611328125,
+            "tokens": 443
+          },
+          "bypassed": {
+            "sum_nll": 711.5206298828125,
+            "tokens": 443
+          },
+          "full_bypass": {
+            "sum_nll": 506.97259521484375,
+            "tokens": 443
+          }
+        }
+      },
+      {
+        "id": "2451081f8efca870df44d2d1be6f4bdf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 567.8094482421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 537.288330078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 466.42694091796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fea5c6847df3e1041a7e26846d949ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 808.2264404296875,
+            "tokens": 434
+          },
+          "bypassed": {
+            "sum_nll": 717.1285400390625,
+            "tokens": 434
+          },
+          "full_bypass": {
+            "sum_nll": 408.75,
+            "tokens": 434
+          }
+        }
+      },
+      {
+        "id": "21a3ba0e41cf4bd3e94b4bd4ea761f73",
+        "modes": {
+          "enabled": {
+            "sum_nll": 739.0752563476562,
+            "tokens": 433
+          },
+          "bypassed": {
+            "sum_nll": 649.3665771484375,
+            "tokens": 433
+          },
+          "full_bypass": {
+            "sum_nll": 377.4419860839844,
+            "tokens": 433
+          }
+        }
+      },
+      {
+        "id": "23a85583418859efa314110c5877ad6d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 500.2993469238281,
+            "tokens": 373
+          },
+          "bypassed": {
+            "sum_nll": 464.290283203125,
+            "tokens": 373
+          },
+          "full_bypass": {
+            "sum_nll": 380.2016906738281,
+            "tokens": 373
+          }
+        }
+      },
+      {
+        "id": "22352b99e8d313a6a0452efcfcb2c8cc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 568.708984375,
+            "tokens": 401
+          },
+          "bypassed": {
+            "sum_nll": 490.7110595703125,
+            "tokens": 401
+          },
+          "full_bypass": {
+            "sum_nll": 334.69488525390625,
+            "tokens": 401
+          }
+        }
+      },
+      {
+        "id": "1d887c508d762fdd978b5fb11d2ee623",
+        "modes": {
+          "enabled": {
+            "sum_nll": 484.98187255859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 454.842529296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 408.3238525390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f467c0fc88dd896a6817dd89cebe7a0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 835.3768920898438,
+            "tokens": 384
+          },
+          "bypassed": {
+            "sum_nll": 710.77001953125,
+            "tokens": 384
+          },
+          "full_bypass": {
+            "sum_nll": 410.16900634765625,
+            "tokens": 384
+          }
+        }
+      },
+      {
+        "id": "20047f7517aed56ddf465b15898f8aa1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1464.160888671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1446.699951171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1364.0751953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "218e99ea452b24c030ddbf49d9d14ba7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 886.36669921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 833.5891723632812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 638.6746826171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dbb52227bf958dc3dfa25b083f1db84",
+        "modes": {
+          "enabled": {
+            "sum_nll": 579.4915161132812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 547.3322143554688,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 497.66064453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "239df3929808d6b273d0bf2f9a38cede",
+        "modes": {
+          "enabled": {
+            "sum_nll": 602.4365844726562,
+            "tokens": 451
+          },
+          "bypassed": {
+            "sum_nll": 552.9681396484375,
+            "tokens": 451
+          },
+          "full_bypass": {
+            "sum_nll": 376.39202880859375,
+            "tokens": 451
+          }
+        }
+      },
+      {
+        "id": "1cf875f6755bfae7bc91f3049fc8f0e5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 645.0386352539062,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 589.620849609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 512.66357421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d63f1afff1d3214292ba3c66c4a77e8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 734.812744140625,
+            "tokens": 468
+          },
+          "bypassed": {
+            "sum_nll": 660.3013916015625,
+            "tokens": 468
+          },
+          "full_bypass": {
+            "sum_nll": 433.3492431640625,
+            "tokens": 468
+          }
+        }
+      },
+      {
+        "id": "1d3666346f7a1fd68b82d5cfac6d1d67",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1011.3174438476562,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 872.6323852539062,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 439.29107666015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2215c3111220e8a560a06a70515e234d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 632.8063354492188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 581.394775390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 470.87469482421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "225a90f28a008446504feb3ba3a93eb0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 412.292724609375,
+            "tokens": 330
+          },
+          "bypassed": {
+            "sum_nll": 368.4850158691406,
+            "tokens": 330
+          },
+          "full_bypass": {
+            "sum_nll": 271.13690185546875,
+            "tokens": 330
+          }
+        }
+      },
+      {
+        "id": "210883a1467f2e377315c778f364d70e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 594.5460815429688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 559.1572875976562,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 470.11285400390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20acef17864f7bad7aa20c9f73f294d4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 399.0563049316406,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 370.8984375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 286.117919921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e438fa2b128a682ce66f804c5de70dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 726.283447265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 662.742919921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 472.949951171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e1dfc123eaa3f74e74eb03988c1d595",
+        "modes": {
+          "enabled": {
+            "sum_nll": 681.5371704101562,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 659.3074951171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 580.63818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2485cc55e46c8434b05344d250f2223f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 548.4658203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 434.51470947265625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 264.9483642578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1df9ed4ac7c7f015a5570d1c8e60ff7b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 691.1033935546875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 649.396240234375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 522.9393310546875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "232b893681652a364b7be049556d8a9a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 852.4270629882812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 755.167724609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 445.8344421386719,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20ef44aec1ee79c10281a0369c317afb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 742.9085083007812,
+            "tokens": 447
+          },
+          "bypassed": {
+            "sum_nll": 663.5986328125,
+            "tokens": 447
+          },
+          "full_bypass": {
+            "sum_nll": 404.70794677734375,
+            "tokens": 447
+          }
+        }
+      },
+      {
+        "id": "2340b2ca9d4723c368b45cec046e5027",
+        "modes": {
+          "enabled": {
+            "sum_nll": 670.6475830078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 618.7838134765625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 494.23651123046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c90563e3ce70ac34e5aee57ef2b608b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 532.6761474609375,
+            "tokens": 455
+          },
+          "bypassed": {
+            "sum_nll": 484.91363525390625,
+            "tokens": 455
+          },
+          "full_bypass": {
+            "sum_nll": 321.21270751953125,
+            "tokens": 455
+          }
+        }
+      },
+      {
+        "id": "1e6f7adc7ef5d8d3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1669.6416015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1456.8875732421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1231.50048828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2350b6efe27bc0102ccd750e7bbaa3d7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1468.170166015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1470.1708984375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1411.9078369140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2255947d35c8ac1ef5bfa40faa8ab128",
+        "modes": {
+          "enabled": {
+            "sum_nll": 516.5841674804688,
+            "tokens": 369
+          },
+          "bypassed": {
+            "sum_nll": 464.25628662109375,
+            "tokens": 369
+          },
+          "full_bypass": {
+            "sum_nll": 339.529541015625,
+            "tokens": 369
+          }
+        }
+      },
+      {
+        "id": "1ff85e6fed45b0955290c5b98046b845",
+        "modes": {
+          "enabled": {
+            "sum_nll": 727.5115966796875,
+            "tokens": 389
+          },
+          "bypassed": {
+            "sum_nll": 648.3699951171875,
+            "tokens": 389
+          },
+          "full_bypass": {
+            "sum_nll": 416.3367919921875,
+            "tokens": 389
+          }
+        }
+      },
+      {
+        "id": "1e35ce364fe82b35c735f46f3b32b36c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1377.2412109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1378.4478759765625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1331.96240234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "213e5aa892bcc593de5d8b799f6c1ab3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 530.051025390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 471.3739013671875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 326.0784912109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20d539ba1a2d8b21d9be950a0fec84a7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 849.785400390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 639.84228515625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 453.83984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d8b7121795ed1eaaa9f86922ce09cb7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1505.88916015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1512.5062255859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1386.9150390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226e6d27a8a3de90adbf46a7dd2cb667",
+        "modes": {
+          "enabled": {
+            "sum_nll": 621.2970581054688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 596.8397216796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 509.86981201171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ff920b41e84e48f92ee1e7cf728c354",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1472.48046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1461.145263671875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1379.0723876953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d75d16bc696f120bccad0e7162d6d72",
+        "modes": {
+          "enabled": {
+            "sum_nll": 390.3624267578125,
+            "tokens": 231
+          },
+          "bypassed": {
+            "sum_nll": 370.65753173828125,
+            "tokens": 231
+          },
+          "full_bypass": {
+            "sum_nll": 337.1778869628906,
+            "tokens": 231
+          }
+        }
+      },
+      {
+        "id": "1f09f9c2aae097b7e1f53bfdeef668ca",
+        "modes": {
+          "enabled": {
+            "sum_nll": 886.1439208984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 830.4856567382812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 513.314453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d8070e3148041f57867b469cb8e9da5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 588.0435791015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 552.3712158203125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 474.693115234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23cd7da17fb5cf9e81d6f1a3c4d0a381",
+        "modes": {
+          "enabled": {
+            "sum_nll": 453.4480285644531,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 434.2818908691406,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 397.76416015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21472891631a794710b6214ea5f56aff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 709.411376953125,
+            "tokens": 409
+          },
+          "bypassed": {
+            "sum_nll": 622.0667724609375,
+            "tokens": 409
+          },
+          "full_bypass": {
+            "sum_nll": 329.6840515136719,
+            "tokens": 409
+          }
+        }
+      },
+      {
+        "id": "209c7efbe7d0aa1f2aaff13d6e37ad46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1075.4622802734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 919.217529296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 467.02471923828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e35d0f21cf0b80777d13a21bffa515a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1455.6845703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1429.391357421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1417.788818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fe827b48ae3e795c2f928517da5ac3d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1027.4664306640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 894.8848876953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 549.3346557617188,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eec85d22a1ec7fd887560679064f074",
+        "modes": {
+          "enabled": {
+            "sum_nll": 990.904541015625,
+            "tokens": 375
+          },
+          "bypassed": {
+            "sum_nll": 850.1265869140625,
+            "tokens": 375
+          },
+          "full_bypass": {
+            "sum_nll": 577.5,
+            "tokens": 375
+          }
+        }
+      },
+      {
+        "id": "24acae33c393b10427d51e807c8997dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1541.7978515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1154.155517578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 654.0301513671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f1cd4d93186397bdc0a5ad0485b8c6e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 380.2624816894531,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 328.0655517578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 217.71148681640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21e404bc25dcb87b3124feadc9627245",
+        "modes": {
+          "enabled": {
+            "sum_nll": 842.8751220703125,
+            "tokens": 483
+          },
+          "bypassed": {
+            "sum_nll": 747.5400390625,
+            "tokens": 483
+          },
+          "full_bypass": {
+            "sum_nll": 451.6751708984375,
+            "tokens": 483
+          }
+        }
+      },
+      {
+        "id": "1ed3ec24d8f160e6bd3c908603ba138c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 674.9720458984375,
+            "tokens": 478
+          },
+          "bypassed": {
+            "sum_nll": 605.958740234375,
+            "tokens": 478
+          },
+          "full_bypass": {
+            "sum_nll": 366.21331787109375,
+            "tokens": 478
+          }
+        }
+      },
+      {
+        "id": "24502ef8a9ac1cb3ead1894291113318",
+        "modes": {
+          "enabled": {
+            "sum_nll": 906.7252807617188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 820.5499267578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 512.6898803710938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e1870d1ca47bbf09a34536b67ed7fbb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 592.67333984375,
+            "tokens": 376
+          },
+          "bypassed": {
+            "sum_nll": 521.7081298828125,
+            "tokens": 376
+          },
+          "full_bypass": {
+            "sum_nll": 333.56817626953125,
+            "tokens": 376
+          }
+        }
+      },
+      {
+        "id": "207a7975668ad089e653cc98938e1917",
+        "modes": {
+          "enabled": {
+            "sum_nll": 474.0075988769531,
+            "tokens": 379
+          },
+          "bypassed": {
+            "sum_nll": 459.30328369140625,
+            "tokens": 379
+          },
+          "full_bypass": {
+            "sum_nll": 425.2422180175781,
+            "tokens": 379
+          }
+        }
+      },
+      {
+        "id": "2287ae9995041b9a5789560bbf31123c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 498.1717529296875,
+            "tokens": 423
+          },
+          "bypassed": {
+            "sum_nll": 436.8828125,
+            "tokens": 423
+          },
+          "full_bypass": {
+            "sum_nll": 277.659912109375,
+            "tokens": 423
+          }
+        }
+      },
+      {
+        "id": "1e5fbc90bea6180c6d259c6c42c111e0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 529.7471923828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 466.35577392578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 308.6092529296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21af5be646a470f3771d8808fc19ef74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 348.4146728515625,
+            "tokens": 267
+          },
+          "bypassed": {
+            "sum_nll": 304.89752197265625,
+            "tokens": 267
+          },
+          "full_bypass": {
+            "sum_nll": 220.0030517578125,
+            "tokens": 267
+          }
+        }
+      },
+      {
+        "id": "20c43410dfa3bf4290ae0f2284abb887",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1516.19580078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1522.47021484375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1387.590576171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f5408f042cf1ac9be59fec7610d0e1b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 839.1412353515625,
+            "tokens": 506
+          },
+          "bypassed": {
+            "sum_nll": 735.8427734375,
+            "tokens": 506
+          },
+          "full_bypass": {
+            "sum_nll": 408.9093017578125,
+            "tokens": 506
+          }
+        }
+      },
+      {
+        "id": "1dd326720e9e015729edb9fd29e76c5c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 548.541259765625,
+            "tokens": 431
+          },
+          "bypassed": {
+            "sum_nll": 496.7743225097656,
+            "tokens": 431
+          },
+          "full_bypass": {
+            "sum_nll": 302.31866455078125,
+            "tokens": 431
+          }
+        }
+      },
+      {
+        "id": "1cc47451e70b7f7b97b0d60e2462c3a8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1410.41943359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1385.9305419921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1371.295166015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "242490b9d6a1bc5cbc5dd85e5944965b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 474.3628234863281,
+            "tokens": 329
+          },
+          "bypassed": {
+            "sum_nll": 422.2685241699219,
+            "tokens": 329
+          },
+          "full_bypass": {
+            "sum_nll": 314.4862365722656,
+            "tokens": 329
+          }
+        }
+      },
+      {
+        "id": "22c5ecad1e2e0f1dcf19519037ec4f01",
+        "modes": {
+          "enabled": {
+            "sum_nll": 457.5596618652344,
+            "tokens": 328
+          },
+          "bypassed": {
+            "sum_nll": 435.73199462890625,
+            "tokens": 328
+          },
+          "full_bypass": {
+            "sum_nll": 389.91119384765625,
+            "tokens": 328
+          }
+        }
+      },
+      {
+        "id": "1d215183adef2405ecb4f21b677086c5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 744.8636474609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 645.1632080078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 362.4006042480469,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "212fde8e46a18d0d29a04475e3939cff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 501.3165588378906,
+            "tokens": 166
+          },
+          "bypassed": {
+            "sum_nll": 456.1082763671875,
+            "tokens": 166
+          },
+          "full_bypass": {
+            "sum_nll": 324.6537780761719,
+            "tokens": 166
+          }
+        }
+      },
+      {
+        "id": "1c9a11972e39a1d2972e7470df96d088",
+        "modes": {
+          "enabled": {
+            "sum_nll": 988.3202514648438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 869.5735473632812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 564.7720336914062,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e146d23ad89441e9b88dbba3ac22864",
+        "modes": {
+          "enabled": {
+            "sum_nll": 390.798095703125,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 338.62579345703125,
+            "tokens": 340
+          },
+          "full_bypass": {
+            "sum_nll": 221.58181762695312,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "23cc8c9b8f4589d51f229f7b88876a2a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.0221252441406,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 439.3224792480469,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 380.348388671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dfc9958d09a04649668505f3cf4a542",
+        "modes": {
+          "enabled": {
+            "sum_nll": 441.4588317871094,
+            "tokens": 305
+          },
+          "bypassed": {
+            "sum_nll": 391.1601257324219,
+            "tokens": 305
+          },
+          "full_bypass": {
+            "sum_nll": 281.3343811035156,
+            "tokens": 305
+          }
+        }
+      },
+      {
+        "id": "2226f000bb734662337ea3ba2a15d310",
+        "modes": {
+          "enabled": {
+            "sum_nll": 918.084228515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 814.6102294921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 503.0911865234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205538dc55a0e8353cdcce3d3bd0a193",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1522.617919921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1512.7186279296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1414.182861328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec5bc3c6f09df8c0a58b1fbaa42f1b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 452.61175537109375,
+            "tokens": 324
+          },
+          "bypassed": {
+            "sum_nll": 404.77020263671875,
+            "tokens": 324
+          },
+          "full_bypass": {
+            "sum_nll": 268.29876708984375,
+            "tokens": 324
+          }
+        }
+      },
+      {
+        "id": "21fe50431b232c44e0be7b96efa8bb17",
+        "modes": {
+          "enabled": {
+            "sum_nll": 811.87158203125,
+            "tokens": 411
+          },
+          "bypassed": {
+            "sum_nll": 734.81494140625,
+            "tokens": 411
+          },
+          "full_bypass": {
+            "sum_nll": 506.42669677734375,
+            "tokens": 411
+          }
+        }
+      },
+      {
+        "id": "1ec28691b608729e15ac4f2547010821",
+        "modes": {
+          "enabled": {
+            "sum_nll": 507.915283203125,
+            "tokens": 477
+          },
+          "bypassed": {
+            "sum_nll": 440.76519775390625,
+            "tokens": 477
+          },
+          "full_bypass": {
+            "sum_nll": 284.1041259765625,
+            "tokens": 477
+          }
+        }
+      },
+      {
+        "id": "1f9c925ffcb5d50031a726fd951fbe8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1071.339599609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 934.93408203125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 592.1749267578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e4e90bdf5751b9ef293149dd41f8c74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 930.0118408203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 887.4408569335938,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 749.1663818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec171bb5838bada69d6dfcc18f871f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 495.3527526855469,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 428.7463073730469,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 271.18218994140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ef661e686f44e1f36de7f213867390a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 478.1313171386719,
+            "tokens": 370
+          },
+          "bypassed": {
+            "sum_nll": 434.7677001953125,
+            "tokens": 370
+          },
+          "full_bypass": {
+            "sum_nll": 288.55072021484375,
+            "tokens": 370
+          }
+        }
+      },
+      {
+        "id": "1d442aed5474268a6aa5312f8e1113ee",
+        "modes": {
+          "enabled": {
+            "sum_nll": 846.09130859375,
+            "tokens": 462
+          },
+          "bypassed": {
+            "sum_nll": 728.791259765625,
+            "tokens": 462
+          },
+          "full_bypass": {
+            "sum_nll": 401.14813232421875,
+            "tokens": 462
+          }
+        }
+      },
+      {
+        "id": "2440bd28d7f314cfd58cd336d89eef23",
+        "modes": {
+          "enabled": {
+            "sum_nll": 682.5868530273438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 571.637451171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 362.3013916015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e3a3ec500ae9bf3a648becf86ef8341",
+        "modes": {
+          "enabled": {
+            "sum_nll": 763.1234130859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 645.0738525390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 456.1075439453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e732e6f45b4d58030cd8e865339b15b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 471.6423645019531,
+            "tokens": 301
+          },
+          "bypassed": {
+            "sum_nll": 418.008056640625,
+            "tokens": 301
+          },
+          "full_bypass": {
+            "sum_nll": 258.33245849609375,
+            "tokens": 301
+          }
+        }
+      },
+      {
+        "id": "241e8ad0446d14a8f056aa284ea690c4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 776.9926147460938,
+            "tokens": 348
+          },
+          "bypassed": {
+            "sum_nll": 642.2647705078125,
+            "tokens": 348
+          },
+          "full_bypass": {
+            "sum_nll": 408.072509765625,
+            "tokens": 348
+          }
+        }
+      },
+      {
+        "id": "23a582545146324ca3c429417362dd09",
+        "modes": {
+          "enabled": {
+            "sum_nll": 442.32574462890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 419.9913635253906,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 394.92718505859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22ceb069d0cfbfa464e531c6c635fc8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1501.7734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1480.18310546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1431.182373046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222dee05039928f77e0a5c89ccfe8434",
+        "modes": {
+          "enabled": {
+            "sum_nll": 419.0981750488281,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 400.7000732421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 382.9488830566406,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22d23f2b9994f5e06cd7fb7f35c3a06a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 439.0948181152344,
+            "tokens": 346
+          },
+          "bypassed": {
+            "sum_nll": 387.9669494628906,
+            "tokens": 346
+          },
+          "full_bypass": {
+            "sum_nll": 255.44058227539062,
+            "tokens": 346
+          }
+        }
+      },
+      {
+        "id": "1ee7e1ba708c7b96fcf14b519c6b960d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 918.20751953125,
+            "tokens": 382
+          },
+          "bypassed": {
+            "sum_nll": 788.91552734375,
+            "tokens": 382
+          },
+          "full_bypass": {
+            "sum_nll": 514.3983764648438,
+            "tokens": 382
+          }
+        }
+      },
+      {
+        "id": "1fee52fe0d67a7036ea6122b7cbcea32",
+        "modes": {
+          "enabled": {
+            "sum_nll": 597.95947265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 565.2134399414062,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 451.29876708984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "223c1db80d10e72a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1161.49072265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1102.5694580078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1025.9910888671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23ef0b5c7539b833a33eaab56311d5e6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 453.4507141113281,
+            "tokens": 328
+          },
+          "bypassed": {
+            "sum_nll": 403.40521240234375,
+            "tokens": 328
+          },
+          "full_bypass": {
+            "sum_nll": 270.73114013671875,
+            "tokens": 328
+          }
+        }
+      },
+      {
+        "id": "229477e88bff9c7e14eb76be074a667a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 440.77484130859375,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 418.8116455078125,
+            "tokens": 340
+          },
+          "full_bypass": {
+            "sum_nll": 373.5313720703125,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "1fef9f5b65ab2e85b0be12a4653aaa4b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 457.71234130859375,
+            "tokens": 456
+          },
+          "bypassed": {
+            "sum_nll": 437.0821533203125,
+            "tokens": 456
+          },
+          "full_bypass": {
+            "sum_nll": 403.94281005859375,
+            "tokens": 456
+          }
+        }
+      },
+      {
+        "id": "1e376b35a90500987374efb9c837c12b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 444.68255615234375,
+            "tokens": 421
+          },
+          "bypassed": {
+            "sum_nll": 403.6882629394531,
+            "tokens": 421
+          },
+          "full_bypass": {
+            "sum_nll": 277.68426513671875,
+            "tokens": 421
+          }
+        }
+      },
+      {
+        "id": "22629b0a70506f7a851797f6814ec69b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 519.4608764648438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 436.6456298828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 276.1716613769531,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e167bedfaedf234043fedbd96935b44",
+        "modes": {
+          "enabled": {
+            "sum_nll": 462.776611328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 442.87957763671875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 423.1791076660156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f253fac6f5297aa5c03166fb98a885a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 407.8349609375,
+            "tokens": 311
+          },
+          "bypassed": {
+            "sum_nll": 365.5843505859375,
+            "tokens": 311
+          },
+          "full_bypass": {
+            "sum_nll": 254.98916625976562,
+            "tokens": 311
+          }
+        }
+      },
+      {
+        "id": "2419233497332344244229fcf2d0aad2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 486.7149658203125,
+            "tokens": 384
+          },
+          "bypassed": {
+            "sum_nll": 448.08929443359375,
+            "tokens": 384
+          },
+          "full_bypass": {
+            "sum_nll": 317.21026611328125,
+            "tokens": 384
+          }
+        }
+      },
+      {
+        "id": "248a91e978f91c13da2619d73f70e523",
+        "modes": {
+          "enabled": {
+            "sum_nll": 585.1951904296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 549.1429443359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 434.1771240234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222b5a14400802c3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 852.875732421875,
+            "tokens": 378
+          },
+          "bypassed": {
+            "sum_nll": 807.0487060546875,
+            "tokens": 378
+          },
+          "full_bypass": {
+            "sum_nll": 760.01220703125,
+            "tokens": 378
+          }
+        }
+      },
+      {
+        "id": "239a6986fb1c1cc3a2606e88667c3965",
+        "modes": {
+          "enabled": {
+            "sum_nll": 438.6502685546875,
+            "tokens": 507
+          },
+          "bypassed": {
+            "sum_nll": 412.082763671875,
+            "tokens": 507
+          },
+          "full_bypass": {
+            "sum_nll": 367.5538330078125,
+            "tokens": 507
+          }
+        }
+      },
+      {
+        "id": "1fd7e64e0e3ee15b33f7418e78f728e4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 516.6067504882812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 460.26397705078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 334.40960693359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "249ad9685b945bbbc8eb6c32f3dd9679",
+        "modes": {
+          "enabled": {
+            "sum_nll": 511.12933349609375,
+            "tokens": 450
+          },
+          "bypassed": {
+            "sum_nll": 441.1935119628906,
+            "tokens": 450
+          },
+          "full_bypass": {
+            "sum_nll": 283.43658447265625,
+            "tokens": 450
+          }
+        }
+      },
+      {
+        "id": "1d3c49b5419033863c0678ea3817ca5f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 992.878173828125,
+            "tokens": 487
+          },
+          "bypassed": {
+            "sum_nll": 884.8424682617188,
+            "tokens": 487
+          },
+          "full_bypass": {
+            "sum_nll": 555.6961669921875,
+            "tokens": 487
+          }
+        }
+      },
+      {
+        "id": "240c1c91bc24ca67a8d5f08a5563552c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 739.6165771484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 700.4178466796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 596.1433715820312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f9e3de60c14c81e34ed493d3c473d74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 388.5635070800781,
+            "tokens": 416
+          },
+          "bypassed": {
+            "sum_nll": 336.94683837890625,
+            "tokens": 416
+          },
+          "full_bypass": {
+            "sum_nll": 232.33010864257812,
+            "tokens": 416
+          }
+        }
+      },
+      {
+        "id": "2158e241c7373d9a5c4b61adfc6a6ca7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.4310607910156,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 457.7320556640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 424.82952880859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dba845188c9b8f16e79114d616ecd4d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 410.02276611328125,
+            "tokens": 293
+          },
+          "bypassed": {
+            "sum_nll": 364.143310546875,
+            "tokens": 293
+          },
+          "full_bypass": {
+            "sum_nll": 247.62887573242188,
+            "tokens": 293
+          }
+        }
+      },
+      {
+        "id": "1e876e041890cd983ce67721146cd3f4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 364.5638427734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 316.09600830078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 214.62722778320312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d3f16d38524f22069e92e5bf5868656",
+        "modes": {
+          "enabled": {
+            "sum_nll": 681.178955078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 631.4442749023438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 510.8049011230469,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20675087b927722accf560153d533269",
+        "modes": {
+          "enabled": {
+            "sum_nll": 597.6290893554688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 569.28173828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 511.9439392089844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2227aceb0192a6e72a84550fca8b1931",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1486.0616455078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1466.0068359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1388.512939453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1faa817f028c419847219d215be74fd4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1521.312255859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1529.85400390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1414.566162109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f6934513a39d4c6091bcf6d95bcc235",
+        "modes": {
+          "enabled": {
+            "sum_nll": 740.9523315429688,
+            "tokens": 420
+          },
+          "bypassed": {
+            "sum_nll": 646.619873046875,
+            "tokens": 420
+          },
+          "full_bypass": {
+            "sum_nll": 344.88446044921875,
+            "tokens": 420
+          }
+        }
+      },
+      {
+        "id": "2384f0b128dfade744500a2ab61d8317",
+        "modes": {
+          "enabled": {
+            "sum_nll": 491.75775146484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 465.49298095703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 388.08984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1efd1a3c5bee2e941cbc69188afc8539",
+        "modes": {
+          "enabled": {
+            "sum_nll": 545.6221923828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 516.126220703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 411.37457275390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f889af258ccda90997a145c7d525b1f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1010.5906982421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 879.94970703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 461.8619384765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2294a1087479db08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 717.3243408203125,
+            "tokens": 232
+          },
+          "bypassed": {
+            "sum_nll": 692.344482421875,
+            "tokens": 232
+          },
+          "full_bypass": {
+            "sum_nll": 566.1739501953125,
+            "tokens": 232
+          }
+        }
+      },
+      {
+        "id": "215fb7fab6bf3103baab4e7597661020",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1003.9843139648438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 909.4730224609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 551.3681640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2332e284348cf45e460bc1a614530ade",
+        "modes": {
+          "enabled": {
+            "sum_nll": 486.93182373046875,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 434.2100830078125,
+            "tokens": 340
+          },
+          "full_bypass": {
+            "sum_nll": 249.88137817382812,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "20720ac4716b7356cfbe9d7ff9763b4d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 514.3640747070312,
+            "tokens": 310
+          },
+          "bypassed": {
+            "sum_nll": 458.151611328125,
+            "tokens": 310
+          },
+          "full_bypass": {
+            "sum_nll": 276.1939392089844,
+            "tokens": 310
+          }
+        }
+      },
+      {
+        "id": "1cbcc2a099f8202ec29c455036793757",
+        "modes": {
+          "enabled": {
+            "sum_nll": 810.918212890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 721.381591796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 432.2310791015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d0aa7203d55ab65a2ccadf59926950d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 735.377197265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 684.9855346679688,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 528.7741088867188,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eb70769b979cf503c82c00c0b2d74bb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1436.8720703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1416.13134765625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1371.8502197265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22adf712014f2c8044b2e0b74db6fb51",
+        "modes": {
+          "enabled": {
+            "sum_nll": 445.5639343261719,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 421.43377685546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 381.51220703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "210f25598901481e022dcc99be11e677",
+        "modes": {
+          "enabled": {
+            "sum_nll": 349.88897705078125,
+            "tokens": 164
+          },
+          "bypassed": {
+            "sum_nll": 321.87677001953125,
+            "tokens": 164
+          },
+          "full_bypass": {
+            "sum_nll": 278.12445068359375,
+            "tokens": 164
+          }
+        }
+      },
+      {
+        "id": "1f902a17386b7ce100a3cfee4731ea17",
+        "modes": {
+          "enabled": {
+            "sum_nll": 650.09814453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 615.12939453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 531.65234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23a050b06420d12b1ef9212e8fcfad76",
+        "modes": {
+          "enabled": {
+            "sum_nll": 457.2842712402344,
+            "tokens": 484
+          },
+          "bypassed": {
+            "sum_nll": 404.41204833984375,
+            "tokens": 484
+          },
+          "full_bypass": {
+            "sum_nll": 280.204345703125,
+            "tokens": 484
+          }
+        }
+      },
+      {
+        "id": "21bfdbf7479c4fc601af3c1db6e996a6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1128.894287109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 936.1227416992188,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 608.8695678710938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d6895d2dbd0dc43b268b244128cad4c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 632.0546875,
+            "tokens": 412
+          },
+          "bypassed": {
+            "sum_nll": 529.5905151367188,
+            "tokens": 412
+          },
+          "full_bypass": {
+            "sum_nll": 379.27020263671875,
+            "tokens": 412
+          }
+        }
+      },
+      {
+        "id": "1e39d964b68f63d00314f9d1c0e8fdaa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 557.7731323242188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 527.7745361328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 457.4277648925781,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cc9ef6a4f502ef39d997682c082c666",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1537.053955078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1538.167236328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1424.389892578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22bf78d9f7baef06c1d6b5be0b1d42d2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 973.671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 906.6092529296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 607.198486328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e0dd34ec86112e72dc87a4ed81057bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 654.2257690429688,
+            "tokens": 414
+          },
+          "bypassed": {
+            "sum_nll": 564.0478515625,
+            "tokens": 414
+          },
+          "full_bypass": {
+            "sum_nll": 364.8004455566406,
+            "tokens": 414
+          }
+        }
+      },
+      {
+        "id": "22c97933739aa4d5a3585301170720fc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 693.853515625,
+            "tokens": 419
+          },
+          "bypassed": {
+            "sum_nll": 663.6405029296875,
+            "tokens": 419
+          },
+          "full_bypass": {
+            "sum_nll": 582.6493530273438,
+            "tokens": 419
+          }
+        }
+      },
+      {
+        "id": "2134fffe5a30f375b6bf0e0e4d13a0d6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1430.608642578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1409.1329345703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1362.740966796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222b8eb35d43aefe7f04c307d8f1afc5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 453.8833923339844,
+            "tokens": 422
+          },
+          "bypassed": {
+            "sum_nll": 397.9834289550781,
+            "tokens": 422
+          },
+          "full_bypass": {
+            "sum_nll": 278.9466857910156,
+            "tokens": 422
+          }
+        }
+      },
+      {
+        "id": "1f184639e050e2855f2ac1eff8a2305c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 455.55364990234375,
+            "tokens": 302
+          },
+          "bypassed": {
+            "sum_nll": 422.610107421875,
+            "tokens": 302
+          },
+          "full_bypass": {
+            "sum_nll": 330.8946533203125,
+            "tokens": 302
+          }
+        }
+      },
+      {
+        "id": "1d086de23ccdb8ef0e703fbbcd6fa54c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 443.4040832519531,
+            "tokens": 281
+          },
+          "bypassed": {
+            "sum_nll": 398.5653076171875,
+            "tokens": 281
+          },
+          "full_bypass": {
+            "sum_nll": 241.81900024414062,
+            "tokens": 281
+          }
+        }
+      },
+      {
+        "id": "241774dae550299034f434a1df9a7fbc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 603.717041015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 538.0386352539062,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 380.52392578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21b7ff9a124a3cffeaff37d5f928b91d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 458.2628479003906,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 440.93988037109375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 421.5330505371094,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2225ea933ee1c3fa8a70b47e17269df2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 447.3465881347656,
+            "tokens": 317
+          },
+          "bypassed": {
+            "sum_nll": 386.1208190917969,
+            "tokens": 317
+          },
+          "full_bypass": {
+            "sum_nll": 235.21096801757812,
+            "tokens": 317
+          }
+        }
+      },
+      {
+        "id": "1ed06514e7d5b48010586393771efa51",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1719.087646484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1379.0135498046875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 922.9285888671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21d1742e2bdc5e5239303b5841ef3442",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1505.5108642578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1480.6749267578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1433.126220703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2095b7204c828900932e98bcc064fd40",
+        "modes": {
+          "enabled": {
+            "sum_nll": 522.9327392578125,
+            "tokens": 316
+          },
+          "bypassed": {
+            "sum_nll": 474.0860900878906,
+            "tokens": 316
+          },
+          "full_bypass": {
+            "sum_nll": 332.33868408203125,
+            "tokens": 316
+          }
+        }
+      },
+      {
+        "id": "1ca5f2e6a365aa1f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1124.2640380859375,
+            "tokens": 454
+          },
+          "bypassed": {
+            "sum_nll": 1069.6240234375,
+            "tokens": 454
+          },
+          "full_bypass": {
+            "sum_nll": 1017.0660400390625,
+            "tokens": 454
+          }
+        }
+      },
+      {
+        "id": "215b6460fdd0561590f08de1996f45be",
+        "modes": {
+          "enabled": {
+            "sum_nll": 488.2735595703125,
+            "tokens": 322
+          },
+          "bypassed": {
+            "sum_nll": 415.2339782714844,
+            "tokens": 322
+          },
+          "full_bypass": {
+            "sum_nll": 234.74427795410156,
+            "tokens": 322
+          }
+        }
+      },
+      {
+        "id": "23ea1264a96c5d2a0db2d842c3e86f36",
+        "modes": {
+          "enabled": {
+            "sum_nll": 403.16534423828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 355.2545166015625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 267.35205078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2076ade6ecd713fc6dc17ce531c8dc0b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 650.4503173828125,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 559.1369018554688,
+            "tokens": 397
+          },
+          "full_bypass": {
+            "sum_nll": 330.8829040527344,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "2149bb2ba8da4f5cb7f0341cdd17e7d0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 890.0905151367188,
+            "tokens": 510
+          },
+          "bypassed": {
+            "sum_nll": 761.1470947265625,
+            "tokens": 510
+          },
+          "full_bypass": {
+            "sum_nll": 400.48565673828125,
+            "tokens": 510
+          }
+        }
+      },
+      {
+        "id": "203dc3caf4de448dd4f2aab544ebc311",
+        "modes": {
+          "enabled": {
+            "sum_nll": 646.7902221679688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 619.19970703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 515.2659301757812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24b6d911db02c282504e5e9e2b66bfde",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1437.93408203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1067.689453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 620.2501220703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23ac1e947e4299c0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1736.2337646484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1470.737548828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1020.167724609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "214eff0ca2f31d591e80d71684d759ee",
+        "modes": {
+          "enabled": {
+            "sum_nll": 916.368408203125,
+            "tokens": 462
+          },
+          "bypassed": {
+            "sum_nll": 788.3958740234375,
+            "tokens": 462
+          },
+          "full_bypass": {
+            "sum_nll": 377.5361633300781,
+            "tokens": 462
+          }
+        }
+      },
+      {
+        "id": "1d8bc9897e83a305fb4cc84dc598a39f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 398.73980712890625,
+            "tokens": 364
+          },
+          "bypassed": {
+            "sum_nll": 358.3455810546875,
+            "tokens": 364
+          },
+          "full_bypass": {
+            "sum_nll": 252.56739807128906,
+            "tokens": 364
+          }
+        }
+      },
+      {
+        "id": "1fd81f0f7e5ed53ce0d76d218a5e436c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 356.20281982421875,
+            "tokens": 381
+          },
+          "bypassed": {
+            "sum_nll": 316.21234130859375,
+            "tokens": 381
+          },
+          "full_bypass": {
+            "sum_nll": 217.77182006835938,
+            "tokens": 381
+          }
+        }
+      },
+      {
+        "id": "1cc9ee24ed3241bc37cad0ad23cb7f46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 524.7565307617188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 466.9853820800781,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 372.33734130859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d7f1cd0e1210acbd21cbdb4eaaaa6c4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.6133728027344,
+            "tokens": 482
+          },
+          "bypassed": {
+            "sum_nll": 433.4686279296875,
+            "tokens": 482
+          },
+          "full_bypass": {
+            "sum_nll": 291.068603515625,
+            "tokens": 482
+          }
+        }
+      },
+      {
+        "id": "1edae4861649eddf07a4536ed86dc0e1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 493.0541687011719,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 469.4083557128906,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 428.4066162109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2034b26e2bac9b13cc44cd64d9237fc0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1041.1700439453125,
+            "tokens": 372
+          },
+          "bypassed": {
+            "sum_nll": 893.5625,
+            "tokens": 372
+          },
+          "full_bypass": {
+            "sum_nll": 510.4466552734375,
+            "tokens": 372
+          }
+        }
+      },
+      {
+        "id": "1cf2b57c30b1547dc9fbd6ebca7299ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 727.16845703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 701.203369140625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 626.7994384765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20474b4570ef05c34d47302822e99fa0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 856.1067504882812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 747.384765625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 407.1507568359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226758678f9f0d95419f9fb5d7367ce1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1085.44970703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 920.55859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 448.76702880859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e70eb00e6030f8ee02e765ef5cfa130",
+        "modes": {
+          "enabled": {
+            "sum_nll": 468.3839111328125,
+            "tokens": 369
+          },
+          "bypassed": {
+            "sum_nll": 399.5223388671875,
+            "tokens": 369
+          },
+          "full_bypass": {
+            "sum_nll": 254.14468383789062,
+            "tokens": 369
+          }
+        }
+      },
+      {
+        "id": "1e4ae0018dadec79ff9d96123df0a510",
+        "modes": {
+          "enabled": {
+            "sum_nll": 456.14068603515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 435.6670227050781,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 412.8792419433594,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d86bda1c8fea99b35c727d0d642c021",
+        "modes": {
+          "enabled": {
+            "sum_nll": 471.301513671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 396.5174560546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 243.00686645507812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f07776d4268eec53d326a44845aeeb1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 977.1795654296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 844.5701293945312,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 489.8907165527344,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e5f46a212ba6477ccc099e356cd4a5f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 361.7070617675781,
+            "tokens": 297
+          },
+          "bypassed": {
+            "sum_nll": 330.265380859375,
+            "tokens": 297
+          },
+          "full_bypass": {
+            "sum_nll": 263.0793762207031,
+            "tokens": 297
+          }
+        }
+      },
+      {
+        "id": "1d8ab34c97f73a2104c4d9418caf4da5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 748.1383056640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 720.2496337890625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 610.508056640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f055095bb70286b6886e93148fb6768",
+        "modes": {
+          "enabled": {
+            "sum_nll": 766.8565063476562,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 648.8394775390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 349.6770324707031,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21fc5702a7b47ba3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 822.131591796875,
+            "tokens": 260
+          },
+          "bypassed": {
+            "sum_nll": 777.5467529296875,
+            "tokens": 260
+          },
+          "full_bypass": {
+            "sum_nll": 701.2657470703125,
+            "tokens": 260
+          }
+        }
+      },
+      {
+        "id": "1d968b6ae6fcf6785e2df33f7e6b3e25",
+        "modes": {
+          "enabled": {
+            "sum_nll": 617.5527954101562,
+            "tokens": 413
+          },
+          "bypassed": {
+            "sum_nll": 562.6495971679688,
+            "tokens": 413
+          },
+          "full_bypass": {
+            "sum_nll": 292.22845458984375,
+            "tokens": 413
+          }
+        }
+      },
+      {
+        "id": "241292ff9503f3e7c821f33f676ef3f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 390.4145812988281,
+            "tokens": 199
+          },
+          "bypassed": {
+            "sum_nll": 374.45806884765625,
+            "tokens": 199
+          },
+          "full_bypass": {
+            "sum_nll": 365.659912109375,
+            "tokens": 199
+          }
+        }
+      },
+      {
+        "id": "1e080d2ce68dc3a7c445d05d05ba715a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 798.6982421875,
+            "tokens": 484
+          },
+          "bypassed": {
+            "sum_nll": 673.11767578125,
+            "tokens": 484
+          },
+          "full_bypass": {
+            "sum_nll": 396.2043762207031,
+            "tokens": 484
+          }
+        }
+      },
+      {
+        "id": "1d6520ed13743a4b323c01ec377be3d9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 596.5946044921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 560.4664306640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 417.9095764160156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "221c5a5314c086bd885da643bfd70be4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 776.9447021484375,
+            "tokens": 497
+          },
+          "bypassed": {
+            "sum_nll": 687.467529296875,
+            "tokens": 497
+          },
+          "full_bypass": {
+            "sum_nll": 400.98046875,
+            "tokens": 497
+          }
+        }
+      },
+      {
+        "id": "230002310904024d53b2e795623c91ae",
+        "modes": {
+          "enabled": {
+            "sum_nll": 446.42254638671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 398.95367431640625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 262.41510009765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226c9f80c729e97282b6f6be745ee1cf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1375.7379150390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1377.503662109375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1346.42822265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20e5e236711d4a43743f438f7f5402f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 791.1231689453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 737.6350708007812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 609.60302734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21ad2510933d9ed46fc98542cefd5e18",
+        "modes": {
+          "enabled": {
+            "sum_nll": 466.48211669921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 392.49591064453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 261.24468994140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22934aa4972ce715d6af8e3eaea4487b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 507.9652404785156,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 477.385498046875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 431.7502746582031,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e945a9c33c362e16bb3712c6f718f8e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1023.45263671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 996.755859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 914.707275390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e17cb6a58c2f22c116a7ad2c25c3c61",
+        "modes": {
+          "enabled": {
+            "sum_nll": 755.968505859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 660.525146484375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 398.0827941894531,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d28678ad54f537dbe22e3b3994197c6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 684.8843383789062,
+            "tokens": 274
+          },
+          "bypassed": {
+            "sum_nll": 622.7075805664062,
+            "tokens": 274
+          },
+          "full_bypass": {
+            "sum_nll": 411.4810791015625,
+            "tokens": 274
+          }
+        }
+      },
+      {
+        "id": "2226c706ca8706ec4fb5b340e4528788",
+        "modes": {
+          "enabled": {
+            "sum_nll": 577.6195068359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 545.129150390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 469.983154296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2044c14330ece86fef392535f302820d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1159.9508056640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1021.847412109375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 593.6566162109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f2cca660ceed697cd830202a5aa5f33",
+        "modes": {
+          "enabled": {
+            "sum_nll": 423.1257019042969,
+            "tokens": 390
+          },
+          "bypassed": {
+            "sum_nll": 380.71923828125,
+            "tokens": 390
+          },
+          "full_bypass": {
+            "sum_nll": 240.8060302734375,
+            "tokens": 390
+          }
+        }
+      },
+      {
+        "id": "1d22a3e355ea443771cf5480457bd2b2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 909.8443603515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 802.7835693359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 500.79058837890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2058ee021b0de9b003b5731e59f86641",
+        "modes": {
+          "enabled": {
+            "sum_nll": 414.99139404296875,
+            "tokens": 317
+          },
+          "bypassed": {
+            "sum_nll": 363.8067626953125,
+            "tokens": 317
+          },
+          "full_bypass": {
+            "sum_nll": 247.17027282714844,
+            "tokens": 317
+          }
+        }
+      },
+      {
+        "id": "249b6f1ada3506bbc77106dc50c16b1a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 394.3662109375,
+            "tokens": 253
+          },
+          "bypassed": {
+            "sum_nll": 350.2251892089844,
+            "tokens": 253
+          },
+          "full_bypass": {
+            "sum_nll": 251.1680908203125,
+            "tokens": 253
+          }
+        }
+      },
+      {
+        "id": "1f17755f24ad4a7a6544e8a2a7308a22",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1280.2916259765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1009.4495849609375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 480.1867980957031,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f714536a658630d4d36e33c9fad2702",
+        "modes": {
+          "enabled": {
+            "sum_nll": 544.081787109375,
+            "tokens": 449
+          },
+          "bypassed": {
+            "sum_nll": 492.6968688964844,
+            "tokens": 449
+          },
+          "full_bypass": {
+            "sum_nll": 335.05230712890625,
+            "tokens": 449
+          }
+        }
+      },
+      {
+        "id": "20b010235010e7f8e7dc02d2c23bb445",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1452.8759765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1456.9395751953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1391.515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c6ff2ee67553b274b76484d2320f1f3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 796.4622802734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 750.53466796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 646.4169311523438,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23fb65e2880f7ade8759791d1d35eec2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 784.1463623046875,
+            "tokens": 423
+          },
+          "bypassed": {
+            "sum_nll": 656.1051025390625,
+            "tokens": 423
+          },
+          "full_bypass": {
+            "sum_nll": 331.9356689453125,
+            "tokens": 423
+          }
+        }
+      },
+      {
+        "id": "22690048f3562e044f74eab294750725",
+        "modes": {
+          "enabled": {
+            "sum_nll": 544.6282348632812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 512.634521484375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 444.5975036621094,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2098557250daa64ca7eba9b9921dcac6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 637.0738525390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 565.95751953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 412.0459899902344,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "227fd55bc691de5ee9a96c2b5ddd5f12",
+        "modes": {
+          "enabled": {
+            "sum_nll": 394.9778137207031,
+            "tokens": 305
+          },
+          "bypassed": {
+            "sum_nll": 374.63037109375,
+            "tokens": 305
+          },
+          "full_bypass": {
+            "sum_nll": 363.41943359375,
+            "tokens": 305
+          }
+        }
+      },
+      {
+        "id": "21f3810578c45ae6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1664.761962890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1437.638427734375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 999.0205078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22eac71833d40e69f1c9e04716bb5085",
+        "modes": {
+          "enabled": {
+            "sum_nll": 728.6842041015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 702.8604125976562,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 617.10595703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fac2c762ebe6233cd87b80852fc66df",
+        "modes": {
+          "enabled": {
+            "sum_nll": 761.014892578125,
+            "tokens": 434
+          },
+          "bypassed": {
+            "sum_nll": 669.6365966796875,
+            "tokens": 434
+          },
+          "full_bypass": {
+            "sum_nll": 378.1413879394531,
+            "tokens": 434
+          }
+        }
+      },
+      {
+        "id": "1f7ddb90064f90b9e8e4983e4cda693d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 771.7906494140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 740.9378051757812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 651.4387817382812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22fe1c4f77f4da35beda3301cff50965",
+        "modes": {
+          "enabled": {
+            "sum_nll": 893.6458740234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 773.8372192382812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 405.01043701171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "201b3fc33ffbb4f7d46e0bbebd504fa9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 677.6702880859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 510.9202880859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 361.8944091796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24a02ec5ee791e16857c35bae3d38ac1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 433.9656677246094,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 377.77740478515625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 257.6283874511719,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f33274af37de0e2074e480809bbf4e9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 669.9364624023438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 624.18994140625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 506.3809814453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "211d3f5db20cf9aa20c5518e39edf5bc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 466.4519348144531,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 435.59710693359375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 325.87042236328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fc2937a7bcc02ef6698d879423c8bea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 863.5154418945312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 739.130859375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 394.8023376464844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2091995cc1cd14250beeac4c3ec12670",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1015.3175048828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 799.3087158203125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 495.36944580078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "238856ad9478242404dfb171ae9e64a2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 472.58209228515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 444.427734375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 419.3439025878906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22831a4bb2b6819b9f6711a3b1c828ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 427.65374755859375,
+            "tokens": 356
+          },
+          "bypassed": {
+            "sum_nll": 373.902099609375,
+            "tokens": 356
+          },
+          "full_bypass": {
+            "sum_nll": 272.41290283203125,
+            "tokens": 356
+          }
+        }
+      },
+      {
+        "id": "1e36aa074bf482f6094db760cde12be0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 388.95745849609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 365.90350341796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 315.2217102050781,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2310d1d2fbce244ec4d1f584cd88dc94",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1825.599365234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1424.534423828125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 899.83544921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2496a5285de906c4f389ee1edd3d6612",
+        "modes": {
+          "enabled": {
+            "sum_nll": 759.3995971679688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 670.03662109375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 391.2022705078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f2555cb63858cae95035f812f4536ab",
+        "modes": {
+          "enabled": {
+            "sum_nll": 386.15643310546875,
+            "tokens": 252
+          },
+          "bypassed": {
+            "sum_nll": 343.79095458984375,
+            "tokens": 252
+          },
+          "full_bypass": {
+            "sum_nll": 253.70956420898438,
+            "tokens": 252
+          }
+        }
+      },
+      {
+        "id": "246d5df62870bf685e43bf039fe50cae",
+        "modes": {
+          "enabled": {
+            "sum_nll": 556.69287109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 520.7450561523438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 432.308349609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e760ba0e1b34ffd01396ecfb24f3bcd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 686.3088989257812,
+            "tokens": 374
+          },
+          "bypassed": {
+            "sum_nll": 617.1492919921875,
+            "tokens": 374
+          },
+          "full_bypass": {
+            "sum_nll": 380.6206359863281,
+            "tokens": 374
+          }
+        }
+      },
+      {
+        "id": "21a73346c5a820babed4220eba8f7825",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1349.3934326171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 953.295654296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 495.7696228027344,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "233821c82086f3373a9624da8190b84b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 411.06134033203125,
+            "tokens": 267
+          },
+          "bypassed": {
+            "sum_nll": 366.93792724609375,
+            "tokens": 267
+          },
+          "full_bypass": {
+            "sum_nll": 267.5379638671875,
+            "tokens": 267
+          }
+        }
+      },
+      {
+        "id": "1ec95a046900498a895a039285dec182",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1494.343505859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1476.8419189453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1442.32421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24b33aea032700301922ff409c30a1a8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 731.7861938476562,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 689.233642578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 498.0301513671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23bba151da1e30fdc9872bc7d4465899",
+        "modes": {
+          "enabled": {
+            "sum_nll": 628.3732299804688,
+            "tokens": 280
+          },
+          "bypassed": {
+            "sum_nll": 561.2918701171875,
+            "tokens": 280
+          },
+          "full_bypass": {
+            "sum_nll": 383.16217041015625,
+            "tokens": 280
+          }
+        }
+      },
+      {
+        "id": "1e63b204732a6988ba20fdaee785abea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 859.3086547851562,
+            "tokens": 435
+          },
+          "bypassed": {
+            "sum_nll": 756.1868286132812,
+            "tokens": 435
+          },
+          "full_bypass": {
+            "sum_nll": 444.99871826171875,
+            "tokens": 435
+          }
+        }
+      },
+      {
+        "id": "209b2e77fa8e9a73c01c4f277614c8df",
+        "modes": {
+          "enabled": {
+            "sum_nll": 799.9669189453125,
+            "tokens": 405
+          },
+          "bypassed": {
+            "sum_nll": 721.7511596679688,
+            "tokens": 405
+          },
+          "full_bypass": {
+            "sum_nll": 411.3592834472656,
+            "tokens": 405
+          }
+        }
+      },
+      {
+        "id": "20494e20b5e8001eb13694e2882286dd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 448.3717346191406,
+            "tokens": 296
+          },
+          "bypassed": {
+            "sum_nll": 398.86260986328125,
+            "tokens": 296
+          },
+          "full_bypass": {
+            "sum_nll": 278.284423828125,
+            "tokens": 296
+          }
+        }
+      },
+      {
+        "id": "2320149d33ad09f15c0c03ae0dc10098",
+        "modes": {
+          "enabled": {
+            "sum_nll": 566.2090454101562,
+            "tokens": 508
+          },
+          "bypassed": {
+            "sum_nll": 475.682373046875,
+            "tokens": 508
+          },
+          "full_bypass": {
+            "sum_nll": 285.7357177734375,
+            "tokens": 508
+          }
+        }
+      },
+      {
+        "id": "21d2b3d18b7df993",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1947.054443359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1587.6002197265625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1026.15673828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22b05dce47e5e65e442d68ea2ecef988",
+        "modes": {
+          "enabled": {
+            "sum_nll": 495.1190490722656,
+            "tokens": 455
+          },
+          "bypassed": {
+            "sum_nll": 408.197998046875,
+            "tokens": 455
+          },
+          "full_bypass": {
+            "sum_nll": 259.6319580078125,
+            "tokens": 455
+          }
+        }
+      },
+      {
+        "id": "22094ce6939f0ff93b974498d3bd4e2c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 728.6536865234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 673.3021240234375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 511.2367248535156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20fe5d2e341422f9309f5ec5c2c2d312",
+        "modes": {
+          "enabled": {
+            "sum_nll": 577.4611206054688,
+            "tokens": 509
+          },
+          "bypassed": {
+            "sum_nll": 518.9317626953125,
+            "tokens": 509
+          },
+          "full_bypass": {
+            "sum_nll": 349.2250671386719,
+            "tokens": 509
+          }
+        }
+      },
+      {
+        "id": "1e8d24aa792362ea0b57dad9fc77a291",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1102.052734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 939.3367919921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 593.1278686523438,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21661e3f6f2dde21d40e8c00fbbf6207",
+        "modes": {
+          "enabled": {
+            "sum_nll": 519.5695190429688,
+            "tokens": 357
+          },
+          "bypassed": {
+            "sum_nll": 424.7726745605469,
+            "tokens": 357
+          },
+          "full_bypass": {
+            "sum_nll": 287.39605712890625,
+            "tokens": 357
+          }
+        }
+      },
+      {
+        "id": "221d83e553e52685c83c04332b99af49",
+        "modes": {
+          "enabled": {
+            "sum_nll": 901.137451171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 782.7142333984375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 457.6456604003906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22a7d62830e719e2a39a7f0e57512a53",
+        "modes": {
+          "enabled": {
+            "sum_nll": 707.6435546875,
+            "tokens": 377
+          },
+          "bypassed": {
+            "sum_nll": 616.804443359375,
+            "tokens": 377
+          },
+          "full_bypass": {
+            "sum_nll": 348.3883056640625,
+            "tokens": 377
+          }
+        }
+      },
+      {
+        "id": "1fe44f6ebcedc98f9dadd0af5b614c7c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 833.147705078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 710.323486328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 388.3670654296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e7feb4a10e7791dd719f0383ddad5fa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1450.5068359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1428.178955078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1379.26318359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "218b56a93ed46c06709cb0a8bf208dde",
+        "modes": {
+          "enabled": {
+            "sum_nll": 629.610595703125,
+            "tokens": 405
+          },
+          "bypassed": {
+            "sum_nll": 545.8497924804688,
+            "tokens": 405
+          },
+          "full_bypass": {
+            "sum_nll": 303.8133544921875,
+            "tokens": 405
+          }
+        }
+      },
+      {
+        "id": "2030cc38ecf599d565c08a8c45d7da85",
+        "modes": {
+          "enabled": {
+            "sum_nll": 684.2151489257812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 635.8511962890625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 517.521484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205b5273d15a8e0b589b55a91e56ac0a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 488.8878173828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 469.0323486328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 416.7694396972656,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23a519caf4dc849246b1c2044dd81e53",
+        "modes": {
+          "enabled": {
+            "sum_nll": 411.7667236328125,
+            "tokens": 323
+          },
+          "bypassed": {
+            "sum_nll": 366.042724609375,
+            "tokens": 323
+          },
+          "full_bypass": {
+            "sum_nll": 259.36004638671875,
+            "tokens": 323
+          }
+        }
+      },
+      {
+        "id": "1f3ea1ddb080143c64633c263ab6cd96",
+        "modes": {
+          "enabled": {
+            "sum_nll": 409.59161376953125,
+            "tokens": 306
+          },
+          "bypassed": {
+            "sum_nll": 354.7001647949219,
+            "tokens": 306
+          },
+          "full_bypass": {
+            "sum_nll": 239.09674072265625,
+            "tokens": 306
+          }
+        }
+      },
+      {
+        "id": "1d7f31f6599cfc45c3da79bfada9874f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 690.87158203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 649.1454467773438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 467.70233154296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e36f37e7f145d7387f41abcc18b4401",
+        "modes": {
+          "enabled": {
+            "sum_nll": 522.6300048828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 446.39129638671875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 276.4859924316406,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cb1cfe52d60306dd94d7a3030ea55b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1334.482421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1336.324951171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1329.5166015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c84a29aee3f4d25a4817c8aa864b8d8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 703.8048706054688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 660.237060546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 501.093994140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d950e8720dd5e52a2b4480380734a08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1502.2867431640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1480.072998046875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1395.672119140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2048fd8795f320820b058f4122448fe2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 420.76617431640625,
+            "tokens": 300
+          },
+          "bypassed": {
+            "sum_nll": 371.7152099609375,
+            "tokens": 300
+          },
+          "full_bypass": {
+            "sum_nll": 256.8746337890625,
+            "tokens": 300
+          }
+        }
+      },
+      {
+        "id": "1e870cfd0a8447cfceeeca77fa278d1a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 460.1146240234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 437.21875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 407.30029296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1da7c2be41c33dd04c0715ca4086ac7b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 940.3349609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 839.305419921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 560.040771484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "219031736e462d937aff7a7a226f6879",
+        "modes": {
+          "enabled": {
+            "sum_nll": 499.83740234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 439.4910583496094,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 290.50128173828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d4d81a686f229436e843b41c781d6e2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 477.46630859375,
+            "tokens": 331
+          },
+          "bypassed": {
+            "sum_nll": 410.5413818359375,
+            "tokens": 331
+          },
+          "full_bypass": {
+            "sum_nll": 255.61517333984375,
+            "tokens": 331
+          }
+        }
+      },
+      {
+        "id": "1f27cab3dbac88188c24fe77d138b0fa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 858.8154296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 782.0563354492188,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 517.3578491210938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205bba57672d8eadc8d6ac05e17e55b0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1179.6396484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 968.5991821289062,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 515.77197265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202ce9aa1774c4089db86b0e3bc77cc9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 394.7757568359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 348.5253601074219,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 232.79888916015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d89aa35f930d816b0d6437b694e65e8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 865.2853393554688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 756.3641967773438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 421.028076171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2263b11e610ad217aa9e74a383663029",
+        "modes": {
+          "enabled": {
+            "sum_nll": 439.6973571777344,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 390.6512451171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 260.36126708984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2238c4bfbc4e3435f34312e33f534468",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1559.322265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1543.624267578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1457.746337890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202defc6a933f683a62a2aa59edefaf3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1038.207763671875,
+            "tokens": 403
+          },
+          "bypassed": {
+            "sum_nll": 720.013916015625,
+            "tokens": 403
+          },
+          "full_bypass": {
+            "sum_nll": 408.3446960449219,
+            "tokens": 403
+          }
+        }
+      },
+      {
+        "id": "20a3d540801f2a02d56df864a9d18748",
+        "modes": {
+          "enabled": {
+            "sum_nll": 748.2450561523438,
+            "tokens": 479
+          },
+          "bypassed": {
+            "sum_nll": 669.13623046875,
+            "tokens": 479
+          },
+          "full_bypass": {
+            "sum_nll": 451.2129211425781,
+            "tokens": 479
+          }
+        }
+      },
+      {
+        "id": "1e4c076b76b30620",
+        "modes": {
+          "enabled": {
+            "sum_nll": 905.4133911132812,
+            "tokens": 367
+          },
+          "bypassed": {
+            "sum_nll": 894.1572265625,
+            "tokens": 367
+          },
+          "full_bypass": {
+            "sum_nll": 843.65283203125,
+            "tokens": 367
+          }
+        }
+      },
+      {
+        "id": "238b92d12182226f6b055d08a8ed48cb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 776.9706420898438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 728.376220703125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 567.467529296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d3d8c56f0cc09821c2b29a43029f230",
+        "modes": {
+          "enabled": {
+            "sum_nll": 461.3763427734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 433.9974060058594,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 401.0926513671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "246cda4d5ed5d7688a15e1449b2a9246",
+        "modes": {
+          "enabled": {
+            "sum_nll": 380.68206787109375,
+            "tokens": 315
+          },
+          "bypassed": {
+            "sum_nll": 326.61639404296875,
+            "tokens": 315
+          },
+          "full_bypass": {
+            "sum_nll": 231.73916625976562,
+            "tokens": 315
+          }
+        }
+      },
+      {
+        "id": "224e3380200a0da59d8bd2cd81ba3946",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1423.7138671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1362.0107421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1327.76025390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cebb47566e5ff5c6799e2cf549d2c8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 910.6693725585938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 789.0616455078125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 420.9486389160156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20b328e1238ca93c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 971.30859375,
+            "tokens": 327
+          },
+          "bypassed": {
+            "sum_nll": 951.1607666015625,
+            "tokens": 327
+          },
+          "full_bypass": {
+            "sum_nll": 882.3626708984375,
+            "tokens": 327
+          }
+        }
+      },
+      {
+        "id": "1f75a2ff0352b92a66d0d079226b2655",
+        "modes": {
+          "enabled": {
+            "sum_nll": 927.7337036132812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 810.449951171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 429.520263671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2147ab1dd52d55d8eb1e01e4aeab66c1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 494.62225341796875,
+            "tokens": 355
+          },
+          "bypassed": {
+            "sum_nll": 451.25726318359375,
+            "tokens": 355
+          },
+          "full_bypass": {
+            "sum_nll": 316.1663818359375,
+            "tokens": 355
+          }
+        }
+      },
+      {
+        "id": "2023f9ab2e47c2b86c9054832bf74700",
+        "modes": {
+          "enabled": {
+            "sum_nll": 451.08941650390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 405.9857482910156,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 306.2152099609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dafd9aa5e6c2ada45beac5ce1b3e12e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 833.480224609375,
+            "tokens": 476
+          },
+          "bypassed": {
+            "sum_nll": 734.884765625,
+            "tokens": 476
+          },
+          "full_bypass": {
+            "sum_nll": 417.83502197265625,
+            "tokens": 476
+          }
+        }
+      },
+      {
+        "id": "22cea368bcdd70aa4f5b0cc5ca3ce007",
+        "modes": {
+          "enabled": {
+            "sum_nll": 655.3270874023438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 607.6414794921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 467.21771240234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fbd0b10902d6dabd036e7372bfd51a5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 692.82421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 641.5748291015625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 490.531982421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ccd9b02ff1b28a427854df4c4ba741b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 598.2216796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 577.483642578125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 541.7733154296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22656c44b2e2ae3f61428c44f52663b9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 352.82415771484375,
+            "tokens": 212
+          },
+          "bypassed": {
+            "sum_nll": 312.17218017578125,
+            "tokens": 212
+          },
+          "full_bypass": {
+            "sum_nll": 217.1109619140625,
+            "tokens": 212
+          }
+        }
+      },
+      {
+        "id": "1f6be185ae8c1fff7c02ce03415feb00",
+        "modes": {
+          "enabled": {
+            "sum_nll": 737.9734497070312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 694.5995483398438,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 479.0523376464844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dc945bc322bc767eb8cdcafe0104287",
+        "modes": {
+          "enabled": {
+            "sum_nll": 755.5084838867188,
+            "tokens": 492
+          },
+          "bypassed": {
+            "sum_nll": 662.5137939453125,
+            "tokens": 492
+          },
+          "full_bypass": {
+            "sum_nll": 420.50494384765625,
+            "tokens": 492
+          }
+        }
+      },
+      {
+        "id": "2327224142209c1350be04c915a88b50",
+        "modes": {
+          "enabled": {
+            "sum_nll": 731.8592529296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 645.77587890625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 367.44476318359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "228f5cae466188d52debb9f35218118a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 884.334716796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 746.48779296875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 510.298583984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ddf029945062a32",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1401.614990234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1334.160400390625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1169.845458984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cb902d4b70a6062504eb78840b382dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 702.480224609375,
+            "tokens": 457
+          },
+          "bypassed": {
+            "sum_nll": 593.4457397460938,
+            "tokens": 457
+          },
+          "full_bypass": {
+            "sum_nll": 352.70343017578125,
+            "tokens": 457
+          }
+        }
+      },
+      {
+        "id": "1dc815bb10b6dae0e5a902696bc64c0f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 810.2432861328125,
+            "tokens": 419
+          },
+          "bypassed": {
+            "sum_nll": 711.4130859375,
+            "tokens": 419
+          },
+          "full_bypass": {
+            "sum_nll": 411.5060119628906,
+            "tokens": 419
+          }
+        }
+      },
+      {
+        "id": "1d8dbbbbaabada8b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 745.0054321289062,
+            "tokens": 367
+          },
+          "bypassed": {
+            "sum_nll": 688.797119140625,
+            "tokens": 367
+          },
+          "full_bypass": {
+            "sum_nll": 601.631591796875,
+            "tokens": 367
+          }
+        }
+      },
+      {
+        "id": "1f2bb91ac6c931fa6e14c0d89b46c8ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 498.0199890136719,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 469.84228515625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 402.7765808105469,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "211f12f6a2a9862a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1320.8548583984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1327.403076171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1241.64306640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1db4e76f7b71c7499e46f201bfc5935b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1511.263916015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1471.953857421875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1394.05615234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2215c69ad3ee46fd292c8b35f4957ca3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 858.6929321289062,
+            "tokens": 489
+          },
+          "bypassed": {
+            "sum_nll": 767.3382568359375,
+            "tokens": 489
+          },
+          "full_bypass": {
+            "sum_nll": 458.0586242675781,
+            "tokens": 489
+          }
+        }
+      },
+      {
+        "id": "248c858a343ca224e0c1587b9c39ea67",
+        "modes": {
+          "enabled": {
+            "sum_nll": 445.3331298828125,
+            "tokens": 509
+          },
+          "bypassed": {
+            "sum_nll": 397.7545471191406,
+            "tokens": 509
+          },
+          "full_bypass": {
+            "sum_nll": 268.02801513671875,
+            "tokens": 509
+          }
+        }
+      },
+      {
+        "id": "249d89c1549bd10abd95916cf9f3b9ea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 435.50537109375,
+            "tokens": 319
+          },
+          "bypassed": {
+            "sum_nll": 383.1594543457031,
+            "tokens": 319
+          },
+          "full_bypass": {
+            "sum_nll": 255.60348510742188,
+            "tokens": 319
+          }
+        }
+      },
+      {
+        "id": "21d0113ad4f7a04764fb6eee1fbe5daf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 577.3480834960938,
+            "tokens": 330
+          },
+          "bypassed": {
+            "sum_nll": 495.1895751953125,
+            "tokens": 330
+          },
+          "full_bypass": {
+            "sum_nll": 330.8772277832031,
+            "tokens": 330
+          }
+        }
+      },
+      {
+        "id": "1c8318d12dcdb76a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1860.7061767578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1577.3995361328125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1033.8197021484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23c7055ad620501d5173e7ae3fb5a928",
+        "modes": {
+          "enabled": {
+            "sum_nll": 498.6341552734375,
+            "tokens": 435
+          },
+          "bypassed": {
+            "sum_nll": 439.684814453125,
+            "tokens": 435
+          },
+          "full_bypass": {
+            "sum_nll": 270.55267333984375,
+            "tokens": 435
+          }
+        }
+      },
+      {
+        "id": "1fec7fb08c1965f6c653aa36e0022316",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1116.785400390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 993.7982177734375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 529.5364990234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ccd9105753774d5b95420ad77acd1b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 785.34765625,
+            "tokens": 473
+          },
+          "bypassed": {
+            "sum_nll": 698.499755859375,
+            "tokens": 473
+          },
+          "full_bypass": {
+            "sum_nll": 419.3757019042969,
+            "tokens": 473
+          }
+        }
+      },
+      {
+        "id": "1cde519b10ccdc1d913bc13204b8036e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 435.747802734375,
+            "tokens": 294
+          },
+          "bypassed": {
+            "sum_nll": 391.14794921875,
+            "tokens": 294
+          },
+          "full_bypass": {
+            "sum_nll": 264.3558654785156,
+            "tokens": 294
+          }
+        }
+      },
+      {
+        "id": "24767f82f0ec67a0ef827b58cec06cff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 384.41241455078125,
+            "tokens": 258
+          },
+          "bypassed": {
+            "sum_nll": 342.99755859375,
+            "tokens": 258
+          },
+          "full_bypass": {
+            "sum_nll": 253.39389038085938,
+            "tokens": 258
+          }
+        }
+      },
+      {
+        "id": "1c973a80c6e8c977fb6a3353be266dc9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 461.237548828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 418.0487060546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 369.86590576171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e92d431645ea039b7cdecd2c37220ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 491.51434326171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 461.2908935546875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 398.1773376464844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21f6dbeb8c8b09cbe32a634be5d377f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 451.2662353515625,
+            "tokens": 336
+          },
+          "bypassed": {
+            "sum_nll": 398.7629089355469,
+            "tokens": 336
+          },
+          "full_bypass": {
+            "sum_nll": 277.0575866699219,
+            "tokens": 336
+          }
+        }
+      },
+      {
+        "id": "1db880487d919c75dd287321efadfbd4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 482.7613220214844,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 450.66278076171875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 395.2754821777344,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226ed70f6dea7cce05b8e278eea38f6d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1480.97021484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1484.9095458984375,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1377.1519775390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "203ead4da8189ecd0658afacb3497584",
+        "modes": {
+          "enabled": {
+            "sum_nll": 675.2138061523438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 628.9356079101562,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 475.5722351074219,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f4ede0d4b0d46dba8a59fba077495fd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 906.6791381835938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 839.6526489257812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 611.06298828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f5ea75e8c8456e902d376c16d1bb3b8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 445.5565490722656,
+            "tokens": 168
+          },
+          "bypassed": {
+            "sum_nll": 390.3155822753906,
+            "tokens": 168
+          },
+          "full_bypass": {
+            "sum_nll": 247.8321075439453,
+            "tokens": 168
+          }
+        }
+      },
+      {
+        "id": "2499b481fced21feb6f23449cf360a4b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 669.75927734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 635.944091796875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 528.2020263671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1de66572aa8d20fbf67acc2f81c00e19",
+        "modes": {
+          "enabled": {
+            "sum_nll": 788.9915771484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 698.2327270507812,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 401.0132751464844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec9d826b51c2cc4ab61eace53fd39f4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1526.975830078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1474.559814453125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1388.9056396484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "217d7a8429b308bccda46746be59a03c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 623.585693359375,
+            "tokens": 505
+          },
+          "bypassed": {
+            "sum_nll": 596.886474609375,
+            "tokens": 505
+          },
+          "full_bypass": {
+            "sum_nll": 518.9918212890625,
+            "tokens": 505
+          }
+        }
+      },
+      {
+        "id": "2444ff6adb0b2a068c903df19288024a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1156.44580078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1001.3170166015625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 623.015380859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21cec0fed9cd2ccb60cc63c7bddc00d7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1423.00732421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1399.8992919921875,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 1388.967529296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e38e820cb48d2dc8d80af6e2cb34a58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 781.417236328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 662.5958251953125,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 368.0699462890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d881bffeb5b1f76971690e53ab0fe19",
+        "modes": {
+          "enabled": {
+            "sum_nll": 571.9076538085938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 541.896728515625,
+            "tokens": 511
+          },
+          "full_bypass": {
+            "sum_nll": 449.80596923828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22db40c6f3068abd20b87565350ce9ad",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.2051086425781,
+            "tokens": 489
+          },
+          "bypassed": {
+            "sum_nll": 440.7420959472656,
+            "tokens": 489
+          },
+          "full_bypass": {
+            "sum_nll": 391.7947998046875,
+            "tokens": 489
+          }
+        }
+      }
+    ]
+  },
+  "elapsed_seconds": 167.375
+}
