@@ -1095,24 +1095,57 @@ Scored on assistant tokens, 384 documents:
 Best arm so far on every measure, and the bypassed comparison spanning zero says the
 difference is the adapter rather than the run.
 
-### An open thread: the gate parameters did not train
+### The gate parameters could not be *stored*, and one of my readings of that was wrong
 
 The trained checkpoint has `sharpness` at **exactly** 1.0 on all four values -- bit
-identical to its initialisation -- and `gate` at norm 2.0121 against 2.024 at init, about
-what weight decay alone accounts for. `value_proj` went 0 to 3.1605 and `conv1d` 0 to
-0.2783 over the same run.
+identical to its initialisation -- while `value_proj` went 0 to 3.1605 and `conv1d` 0 to
+0.2783 over the same run. `gate` finished at norm 2.0121 against 2.0212 at init.
 
-In isolation both gate tensors receive gradients of order 1e3, and one AdamW step at
-1e-4 moves each by 1e-4, so 72 steps should drift about 0.007. They are in
-`_auxiliary_parameter_ids`, `freeze_backbone_for_stage1` does not freeze them, and
-`mixed_parameter_groups` routes them to AdamW. Something in the real run prevents the
-update anyway.
+Codex instrumented the production path directly (`scratch/gate-update-diagnosis/`):
+three real optimizer steps on the real student, real table, offline cache, both TP
+devices, production freezing/grouping/clipping, with the actual optimizer observed by
+pre/post hooks and the same post-clipping gradients replayed onto shadow fp32
+parameters. Per step, `sharpness`:
 
-**So the improvement above is initialisation, not learning.** The gate is selective from
-step zero because the geometry is now right, and it stayed wherever it started. If the
-blockage is real and fixable there is more available here than has been measured.
-Unruled-out candidates: the gradient-checkpointing interaction, the tensor-parallel path,
-`sync_replicated_gradients`, the Muon/AdamW split, and gradient clipping.
+| step | grad L2 (after clipping) | bf16 delta | same gradient in fp32 |
+| ---: | ---: | ---: | ---: |
+| 1 | 0 | 0 | 0 |
+| 2 | 0.003244 | **0** | 7.43866e-5 |
+| 3 | 0.001740 | **0** | 8.49962e-5 |
+
+Gradients exist, survive TP synchronisation bit-identically, survive clipping, and reach
+AdamW, whose moments are nonzero at step 72 in the saved optimizer state. The update is
+then lost **on assignment**: `torch.optim.AdamW` writes in place and this project keeps
+no fp32 master copy, so a bf16 parameter at 1.0, where the spacing is 0.0078, rounds
+every 1e-4 update straight back to 1.0. Seventy-two of them do not accumulate, because
+nothing retains the remainder.
+
+**Two things I wrote here were wrong.**
+
+*"About what weight decay alone accounts for"* -- the saved optimizer group has
+`weight_decay = 0.0` (read directly out of `checkpoint-72/optimizer.pt`). Whatever moved
+the norm, it was not decay.
+
+*"The gate is stuck too"* -- it is not. **8,723 of its 10,240 coordinates** differed from
+initialisation after one step, with total displacement 0.0153; the norm barely moved
+because a direction rotating at fixed length is exactly what a normalised direction does.
+I read a constant norm as a constant tensor. bf16 spacing is relative, so which
+coordinates moved depended on where they sat: below 0.03125 the spacing is 6.1e-5 and a
+7.4e-5 update lands, at or above it the spacing is 1.22e-4 and the same update vanishes.
+Partial storage loss, not a blocked gradient path.
+
+**So "the improvement above is initialisation, not learning" is not established.** The
+gate direction did train. How much of the -0.0046 that bought is unmeasured, and the
+question is now open rather than answered in either direction.
+
+The fix is `_apply` in `ple_gated_sidecar.py`: `gate` and `sharpness_delta` are pinned to
+fp32 through every dtype conversion while the backbone stays bf16. 10,244 numbers, so
+about 60 KiB more with their two moments. This is the master-weight argument from
+Micikevicius et al., *Mixed Precision Training* (arXiv:1710.03740), applied to the two
+tensors that need it. The `1 + delta` parameterisation is kept as well -- it is what
+makes the value survive a checkpoint saved in bf16 -- but the pin is the load-bearing
+half, and `.float()` in the forward was never going to be enough: by then the update has
+already been rounded away.
 
 ## The direction-gated sidecar: better, still not good (2026-09-10)
 

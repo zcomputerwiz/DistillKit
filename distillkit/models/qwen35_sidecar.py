@@ -95,6 +95,10 @@ learned sidecar weights never resets a sibling that was present in the checkpoin
                 nn.init.zeros_(module.bias)
         elif isinstance(module, DirectionGatedPLESidecar):
             # Bare Parameters carry no init mark of their own; see the note there.
+            # `from_pretrained` can hand back bfloat16 storage whichever way it
+            # materialises these, and `_apply` only fires on conversions that go
+            # through it, so re-assert the pin at the one hook that always runs.
+            module.pin_fp32()
             nn.init.normal_(module.gate, std=module.gate_init_std)
             nn.init.zeros_(module.sharpness_delta)
         elif isinstance(module, IQ4NLDequant):

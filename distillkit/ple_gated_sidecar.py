@@ -59,8 +59,14 @@ while the gap to a selective scale is about 1.0 per element -- 140x the entire s
 budget, needing ``lr`` near 0.014 to close, which would wreck everything else sharing the
 optimizer. So the scale is fixed by construction here: the direction is RMS-normalised to
 ``sqrt(d)`` and a learned per-direction ``sharpness_delta`` (initialised at 0, applied as
-``1 + delta``) carries the magnitude. Only the direction's *direction* is learned as a direction, which is what it
-was ever supposed to mean, and no choice of ``gate_init_std`` can silently flatten it.
+``1 + delta``) carries the magnitude. Only the direction's *direction* is learned as a
+direction, which is what it was ever supposed to mean, and no choice of
+``gate_init_std`` can silently flatten it.
+
+**The gate parameters are stored in fp32 and that is also not cosmetic** -- see
+``_apply``. Both of the above facts are about the same thing from opposite ends: the
+scale has to be right in the forward *and* representable in storage, and getting one
+without the other still gives a gate that cannot move.
 
 **Identity at load** is preserved the way ``PLESidecar`` establishes it: ``value_proj``
 and ``conv1d`` are both zero, so the gated value and the convolution branch are both
@@ -123,15 +129,20 @@ class DirectionGatedPLESidecar(nn.Module):
         self.short_conv_state_len = (conv_kernel_size - 1) * ngram_size
 
         self.value_proj = nn.Linear(feature_dim, hidden_size, bias=False)
-        self.gate = nn.Parameter(torch.empty(hc_count, gate_directions, hidden_size))
+        # fp32 whatever dtype the rest of the model loads in; see `_apply` below.
+        self.gate = nn.Parameter(
+            torch.empty(hc_count, gate_directions, hidden_size, dtype=torch.float32))
         # The *deviation* from unit sharpness, not the sharpness itself, for the reason
         # `_PLERMSNorm` stores a deviation: bfloat16 spacing near 1.0 is 0.0078, and this
         # parameter's AdamW update at lr 1e-4 is about 7.4e-5, so a scale stored directly
         # at 1.0 rounds back to 1.0 on every step and can never move. Measured over a
         # 72-step run: sharpness exactly 1.0, 1.0, 1.0, 1.0 while the same gradient in
         # fp32 would have moved each element 7.44e-5 per step. Near zero the spacing is
-        # ~1e-41 and the identical update survives.
-        self.sharpness_delta = nn.Parameter(torch.zeros(hc_count, gate_directions))
+        # ~1e-41 and the identical update survives. Keeping the deviation is still worth
+        # it with the fp32 pin below -- it is what makes the parameter survive a
+        # checkpoint someone saves in bfloat16 -- but the pin is the load-bearing fix.
+        self.sharpness_delta = nn.Parameter(
+            torch.zeros(hc_count, gate_directions, dtype=torch.float32))
         self.conv1d = nn.Conv1d(
             hc_count * hidden_size, hc_count * hidden_size, kernel_size=conv_kernel_size,
             groups=hc_count * hidden_size, dilation=self.conv_dilation, bias=False,
@@ -146,6 +157,47 @@ class DirectionGatedPLESidecar(nn.Module):
         for zeroed in (self.value_proj, self.conv1d):
             nn.init.zeros_(zeroed.weight)
             zeroed._sidecar_weight_init = "zero"
+
+    #: Storage precision is part of this module's contract, not a loading detail.
+    FP32_PARAMETERS = ("gate", "sharpness_delta")
+
+    def _apply(self, fn, *args, **kwargs):
+        """Keep the admission parameters in fp32 through every dtype conversion.
+
+        These two are the entire learned criterion and their AdamW update is about
+        `lr` per element -- 1e-4 here. bfloat16 has eight mantissa bits: at a direction
+        coordinate near 0.02 the spacing is 1.22e-4, so roughly half of those updates
+        round away, and at a scale near 1.0 it is 0.0078, so all of them do.
+        `torch.optim.AdamW` updates the parameter in place and keeps no fp32 master
+        copy, and neither does this project's wrapper, so the precision has to live on
+        the parameter itself. `.float()` in the forward is not enough; by then the
+        update has already been lost on assignment.
+
+        Measured over a 72-step production run (`scratch/gate-update-diagnosis/`):
+        `sharpness` finished bit-identical to its initialisation on all four elements,
+        with nonzero AdamW moments throughout, while the same post-clipping gradients
+        applied to fp32 copies moved it 7.44e-5 and 8.50e-5 on the steps that had one.
+        The direction did move -- 8,723 of 10,240 coordinates -- but only where its
+        update happened to exceed the local spacing.
+
+        10,244 numbers, so the parameters and their two moments cost about 60 KiB more
+        than bfloat16. This is the master-weight argument from Micikevicius et al.,
+        *Mixed Precision Training* (arXiv:1710.03740), applied to the two tensors that
+        need it rather than to the whole model.
+        """
+        module = super()._apply(fn, *args, **kwargs)
+        module.pin_fp32()
+        return module
+
+    def pin_fp32(self) -> None:
+        """Restore fp32 storage on the admission parameters. See ``_apply``."""
+        for name in self.FP32_PARAMETERS:
+            param = getattr(self, name, None)
+            if param is None or param.dtype == torch.float32:
+                continue
+            param.data = param.data.float()
+            if param.grad is not None:
+                param.grad = param.grad.float()
 
     def _admission(self, stream: torch.Tensor) -> torch.Tensor:
         """``2 * mean_k sigmoid(signed_sqrt(rms(stream_s) . g_sk / sqrt(d)))``.

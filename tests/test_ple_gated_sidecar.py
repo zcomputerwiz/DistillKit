@@ -307,3 +307,39 @@ def test_sharpness_stores_a_deviation_because_bfloat16_cannot_hold_one():
     assert torch.equal((scale.float() + update).bfloat16(), scale), "a scale at 1.0 is stuck"
     stored = module.sharpness_delta.bfloat16()
     assert not torch.equal((stored.float() + update).bfloat16(), stored), "a deviation moves"
+
+
+def test_admission_parameters_stay_fp32_through_a_bfloat16_conversion():
+    """The rest of the model loads in bf16; these two must not come with it.
+
+    Measured over a 72-step run: `sharpness` finished bit-identical to its
+    initialisation with nonzero AdamW moments throughout, and the direction moved on
+    only 8,723 of its 10,240 coordinates -- the ones whose update happened to exceed the
+    local bf16 spacing. AdamW updates the parameter in place with no fp32 master copy,
+    so `.float()` in the forward is too late.
+    """
+    module = _sidecar().bfloat16()
+    assert module.value_proj.weight.dtype is torch.bfloat16, "the rest did convert"
+    assert module.gate.dtype is torch.float32
+    assert module.sharpness_delta.dtype is torch.float32
+    # And the forward still runs against a bf16 stream.
+    stream = torch.randn(2, 5, module.hc_count, module.hidden_size, dtype=torch.bfloat16)
+    features = torch.randn(2, 5, module.feature_dim, dtype=torch.bfloat16)
+    assert module(stream, features).dtype is torch.bfloat16
+
+
+def test_an_fp32_direction_keeps_updates_a_bfloat16_one_would_round_away():
+    """bf16 spacing is relative, so whether an update survives depends on the coordinate.
+
+    A direction drawn at std 0.02 straddles the boundary: below 0.03125 the spacing is
+    6.1e-5 and a 7.44e-5 update moves the value, at or above it the spacing is 1.22e-4
+    and the update vanishes. That is exactly what the production run showed -- 8,723 of
+    10,240 coordinates moved at one step and the rest did not. fp32 moves all of them.
+    """
+    module = _sidecar()
+    update = 7.44e-5
+    direction = module.gate.detach()
+    assert direction.dtype is torch.float32
+    stuck = ((direction.bfloat16().float() + update).bfloat16() == direction.bfloat16())
+    assert 0 < stuck.float().mean() < 1, "bf16 loses some coordinates and keeps others"
+    assert ((direction + update) != direction).all(), "fp32 keeps every one"
