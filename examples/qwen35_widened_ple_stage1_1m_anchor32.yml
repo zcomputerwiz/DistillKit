@@ -1,0 +1,157 @@
+# Stage 1 without the intermediate anchor: does imitating the teacher's mid-depth
+# representation obstruct the retrofit?
+#
+# Matched to qwen35_widened_ple_stage1_1m.yml in every other respect -- same widening,
+# same PLE sidecar, same 1M cache -- so that run is the control.
+#
+# The reason to suspect the term at all: over a whole 5M stage-2 run the aggregate
+# hs_cosine goes 1.0000 to 0.8828, a cosine similarity of 0.117 between the student's
+# projected states and the teacher's, and stage 1 with a frozen backbone gets *closer*
+# at 0.7793. Alignment gets worse when the backbone is unlocked, which is backwards for
+# a term meant to teach representation. The per-anchor telemetry added alongside this
+# config will say which of the two anchors that average was hiding.
+#
+# Judge this on assistant-only independent NLL, not on eval_loss: removing a term that
+# contributes about 0.26 of a 0.43-scale objective lowers eval_loss mechanically.
+#
+# Run:
+#   python -m distillkit.main examples/qwen35_widened_ple_stage1_1m_anchor32.yml -v
+
+model: D:/DeepThought/Projects/HybridModel/student-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/widened-ple-stage1-1m-anchor32
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  # Both splits come from the capture manifest; the eval holdout was carved out in
+  # the same pass so it cannot drift from the training stream.
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+# Tensor parallel, not the layer split this config used to inherit. Stage 1 freezes the
+# backbone, so every Muon-routed parameter is frozen and "hybrid" is exactly
+# AdamW-on-auxiliary -- which is the condition configuration now permits alongside
+# tensor_parallel. The layer split runs one card at a time (measured: exactly one GPU
+# busy in 21 of 30 samples); this uses both.
+tensor_parallel: true
+# Required under tensor parallelism: the residual stream and the head share card 0, so
+# the materialized logits are what binds.
+chunked_head: true
+# Length-group each microbatch and shuffle the batch order. Both arms sample
+# identically, so the sampler's offset is common-mode.
+sortish_batching: true
+sidecar:
+  # Shard 2 of the Unsloth GGUF carries per_layer_token_embd.weight (IQ4_NL, 28.8 GB).
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  # Resident costs 28.8 GB of RAM and ~20 s at startup, but a cold mmap gather is
+  # ~2.8 s per batch versus ~8 ms warm -- 80% of a step versus 0.4%. Requires
+  # dataloader_num_workers 0 so workers cannot each copy the table.
+  resident: true
+  prefault: true
+  layer_index: 1   # matches Flash-Next's ple_layer_ids (one-indexed [2])
+  num_branches: 4
+  variant: ple
+
+# Student hidden_states index -> anchor position in the cache (not the teacher's
+# layer id). Teacher anchor 8 of 64 is 12.5% depth -> student layer 4; anchor 64 is
+# the final post-norm state -> student layer 32.
+
+# The retrofit under test. Two persistent residual branches with an
+# identity-initialised Hyper-Connections read/write at every attention and MLP
+# subblock: at step zero the logits are bit-identical to the unwidened student, so
+# anything this run measures is what the routing learned, not damage from the graft.
+# n_r=2 rather than 3 or 4 for margin -- 42.6M routing parameters and the smallest
+# memory bill. See docs/widened_residual.md.
+residual_stream:
+  num_branches: 2
+  lowrank: 64
+layer_mapping:
+  # Anchor 4 removed. It is the only intermediate-depth constraint, and it is the
+  # one that can obstruct a retrofit that changes the residual stream's structure;
+  # anchor 32 is the post-norm state lm_head consumes, which the KL term already
+  # constrains through the head.
+  #
+  # The hidden-state term is a mean over anchors, so dropping one and keeping
+  # hs_cosine at 0.3 would double the survivor's coefficient. The weights below
+  # hold the KL-to-anchor ratio at its original 0.7 : 0.15 instead.
+  - [32, 1]
+
+loss_functions:
+  # cross_entropy is deliberately absent. It is the only loss that reads
+  # student_outputs.loss, so omitting it makes requires_model_loss false and the model
+  # skips its 248,320-wide cross-entropy entirely -- forward and backward. Keeping it
+  # cost a 3.79 GiB fp32 gradient over the full logits and OOM'd on long documents.
+  # KL is the teacher-alignment term anyway; ground-truth CE can come back in stage 2.
+  # The teacher-alignment term: match the full distribution, not just the argmax.
+  - function: kl
+    # 0.8235 : 0.1765 is 0.7 : 0.15 rescaled to sum to one. The trainer divides the
+    # weighted sum by sum(weights), so preserving the ratio is what preserves the
+    # balance; rescaling to one as well keeps the decoupled weight decay in the same
+    # proportion to the gradient rather than 18% weaker.
+    weight: 0.8235
+    temperature: 1.0
+    missing_probability_handling: zero
+    # Without this the KL term takes a full fp32 log_softmax over the 248,320-wide
+    # vocabulary in one go: 4.07 GB at sequence 4096, held for backward. Chunked and
+    # checkpointed it is ~0.5 GB.
+    sparse_chunk_length: 256
+  # Representation alignment. Cosine rather than MSE because the student's projected
+  # 5120-d states have no reason to match the teacher's scale, only its direction.
+  - function: hs_cosine
+    weight: 0.1765
+
+optimizer:
+  strategy: hybrid          # Muon on 2D matrices, AdamW on embeddings/norms/gates
+  freeze_backbone: true     # stage 1: sidecar + gated residual only
+  unfreeze_at_step: null    # keep the probe clean; stage 2 is a separate run
+  log_every_n_steps: 5      # gate/projection telemetry; 72 steps is few enough to watch closely
+
+use_flash_attention: false  # no Windows wheels; bf16 is set explicitly below
+functionary_packing: false  # qwen3_5 hits monkey_patch_packing's else-raise anyway
+chunked_cross_entropy: true
+max_vram_fraction: 0.95     # batch 4 wants the headroom
+
+training_args:
+  bf16: true                     # fp32 distillation projections need autocast
+  remove_unused_columns: false   # or doc_id / ngram_raw are dropped before the collator
+  dataloader_num_workers: 0      # required by sidecar.resident
+  # sequence_length must stay 4096 to match the cache's truncation rule, but that is
+  # not the padded batch length: the collator pads to the longest document in each
+  # batch, and documents average ~870 tokens.
+  # No group_by_length: trl 0.25.1's SFTConfig dropped that field (only
+  # length_column_name survives), so batch 2 eats some padding waste. Both arms eat
+  # the same waste, so the comparison is unaffected.
+  # Batch 2 pushed the working set to 24.3 GB dedicated + 19.7 GB SPILLED to shared
+  # system memory: 100% GPU utilisation at 133 W with a 0% memory controller, and
+  # 200 tok/s instead of 1428. Batch 1 keeps it resident; effective batch is unchanged.
+  per_device_train_batch_size: 4
+  length_column_name: length
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  # The TP collectives are custom autograd Functions; reentrant
+  # checkpointing cannot see through them.
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  num_train_epochs: 1
+  learning_rate: 1.0e-4
+  # Constant LR on purpose: a cosine schedule tuned for a long run decays differently
+  # over 1M tokens and would not predict anything about the full run.
+  lr_scheduler_type: constant_with_warmup
+  warmup_steps: 20
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 10            # 7 evaluations rather than 2: a trajectory, not two points
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42

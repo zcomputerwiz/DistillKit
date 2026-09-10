@@ -172,11 +172,19 @@ def prepare(args):
     for row in unseen:
         encoded = tokenizer(row["text"], add_special_tokens=True, return_offsets_mapping=True)
         ids = encoded["input_ids"]
-        if len(ids) >= args.min_document_tokens:
-            keep = args.document_tokens
-            spans = role_spans(row["text"], encoded["offset_mapping"][:keep])
-            docs.append({"id": row["id"], "task": "nll", "ids": ids[:keep],
-                         "roles": spans, "text_sha256": digest(row["text"])})
+        if len(ids) < args.min_document_tokens:
+            continue
+        keep = args.document_tokens
+        spans = role_spans(row["text"], encoded["offset_mapping"][:keep])
+        # A document whose window is all prompt cannot say anything about responses,
+        # and at 512 tokens 21 of 384 were exactly that. Requiring a minimum spends the
+        # budget on documents that can answer the question instead.
+        assistant = sum(high - low for low, high in spans.get("assistant", []))
+        if assistant < args.min_assistant_tokens:
+            continue
+        docs.append({"id": row["id"], "task": "nll", "ids": ids[:keep],
+                     "roles": spans, "assistant_tokens": assistant,
+                     "text_sha256": digest(row["text"])})
     banks = {"nll": docs}
     if not args.text_only:
         for task, source, dataset, config in [
@@ -198,8 +206,11 @@ def prepare(args):
         bundle["splits"][split] = {task: select_split(bank, args.docs if task == "nll" else args.questions, split)
                                     for task, bank in banks.items()}
     write_json(args.output, bundle)
-    print(json.dumps({"output": args.output, "unseen": len(unseen),
-                      "counts_per_split": {k: len(v) for k, v in bundle["splits"]["screen"].items()}}))
+    scored = {task: sum(r.get("assistant_tokens", 0) for r in records)
+              for task, records in bundle["splits"]["screen"].items() if task == "nll"}
+    print(json.dumps({"output": args.output, "unseen": len(unseen), "eligible": len(docs),
+                      "counts_per_split": {k: len(v) for k, v in bundle["splits"]["screen"].items()},
+                      "screen_assistant_tokens": scored}))
 
 
 class TextCollator:
@@ -541,6 +552,8 @@ def main():
     prep.add_argument("--questions", type=int, default=32)
     prep.add_argument("--document-tokens", type=int, default=512)
     prep.add_argument("--min-document-tokens", type=int, default=128)
+    prep.add_argument("--min-assistant-tokens", type=int, default=0,
+                      help="drop documents whose window carries fewer assistant tokens")
     prep.add_argument("--max-question-tokens", type=int, default=4096)
     prep.add_argument("--text-only", action="store_true")
     prep.add_argument("--mmlu-json")
