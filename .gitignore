@@ -177,3 +177,8 @@ cython_debug/
 # 32-document text-bundle.json stays committed as the smallest reproducible example.
 /scratch/independent-eval/text-bundle-[0-9]*.json
 /scratch/independent-eval/full-bundle-*.json
+/scratch/independent-eval/*-bundle-*.json
+# Per-task intermediates; the merged result beside them carries the same records.
+/scratch/independent-eval/*.nll.json
+/scratch/independent-eval/*.mmlu.json
+/scratch/independent-eval/*.arc.json
