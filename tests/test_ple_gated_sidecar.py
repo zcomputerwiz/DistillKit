@@ -118,9 +118,10 @@ def test_parameter_count_drops_the_key_projection():
     hidden, features, hc, k = 32, 48, 2, 2
     module = DirectionGatedPLESidecar(hidden, features, hc_count=hc, gate_directions=k)
     counts = {name: p.numel() for name, p in module.named_parameters()}
-    assert set(counts) == {"value_proj.weight", "gate", "conv1d.weight"}
+    assert set(counts) == {"value_proj.weight", "gate", "sharpness", "conv1d.weight"}
     assert counts["value_proj.weight"] == hidden * features
     assert counts["gate"] == hc * k * hidden
+    assert counts["sharpness"] == hc * k
     assert counts["conv1d.weight"] == hc * hidden * 4
 
 
@@ -250,3 +251,43 @@ def test_the_plumbing_probe_counts_one_call_for_a_stream_reading_sidecar():
     assert report["sidecar_calls"][0]["enabled"] and report["sidecar_calls"][0]["raw_present"]
     assert not report["sidecar_calls"][1]["enabled"]
     assert report["enabled_minus_bypassed_logits_max"] > 0, "a trained value must change the logits"
+
+
+def test_gate_selectivity_does_not_depend_on_the_initialisation_scale():
+    """The bug the first run had: /sqrt(d) assumes both operands have norm sqrt(d).
+
+    A raw learned vector at std 0.02 has norm ~1, the pre-activation is 50x too small,
+    and the gate is pinned near 0.5 whatever it learns -- measured gate_std 0.0348
+    against upstream's 0.080-0.228. Normalising the direction fixes the scale by
+    construction, so no choice of gate_init_std can flatten it.
+    """
+    torch.manual_seed(0)
+    stream = torch.randn(2, 128, 2, 256)
+    spreads = []
+    for std in (0.002, 0.02, 1.0):
+        torch.manual_seed(0)
+        module = DirectionGatedPLESidecar(256, 64, hc_count=2, gate_directions=2,
+                                          gate_init_std=std)
+        spreads.append(module._admission(stream).std().item())
+    assert max(spreads) - min(spreads) < 0.05, spreads
+    assert min(spreads) > 0.1, spreads
+
+
+def test_sharpness_carries_the_magnitude_and_survives_reinitialisation():
+    module = _sidecar()
+    assert torch.equal(module.sharpness, torch.ones_like(module.sharpness))
+    stream, _ = _inputs(module)
+    narrow = module._admission(stream)
+    with torch.no_grad():
+        module.sharpness.mul_(6.0)
+    assert module._admission(stream).std() > narrow.std(), "sharpness must sharpen"
+
+    # And a model built through HF's own initialisation must arrive with both intact:
+    # they are bare Parameters, which carry no init mark of their own.
+    from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
+
+    torch.manual_seed(0)
+    config = _widened_config()
+    built = Qwen35WidenedForCausalLM(config).model.layers[config.sidecar_layer_index].sidecar.ple
+    assert torch.equal(built.sharpness, torch.ones_like(built.sharpness))
+    assert built.gate.abs().max() > 0

@@ -94,8 +94,9 @@ learned sidecar weights never resets a sibling that was present in the checkpoin
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
         elif isinstance(module, DirectionGatedPLESidecar):
-            # A bare Parameter carries no init mark of its own; see the note there.
+            # Bare Parameters carry no init mark of their own; see the note there.
             nn.init.normal_(module.gate, std=module.gate_init_std)
+            nn.init.ones_(module.sharpness)
         elif isinstance(module, IQ4NLDequant):
             # Non-persistent buffers are also rematerialized empty by HF loading.
             module.kvalues.copy_(torch.tensor(IQ4NL_KVALUES, device=module.kvalues.device))

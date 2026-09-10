@@ -44,6 +44,24 @@ normalised query elementwise by ``(1 + w_s)`` and then dots it with the key; sin
 absorbable into that stream's direction, and keeping both would be two parameterisations
 of one function.
 
+**The direction is normalised, and that is not cosmetic.** The gate divides by
+``sqrt(hidden_size)``, which is the attention convention and assumes *both* sides of the
+dot product have norm ``sqrt(d)``. Upstream gets that for free because it RMS-normalises
+its key. A raw learned vector does not: at ``std = 0.02`` its norm is about 1.0 rather
+than 50.6, the pre-activation is 50x too small, and the gate is pinned near 0.5 no matter
+what it learns. The first run of this module measured ``gate_std`` 0.0348 against a
+predicted 0.0313 for that initialisation, while upstream's four streams sit at 0.080 to
+0.228 -- so the gate was not failing to learn, it was structurally unable to select.
+
+Nor could a learning-rate sweep have rescued it. AdamW's step is about ``lr`` per element
+regardless of gradient size, so 72 steps at 1e-4 move each element by at most 0.0072
+while the gap to a selective scale is about 1.0 per element -- 140x the entire step
+budget, needing ``lr`` near 0.014 to close, which would wreck everything else sharing the
+optimizer. So the scale is fixed by construction here: the direction is RMS-normalised to
+``sqrt(d)`` and a learned per-direction ``sharpness`` (initialised at 1.0) carries the
+magnitude. Only the direction's *direction* is learned as a direction, which is what it
+was ever supposed to mean, and no choice of ``gate_init_std`` can silently flatten it.
+
 **Identity at load** is preserved the way ``PLESidecar`` establishes it: ``value_proj``
 and ``conv1d`` are both zero, so the gated value and the convolution branch are both
 exactly zero and the module returns its input unchanged. The gate directions are
@@ -106,6 +124,9 @@ class DirectionGatedPLESidecar(nn.Module):
 
         self.value_proj = nn.Linear(feature_dim, hidden_size, bias=False)
         self.gate = nn.Parameter(torch.empty(hc_count, gate_directions, hidden_size))
+        # Magnitude lives here so the direction can be normalised; 1.0 reproduces the
+        # sqrt(d) norm the gate's own scaling assumes.
+        self.sharpness = nn.Parameter(torch.ones(hc_count, gate_directions))
         self.conv1d = nn.Conv1d(
             hc_count * hidden_size, hc_count * hidden_size, kernel_size=conv_kernel_size,
             groups=hc_count * hidden_size, dilation=self.conv_dilation, bias=False,
@@ -129,7 +150,12 @@ class DirectionGatedPLESidecar(nn.Module):
         """
         query = stream.float()
         query = query * torch.rsqrt(query.pow(2).mean(-1, keepdim=True) + self.eps)
-        raw = torch.einsum("...hd,hkd->...hk", query, self.gate.float())
+        # Both sides at RMS 1, exactly as upstream's normalised key gives it, so the
+        # /sqrt(d) below divides by the scale the operands actually have.
+        direction = self.gate.float()
+        direction = direction * torch.rsqrt(direction.pow(2).mean(-1, keepdim=True) + self.eps)
+        direction = direction * self.sharpness.float().unsqueeze(-1)
+        raw = torch.einsum("...hd,hkd->...hk", query, direction)
         raw = raw / math.sqrt(self.hidden_size)
         # Signed square root: compresses the dot product's range without losing its sign,
         # so a strongly disagreeing stream suppresses the value rather than merely not
@@ -182,6 +208,9 @@ class DirectionGatedPLESidecar(nn.Module):
             f"{prefix}/value_norm": self.value_proj.weight.float().norm().item(),
             f"{prefix}/conv_norm": self.conv1d.weight.float().norm().item(),
             f"{prefix}/gate_direction_norm": self.gate.float().norm().item(),
+            f"{prefix}/gate_sharpness_mean": self.sharpness.float().mean().item(),
+            f"{prefix}/gate_sharpness_min": self.sharpness.float().min().item(),
+            f"{prefix}/gate_sharpness_max": self.sharpness.float().max().item(),
         }
         for stream in range(self.hc_count):
             report[f"{prefix}/gate_direction_norm_{stream}"] = (
