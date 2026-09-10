@@ -11,8 +11,6 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from distillkit.fused import fused
-
 
 # Below this a saved tensor is bookkeeping (RNG state, scalars), not a stream.
 _OFFLOAD_MIN_BYTES = 16 * 1024**2
@@ -120,14 +118,12 @@ def branch_norm(x, norm, gain_delta):
     return _BranchNorm.apply(x, gain, norm.eps)
 
 
-@fused
 def collapse_residual(states: torch.Tensor) -> torch.Tensor:
     """Mean over branches, expressed around branch zero for exact BF16 identity."""
     reference = states[..., 0, :]
     return reference + (states - reference.unsqueeze(-2)).mean(dim=-2)
 
 
-@fused
 def _combine(normalized, gate_logits, write_logits, read_offset, lambda_read,
              write_offset, lambda_write, read_index):
     """Both gates, the corrected read and the write weights, from the routing logits.

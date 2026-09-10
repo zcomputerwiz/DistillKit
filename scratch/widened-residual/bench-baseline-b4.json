@@ -1,0 +1,55 @@
+{
+  "kind": "training_cost",
+  "branches": 2,
+  "batch": 4,
+  "sequence": 4096,
+  "steps": [
+    {
+      "step": 1,
+      "seconds": 13.92210519999935,
+      "loss": 7.451745986938477,
+      "routing_grad_count": 128,
+      "routing_grad_max": 1.3828125,
+      "peak_gib": [
+        15.421032905578613,
+        11.89143180847168
+      ],
+      "reserved_gib": [
+        17.34765625,
+        12.220703125
+      ]
+    },
+    {
+      "step": 2,
+      "seconds": 12.96014550000109,
+      "loss": 7.035508632659912,
+      "routing_grad_count": 128,
+      "routing_grad_max": 0.4296875,
+      "peak_gib": [
+        19.63606357574463,
+        14.209789276123047
+      ],
+      "reserved_gib": [
+        20.90625,
+        16.482421875
+      ]
+    },
+    {
+      "step": 3,
+      "seconds": 12.559250600002997,
+      "loss": 7.167518138885498,
+      "routing_grad_count": 128,
+      "routing_grad_max": 0.22265625,
+      "peak_gib": [
+        19.635605812072754,
+        14.208812713623047
+      ],
+      "reserved_gib": [
+        20.876953125,
+        16.482421875
+      ]
+    }
+  ],
+  "parameters": 4340443008,
+  "quality_evaluation": false
+}
