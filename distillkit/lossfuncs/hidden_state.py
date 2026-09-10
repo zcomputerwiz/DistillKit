@@ -1,3 +1,5 @@
+import threading
+
 import torch
 import torch.nn.functional as F
 from torch.utils.checkpoint import checkpoint
@@ -84,6 +86,25 @@ def _accumulate_anchor(kind, student_h, teacher_h, layer_mask, projection, chunk
     return total
 
 
+# Per-anchor values for the trainer to log. Thread-local because the opt-in
+# concurrent-microbatch path calls this from worker threads, and a diagnostic that is
+# quietly attributed to the wrong microbatch is worse than no diagnostic.
+_ANCHOR_REPORT = threading.local()
+
+
+def last_anchor_report() -> dict[str, float]:
+    """What each anchor contributed on this thread's most recent call.
+
+    The aggregate `hs_cosine` hides which anchor is doing anything. Measured across a
+    whole 5M stage-2 run it ends at 0.88 -- a cosine similarity of 0.12 between the
+    student's projected states and the teacher's -- and stage 1, where only the
+    projections and the adapter train, gets *closer* at 0.78. One of those anchors may
+    be carrying all of it, and until they are logged separately there is no way to know
+    which, or whether either is worth its 13.1M projection parameters.
+    """
+    return dict(getattr(_ANCHOR_REPORT, "values", {}))
+
+
 def compute_hs_loss(
     kind: str,
     student_outputs: CausalLMOutput,
@@ -116,6 +137,7 @@ def compute_hs_loss(
         mask = mask.unsqueeze(-1)
 
     total_loss = torch.tensor(0.0, device=reference.device)
+    report = {}
     for i, (student_layer_idx, teacher_layer_idx) in enumerate(
         hidden_state_mapping.layer_mapping
     ):
@@ -136,9 +158,11 @@ def compute_hs_loss(
         width = teacher_h.shape[-1] if kind == "mse" else 1
         layer_loss = summed / (layer_mask.sum().to(summed.device) * width)
 
+        report[f"hs_{kind}/anchor_{student_layer_idx}"] = layer_loss.detach().item()
         # Anchors on different cards each produce a scalar; only the scalar crosses.
         total_loss = total_loss + layer_loss.to(total_loss.device)
 
+    _ANCHOR_REPORT.values = report
     return total_loss / len(hidden_state_mapping.layer_mapping)
 
 
