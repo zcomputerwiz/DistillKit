@@ -172,3 +172,8 @@ cython_debug/
 
 # Keep the bounded widening probe results, not its multi-GB training checkpoint.
 /scratch/widened-residual/smoke-checkpoint/
+# Evaluation bundles are large and deterministic: `independent_eval prepare` rebuilds
+# them byte for byte, and every result JSON records the bundle's sha256. The original
+# 32-document text-bundle.json stays committed as the smallest reproducible example.
+/scratch/independent-eval/text-bundle-[0-9]*.json
+/scratch/independent-eval/full-bundle-*.json

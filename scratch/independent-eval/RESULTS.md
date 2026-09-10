@@ -4,7 +4,14 @@ Status: all four required checkpoints completed the independent-text screening
 run. Real MMLU/ARC-Challenge runs are **not complete**: direct downloads failed
 with Windows socket permissions, and browser access to the dataset server was
 denied by browser security. No benchmark scores or accuracy intervals have been
-fabricated. The likelihood scorer and normalization logic have automated tests.
+fabricated.
+
+**Correction, 2026-09-09.** That was the sandbox, not the machine. Both datasets
+download anonymously here on the first attempt -- `cais/mmlu` `all` 14,042 test rows,
+`allenai/ai2_arc` `ARC-Challenge` 1,172 -- and no Hugging Face token is required.
+`full-bundle-384.json` now carries 384 documents plus 256 MMLU and 256 ARC questions
+per split. Benchmark scoring is queued behind the stage-2 training runs, which own
+the GPU; see `scratch/score_widening_full.sh`. The likelihood scorer and normalization logic have automated tests.
 
 The text screen contains 32 documents / 14,396 scored tokens, selected from 1,602
 documents absent from both cache manifests. Each document contributes its first

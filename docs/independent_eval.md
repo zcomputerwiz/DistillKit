@@ -112,6 +112,28 @@ local NLL input without network access. Check the source files are the requested
 test datasets; the evaluator does not invent benchmark questions when downloads
 are unavailable.
 
+Both datasets are public and download anonymously -- `cais/mmlu` `all` gives 14,042
+test rows, `allenai/ai2_arc` `ARC-Challenge` gives 1,172 -- so no token is needed.
+The earlier "downloads unavailable" note described the sandbox the evaluator was
+built in, not this machine, where the identical command succeeds. The bundles these
+commands produce are large (6.6 MB text-only at 384 documents, 14.7 MB with 256
+questions per benchmark) and are deliberately not committed: preparation is
+deterministic given the same documents, manifests and tokenizer, and every result
+JSON records the bundle's `bundle_sha256`, so a bundle is verified by rebuilding it
+rather than by storing it.
+
+The two bundles behind the recorded results:
+
+```powershell
+.venv/Scripts/python.exe -m distillkit.independent_eval prepare --tokenizer ../student-hf --documents ../capture-data/heldout.jsonl --manifests ../teacher-cache-1m/manifest.json ../teacher-cache-5m/manifest.json --docs 384 --document-tokens 512 --text-only --output scratch/independent-eval/text-bundle-384.json
+.venv/Scripts/python.exe -m distillkit.independent_eval prepare --tokenizer ../student-hf --documents ../capture-data/heldout.jsonl --manifests ../teacher-cache-1m/manifest.json ../teacher-cache-5m/manifest.json --docs 384 --questions 256 --document-tokens 512 --output scratch/independent-eval/full-bundle-384.json
+```
+
+Scoring loads the 4B student on `cuda:0`, so it needs the GPU to itself; running it
+beside a training job OOMs one of the two. `scratch/score_widening_full.sh` scores
+every arm of the widened curriculum, one task per process because the 540-second
+watchdog is per invocation and three tasks over two ablation modes do not fit in one.
+
 ```powershell
 $evalTable = (Get-Content examples/_lr_sweep_base.yml | Select-String '^  table_path: ').Line.Substring(14).Trim()
 .venv/Scripts/python.exe -m distillkit.independent_eval evaluate --bundle scratch/independent-eval/bundle.json --checkpoint ../runs/gr-stage1-1m --table $evalTable --limit 2 --output scratch/independent-eval/tiny.json
