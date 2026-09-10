@@ -107,3 +107,74 @@ def test_no_grad_path_skips_the_checkpoint():
     with torch.no_grad():
         value = compute_hs_loss("cosine", outputs, signal, mask, mapping, chunk_rows=3)
     assert torch.isfinite(value)
+
+
+def test_bfloat16_chunks_do_not_undercount_the_sum():
+    """A running BF16 scalar sum stops changing once the accumulator is large relative
+    to each addend. Measured on the real module before the fix: orthogonal BF16 vectors
+    whose cosine loss is exactly 1.0 came back as 0.0625 at chunk_rows=2 and 1.0 at
+    chunk_rows=1024. CUDA autocast promotes this path and hid it in every configured
+    run, which is why the reduction dtype is now explicit rather than ambient."""
+    batch, sequence, width = 2, 4096, 2
+    student = torch.zeros(batch, sequence, width, dtype=torch.bfloat16)
+    teacher = torch.zeros(batch, sequence, width, dtype=torch.bfloat16)
+    student[..., 0] = 1.0          # orthogonal, so every position contributes exactly 1
+    teacher[..., 1] = 1.0
+    outputs = CausalLMOutput(logits=None, hidden_states={ANCHOR: student})
+
+    class _Signal:
+        hidden_states = (teacher,)
+
+    mapping = _Mapping(None)
+    mask = torch.ones(batch, sequence, dtype=torch.bool)
+    for chunk_rows in (2, 8, 1024, 10**6):
+        value = compute_hs_loss("cosine", outputs, _Signal(), mask, mapping,
+                                chunk_rows=chunk_rows)
+        assert abs(value.item() - 1.0) < 1e-3, (chunk_rows, value.item())
+
+
+def _saved_bytes(fn):
+    seen = {}
+
+    def pack(tensor):
+        seen[id(tensor)] = tensor.numel() * tensor.element_size()
+        return tensor
+
+    with torch.autograd.graph.saved_tensors_hooks(pack, lambda t: t):
+        fn().backward()
+    return sum(seen.values())
+
+
+def test_a_frozen_anchor_with_a_trainable_projection_still_checkpoints():
+    """Stage 1 freezes the backbone, so the anchor does not require grad while the
+    projection consuming it does. Gating the checkpoint on the anchor alone skipped it
+    in exactly the configuration chunking exists for, and every chunk's intermediates
+    stayed alive to backward."""
+    def build(freeze_anchor):
+        torch.manual_seed(3)
+        student = torch.randn(2, 64, STUDENT_WIDTH, requires_grad=not freeze_anchor)
+        teacher = torch.randn(2, 64, TEACHER_WIDTH)
+        projections = nn.ModuleList([nn.Linear(STUDENT_WIDTH, TEACHER_WIDTH, bias=False)])
+        outputs = CausalLMOutput(logits=None, hidden_states={ANCHOR: student})
+
+        class _Signal:
+            hidden_states = (teacher,)
+
+        mask = torch.ones(2, 64, dtype=torch.bool)
+        return lambda: compute_hs_loss("cosine", outputs, _Signal(), mask,
+                                       _Mapping(projections), chunk_rows=8)
+
+    frozen = _saved_bytes(build(True))
+    trainable = _saved_bytes(build(False))
+    # Both paths checkpoint, so neither retains a chunk's projected states. A regression
+    # shows up as the frozen case holding far more than the trainable one.
+    assert frozen <= trainable * 1.5, (frozen, trainable)
+
+
+def test_no_grad_still_skips_the_checkpoint():
+    """Evaluation runs under inference_mode, where checkpoint would raise, and nothing
+    is trainable there however the projection is flagged."""
+    outputs, signal, mask, mapping, _ = _fixture()
+    with torch.no_grad():
+        assert torch.isfinite(compute_hs_loss("cosine", outputs, signal, mask, mapping,
+                                              chunk_rows=3))

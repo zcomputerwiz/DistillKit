@@ -46,12 +46,20 @@ def _anchor_sum(kind, student_h, teacher_h, layer_mask, projection):
 # memory here comes from the checkpoint rather than from fusing four cheap kernels,
 # so there is nothing to trade away.
 def _masked_cosine(student_h, teacher_h, layer_mask):
-    cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1)
-    return ((1 - cosine_sim) * layer_mask.squeeze(-1)).sum()
+    # fp32 for the reduction, explicitly rather than by whatever autocast happens to be
+    # active. In BF16 a running scalar sum stops changing once the accumulator is large
+    # relative to each addend: measured on orthogonal BF16 vectors of shape [2, 4096, 2],
+    # a loss of 1.0 came back as 0.0625 at chunk_rows=2 and 1.0 at chunk_rows=1024. Under
+    # CUDA autocast this path is promoted anyway, so the configured run never showed it --
+    # which is exactly why it is pinned here instead of left to the ambient context.
+    # Casting the [batch, tokens] similarity rather than the [batch, tokens, hidden]
+    # inputs keeps the fp32 tensor 2560x smaller than the operands.
+    cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1).float()
+    return ((1 - cosine_sim) * layer_mask.squeeze(-1).float()).sum(dtype=torch.float32)
 
 
 def _masked_mse(student_h, teacher_h, layer_mask):
-    return (((student_h - teacher_h) ** 2) * layer_mask).sum()
+    return (((student_h - teacher_h) ** 2) * layer_mask).sum(dtype=torch.float32)
 
 
 def _accumulate_anchor(kind, student_h, teacher_h, layer_mask, projection, chunk_rows):
@@ -69,11 +77,19 @@ def _accumulate_anchor(kind, student_h, teacher_h, layer_mask, projection, chunk
     """
     rows = max(1, chunk_rows // max(1, student_h.shape[0]))
     sequence = student_h.shape[1]
+    # The anchor itself does not require grad when the backbone is frozen, but the
+    # projection consuming it still trains -- which is every stage-1 run. Gating on the
+    # anchor alone skipped the checkpoint in exactly that case and kept every chunk's
+    # intermediates alive, defeating the point of chunking where it is needed most.
+    trainable = torch.is_grad_enabled() and (
+        student_h.requires_grad
+        or (projection is not None
+            and any(parameter.requires_grad for parameter in projection.parameters())))
     total = None
     for start in range(0, sequence, rows):
         end = min(start + rows, sequence)
         pieces = (student_h[:, start:end], teacher_h[:, start:end], layer_mask[:, start:end])
-        if pieces[0].requires_grad:
+        if trainable:
             # preserve_rng_state=False: no dropout here, and restoring global RNG from
             # a worker thread would race other in-flight recomputes.
             part = checkpoint(

@@ -9,6 +9,7 @@ import contextlib
 
 import torch
 from torch import nn
+from torch.autograd.function import once_differentiable
 from torch.nn import functional as F
 
 
@@ -89,7 +90,11 @@ class _BranchNorm(torch.autograd.Function):
         return ((x * rstd) * gain).to(x.dtype)
 
     @staticmethod
+    @once_differentiable
     def backward(ctx, grad_output):
+        # Single-differentiable on purpose: rstd is computed inside forward and carries
+        # no graph, so a second derivative through it would be silently wrong rather
+        # than merely unsupported. gradgradcheck now raises instead of returning False.
         x, gain, rstd = ctx.saved_tensors
         width = x.shape[-1]
         grad = grad_output.to(rstd.dtype)
@@ -98,7 +103,12 @@ class _BranchNorm(torch.autograd.Function):
         grad_x = rstd * scaled - (rstd.pow(3) / width) * inner * x
         grad_gain = None
         if ctx.needs_input_grad[1]:
-            grad_gain = (grad * x * rstd).sum(dim=tuple(range(grad.ndim - 1)))
+            # sum(dim=()) reduces everything rather than nothing, so a bare [hidden]
+            # input would collapse the gain gradient to a scalar and fail the shape
+            # check. With no leading dimensions there is nothing to reduce.
+            leading = tuple(range(grad.ndim - 1))
+            product = grad * x * rstd
+            grad_gain = product.sum(dim=leading) if leading else product
         return grad_x.to(x.dtype), grad_gain, None
 
 
@@ -110,7 +120,11 @@ def branch_norm(x, norm, gain_delta):
     """
     from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5RMSNorm
 
-    if not isinstance(norm, Qwen3_5RMSNorm):
+    if not isinstance(norm, Qwen3_5RMSNorm) or x.dtype == torch.float64:
+        # float64 is the module's own path, not this one. `Qwen3_5RMSNorm` computes from
+        # `x.float()`, so it discards half a double's mantissa; matching it bit for bit
+        # matters more than the memory this saves, and nothing trains in float64. The
+        # private Function keeps its double support so gradcheck stays meaningful.
         return norm(x) * (1 + gain_delta)
     # Folding the gain into the weight drops one full-width multiply and one rounding.
     # At initialisation the gain is exactly zero, so this is exactly `1 + weight`.

@@ -181,3 +181,38 @@ def test_it_holds_a_fifth_of_what_the_module_holds():
     assert module > 9.9, module          # fp32 copy + fp32 normalised value + the bf16 input
     assert fused < 2.2, fused            # the bf16 input, and per-row reciprocals
     assert module / fused > 4, (module, fused)
+
+
+def test_float64_falls_back_to_the_module():
+    """`Qwen3_5RMSNorm` computes from `x.float()`, discarding half a double's mantissa.
+    Matching it exactly matters more than the memory this saves, and nothing trains in
+    float64 -- but gradcheck runs there, so the Function keeps its double support."""
+    norm = _norm(dtype=torch.float64)
+    x = torch.randn(2, 5, WIDTH, dtype=torch.float64)
+    gain = torch.zeros(WIDTH, dtype=torch.float64)
+    assert torch.equal(branch_norm(x, norm, gain), reference(x, norm, gain))
+
+
+def test_a_bare_hidden_vector_reduces_correctly():
+    """`sum(dim=())` reduces everything rather than nothing, so an input with no leading
+    dimensions collapsed the gain gradient to a scalar and failed autograd's shape check."""
+    from distillkit.widened_residual import _BranchNorm
+
+    x = torch.randn(9, dtype=torch.double, requires_grad=True)
+    gain = torch.randn(9, dtype=torch.double, requires_grad=True)
+    _BranchNorm.apply(x, gain, 1e-6).sum().backward()
+    assert gain.grad.shape == gain.shape and torch.isfinite(gain.grad).all()
+    assert x.grad.shape == x.shape
+
+
+def test_second_derivatives_are_refused_rather_than_wrong():
+    """rstd is computed inside forward and carries no graph, so a second derivative
+    through it would be silently wrong. Raising beats returning a plausible number."""
+    from distillkit.widened_residual import _BranchNorm
+
+    x = torch.randn(2, 4, dtype=torch.double, requires_grad=True)
+    gain = torch.randn(4, dtype=torch.double, requires_grad=True)
+    out = _BranchNorm.apply(x, gain, 1e-6)
+    (grad,) = torch.autograd.grad(out.sum(), x, create_graph=True)
+    with pytest.raises(RuntimeError):
+        torch.autograd.grad(grad.sum(), x)
