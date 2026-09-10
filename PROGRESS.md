@@ -970,6 +970,113 @@ head is recomputed during backward -- and which way it pays depends on what is b
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
 
+## Upstream's PLE weights do not transfer, and hc_count is 4 (2026-09-10)
+
+Two questions were open about the downloaded Flash-Next PLE layer: what shape it really
+is, and whether its trained gate means anything on this student.
+
+### The shape answers the design question
+
+`key_proj` is `(10240, 2560)` and `value_proj` is `(2560, 2560)`, so upstream's
+`hc_count` is **4**. Reading `Qwen4ExpTextPLELayer` confirms the arrangement:
+
+    key   = norm_key(key_proj(features)).unflatten(-1, (hc_count, hidden))
+    query = norm_query(hidden_states).unflatten(-1, (hc_count, hidden))
+    gate  = sigmoid(signed_sqrt((key * query).sum(-1) / sqrt(hidden)))   # per stream
+    out   = gate * value.unsqueeze(-2)                                   # value shared
+
+**One key per residual stream, one shared value, four independent gates.** That is
+upstream's own answer to "how does the model use the table": not one read, four reads of
+the same value, each admitted or refused by its own stream. This fork's port set
+`hc_count = 1` -- documented at the time as the one deliberate divergence -- and the
+widened model then applied the whole sidecar independently to each branch, which is a
+different structure: four *values* rather than four gates on one.
+
+### The trained gate does not transfer
+
+The gate is a dot product between the table's key and *our backbone's* residual stream.
+`key_proj` and `norm_query` were trained against Flash-Next's basis; this student merely
+shares the hidden size. `scratch/ple_transfer_probe.py` scores real (features, position)
+pairings against two shuffles -- rolling within the document, which holds the topic and
+moves only the position, and rolling across documents, which mismatches everything.
+32 documents, 512 tokens each, at the layer the sidecar occupies:
+
+| stream | gate | vs within-document | vs across-documents |
+| --- | ---: | ---: | ---: |
+| 0 | 0.6887 +- 0.0803 | **-0.01203** (15.0% of std) | **-0.00879** (10.9%) |
+| 1 | 0.4820 +- 0.2281 | +0.00910 (4.0%) | +0.00621 (2.7%) |
+| 2 | 0.4921 +- 0.1680 | +0.00978 (5.8%) | +0.00375 (2.2%) |
+| 3 | 0.4903 +- 0.1698 | +0.00774 (4.6%) | +0.00691 (4.1%) |
+
+Every interval excludes zero, so there is *some* dependence on the pairing. It is
+2-15% of the gate's own spread, and two details say it is not the intended one:
+
+* **Stream 0 has the sign backwards.** Correct pairings get a *lower* gate than
+  mismatched ones. It is also the stream with the largest `key_proj` (norm 43.5 against
+  27.6-34.4), so it is not a dormant head.
+* **The hard control separates more than the easy one**, on all four streams. A gate
+  that recognised content should punish another document's n-grams more than the same
+  document's neighbouring ones. It does the opposite, which is what local positional
+  overlap looks like rather than agreement.
+
+So the weights are not an initialisation for this student -- they are a prior in a basis
+the backbone does not share, and one quarter of it points the wrong way. Loading them
+would need an alignment from our stream into upstream's, which is a full 2560x2560
+matrix: exactly as many parameters as `key_proj`, so there is nothing left to borrow.
+
+**What survives the download is the architecture, not the numbers.** Four gates over a
+shared value is worth building; the `hc_count = 4` weights are not worth loading.
+
+## G1/G2: the GPU checks Codex asked for (2026-09-10)
+
+**G1, real-model identity under tensor parallelism.** `widened_residual_probe.py
+identity --tp`, after the memory work: 32 widened layers observed, every branch pair
+equal at every layer, logits **bit-identical** to the unwidened arm (`max_abs_difference`
+0.0). The `_BranchNorm` forward change did not disturb the identity initialisation.
+
+**G2, peer offload under checkpointing with TP barriers.** Codex could only exercise
+`offload_stream_boundaries` on CPU tensors, which take the bypass branch in `pack`, so
+the peer copies themselves were unvalidated. `scratch/g2_offload_probe.py` runs one
+model through four backwards at the production shape (2 x 4096) -- offload on, off, on
+again, and on with `every=1` -- and compares gradients.
+
+Two implementation notes worth keeping. Nested `saved_tensors_hooks` **do not compose**:
+only the innermost pair is consulted, so an observer wrapped around the production
+context never runs at all. The probe wraps the *registration* instead. And a
+per-parameter relative difference is useless here -- the identity-initialised routing
+scalars carry gradient norms near 1e-6 and their relative difference swings by an order
+of magnitude between two runs of the same arm -- so the comparison is magnitude-weighted
+over all 1306 parameters.
+
+| comparison | global relative gradient difference |
+| --- | ---: |
+| offload vs no offload | 5.137e-04 |
+| **the same arm, run twice** | **1.249e-03** |
+
+**The offload's effect on the gradients is below the run-to-run floor**, and the loss is
+bit-identical across all four arms. 16 tensors totalling 1.25 GiB were confirmed parked
+on `cuda:1`.
+
+### What it also measured: the offload works, and buys nothing at the peak
+
+| arm | allocated after forward (home / peer) | peak (home / peer) |
+| --- | --- | --- |
+| offload, `every=2` | 5.647 / 5.175 | 10.218 / 8.364 |
+| no offload | 6.906 / 3.941 | 10.219 / 8.360 |
+| offload, `every=1` | 4.445 / 6.441 | 10.179 / 8.439 |
+
+The parking is real and exactly as large as advertised: **1.259 GiB off the home card at
+the end of the forward, 2.461 GiB with every boundary parked.** And the peak does not
+move -- 10.218 against 10.219 GiB, and 10.179 even when 2.5 GiB is parked.
+
+**The peak is set during backward, not at the end of the forward.** Whatever is binding
+is the recompute working set of a single layer, so relieving the stored boundaries
+cannot raise the ceiling. This does not retract the batch-4 result -- that was measured
+under the full objective, where the logit and optimizer pressure sits elsewhere -- but
+it does mean the offload is not what buys headroom at this shape, and it costs about
+0.8 s on the first step it runs. It is a candidate for removal, and the measurement that
+would settle it is the same probe under the real loss rather than a synthetic one.
+
 ## Half the screen was prompt, and the sidecar was wrecking the prompt (2026-09-10)
 
 The held-out corpus is chat-formatted and the screen scored each document's first 512

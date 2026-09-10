@@ -1,0 +1,130 @@
+{
+  "kind": "g2_peer_offload",
+  "batch": 2,
+  "sequence": 4096,
+  "arms": [
+    {
+      "offload": true,
+      "every": 2,
+      "allocated_after_forward_gib": [
+        5.6469526290893555,
+        5.174800872802734
+      ],
+      "loss": -0.0009113780106417835,
+      "seconds": 6.161235100007616,
+      "peak_gib": [
+        10.218372821807861,
+        8.363547801971436
+      ],
+      "reserved_gib": [
+        11.849609375,
+        9.83203125
+      ],
+      "hook_installations": 1,
+      "saved_tensors": 64,
+      "saved_gib": 2.5,
+      "parked_tensors": 16,
+      "parked_gib": 1.25,
+      "parked_on": [
+        "cuda:1"
+      ]
+    },
+    {
+      "offload": false,
+      "every": null,
+      "allocated_after_forward_gib": [
+        6.9058637619018555,
+        3.9406700134277344
+      ],
+      "loss": -0.0009113780106417835,
+      "seconds": 5.341541699992376,
+      "peak_gib": [
+        10.219334125518799,
+        8.359641551971436
+      ],
+      "reserved_gib": [
+        13.037109375,
+        11.017578125
+      ],
+      "hook_installations": 0,
+      "saved_tensors": 0,
+      "saved_gib": 0.0,
+      "parked_tensors": 0,
+      "parked_gib": 0.0,
+      "parked_on": []
+    },
+    {
+      "offload": true,
+      "every": 2,
+      "allocated_after_forward_gib": [
+        5.6558637619018555,
+        5.190670013427734
+      ],
+      "loss": -0.0009113780106417835,
+      "seconds": 5.3955507000064244,
+      "peak_gib": [
+        10.218861103057861,
+        8.359641551971436
+      ],
+      "reserved_gib": [
+        13.037109375,
+        11.017578125
+      ],
+      "hook_installations": 1,
+      "saved_tensors": 64,
+      "saved_gib": 2.5,
+      "parked_tensors": 16,
+      "parked_gib": 1.25,
+      "parked_on": [
+        "cuda:1"
+      ]
+    },
+    {
+      "offload": true,
+      "every": 1,
+      "allocated_after_forward_gib": [
+        4.4449262619018555,
+        6.440670013427734
+      ],
+      "loss": -0.0009113780106417835,
+      "seconds": 5.468125200000941,
+      "peak_gib": [
+        10.178776264190674,
+        8.438743114471436
+      ],
+      "reserved_gib": [
+        13.037109375,
+        11.017578125
+      ],
+      "hook_installations": 1,
+      "saved_tensors": 64,
+      "saved_gib": 2.5,
+      "parked_tensors": 32,
+      "parked_gib": 2.5,
+      "parked_on": [
+        "cuda:1"
+      ]
+    }
+  ],
+  "home_gib_saved_after_forward": 1.2589111328125,
+  "home_gib_saved_after_forward_every1": 2.4609375,
+  "offload_vs_no_offload": {
+    "parameters_with_grad": 1306,
+    "bit_identical_parameters": 259,
+    "global_norm_relative": 0.0005137143889442086,
+    "parameters_above_1e-3": 458,
+    "worst_substantial_parameter": "model.layers.11.self_attn.k_proj.shards.1",
+    "worst_substantial_relative": 0.005976470371917127
+  },
+  "same_arm_repeated": {
+    "parameters_with_grad": 1306,
+    "bit_identical_parameters": 256,
+    "global_norm_relative": 0.0012485631741583347,
+    "parameters_above_1e-3": 458,
+    "worst_substantial_parameter": "model.layers.1.linear_attn.conv1d.0.weight",
+    "worst_substantial_relative": 0.010380279966843764
+  },
+  "offload_within_nondeterminism": true,
+  "loss_bit_identical": true,
+  "quality_evaluation": false
+}

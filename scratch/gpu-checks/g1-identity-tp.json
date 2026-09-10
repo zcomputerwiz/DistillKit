@@ -1,0 +1,26 @@
+{
+  "kind": "identity",
+  "tensor_parallel": true,
+  "comparisons": [
+    {
+      "branches": 1,
+      "logits_shape": [
+        2,
+        4,
+        248320
+      ],
+      "widened_layers_observed": 0
+    },
+    {
+      "branches": 2,
+      "logits_shape": [
+        2,
+        4,
+        248320
+      ],
+      "widened_layers_observed": 32,
+      "max_abs_difference": 0.0,
+      "bit_identical": true
+    }
+  ]
+}
