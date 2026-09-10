@@ -1,0 +1,33 @@
+{
+  "cache": "..\\teacher-cache-1m",
+  "top_k": 64,
+  "documents": 64,
+  "positions": 50893,
+  "true_token_in_topk": 0.9577938026840627,
+  "true_token_outside_topk": 0.04220619731593733,
+  "teacher_mass_in_topk_mean": 0.9917639493942261,
+  "teacher_mass_in_topk_p05": 0.9736005663871765,
+  "by_role": {
+    "system": {
+      "positions": 7558,
+      "true_token_outside_topk": 0.08110611272823498,
+      "teacher_mass_in_topk_mean": 0.9663093686103821
+    },
+    "user": {
+      "positions": 8778,
+      "true_token_outside_topk": 0.16381863750284797,
+      "teacher_mass_in_topk_mean": 0.9845714569091797
+    },
+    "assistant": {
+      "positions": 33539,
+      "true_token_outside_topk": 0.002802707295983753,
+      "teacher_mass_in_topk_mean": 0.999133825302124
+    },
+    "template": {
+      "positions": 1018,
+      "true_token_outside_topk": 0.0029469548133594925,
+      "teacher_mass_in_topk_mean": 0.9999570250511169
+    }
+  },
+  "quality_evaluation": false
+}
