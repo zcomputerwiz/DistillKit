@@ -1,0 +1,15 @@
+{
+  "kind": "training_cost_failure",
+  "branches": 2,
+  "batch": 4,
+  "sequence": 4096,
+  "allocator": "garbage_collection_threshold:0.8",
+  "completed_updates": 1,
+  "first_update_seconds": 14.128068999998504,
+  "first_update_peak_gib": [16.041964530944824, 11.90131950378418],
+  "failure": "CUDA out of memory in the second update's backward, recomputing the MLP residual read",
+  "failed_allocation_mib": 160,
+  "allocated_gib_at_failure_rounded": 19.31,
+  "reserved_unallocated_gib_at_failure_rounded": 3.37,
+  "cap_gib": 22.8
+}

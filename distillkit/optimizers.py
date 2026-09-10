@@ -14,6 +14,7 @@ from torch import nn
 from transformers import TrainerCallback
 
 from distillkit.gated_residual import GatedResidual
+from distillkit.widened_residual import WidenedResidual
 from distillkit.ple_sidecar import PLESidecar
 
 
@@ -92,7 +93,7 @@ def _auxiliary_parameter_ids(model: nn.Module) -> set[int]:
         result.update(id(p) for name, p in model.named_parameters() if name in names)
     for name, module in model.named_modules():
         parts = set(name.split("."))
-        if isinstance(module, GatedResidual) or parts.intersection(
+        if isinstance(module, (GatedResidual, WidenedResidual)) or parts.intersection(
             {"sidecar", "W_side_proj", "distillation_projections"}
         ):
             result.update(id(p) for p in module.parameters())
@@ -351,7 +352,7 @@ class UnfreezeBackboneCallback(TrainerCallback):
 def architecture_metrics(model: nn.Module) -> dict[str, float]:
     report = {}
     for name, module in model.named_modules():
-        if isinstance(module, GatedResidual):
+        if isinstance(module, (GatedResidual, WidenedResidual)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, PLESidecar):
             report.update(module.gate_report(prefix=f"architecture/{name}"))

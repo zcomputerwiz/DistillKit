@@ -1,0 +1,16 @@
+{
+  "kind": "reload_smoke",
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\widened-residual\\smoke-checkpoint",
+  "exact_routing_tensors": 512,
+  "nonzero_lambdas": 128,
+  "logits_shape": [
+    1,
+    2,
+    248320
+  ],
+  "finite_logits": true,
+  "ignored_loss_only_keys": [
+    "distillation_projections.0.weight",
+    "distillation_projections.1.weight"
+  ]
+}

@@ -1,4 +1,4 @@
-# HybridModel / DistillKit fork — status & handoff (updated 2026-09-07)
+# HybridModel / DistillKit fork — status & handoff (updated 2026-09-09)
 
 This is the continuation/handoff record for the DistillKit n-gram-sidecar fork in
 `D:\DeepThought\Projects\HybridModel\DistillKit`. It began as a log of Claude's
@@ -6,7 +6,7 @@ unfinished GGUF provider + verification work and has grown into the authoritativ
 "where things stand" document. Read **Where things stand** first; the sections below
 are the chronological evidence trail.
 
-## Where things stand (as of 2026-09-08)
+## Where things stand (as of 2026-09-09)
 
 **Built and verified (all CPU-testable parts done):**
 - GGUF IQ4_NL table provider (`ngram_table.py`): hash ported from Flash-Next modeling
@@ -129,6 +129,26 @@ Knobs whose right value depends on what is binding, not on taste:
     parameters sharded, 1193 s against the layer split's 1263 s, eval_loss 0.5329
     against 0.5330, export verified as a stock checkpoint. 1.54x per microbatch but
     1.06x per epoch -- see "Hybrid tensor parallelism" for why, and what it buys.
+11. ~~Widen the residual stream to Flash-Next's multi-branch form~~ - **built and
+    verified at n_r=2**: exact bit-identical logits at initialisation on the real
+    student, single-card and tensor-parallel; trainer and checkpoint round trip clean;
+    fits batch 4 x 4096 at 19.64 / 20.97 GiB for +30% per update. See "Widening the
+    residual stream". No quality claim yet -- see below.
+
+**The two open items, in order:**
+
+A. **Teach `independent_eval` to load widened checkpoints.** Its strict unexpected-key
+   check rejects them, so the widening cannot yet be scored on the only metric this
+   project trusts. Everything else is blocked behind this, because `eval_loss` has
+   already been shown not to measure the thing we want.
+
+B. **Then decide what the adapters are actually for.** Codex's independent evaluation
+   says every adapter built so far *hurts* held-out NLL with all intervals excluding
+   zero -- `gr-stage1-1m` +0.5658 [0.4506, 0.6869], `ple-stage1-1m` +0.4515
+   [0.3770, 0.5266], `lr-sweep-1e3` +0.7186 [0.5805, 0.8581] against `student-hf`.
+   The widening is the first change that is exactly the identity at initialisation, so
+   it is the first one that can be given a fair verdict rather than inheriting a
+   damaged starting point.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -947,6 +967,102 @@ head is recomputed during backward -- and which way it pays depends on what is b
 4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## Widening the residual stream to two branches (2026-09-09)
+
+Every sidecar this project has trained is an *addition* to a single residual stream.
+Flash-Next does not have a single residual stream: `hc_count: 4` gives it four, and the
+per-layer table writes into a wider object than the one Qwen3.5 has. The retrofit is
+`residual_stream: {num_branches: 2, lowrank: 64}`, which carries
+`[batch, tokens, branches, hidden]` through all 32 layers with an identity-initialised
+Hyper-Connections read/write at every attention and MLP subblock. n_r=2 rather than 3 or
+4 for margin: 42.6M routing parameters (1.00%) all learned from scratch, and the smallest
+memory bill of the options.
+
+`distillkit/widened_residual.py`, `distillkit/models/qwen35_widened.py`,
+`docs/widened_residual.md`, 22 tests in `tests/test_widened_residual.py`.
+
+### The identity holds exactly, on the real student, on both cards
+
+Eight output positions across the full 248,320-token vocabulary, widened against
+unwidened: **maximum absolute logit difference 0.0**, bit-identical, single-card and
+under tensor parallelism, with all 32 layer outputs checked for two persistent identical
+branches. That matters because the retrofit is bolted to a trained backbone; anything
+short of exact identity at initialisation is damage before the first step.
+
+Note upstream's own GR module *cannot* be initialised to the identity -- a mean of
+sigmoids is at most 1 and at zero logits is exactly 1/2, so copying it would halve the
+normalised input. The static read/write terms are kept for that reason.
+
+### The all-ones parameter that could not learn, again
+
+Three real trainer steps left `write_deviation` at **exactly 0** at every one of the 64
+routers, while `lambda_write` -- same module, same optimizer, same rate -- had reached
+2.7e-5. The static write was stored as literal ones. **BF16 spacing near 1.0 is 0.0078**,
+so a parameter held at 1.0 cannot record a 1e-5 step; it rounds back to 1.0 forever.
+
+This is the third time this project has hit exactly this failure. `nn.RMSNorm` was the
+first (upstream stores a zero-init weight and scales by `(1 + w)`; torch stores the scale
+directly). The sidecar's own gate was the second. The fix is the same each time: store
+the *offset* from identity, never identity itself. `read_offset` and `write_offset` are
+zero-initialised, and the same three steps now move `write_deviation` to 3.9e-5.
+`test_identity_routes_are_stored_where_bfloat16_is_dense` asserts every non-projection
+routing parameter starts where BF16 is dense.
+
+### Making it fit, and what did not work
+
+The first batch-4 x 4096 attempt completed one update and died in the second backward:
+card 0 at 19.31 GiB allocated with **3.37 GiB reserved but unallocated** under a 22.8 GiB
+cap. It was 90 MiB short. Windows still cannot defragment -- torch 2.11 answers
+`expandable_segments:True` with `expandable_segments not supported on this platform` and
+ignores it -- so:
+
+| attempt | card 0 allocated | card 0 reserved | result |
+| --- | ---: | ---: | --- |
+| `max_split_size_mb:256` | 19.51 | > 22.80 | OOM |
+| `empty_cache()` between updates | 19.50 | > 22.80 | OOM |
+| fewer, more uniform temporaries in read/write | 19.42 | > 22.80 | OOM |
+| alternate boundaries parked on the peer card | 19.64 | **20.97** | runs |
+
+The second row is the informative one: returning the whole pool between updates changed
+nothing, because the fragmentation is generated **inside a single backward**, not carried
+across updates. Nor was it the transient churn -- removing about 1.3 GiB of it per layer
+moved allocated by 0.1 GiB and reserved not at all. (Those cuts stayed in anyway: a
+redundant `.contiguous()` per branch, `1/n` applied to the narrow projection outputs
+instead of a second `[B,T,n,d]` copy, in-place `sigmoid_`, `addcmul` in the write.)
+
+What worked was placement. The stream lives entirely on the TP home card, so widening
+charges the whole retrofit to card 0 while card 1 sits several gigabytes below it.
+`offload_stream_boundaries` parks every second checkpoint boundary on the peer with
+`torch.autograd.graph.saved_tensors_hooks`; under non-reentrant checkpointing the only
+large tensors those hooks see in the layer loop are the per-layer stream inputs, because
+recompute temporaries never leave the checkpoint frame. Card 0's reserved-but-unallocated
+pool fell from 3.32 to 1.34 GiB.
+
+Offloading *every* boundary was measured too and is not better: card 0 improves by
+0.08 GiB while card 1 rises 1.65, because card 0's peak is not in the layer loop.
+
+### What it costs
+
+| | seconds/update | card 0 peak / reserved | card 1 peak / reserved |
+| --- | ---: | --- | --- |
+| `num_branches: 1` | 9.80 | 16.19 / 18.41 GiB | 13.87 / 15.48 GiB |
+| `num_branches: 2` | 12.75 | 19.64 / 20.97 GiB | 14.21 / 16.48 GiB |
+
+About +30% per update, of which the offload is roughly 0.19 s. The rest is the widening
+itself, and it is bandwidth, not arithmetic: the routing projections are about 4 TFLOP
+per update against roughly 140 TFLOP/s of bf16 across the pair, while every elementwise
+op in the layer now runs over twice as many elements. The real trainer, on the actual
+cache with the sidecar collator, runs 12.6-13.2 s/step at 17.40 / 18.58 GiB on card 0.
+
+### What is not established
+
+**Nothing here is a quality result.** The probe losses are plumbing checks on synthetic
+teacher tensors. `independent_eval` does not yet select the widened model class -- its
+strict unexpected-key check rejects widened checkpoints -- so the widening has not been
+measured against the one metric this project trusts, and given that *every* adapter so
+far has hurt held-out NLL, that measurement is the next thing that matters, not another
+`eval_loss` comparison.
 
 ## The objective this project tunes against does not measure the thing it wants (2026-09-09)
 

@@ -89,6 +89,8 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
 
     model.config.use_cache = False
     model._distillkit_tp_devices = tuple(str(d) for d in resolved)
+    # The text model reads this to place stream activations; it is not the root.
+    base._distillkit_tp_devices = model._distillkit_tp_devices
     # This is placement metadata, not accelerate dispatch hooks: prevent Trainer
     # from moving the whole model to one device or wrapping it in DataParallel.
     model.hf_device_map = {"": str(home_device), **{n: str(p.device) for n, p in model.named_parameters()}}

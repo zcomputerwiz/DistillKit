@@ -1,0 +1,120 @@
+{
+  "tensor_parallel": true,
+  "concurrent_microbatches": 1,
+  "sortish_batching": false,
+  "chunked_head": true,
+  "project_name": "hybridmodel-sidecar",
+  "train_model": "D:/DeepThought/Projects/HybridModel/student-hf",
+  "dataset": {
+    "train_dataset": null,
+    "eval_dataset": null,
+    "seed": 42,
+    "num_samples": null,
+    "num_eval_samples": null,
+    "eos_label_token_ids": null,
+    "prepared_dataset_path": null,
+    "prepacked": false
+  },
+  "teacher": {
+    "kind": "dataset",
+    "cache_path": "D:/DeepThought/Projects/HybridModel/teacher-cache-1m",
+    "anchor_layers": [
+      8,
+      64
+    ],
+    "cache_dtype": "float8_e4m3fn",
+    "legacy_logit_compression": null,
+    "logprob_compressor": null
+  },
+  "sequence_length": 4096,
+  "output_path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\widened-residual\\smoke-checkpoint",
+  "resize_embeddings_to_multiple_of": null,
+  "use_flash_attention": false,
+  "loss_functions": [
+    {
+      "function": "kl",
+      "weight": 0.7,
+      "temperature": 1.0,
+      "missing_probability_handling": "zero",
+      "sparse_chunk_length": 256,
+      "margin": null
+    },
+    {
+      "function": "hs_cosine",
+      "weight": 0.3,
+      "temperature": null,
+      "missing_probability_handling": null,
+      "sparse_chunk_length": null,
+      "margin": null
+    }
+  ],
+  "layer_mapping": [
+    [
+      4,
+      0
+    ],
+    [
+      32,
+      1
+    ]
+  ],
+  "force_hidden_state_projection": false,
+  "max_vram_fraction": 0.95,
+  "chunked_cross_entropy": true,
+  "functionary_packing": false,
+  "training_args": {
+    "bf16": true,
+    "remove_unused_columns": false,
+    "dataloader_num_workers": 0,
+    "optim": "adamw_bnb_8bit",
+    "per_device_train_batch_size": 4,
+    "gradient_accumulation_steps": 1,
+    "gradient_checkpointing": true,
+    "gradient_checkpointing_kwargs": {
+      "use_reentrant": false
+    },
+    "num_train_epochs": 1,
+    "learning_rate": 0.00001,
+    "lr_scheduler_type": "constant",
+    "warmup_steps": 0,
+    "max_grad_norm": 1.0,
+    "logging_steps": 1,
+    "eval_strategy": "no",
+    "eval_steps": 50,
+    "per_device_eval_batch_size": 1,
+    "save_strategy": "no",
+    "save_steps": 200,
+    "save_total_limit": 2,
+    "report_to": "none",
+    "seed": 42,
+    "max_steps": 3,
+    "train_sampling_strategy": "group_by_length",
+    "length_column_name": "length"
+  },
+  "model_kwargs": {},
+  "model_auto_class": "AutoModelForCausalLM",
+  "sidecar": {
+    "table_path": "C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf",
+    "enabled": true,
+    "resident": true,
+    "prefault": true,
+    "layer_index": 1,
+    "num_branches": 4,
+    "variant": "gated_residual"
+  },
+  "residual_stream": {
+    "num_branches": 2,
+    "lowrank": 64
+  },
+  "optimizer": {
+    "strategy": "adamw",
+    "muon_lr": null,
+    "sidecar_lr": null,
+    "freeze_backbone": false,
+    "unfreeze_at_step": null,
+    "log_every_n_steps": 1
+  },
+  "trust_remote_code": false,
+  "frozen_modules": null,
+  "frozen_res": null
+}

@@ -105,7 +105,9 @@ class AnchorTap:
             if threading.get_ident() != self._owner:
                 return
             if index not in self._captured:
-                self._captured[index] = _first_tensor(output)
+                value = _first_tensor(output)
+                readout = getattr(_module, "distillation_hidden_state", None)
+                self._captured[index] = readout(value) if callable(readout) else value
 
         return capture
 

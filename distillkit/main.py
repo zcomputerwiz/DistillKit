@@ -210,9 +210,13 @@ def load_student_model(
     tokenizer_vocab_size: int,
     signal_vocab_size: int | None = None,
 ) -> transformers.PreTrainedModel:
+    residual_stream = getattr(config, "residual_stream", None)
     if config.functionary_packing:
         monkey_patch_packing_for_model(config.train_model)
-    if config.sidecar is not None:
+    if residual_stream is not None:
+        from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
+        auto_cls = Qwen35WidenedForCausalLM
+    elif config.sidecar is not None:
         from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
         auto_cls = Qwen35SidecarForCausalLM
     else:
@@ -248,12 +252,37 @@ def load_student_model(
             extra_kwargs["torch_dtype"] = torch.bfloat16
         elif config.training_args.get("fp16"):
             extra_kwargs["torch_dtype"] = torch.float16
-    if config.sidecar is not None:
-        stock_config = transformers.AutoConfig.from_pretrained(config.train_model)
-        text_config = getattr(stock_config, "text_config", stock_config)
-        text_config.sidecar_layer_index = config.sidecar.layer_index
-        text_config.sidecar_num_branches = config.sidecar.num_branches
-        text_config.sidecar_variant = config.sidecar.variant
+    # Inspect saved architecture before choosing overrides: loading widened weights
+    # with the stock class would silently discard trained routing parameters.
+    config_kwargs = {key: extra_kwargs[key] for key in (
+        "revision", "cache_dir", "local_files_only", "token", "subfolder",
+        "trust_remote_code") if key in extra_kwargs}
+    stock_config = transformers.AutoConfig.from_pretrained(config.train_model, **config_kwargs)
+    text_config = getattr(stock_config, "text_config", stock_config)
+    if getattr(text_config, "residual_stream_enabled", False):
+        if residual_stream is None:
+            raise ValueError("Widened checkpoint requires its matching residual_stream run configuration")
+        expected = (text_config.residual_stream_num_branches, text_config.residual_stream_lowrank,
+                    getattr(text_config, "residual_stream_sidecar", False))
+        requested = (residual_stream.num_branches, residual_stream.lowrank, config.sidecar is not None)
+        if expected != requested:
+            raise ValueError(f"Widened checkpoint architecture {expected} differs from requested {requested}")
+        if config.sidecar is not None and (
+            text_config.sidecar_layer_index != config.sidecar.layer_index
+            or text_config.sidecar_num_branches != config.sidecar.num_branches
+            or text_config.sidecar_variant != config.sidecar.variant
+        ):
+            raise ValueError("Widened checkpoint sidecar architecture differs from requested sidecar")
+    if config.sidecar is not None or residual_stream is not None:
+        if config.sidecar is not None:
+            text_config.sidecar_layer_index = config.sidecar.layer_index
+            text_config.sidecar_num_branches = config.sidecar.num_branches
+            text_config.sidecar_variant = config.sidecar.variant
+        if residual_stream is not None:
+            text_config.residual_stream_enabled = True
+            text_config.residual_stream_num_branches = residual_stream.num_branches
+            text_config.residual_stream_lowrank = residual_stream.lowrank
+            text_config.residual_stream_sidecar = config.sidecar is not None
         extra_kwargs["config"] = text_config
     model = auto_cls.from_pretrained(
         config.train_model,
@@ -263,7 +292,7 @@ def load_student_model(
 
     model_vocab_size = model.get_input_embeddings().weight.shape[0]
     required_vocab_size = max(tokenizer_vocab_size, signal_vocab_size or 0)
-    if config.sidecar is not None:
+    if config.sidecar is not None or residual_stream is not None:
         if model_vocab_size < required_vocab_size:
             raise ValueError(
                 "Student head does not cover the tokenizer/signal vocabulary"

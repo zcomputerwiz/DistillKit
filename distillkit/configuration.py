@@ -164,6 +164,12 @@ class SidecarConfig(BaseModel):
         return self
 
 
+class ResidualStreamConfig(BaseModel):
+    """Persistent residual widening; omit this section for the original model."""
+    num_branches: int = Field(default=2, ge=1)
+    lowrank: int = Field(default=64, ge=1)
+
+
 class OptimizerConfig(BaseModel):
     strategy: Literal["hybrid", "adamw"] = "hybrid"
     muon_lr: float | None = Field(default=None, gt=0)
@@ -310,6 +316,7 @@ class DistillationRunConfig(BaseModel):
         description="Auto class for the model.",
     )
     sidecar: SidecarConfig | None = None
+    residual_stream: ResidualStreamConfig | None = None
     optimizer: OptimizerConfig | None = None
     trust_remote_code: bool = Field(
         default=False,
@@ -412,6 +419,6 @@ class DistillationRunConfig(BaseModel):
             raise ValueError("resident tables require dataloader_num_workers=0 to prevent worker copies")
         if self.sidecar and self.resize_embeddings_to_multiple_of is not None:
             raise ValueError("sidecar preserves the original padded vocabulary; omit embedding resize")
-        if self.optimizer and self.optimizer.freeze_backbone and not self.sidecar:
-            raise ValueError("stage-1 backbone freezing requires a sidecar student")
+        if self.optimizer and self.optimizer.freeze_backbone and not (self.sidecar or self.residual_stream):
+            raise ValueError("stage-1 backbone freezing requires a sidecar or residual_stream student")
         return self
