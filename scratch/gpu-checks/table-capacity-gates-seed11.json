@@ -1,0 +1,35 @@
+{
+  "train_docs": 512,
+  "eval_docs": 192,
+  "tokens": 1024,
+  "lr": 0.001,
+  "epochs": 1,
+  "seed": 11,
+  "baseline_nll": 0.48875547982589074,
+  "eval_assistant_tokens": 69143,
+  "table": {
+    "eval_nll": 0.4348368054866039,
+    "delta_vs_baseline": -0.05391867433928682,
+    "readout_norm": 87.89502716064453,
+    "gate_norm": null,
+    "train_tokens": 190615,
+    "seconds": 149.24536410000292
+  },
+  "gate1": {
+    "eval_nll": 0.4344018394073314,
+    "delta_vs_baseline": -0.054353640418559335,
+    "readout_norm": 103.79713439941406,
+    "gate_norm": 5.343952178955078,
+    "train_tokens": 190615,
+    "seconds": 147.9447768999962
+  },
+  "gate4": {
+    "eval_nll": 0.4295329179765587,
+    "delta_vs_baseline": -0.059222561849332056,
+    "readout_norm": 55.61561965942383,
+    "gate_norm": 5.27412223815918,
+    "train_tokens": 190615,
+    "seconds": 148.0849285000004
+  },
+  "quality_evaluation": true
+}

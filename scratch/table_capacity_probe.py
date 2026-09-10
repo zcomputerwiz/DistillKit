@@ -30,6 +30,14 @@ remainder and are disjoint from each other, so the eval documents are new to the
 backbone and to the readout alike. The absolute NLL is still not comparable to the
 reply-bundle arms: different documents, different lengths.
 
+`--arms` also runs the gate ablation. Upstream computes `hc_count` gates, one per
+hyper-connection stream, over a shared value. With a single residual stream those gates
+are all functions of the *same* vector, so adding `gate_s * value` to one stream for
+every s is exactly `(sum_s gate_s) * value` -- four admission decisions collapse to one
+scalar, at four dot products a token and no widening at all. What that leaves open is
+whether a gate earns anything here, which the `linear`, `gate1` and `gate4` arms answer
+directly.
+
     python scratch/table_capacity_probe.py --output scratch/gpu-checks/table-capacity.json
 """
 
@@ -37,6 +45,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import threading
 import time
@@ -104,6 +113,41 @@ def chunked_ce(hidden, head, targets, mask, chunk=256, backward=False, scale=1.0
     return total, counted
 
 
+class Readout(nn.Module):
+    """`W(features)`, optionally admitted by a gate read off the residual stream.
+
+    The gate is upstream's, with the query taken where this probe injects rather than at
+    the sidecar's layer: RMS-normalise the stream, project onto a learned direction,
+    compress with the signed square root, squash. `directions` of 4 reproduces what
+    `hc_count = 4` computes, summed rather than distributed across streams, because one
+    stream is all there is to distribute over.
+    """
+
+    def __init__(self, hidden_size, directions=0):
+        super().__init__()
+        self.value = nn.Linear(hidden_size, hidden_size, bias=False)
+        nn.init.zeros_(self.value.weight)
+        self.directions = directions
+        if directions:
+            # NOT zero, which is the instinct and is a trap: signed_sqrt has sign(0) = 0
+            # and its clamp_min flattens abs() near the origin, so the gradient with
+            # respect to a zero direction is exactly 0.0 and the gate is frozen at 0.5
+            # for the whole run. Measured: |grad| 0.0 at g = 0, 4.85 at g ~ N(0, 0.02).
+            # The first run of this ablation had zero-init gates and therefore compared
+            # three constant rescalings of the value path rather than three gates.
+            self.gate = nn.Parameter(torch.randn(directions, hidden_size) * 0.02)
+
+    def forward(self, features, stream):
+        value = self.value(features)
+        if not self.directions:
+            return value
+        normed = stream.float()
+        normed = normed * torch.rsqrt(normed.pow(2).mean(-1, keepdim=True) + 1e-6)
+        raw = (normed @ self.gate.T) / math.sqrt(stream.shape[-1])
+        gate = torch.sigmoid(raw.abs().clamp_min(1e-6).sqrt() * raw.sign())
+        return value * gate.sum(-1, keepdim=True)
+
+
 def batches(documents, tokenizer, collator, table_batch, tokens):
     for start in range(0, len(documents), table_batch):
         chunk = documents[start:start + table_batch]
@@ -126,8 +170,12 @@ def main():
     parser.add_argument("--tokens", type=int, default=1024)
     parser.add_argument("--batch", type=int, default=2)
     parser.add_argument("--epochs", type=int, default=1)
+    parser.add_argument("--arms", nargs="+", default=["table", "shuffled_control"],
+                        choices=["table", "shuffled_control", "gate1", "gate4"])
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--seed", type=int, default=7,
+                        help="gate direction init and nothing else; the data order is fixed")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     timer = threading.Timer(5400, lambda: os._exit(124))
@@ -190,7 +238,7 @@ def main():
             keep = masks[:, :-1].to(device) & batch["attention_mask"][:, 1:].bool().to(device)
             state = hidden[:, :-1]
             if readout is not None:
-                state = state + readout(features_of(batch, roll)[:, :-1]).to(state.dtype)
+                state = state + readout(features_of(batch, roll)[:, :-1], state).to(state.dtype)
             with torch.no_grad():
                 loss, count = chunked_ce(state, head, targets, keep)
             total += float(loss)
@@ -198,17 +246,18 @@ def main():
         return total / max(counted, 1), counted
 
     results = {"train_docs": len(train_docs), "eval_docs": len(eval_docs),
-               "tokens": args.tokens, "lr": args.lr, "epochs": args.epochs}
+               "tokens": args.tokens, "lr": args.lr, "epochs": args.epochs, "seed": args.seed}
     baseline, eval_tokens = evaluate(None, False)
     results["baseline_nll"] = baseline
     results["eval_assistant_tokens"] = eval_tokens
     print("baseline assistant NLL %.4f over %d tokens" % (baseline, eval_tokens))
 
-    for name, roll in (("table", False), ("shuffled_control", True)):
-        torch.manual_seed(7)
-        readout = nn.Linear(hidden_size, hidden_size, bias=False).to(device)
-        nn.init.zeros_(readout.weight)
-        readout.to(torch.float32)
+    plan = {"table": (False, 0), "shuffled_control": (True, 0),
+            "gate1": (False, 1), "gate4": (False, 4)}
+    for name in args.arms:
+        roll, directions = plan[name]
+        torch.manual_seed(args.seed)
+        readout = Readout(hidden_size, directions).to(device).to(torch.float32)
         optimizer = torch.optim.AdamW(readout.parameters(), lr=args.lr)
         started = time.perf_counter()
         seen = 0
@@ -221,7 +270,8 @@ def main():
                 count = int(keep.sum())
                 if not count:
                     continue
-                state = hidden[:, :-1] + readout(features_of(batch, roll)[:, :-1]).to(hidden.dtype)
+                stream = hidden[:, :-1]
+                state = stream + readout(features_of(batch, roll)[:, :-1], stream).to(hidden.dtype)
                 optimizer.zero_grad(set_to_none=True)
                 loss, _ = chunked_ce(state, head, targets, keep, backward=True, scale=1.0 / count)
                 optimizer.step()
@@ -233,15 +283,17 @@ def main():
         results[name] = {
             "eval_nll": trained,
             "delta_vs_baseline": trained - baseline,
-            "readout_norm": readout.weight.float().norm().item(),
+            "readout_norm": readout.value.weight.float().norm().item(),
+            "gate_norm": (readout.gate.float().norm().item() if directions else None),
             "train_tokens": seen,
             "seconds": time.perf_counter() - started,
         }
         print("%s: eval NLL %.4f  delta %+.4f  |W| %.3f"
               % (name, trained, trained - baseline, results[name]["readout_norm"]), flush=True)
 
-    results["table_gain_over_control"] = (results["shuffled_control"]["delta_vs_baseline"]
-                                          - results["table"]["delta_vs_baseline"])
+    if "table" in args.arms and "shuffled_control" in args.arms:
+        results["table_gain_over_control"] = (results["shuffled_control"]["delta_vs_baseline"]
+                                              - results["table"]["delta_vs_baseline"])
     results["quality_evaluation"] = True
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(results, indent=2), encoding="utf-8")

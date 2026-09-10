@@ -1,0 +1,96 @@
+{
+  "assistant_only_paired_widened_minus_control": {
+    "stage1_enabled": {
+      "estimate": 0.01244912574365314,
+      "ci95": [
+        0.011195224955936497,
+        0.013713534107430037
+      ],
+      "units": 384
+    },
+    "stage1_bypassed": {
+      "estimate": -0.001874003503078419,
+      "ci95": [
+        -0.002438773860694873,
+        -0.0013475699507596638
+      ],
+      "units": 384
+    },
+    "stage2_enabled": {
+      "estimate": -0.001115826519128063,
+      "ci95": [
+        -0.0019253804098431743,
+        -0.0003155346101959866
+      ],
+      "units": 384
+    },
+    "stage2_bypassed": {
+      "estimate": 0.0011213674725893223,
+      "ci95": [
+        0.0005250917304581818,
+        0.0017342701500107853
+      ],
+      "units": 384
+    }
+  },
+  "whole_window_reply_bundle_paired_widened_minus_control": {
+    "stage1_enabled": {
+      "estimate": 0.048532865963962335,
+      "ci95": [
+        0.04471592861176485,
+        0.05258601928635633
+      ],
+      "units": 384
+    },
+    "stage1_bypassed": {
+      "estimate": -0.011842338764526913,
+      "ci95": [
+        -0.012601825175413566,
+        -0.01109161059259512
+      ],
+      "units": 384
+    },
+    "stage2_enabled": {
+      "estimate": 0.00793756120285604,
+      "ci95": [
+        0.005640716721867832,
+        0.010433764691103962
+      ],
+      "units": 384
+    },
+    "stage2_bypassed": {
+      "estimate": -0.0019031794500468618,
+      "ci95": [
+        -0.003971785227942714,
+        -0.00024932249340342875
+      ],
+      "units": 384
+    }
+  },
+  "constant_mixer_normalization_counterexample": {
+    "constant_mix_weight": 0.5,
+    "same_raw_stream_mean": [
+      1.0,
+      0.5
+    ],
+    "split_gates": [
+      0.2,
+      0.8
+    ],
+    "tied_gates": [
+      0.5,
+      0.5
+    ],
+    "split_mixer_output": [
+      0.6227658987045288,
+      0.2902003526687622
+    ],
+    "tied_mixer_output": [
+      0.6324549913406372,
+      0.3162274956703186
+    ],
+    "max_abs_difference": 0.026027143001556396
+  },
+  "sum_to_mean_with_W_times_four_max_abs_error": 0.0,
+  "opposite_gate_complement_max_abs_error": 1.1920928955078125e-07
+}

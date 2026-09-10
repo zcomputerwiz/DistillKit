@@ -990,7 +990,7 @@ upstream's own answer to "how does the model use the table": not one read, four 
 the same value, each admitted or refused by its own stream. This fork's port set
 `hc_count = 1` -- documented at the time as the one deliberate divergence -- and the
 widened model then applied the whole sidecar independently to each branch, which is a
-different structure: four *values* rather than four gates on one.
+different structure -- though not the one first recorded here; see Correction 4 below, the port shares one sidecar module across branches.
 
 ### The trained gate does not transfer
 
@@ -1026,6 +1026,111 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
+
+## Codex on hyper-connections versus gates: four corrections (2026-09-10)
+
+Codex reviewed the restructuring and the hyper-connections-versus-gates decision. Four
+of its findings change conclusions recorded above; they are corrected here rather than
+edited away, because the wrong versions were acted on.
+
+### Correction 1: the widening does *not* lose at every stage
+
+Every "widening loses" number in this document is a whole-window comparison, and the
+whole window on this corpus is about half instruction block. Recomputed from the same
+saved records, selecting `by_role.assistant`, 384 documents and 156,565 assistant
+tokens, paired percentile bootstrap (`scratch/hc_gate_review_cpu.py`, independently
+reproduced to six decimals by `scratch/verify_assistant_arms.py`):
+
+| widened minus control | whole window | **assistant only** |
+| --- | ---: | ---: |
+| stage 1, enabled | +0.048533 | +0.012449 [+0.011188, +0.013673] |
+| stage 1, bypassed | -0.011842 | -0.001874 [-0.002450, -0.001341] |
+| **stage 2, enabled** | +0.007938 | **-0.001116 [-0.001901, -0.000318]** |
+| stage 2, bypassed | -0.001903 | +0.001121 [+0.000547, +0.001726] |
+
+**At stage 2 with the sidecar enabled the widening beats its control on assistant
+tokens**, interval excluding zero. It loses at stage 1 and it loses bypassed, but the
+headline claim that it loses everywhere is wrong. The case against widening is now cost
+against a small demonstrated benefit, not architectural equivalence and not defeat.
+
+The trap that produced this: the `reply-*.json` files carry a top-level NLL over *all*
+roles alongside the `by_role` breakdown, and `scratch/paired_arms.py` reads the
+top-level total. Any assistant-only claim has to select the subsection explicitly.
+
+### Correction 2: collapsing four gates onto one stream is not faithful
+
+The identity `sum_s gate_s * value = (sum_s gate_s) * value` holds for what lands in a
+single destination. It does not establish equivalence to keeping `H_s + gate_s * value`
+separately, for three independent reasons:
+
+* **Normalisation happens per stream, after injection.** In general
+  `mean_s N(H_s + g_s v) != N(mean_s (H_s + g_s v))`. Codex's counterexample fixes every
+  read weight at 0.5 and holds the raw stream means identical, and the mixer outputs
+  still differ by 0.0260 -- so near-constant mixing weights alone do not rescue it.
+* **The read weights are per stream *and* per channel**, a sigmoid of a low-rank map of
+  all normalised streams jointly, and the write-back uses separate per-stream weights.
+  Fixed but unequal channel weights already produce channel-dependent combinations of
+  the gates.
+* **The convolution branch is stream-specific and non-linear.** Its input is
+  gate-independent (that result stands), but `conv1d` has its own channels per stream and
+  `silu` follows, so four branches cannot be combined by summing gates. Four parallel
+  branches on one stream would reproduce them, at 4x a cost that is 0.1% of the layer.
+
+A faithful regime does exist and it is the one this fork's retrofit starts in: identical
+streams, one shared sidecar, identity routing, unit writes. That is the initialisation,
+not the trained model.
+
+### Correction 3: gate4's advantage is optimisation, not capacity
+
+With a free value matrix, summing and averaging represent the same functions:
+`(sum_i g_i) W f = (mean_i g_i)(k W) f`. So `gate4` reaching 4.0 where `gate1` is bounded
+by 1.0 is **not** extra capacity -- and the value norms are exactly what compensating
+scale looks like (103.31 for gate1, 87.90 for linear, 55.38 for gate4, against effective
+initial multipliers of about 0.5, 1 and 2). The measured gain is real and reproduces
+across gate initialisations -- gate4 minus linear is -0.005236 at seed 7 and -0.005304 at
+seed 11 -- but what it currently demonstrates is that this parameterisation optimises
+better in a fixed-budget run, not that four directions buy shape.
+
+The fair comparison is `2 * mean_i g_i` for both arms, so both start near 1.0 with the
+same range, plus the two controls this ablation is missing: a frozen-random gate and a
+constant gate.
+
+The family is also more constrained than "a one-hidden-layer network" suggests. The gates
+carry no bias and the signed square root is odd, so `G_k(-q) = k - G_k(q)`, and a pair of
+opposite directions cancels exactly: `g_a(q) + g_{-a}(q) = 1`.
+
+### Correction 4: two claims above overreach
+
+* **"The optimum of the entire objective is a student whose sidecar contributes
+  nothing"** does not follow from the teacher lacking a table. KL compares output
+  distributions, and a sidecar can reduce student-teacher divergence; the hidden-state
+  term compares a *learned projection* against teacher states and does not penalise
+  sidecar use as such. Cancellation may well be what happens -- anchor 4's 0.109 is
+  consistent with it -- but the architecture mismatch does not prove it.
+* **"Four *values* rather than four gates"** is wrong about this fork's own port.
+  `WidenedDecoderLayer` reuses one `sidecar` module across branches and its value depends
+  only on the shared features, so the port shares key, value, norms *and* convolution
+  across branches. Upstream shares the value but has stream-specific keys, norm gains and
+  convolution channels. The widened arm is a restricted analogue of upstream, which
+  limits what its failure can establish about the architecture.
+
+### What the capacity probe does and does not measure
+
+It injects immediately before `lm_head` and reads its gate query from the final hidden
+state. So its 0.047 nats is a statement about useful features available at the output,
+not a measured early-layer gain and not a numerical bound on one -- it bypasses the whole
+transport problem the real sidecar at layer 1 has to solve. Two further limits: the
+"query-only R^2" in the gate decomposition is a squared correlation against one
+shuffled-key gate rather than a conditional variance decomposition, and the readout's
+training consumed 512 documents from the manifest-established unseen pool, which must be
+excluded from any future evaluation of a model carrying that readout.
+
+### Where this leaves the decision
+
+Single-stream gate experiments still come first, on cost against demonstrated benefit.
+The next measurements, in order: the `2 * mean` scale control with frozen-random and
+constant-gate arms; per-document NLL so gate4 versus linear gets a paired interval; and
+the same comparison at the sidecar's actual layer rather than at the head.
 
 ## What upstream's PLE gate is actually signalling (2026-09-10)
 
