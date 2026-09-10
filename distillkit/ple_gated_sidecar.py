@@ -58,8 +58,8 @@ regardless of gradient size, so 72 steps at 1e-4 move each element by at most 0.
 while the gap to a selective scale is about 1.0 per element -- 140x the entire step
 budget, needing ``lr`` near 0.014 to close, which would wreck everything else sharing the
 optimizer. So the scale is fixed by construction here: the direction is RMS-normalised to
-``sqrt(d)`` and a learned per-direction ``sharpness`` (initialised at 1.0) carries the
-magnitude. Only the direction's *direction* is learned as a direction, which is what it
+``sqrt(d)`` and a learned per-direction ``sharpness_delta`` (initialised at 0, applied as
+``1 + delta``) carries the magnitude. Only the direction's *direction* is learned as a direction, which is what it
 was ever supposed to mean, and no choice of ``gate_init_std`` can silently flatten it.
 
 **Identity at load** is preserved the way ``PLESidecar`` establishes it: ``value_proj``
@@ -124,9 +124,14 @@ class DirectionGatedPLESidecar(nn.Module):
 
         self.value_proj = nn.Linear(feature_dim, hidden_size, bias=False)
         self.gate = nn.Parameter(torch.empty(hc_count, gate_directions, hidden_size))
-        # Magnitude lives here so the direction can be normalised; 1.0 reproduces the
-        # sqrt(d) norm the gate's own scaling assumes.
-        self.sharpness = nn.Parameter(torch.ones(hc_count, gate_directions))
+        # The *deviation* from unit sharpness, not the sharpness itself, for the reason
+        # `_PLERMSNorm` stores a deviation: bfloat16 spacing near 1.0 is 0.0078, and this
+        # parameter's AdamW update at lr 1e-4 is about 7.4e-5, so a scale stored directly
+        # at 1.0 rounds back to 1.0 on every step and can never move. Measured over a
+        # 72-step run: sharpness exactly 1.0, 1.0, 1.0, 1.0 while the same gradient in
+        # fp32 would have moved each element 7.44e-5 per step. Near zero the spacing is
+        # ~1e-41 and the identical update survives.
+        self.sharpness_delta = nn.Parameter(torch.zeros(hc_count, gate_directions))
         self.conv1d = nn.Conv1d(
             hc_count * hidden_size, hc_count * hidden_size, kernel_size=conv_kernel_size,
             groups=hc_count * hidden_size, dilation=self.conv_dilation, bias=False,
@@ -154,7 +159,7 @@ class DirectionGatedPLESidecar(nn.Module):
         # /sqrt(d) below divides by the scale the operands actually have.
         direction = self.gate.float()
         direction = direction * torch.rsqrt(direction.pow(2).mean(-1, keepdim=True) + self.eps)
-        direction = direction * self.sharpness.float().unsqueeze(-1)
+        direction = direction * (1.0 + self.sharpness_delta.float()).unsqueeze(-1)
         raw = torch.einsum("...hd,hkd->...hk", query, direction)
         raw = raw / math.sqrt(self.hidden_size)
         # Signed square root: compresses the dot product's range without losing its sign,
@@ -208,9 +213,10 @@ class DirectionGatedPLESidecar(nn.Module):
             f"{prefix}/value_norm": self.value_proj.weight.float().norm().item(),
             f"{prefix}/conv_norm": self.conv1d.weight.float().norm().item(),
             f"{prefix}/gate_direction_norm": self.gate.float().norm().item(),
-            f"{prefix}/gate_sharpness_mean": self.sharpness.float().mean().item(),
-            f"{prefix}/gate_sharpness_min": self.sharpness.float().min().item(),
-            f"{prefix}/gate_sharpness_max": self.sharpness.float().max().item(),
+            f"{prefix}/gate_sharpness_mean": (1 + self.sharpness_delta.float()).mean().item(),
+            f"{prefix}/gate_sharpness_min": (1 + self.sharpness_delta.float()).min().item(),
+            f"{prefix}/gate_sharpness_max": (1 + self.sharpness_delta.float()).max().item(),
+            f"{prefix}/gate_sharpness_deviation": self.sharpness_delta.float().abs().max().item(),
         }
         for stream in range(self.hc_count):
             report[f"{prefix}/gate_direction_norm_{stream}"] = (

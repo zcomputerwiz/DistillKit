@@ -118,10 +118,10 @@ def test_parameter_count_drops_the_key_projection():
     hidden, features, hc, k = 32, 48, 2, 2
     module = DirectionGatedPLESidecar(hidden, features, hc_count=hc, gate_directions=k)
     counts = {name: p.numel() for name, p in module.named_parameters()}
-    assert set(counts) == {"value_proj.weight", "gate", "sharpness", "conv1d.weight"}
+    assert set(counts) == {"value_proj.weight", "gate", "sharpness_delta", "conv1d.weight"}
     assert counts["value_proj.weight"] == hidden * features
     assert counts["gate"] == hc * k * hidden
-    assert counts["sharpness"] == hc * k
+    assert counts["sharpness_delta"] == hc * k
     assert counts["conv1d.weight"] == hc * hidden * 4
 
 
@@ -275,11 +275,11 @@ def test_gate_selectivity_does_not_depend_on_the_initialisation_scale():
 
 def test_sharpness_carries_the_magnitude_and_survives_reinitialisation():
     module = _sidecar()
-    assert torch.equal(module.sharpness, torch.ones_like(module.sharpness))
+    assert torch.equal(module.sharpness_delta, torch.zeros_like(module.sharpness_delta))
     stream, _ = _inputs(module)
     narrow = module._admission(stream)
     with torch.no_grad():
-        module.sharpness.mul_(6.0)
+        module.sharpness_delta.add_(5.0)
     assert module._admission(stream).std() > narrow.std(), "sharpness must sharpen"
 
     # And a model built through HF's own initialisation must arrive with both intact:
@@ -289,5 +289,21 @@ def test_sharpness_carries_the_magnitude_and_survives_reinitialisation():
     torch.manual_seed(0)
     config = _widened_config()
     built = Qwen35WidenedForCausalLM(config).model.layers[config.sidecar_layer_index].sidecar.ple
-    assert torch.equal(built.sharpness, torch.ones_like(built.sharpness))
+    assert torch.equal(built.sharpness_delta, torch.zeros_like(built.sharpness_delta))
     assert built.gate.abs().max() > 0
+
+
+def test_sharpness_stores_a_deviation_because_bfloat16_cannot_hold_one():
+    """The bug a 72-step run hid: a scale at 1.0 in bf16 cannot move.
+
+    bfloat16 spacing near 1.0 is 0.0078 and this parameter's AdamW update at lr 1e-4 is
+    about 7.4e-5, so every step rounded back to exactly 1.0 -- measured, all four values
+    bit-identical after 72 steps, while the same gradient in fp32 moved 7.44e-5 a step.
+    `_PLERMSNorm` stores a deviation for precisely this reason; this is the same trap.
+    """
+    module = _sidecar()
+    update = 7.44e-5
+    scale = torch.ones_like(module.sharpness_delta).bfloat16()
+    assert torch.equal((scale.float() + update).bfloat16(), scale), "a scale at 1.0 is stuck"
+    stored = module.sharpness_delta.bfloat16()
+    assert not torch.equal((stored.float() + update).bfloat16(), stored), "a deviation moves"
