@@ -104,8 +104,11 @@ Random dynamic projections allow the zero-initialized lambdas to learn immediate
         # than [B,T,n,d]; Windows has no expandable_segments, so a backward that
         # churns big odd-sized blocks strands gigabytes of reserved-but-unallocated
         # pool. The branch views are already contiguous in the normalized dimension.
-        normalized = torch.stack([norm(branch) for branch in states.unbind(-2)], dim=-2)
-        normalized = normalized * (1 + self.branch_gain_delta)
+        # The per-branch gain rides along with the norm, so the [B,T,n,d] stack is
+        # written once instead of being read back and multiplied whole.
+        normalized = torch.stack(
+            [norm(branch) * (1 + gain) for branch, gain
+             in zip(states.unbind(-2), self.branch_gain_delta)], dim=-2)
         flattened = normalized.flatten(-2)
         # Linear is homogeneous, so 1/n applies to the narrow output instead of a
         # second [B,T,n,d] copy of the input. n is a power of two in practice and the

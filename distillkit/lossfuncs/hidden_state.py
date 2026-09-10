@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from torch.utils.checkpoint import checkpoint
 from transformers.modeling_outputs import CausalLMOutput
 from typing_extensions import override
 
@@ -10,12 +11,72 @@ from distillkit.lossfuncs.common import (
 from distillkit.signals import TeacherSignal
 
 
+# Positions per chunk at batch 1, halved at batch 2 and so on: a chunk's tensors are
+# [batch, rows, teacher_hidden], so the budget is rows x batch, not rows.
+HS_CHUNK_ROWS = 1024
+
+
+def _anchor_sum(kind, student_h, teacher_h, layer_mask, projection):
+    """One chunk's unnormalised contribution, as a scalar."""
+    if projection is not None:
+        # The projections are built in fp32 after the student is loaded in bf16, so
+        # this matmul only works when autocast happens to be active at this call
+        # site. Align explicitly instead: relying on an ambient context manager for
+        # dtype correctness fails at step 0 with a bare "mat1 and mat2 have
+        # different dtype" and no indication of which side is wrong.
+        student_h = projection(student_h.to(projection.weight.dtype))
+    # The cached teacher states are upcast from fp8 and need not share the student's
+    # dtype either; the arithmetic below assumes they do. They also arrive on the
+    # batch's device, which is only one of several when the student is split.
+    teacher_h = teacher_h.to(device=student_h.device, dtype=student_h.dtype)
+    layer_mask = layer_mask.to(student_h.device)
+    if kind == "mse":
+        return (((student_h - teacher_h) ** 2) * layer_mask).sum()
+    if kind != "cosine":
+        raise RuntimeError(f"Unimplemented hidden state loss type {repr(kind)}")
+    cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1)
+    return ((1 - cosine_sim) * layer_mask.squeeze(-1)).sum()
+
+
+def _accumulate_anchor(kind, student_h, teacher_h, layer_mask, projection, chunk_rows):
+    """Project and reduce a slice of positions at a time.
+
+    This was the one remaining unchunked path in the loss. The projection widens the
+    student's hidden size to the teacher's -- 2560 to 5120 here -- and its output stays
+    live for backward alongside the cosine's own temporaries, twice over because there
+    are two anchors. None of it is needed once a chunk's scalar is accumulated, and the
+    chunked head already does exactly this for the KL term.
+
+    Summing chunk scalars is not bitwise identical to one reduction over the whole
+    sequence. It is the same quantity to fp32 rounding, and the KL term has been
+    computed this way since the folded head landed.
+    """
+    rows = max(1, chunk_rows // max(1, student_h.shape[0]))
+    sequence = student_h.shape[1]
+    total = None
+    for start in range(0, sequence, rows):
+        end = min(start + rows, sequence)
+        pieces = (student_h[:, start:end], teacher_h[:, start:end], layer_mask[:, start:end])
+        if pieces[0].requires_grad:
+            # preserve_rng_state=False: no dropout here, and restoring global RNG from
+            # a worker thread would race other in-flight recomputes.
+            part = checkpoint(
+                lambda a, b, c: _anchor_sum(kind, a, b, c, projection), *pieces,
+                use_reentrant=False, preserve_rng_state=False,
+            )
+        else:
+            part = _anchor_sum(kind, *pieces, projection)
+        total = part if total is None else total + part
+    return total
+
+
 def compute_hs_loss(
     kind: str,
     student_outputs: CausalLMOutput,
     signal: TeacherSignal,
     mask: torch.Tensor | None = None,
     hidden_state_mapping: HiddenStateMapping | None = None,
+    chunk_rows: int = HS_CHUNK_ROWS,
 ):
     assert hidden_state_mapping is not None, (
         "Hidden state losses require HiddenStateMapping"
@@ -47,36 +108,19 @@ def compute_hs_loss(
         student_h = student_outputs.hidden_states[student_layer_idx]
         teacher_h = signal.hidden_states[teacher_layer_idx]
 
+        projection = None
         if hidden_state_mapping.projections is not None:
             projection = hidden_state_mapping.projections[i]
             # On a sharded student each projection was constructed on its anchor's
             # device, so this is a no-op; it is not one if a caller supplied its own
             # mapping.
             student_h = student_h.to(projection.weight.device)
-            # The projections are built in fp32 after the student is loaded in bf16, so
-            # this matmul only works when autocast happens to be active at this call
-            # site. Align explicitly instead: relying on an ambient context manager for
-            # dtype correctness fails at step 0 with a bare "mat1 and mat2 have
-            # different dtype" and no indication of which side is wrong.
-            student_h = projection(student_h.to(projection.weight.dtype))
 
-        # The cached teacher states are upcast from fp8 and need not share the student's
-        # dtype either; the subtraction and cosine below assume they do. They also
-        # arrive on the batch's device, which is only one of several when the student
-        # is split across GPUs.
-        teacher_h = teacher_h.to(device=student_h.device, dtype=student_h.dtype)
         layer_mask = mask.to(student_h.device)
-
-        if kind == "mse":
-            squared_error = (student_h - teacher_h) ** 2
-            masked_error = squared_error * layer_mask
-            layer_loss = masked_error.sum() / (layer_mask.sum() * student_h.shape[-1])
-        elif kind == "cosine":
-            cosine_sim = F.cosine_similarity(student_h, teacher_h, dim=-1)
-            cosine_distance = (1 - cosine_sim) * layer_mask.squeeze(-1)
-            layer_loss = cosine_distance.sum() / layer_mask.sum()
-        else:
-            raise RuntimeError(f"Unimplemented hidden state loss type {repr(kind)}")
+        summed = _accumulate_anchor(kind, student_h, teacher_h, layer_mask,
+                                    projection, chunk_rows)
+        width = teacher_h.shape[-1] if kind == "mse" else 1
+        layer_loss = summed / (layer_mask.sum().to(summed.device) * width)
 
         # Anchors on different cards each produce a scalar; only the scalar crosses.
         total_loss = total_loss + layer_loss.to(total_loss.device)
