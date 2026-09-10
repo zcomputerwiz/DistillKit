@@ -1,0 +1,230 @@
+{
+  "arms": {
+    "raw_table": {
+      "gain_nats": 0.02228996746171536,
+      "ci95": [
+        -0.0019521012649598244,
+        0.04348373632657569
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.8666666666666667,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.4254066050052643,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 2560,
+      "trainable": 40960
+    },
+    "raw_table/shuffled": {
+      "gain_nats": 0.004770863212773036,
+      "ci95": [
+        -0.0019430036199997286,
+        0.015196265005988757
+      ],
+      "documents": 15,
+      "assistant_tokens": 2969,
+      "fraction_documents_helped": 0.6666666666666666,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.5087271928787231,
+      "baseline_nll": 0.6650286266883241,
+      "input_dim": 2560,
+      "trainable": 40960
+    },
+    "query": {
+      "gain_nats": 0.010443371553150262,
+      "ci95": [
+        -0.020993576242524833,
+        0.04149797263321932
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.8,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.43196919560432434,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 5120,
+      "trainable": 40960
+    },
+    "ungated_value": {
+      "gain_nats": 0.03417606413928492,
+      "ci95": [
+        -0.00523213896011928,
+        0.07103734695650524
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.8,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.4167967736721039,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 2560,
+      "trainable": 40960
+    },
+    "gated_value": {
+      "gain_nats": 0.0046874069390362115,
+      "ci95": [
+        -0.03325504064843781,
+        0.04250095840756313
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.6666666666666666,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.42773693799972534,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 5120,
+      "trainable": 40960
+    },
+    "convolution": {
+      "gain_nats": 0.0020525062873912535,
+      "ci95": [
+        -0.026142093412882535,
+        0.022706903825859253
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.8,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.4308836758136749,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 5120,
+      "trainable": 40960
+    },
+    "reader_update": {
+      "gain_nats": 0.009538749189406915,
+      "ci95": [
+        -0.025602723821140524,
+        0.04377680160524956
+      ],
+      "documents": 15,
+      "assistant_tokens": 4755,
+      "fraction_documents_helped": 0.6666666666666666,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.42544466257095337,
+      "baseline_nll": 0.6548111042139031,
+      "input_dim": 5120,
+      "trainable": 40960
+    },
+    "reader_update/shuffled": {
+      "gain_nats": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "documents": 15,
+      "assistant_tokens": 2969,
+      "fraction_documents_helped": 0.0,
+      "status": "inconclusive",
+      "sign_convention": "reference NLL minus candidate NLL; positive is helpful",
+      "bootstrap": {
+        "unit": "document",
+        "estimator": "token-weighted mean",
+        "resamples": 10000,
+        "seed": 910
+      },
+      "validation_nll": 0.5101444125175476,
+      "baseline_nll": 0.6650286266883241,
+      "input_dim": 5120,
+      "trainable": 40960
+    }
+  },
+  "counts": {
+    "fit": 31,
+    "validation": 15,
+    "test": 15
+  },
+  "baseline_nll": 0.6548111042139031,
+  "identity_readout": {
+    "raw_table": {
+      "nll": 11.072596783643014,
+      "validation_nll": 11.10867691040039,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 4755,
+      "input_dim": 2560
+    },
+    "raw_table/shuffled": {
+      "nll": 12.352136916124929,
+      "validation_nll": 12.363451957702637,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 2969,
+      "input_dim": 2560
+    },
+    "ungated_value": {
+      "nll": 9.663707978442138,
+      "validation_nll": 9.524890899658203,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 4755,
+      "input_dim": 2560
+    },
+    "ungated_value/shuffled": {
+      "nll": 12.293506220479973,
+      "validation_nll": 12.290398597717285,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 2969,
+      "input_dim": 2560
+    },
+    "reader_update": {
+      "nll": 9.832628971745665,
+      "validation_nll": 9.700942039489746,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 4755,
+      "input_dim": 5120
+    },
+    "reader_update/shuffled": {
+      "nll": 12.13152611444357,
+      "validation_nll": 12.287348747253418,
+      "uniform_floor": 12.422473515976991,
+      "tokens": 2969,
+      "input_dim": 5120
+    }
+  }
+}
