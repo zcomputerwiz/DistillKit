@@ -290,6 +290,10 @@ def plumbing_probe(model, collator, feature, device):
         observed.append({"enabled": bool(args[2]), "raw_present": args[1] is not None,
                          "residual_max": (output - args[0]).float().abs().max().item()})
 
+    # A widened layer applies the sidecar to each residual branch in turn, so one
+    # forward is one call per branch rather than one call.
+    per_forward = (model.config.residual_stream_num_branches
+                   if getattr(model.config, "residual_stream_enabled", False) else 1)
     handle = sidecar.register_forward_hook(hook)
     batch = {k: v.to(device) for k, v in collator([feature]).items()}
     position = torch.tensor([len(feature["ids"]) - 2], device=device)
@@ -298,9 +302,13 @@ def plumbing_probe(model, collator, feature, device):
         disabled = forward_logits(model, batch, "bypassed", position).float()
     finally:
         handle.remove()
-    if len(observed) != 2 or not observed[0]["enabled"] or observed[1]["enabled"] or not observed[0]["raw_present"]:
+    first, second = observed[:per_forward], observed[per_forward:]
+    if (len(observed) != 2 * per_forward
+            or not all(call["enabled"] and call["raw_present"] for call in first)
+            or any(call["enabled"] for call in second)):
         raise ValueError("evaluation silently bypassed the sidecar or failed to forward its data/flag")
-    return {"sidecar_calls": observed, "enabled_minus_bypassed_logits_max": (enabled - disabled).abs().max().item()}
+    return {"sidecar_calls": observed, "branch_calls_per_forward": per_forward,
+            "enabled_minus_bypassed_logits_max": (enabled - disabled).abs().max().item()}
 
 
 def evaluate(args):

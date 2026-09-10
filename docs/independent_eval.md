@@ -1,5 +1,10 @@
 # Independent checkpoint evaluation
 
+The probe expects one sidecar call per residual branch, so a widened checkpoint
+reports `branch_calls_per_forward` alongside `sidecar_calls`; `load_checkpoint`
+selects the widened model class from the checkpoint's own `residual_stream_enabled`
+and verifies its routing tensors exactly, the same way it verifies a sidecar's.
+
 `distillkit.independent_eval` belongs in the package because checkpoint selection
 needs a maintained loading contract and regression tests. It has no trainer import,
 optimizer, generation loop, teacher logits, or hidden-state projections. No training

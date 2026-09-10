@@ -129,11 +129,12 @@ Knobs whose right value depends on what is binding, not on taste:
     parameters sharded, 1193 s against the layer split's 1263 s, eval_loss 0.5329
     against 0.5330, export verified as a stock checkpoint. 1.54x per microbatch but
     1.06x per epoch -- see "Hybrid tensor parallelism" for why, and what it buys.
-11. ~~Widen the residual stream to Flash-Next's multi-branch form~~ - **built and
-    verified at n_r=2**: exact bit-identical logits at initialisation on the real
-    student, single-card and tensor-parallel; trainer and checkpoint round trip clean;
-    fits batch 4 x 4096 at 19.64 / 20.97 GiB for +30% per update. See "Widening the
-    residual stream". No quality claim yet -- see below.
+11. ~~Widen the residual stream to Flash-Next's multi-branch form~~ - **built,
+    verified, and it is the first change that helps**: exact bit-identical logits at
+    initialisation, and **-0.0258 nats/token** on 384 independent documents with the
+    interval entirely below zero. The sidecar still costs +0.44 to +0.54 and costs
+    slightly *more* with the widening, so the two are independent effects. Stage 2 is
+    running. See "The first change that helps held-out text".
 
 **The two open items, in order:**
 
@@ -143,13 +144,13 @@ A. ~~Teach `independent_eval` to load widened checkpoints~~ - **done**: it selec
    to actually run it on a trained widened checkpoint; `eval_loss` has already been
    shown not to measure the thing we want, so that is the only verdict worth having.
 
-B. **Then decide what the adapters are actually for.** Codex's independent evaluation
-   says every adapter built so far *hurts* held-out NLL with all intervals excluding
-   zero -- `gr-stage1-1m` +0.5658 [0.4506, 0.6869], `ple-stage1-1m` +0.4515
-   [0.3770, 0.5266], `lr-sweep-1e3` +0.7186 [0.5805, 0.8581] against `student-hf`.
-   The widening is the first change that is exactly the identity at initialisation, so
-   it is the first one that can be given a fair verdict rather than inheriting a
-   damaged starting point.
+B. **Then decide what the n-gram sidecar is actually for.** The widening question is
+   answered for stage 1 and the answer is yes, -0.0258 nats/token. The sidecar
+   question is answered too, and the answer is still no: +0.4430 unwidened, +0.5046
+   widened, both intervals far from zero, on top of a backbone the widening improved.
+   Nothing so far has made the n-gram table pay for itself on text the cache never
+   saw, and the widening has now ruled out "the residual stream was too narrow" as
+   the explanation.
 
 ## Environment blockers found 2026-09-07 (verified in the venv)
 
@@ -968,6 +969,95 @@ head is recomputed during backward -- and which way it pays depends on what is b
 4.4% for 1.66 GiB at batch 1. But what it eliminates scales with `batch x sequence`: at
 `[4, 4096, 248320]` the logits are 7.6 GiB and their gradient another 7.6 GiB, so at
 batch 4 it is not optional. **Off at batch 1, required at batch 4.**
+
+## The first change that helps held-out text, and it is not the sidecar (2026-09-09)
+
+Stage 1 of the widened curriculum, scored on 384 independent documents / 175,526
+tokens that appear in no cache manifest -- twelve times the original 32-document
+screen. Reference is `student-hf` at 1.150513 nats/token; every figure below is a
+paired percentile bootstrap over documents.
+
+| arm | NLL | vs `student-hf` |
+| --- | ---: | --- |
+| **`widened-stage1-1m`** (widening only, no sidecar) | **1.124669** | **-0.025844 [-0.028280, -0.023403]** |
+| `widened-ple-stage1-1m`, sidecar bypassed | 1.136468 | **-0.014045 [-0.014968, -0.013129]** |
+| `ple-stage1-1m`, sidecar bypassed | 1.150513 | 0 (frozen backbone, nothing else to change) |
+| `widened-ple-stage1-1m`, sidecar enabled | 1.641075 | +0.490562 [+0.463239, +0.518762] |
+| `ple-stage1-1m`, sidecar enabled | 1.593521 | +0.443008 [+0.417380, +0.469528] |
+| `gr-stage1-1m`, sidecar enabled | 1.686505 | +0.535992 [+0.499463, +0.574419] |
+| `lr-sweep-1e3`, sidecar enabled | 1.835426 | +0.684913 [+0.641930, +0.729746] |
+
+**The widening is the first architectural change this project has made that improves
+independent cross-entropy.** -0.0258 with the whole interval below zero, from 42.6M
+routing parameters trained for 72 steps against a frozen backbone. It is a small
+effect -- 2.2% of the student's own NLL -- but it is real, it is measured, and it is
+the correct sign for the first time in this log.
+
+It survives the sidecar being bolted on: the widened arm's *bypassed* backbone is
+-0.0140 against `student-hf`, where the unwidened arm's bypassed backbone is exactly
+0.0 by construction (stage 1 freezes everything else).
+
+### And it cleanly separates the widening from the sidecar
+
+The sidecar still costs about half a nat, and slightly *more* with the widening than
+without: enabled-minus-bypassed is +0.5046 widened against +0.4430 unwidened. So the
+hypothesis that motivated the retrofit -- that a wider residual stream gives the n-gram
+table somewhere to write that does not cost the backbone -- is **not** what happened.
+The widening helps; the sidecar hurts; they are independent, and the sidecar's damage
+is marginally larger when there is more stream to damage.
+
+This is the first time the two have been separable at all, and only because the
+widening is exactly the identity at initialisation. Every earlier arm confounded
+"what the adapter learned" with "what the graft broke".
+
+### The distillation objective disagreed again, in sign
+
+| arm | final `eval_loss` | independent NLL vs `student-hf` |
+| --- | ---: | ---: |
+| `widened-stage1-1m` | **1.9540** (worst) | **-0.0258** (best) |
+| `widened-ple-stage1-1m` | 0.7262 | +0.4906 |
+| `ple-stage1-1m` | 0.7739 | +0.4430 |
+| `gr-stage1-1m` | 0.5921 (best) | +0.5360 |
+
+Perfectly inverted across all four. The mechanism is not mysterious -- with the backbone
+frozen, `eval_loss` is dominated by how far the KL term can be driven down, and only an
+adapter that injects new information can move it, so an arm with no sidecar at all scores
+worst. But it is worth recording that if this project had ranked these four arms by the
+number it spent two days optimising, it would have picked exactly the wrong one.
+
+All four start at KL 6.428 to four significant figures, which is the identity holding
+on the real corpus: at step zero the widened student is the unwidened student.
+
+### Two defects the run exposed
+
+**The plumbing probe rejected every widened checkpoint.** It required exactly two
+sidecar calls across the enabled and bypassed forwards, but a widened layer applies the
+sidecar once per branch, so `widened-ple-stage1-1m` failed with "evaluation silently
+bypassed the sidecar". The probe now expects `residual_stream_num_branches` calls per
+forward. Worth noting the failure mode was safe -- it refused to score rather than
+scoring something wrong.
+
+**Stage 2 at batch 4 does not fit.** The widened arm ran 32 steps and died inside the
+layer loop with card 0 at 20.62 GiB allocated and 2.13 GiB stranded. The batch-4
+performance probe measured 19.64 GiB peak on a fixed 4x4096 batch; a sortish run's
+shapes vary, and the real run also carries the PLE sidecar and the resident table.
+Both stage-2 arms now use microbatch 2 with accumulation 8 -- identical effective batch
+and tokens per step, and length grouping already removed the padding penalty that used
+to make small microbatches expensive (1024 tok/s at batch 2 grouped against 1053 at
+batch 4).
+
+### What this does not establish
+
+Stage 2 is the run that matters and it is still going. Stage 1 froze the backbone, so
+these numbers are about 42.6M routing parameters and nothing else; `lr-sweep-1e3` already
+showed that unlocking the backbone is worth -0.0928 on its own, which is larger than the
+widening's stage-1 effect. Whether the widening still helps once the backbone can move,
+and whether it changes how much the sidecar costs, is what `widened-ple-stage2-5m`
+against `ple-control-stage2-5m` is for.
+
+MMLU/ARC remain unmeasured: the dataset downloads still fail on Windows socket
+permissions. This is a source-specific cross-entropy screen, not a claim about
+knowledge or reasoning.
 
 ## Widening the residual stream to two branches (2026-09-09)
 

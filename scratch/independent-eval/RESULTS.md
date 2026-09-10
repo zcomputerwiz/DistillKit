@@ -78,3 +78,57 @@ rather than silently changing tokenization relative to the repository.
 See `../../docs/independent_eval.md` for the exact protocol and rerun commands;
 `text-report.json` contains all absolute and delta comparisons, and the four
 `*.text.json` files retain per-document observations, loading audits, and probes.
+
+---
+
+# Widened curriculum, stage 1, on a 384-document screen (2026-09-09)
+
+The 32-document screen above has wide absolute intervals (student-hf
+[0.904510, 1.356853]) -- fine for "does this adapter hurt", too coarse to separate
+two arms of a curriculum. `text-bundle-384.json` draws 384 of the same 1,602 eligible
+unseen documents, 175,526 scored tokens, twelve times the original. Reproduce with
+`bash scratch/score_widening.sh`; each checkpoint takes 57-167 s, well inside the
+540-second watchdog. Benchmark tasks are still absent for the same reason as above.
+
+Reference `student-hf` = 1.150513 nats/token. All intervals are 10,000 paired
+percentile bootstrap resamples over documents.
+
+| Checkpoint | Arm | NLL | Delta vs student-hf [95% CI] |
+|---|---|---:|---|
+| **widened-stage1-1m** | widening only, no sidecar | **1.124669** | **-0.025844 [-0.028280, -0.023403]** |
+| widened-ple-stage1-1m | bypassed | 1.136468 | **-0.014045 [-0.014968, -0.013129]** |
+| widened-ple-stage1-1m | enabled | 1.641075 | +0.490562 [+0.463239, +0.518762] |
+| ple-stage1-1m | bypassed | 1.150513 | +0.000000 |
+| ple-stage1-1m | enabled | 1.593521 | +0.443008 [+0.417380, +0.469528] |
+| gr-stage1-1m | enabled | 1.686505 | +0.535992 [+0.499463, +0.574419] |
+| gr-stage1-1m | flag-only bypassed | 1.533189 | +0.382677 [+0.357176, +0.409036] |
+| gr-stage1-1m | complete bypass | 1.150513 | +0.000000 |
+| lr-sweep-1e3 | enabled | 1.835426 | +0.684913 [+0.641930, +0.729746] |
+| lr-sweep-1e3 | bypassed | 1.057720 | -0.092793 [-0.101844, -0.084066] |
+
+Two readings, both new:
+
+**The widening helps.** `widened-stage1-1m` is the first checkpoint in this project to
+score below the pre-retrofit student, with the whole interval below zero. Its only
+trainable model parameters are 42.6M of routing; the backbone is frozen and the
+architecture is exactly the identity at initialisation.
+
+**The sidecar still hurts, independently.** Enabled-minus-bypassed is +0.504607 with the
+widening and +0.443008 without. A wider residual stream did not give the n-gram table
+somewhere cheaper to write; it cost marginally more. The two effects are separable
+because the widening starts at identity, which no earlier arm did.
+
+The wider screen also reproduces every earlier verdict at four times the precision --
+gr +0.5360 against +0.5658, ple +0.4430 against +0.4515, lr-sweep-1e3 +0.6849 against
++0.7186, and lr-sweep-1e3's bypassed backbone still ahead of the student at -0.0928.
+
+## A probe defect this run found
+
+`plumbing_probe` required exactly two sidecar calls across the enabled and bypassed
+forwards. A widened decoder layer applies the sidecar once per residual branch, so
+`widened-ple-stage1-1m` raised "evaluation silently bypassed the sidecar or failed to
+forward its data/flag" and produced no score at all. It now expects
+`residual_stream_num_branches` calls per forward, and reports the count it used. The
+failure was safe -- the probe refused to score rather than scoring a bypassed model --
+and it is covered by
+`tests/test_independent_eval.py::test_probe_counts_one_sidecar_call_per_residual_branch`.

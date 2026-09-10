@@ -1,0 +1,474 @@
+{
+  "bootstrap": "paired percentile; documents for token-weighted NLL, questions for accuracy",
+  "draws": 10000,
+  "rows": [
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.6865046656235112,
+      "ci95": [
+        1.6157613712825816,
+        1.7587485737065554
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.5331894827944716,
+      "ci95": [
+        1.4661925269879215,
+        1.6010161352225258
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "full_bypass",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.15331518282903958,
+      "ci95": [
+        0.14036483303436623,
+        0.16721558292428917
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.5359919735274873,
+      "ci95": [
+        0.4994630236670696,
+        0.5744189185155462
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.3826767906984478,
+      "ci95": [
+        0.357176477423082,
+        0.4090363705958081
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - full_bypass",
+      "estimate": 0.5359919735274873,
+      "ci95": [
+        0.4994630236670696,
+        0.5744189185155462
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "gr-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "full_bypass - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.8354255251433882,
+      "ci95": [
+        1.7664762415096147,
+        1.9047423906211398
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.0577201736770279,
+      "ci95": [
+        0.9992697447935656,
+        1.1171169208165852
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.7777053514663604,
+      "ci95": [
+        0.738997354853729,
+        0.8174831011809816
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.6849128330473644,
+      "ci95": [
+        0.6419296367371317,
+        0.7297458928719104
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "lr-sweep-1e3",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.09279251841899602,
+      "ci95": [
+        -0.1018442512776929,
+        -0.08406550891993858
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.5935207631346393,
+      "ci95": [
+        1.5210784851630421,
+        1.6664103576801683
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.4430080710386155,
+      "ci95": [
+        0.4173797845745913,
+        0.46952806200242414
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.4430080710386155,
+      "ci95": [
+        0.4173797845745913,
+        0.46952806200242414
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "student-hf",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.6410748438382392,
+      "ci95": [
+        1.5677546130768512,
+        1.71471721769873
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.136467775406331,
+      "ci95": [
+        1.070965435791515,
+        1.2028135756072356
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.5046070684319081,
+      "ci95": [
+        0.47744272712908337,
+        0.5323811375168906
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": 0.4905621517422154,
+      "ci95": [
+        0.46323867952689735,
+        0.5187619562846776
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-ple-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.014044916689692695,
+      "ci95": [
+        -0.014967517456602563,
+        -0.013129107065599083
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled",
+      "estimate": 1.1246686201959575,
+      "ci95": [
+        1.0601232792858148,
+        1.1901579359117294
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed",
+      "estimate": 1.1246686201959575,
+      "ci95": [
+        1.0601232792858148,
+        1.1901579359117294
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "pre_retrofit",
+      "estimate": 1.1505126920960238,
+      "ci95": [
+        1.0844563886911205,
+        1.2177306360294702
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - bypassed",
+      "estimate": 0.0,
+      "ci95": [
+        0.0,
+        0.0
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "enabled - pre_retrofit",
+      "estimate": -0.0258440719000664,
+      "ci95": [
+        -0.028279598451983294,
+        -0.023403100963136622
+      ],
+      "units": 384
+    },
+    {
+      "checkpoint": "widened-stage1-1m",
+      "task": "nll",
+      "metric": "nll",
+      "comparison": "bypassed - pre_retrofit",
+      "estimate": -0.0258440719000664,
+      "ci95": [
+        -0.028279598451983294,
+        -0.023403100963136622
+      ],
+      "units": 384
+    }
+  ]
+}

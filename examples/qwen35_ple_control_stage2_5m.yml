@@ -109,9 +109,17 @@ training_args:
   # recover. Revisit `train_sampling_strategy: group_by_length` with batch 4 if
   # something else forces a larger effective batch; the cache dataset already
   # provides the `length` column that sampler wants.
-  per_device_train_batch_size: 4
+  # 2, not 4. At batch 4 the widened arm ran 32 steps and then OOM'd inside the layer
+  # loop with card 0 at 20.62 GiB allocated and 2.13 GiB stranded: the probe's fixed
+  # 4x4096 batch understates a sortish run, whose batch shapes vary. Halving the
+  # microbatch halves the stored stream, the recompute temporaries and the head's
+  # working set at once. Effective batch and tokens per step are unchanged, and length
+  # grouping already removes the padding waste that used to make small batches costly
+  # (measured on this corpus: batch 2 grouped 1024 tok/s against batch 4 grouped 1053).
+  # Both arms carry it so the microbatch size is common-mode.
+  per_device_train_batch_size: 2
   length_column_name: length
-  gradient_accumulation_steps: 4
+  gradient_accumulation_steps: 8
   gradient_checkpointing: true
   # Required, and checked at config time. Reentrant checkpointing does not carry the
   # saved-tensor barrier that stops the two device workers recomputing one frame

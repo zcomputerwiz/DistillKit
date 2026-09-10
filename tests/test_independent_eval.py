@@ -18,6 +18,7 @@ from distillkit.sidecar_collator import SidecarDataCollator
 from test_sidecar_collator import TinyTable, make_hasher
 from test_sidecar_model import tiny_config
 from distillkit.widened_residual import WidenedResidual
+from test_widened_residual import tiny_config as widened_config
 
 
 def test_evaluation_uses_real_collator_and_eos_padding(monkeypatch):
@@ -72,7 +73,6 @@ def test_widened_checkpoint_loads_through_its_own_class(tmp_path):
     """A widened checkpoint carries routing in every layer, and the stock class has
     nowhere to put it. Loading one with the wrong class would drop 512 trained tensors
     and report the backbone's own score as the architecture's."""
-    from test_widened_residual import tiny_config as widened_config
     from distillkit.models import Qwen35WidenedForCausalLM
 
     torch.manual_seed(11)
@@ -97,6 +97,26 @@ def test_widened_checkpoint_loads_through_its_own_class(tmp_path):
     json.dumps(audit, allow_nan=False)
     with torch.inference_mode():
         assert torch.equal(loaded(input_ids=ids, use_cache=False).logits, expected)
+
+
+def test_probe_counts_one_sidecar_call_per_residual_branch():
+    """A widened layer applies the sidecar to each branch, so a probe that insists on
+    exactly two calls across the two forwards rejects every widened checkpoint as a
+    silent bypass -- which is what it did to widened-ple-stage1-1m."""
+    from distillkit.models import Qwen35WidenedForCausalLM
+
+    torch.manual_seed(3)
+    config = widened_config(residual_stream_sidecar=True, sidecar_layer_index=1,
+                            sidecar_variant="ple")
+    model = Qwen35WidenedForCausalLM(config).eval()
+    with torch.no_grad():  # a dormant sidecar cannot reach the logits, so wake it
+        for parameter in model.model.layers[1].sidecar.parameters():
+            parameter.add_(torch.randn_like(parameter) * .03)
+
+    probe = plumbing_probe(model, raw_collator, {"ids": [5, 7, 8, 9]}, "cpu")
+    assert probe["branch_calls_per_forward"] == config.residual_stream_num_branches
+    assert len(probe["sidecar_calls"]) == 2 * config.residual_stream_num_branches
+    assert probe["enabled_minus_bypassed_logits_max"] > 0
 
 
 def test_loading_rejects_the_sketches_gr_to_ple_mismatch(tmp_path):
