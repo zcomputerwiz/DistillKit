@@ -271,6 +271,12 @@ def load_student_model(
             text_config.sidecar_layer_index != config.sidecar.layer_index
             or text_config.sidecar_num_branches != config.sidecar.num_branches
             or text_config.sidecar_variant != config.sidecar.variant
+            # Only ple_gated has directions. Comparing them unconditionally would
+            # reject every checkpoint saved before the field existed, whose config
+            # carries no such key and whose variant does not use one.
+            or (config.sidecar.variant == "ple_gated"
+                and getattr(text_config, "sidecar_gate_directions", None)
+                != config.sidecar.gate_directions)
         ):
             raise ValueError("Widened checkpoint sidecar architecture differs from requested sidecar")
     if config.sidecar is not None or residual_stream is not None:
@@ -278,6 +284,7 @@ def load_student_model(
             text_config.sidecar_layer_index = config.sidecar.layer_index
             text_config.sidecar_num_branches = config.sidecar.num_branches
             text_config.sidecar_variant = config.sidecar.variant
+            text_config.sidecar_gate_directions = config.sidecar.gate_directions
         if residual_stream is not None:
             text_config.residual_stream_enabled = True
             text_config.residual_stream_num_branches = residual_stream.num_branches

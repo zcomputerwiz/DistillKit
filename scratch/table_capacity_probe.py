@@ -30,6 +30,14 @@ remainder and are disjoint from each other, so the eval documents are new to the
 backbone and to the readout alike. The absolute NLL is still not comparable to the
 reply-bundle arms: different documents, different lengths.
 
+`--inject-layer` moves the injection from the head to a decoder layer, which is the
+comparison that matters for a real sidecar. At the head the readout writes straight into
+what `lm_head` consumes and its gate reads the final hidden state, so it answers "are
+there useful features here" while bypassing the entire transport problem: at layer 1 the
+same features have to survive 31 more layers of a frozen backbone, and the gate has to
+decide from a layer-1 representation. Expect the layer-1 number to be smaller; the
+question is how much.
+
 `--arms` also runs the gate ablation. Upstream computes `hc_count` gates, one per
 hyper-connection stream, over a shared value. With a single residual stream those gates
 are all functions of the *same* vector, so adding `gate_s * value` to one stream for
@@ -109,6 +117,7 @@ def chunked_ce(hidden, head, targets, mask, chunk=256, backward=False, scale=1.0
         loss = F.cross_entropy(logits, flat_targets[start:stop][piece], reduction="sum")
         if backward:
             (loss * scale).backward(retain_graph=True)
+            del logits
         total = total + loss.detach()
     return total, counted
 
@@ -118,16 +127,26 @@ class Readout(nn.Module):
 
     The gate is upstream's, with the query taken where this probe injects rather than at
     the sidecar's layer: RMS-normalise the stream, project onto a learned direction,
-    compress with the signed square root, squash. `directions` of 4 reproduces what
-    `hc_count = 4` computes, summed rather than distributed across streams, because one
-    stream is all there is to distribute over.
+    compress with the signed square root, squash.
+
+    `combiner="mean2"` is `2 * mean_i gate_i`, and it is the one to compare with. Summing
+    was the first thing tried and it confounds the comparison: with a free value matrix
+    `(sum_i g_i) W f = (mean_i g_i)(k W) f`, so k directions summed are not more
+    expressive than their mean, they merely start at an effective multiplier of k/2
+    instead of 1. Under `mean2` every arm starts at 1.0 with the same reachable range, so
+    a difference is shape rather than scale.
+
+    `trainable=False` freezes the directions at their random initialisation, which
+    separates "a learned admission criterion helps" from "any non-linear function of the
+    stream helps".
     """
 
-    def __init__(self, hidden_size, directions=0):
+    def __init__(self, hidden_size, directions=0, combiner="mean2", trainable=True):
         super().__init__()
         self.value = nn.Linear(hidden_size, hidden_size, bias=False)
         nn.init.zeros_(self.value.weight)
         self.directions = directions
+        self.combiner = combiner
         if directions:
             # NOT zero, which is the instinct and is a trap: signed_sqrt has sign(0) = 0
             # and its clamp_min flattens abs() near the origin, so the gradient with
@@ -135,7 +154,8 @@ class Readout(nn.Module):
             # for the whole run. Measured: |grad| 0.0 at g = 0, 4.85 at g ~ N(0, 0.02).
             # The first run of this ablation had zero-init gates and therefore compared
             # three constant rescalings of the value path rather than three gates.
-            self.gate = nn.Parameter(torch.randn(directions, hidden_size) * 0.02)
+            gate = torch.randn(directions, hidden_size) * 0.02
+            self.gate = nn.Parameter(gate, requires_grad=trainable)
 
     def forward(self, features, stream):
         value = self.value(features)
@@ -145,7 +165,9 @@ class Readout(nn.Module):
         normed = normed * torch.rsqrt(normed.pow(2).mean(-1, keepdim=True) + 1e-6)
         raw = (normed @ self.gate.T) / math.sqrt(stream.shape[-1])
         gate = torch.sigmoid(raw.abs().clamp_min(1e-6).sqrt() * raw.sign())
-        return value * gate.sum(-1, keepdim=True)
+        combined = (gate.sum(-1, keepdim=True) if self.combiner == "sum"
+                    else 2.0 * gate.mean(-1, keepdim=True))
+        return value * combined
 
 
 def batches(documents, tokenizer, collator, table_batch, tokens):
@@ -171,9 +193,15 @@ def main():
     parser.add_argument("--batch", type=int, default=2)
     parser.add_argument("--epochs", type=int, default=1)
     parser.add_argument("--arms", nargs="+", default=["table", "shuffled_control"],
-                        choices=["table", "shuffled_control", "gate1", "gate4"])
+                        choices=["table", "shuffled_control", "gate1", "gate4",
+                                 "gate4_sum", "gate4_frozen"])
+    parser.add_argument("--combiner", default="mean2", choices=["mean2", "sum"],
+                        help="how the per-direction gates become one scalar; mean2 is "
+                             "2*mean, which starts every arm at 1.0")
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--inject-layer", type=int, default=-1,
+                        help="decoder layer to inject before; -1 injects at the head")
     parser.add_argument("--seed", type=int, default=7,
                         help="gate direction init and nothing else; the data order is fixed")
     parser.add_argument("--output", type=Path, required=True)
@@ -226,70 +254,151 @@ def main():
                               sidecar_enabled=False)
         return out.last_hidden_state
 
+    def hidden_with_injection(batch, readout, features):
+        """Run the backbone with the readout writing into `--inject-layer`'s input.
+
+        The backbone's parameters are frozen but the graph still has to be built from the
+        injection point onward, which is the cost of asking the question at the place the
+        sidecar actually sits.
+        """
+        injected = {}
+
+        def hook(module, args, kwargs):
+            stream = args[0] if args else kwargs["hidden_states"]
+            addition = readout(features, stream).to(stream.dtype)
+            injected["rms"] = addition.detach().float().pow(2).mean().sqrt().item()
+            stream = stream + addition
+            if args:
+                return (stream,) + tuple(args[1:]), kwargs
+            kwargs["hidden_states"] = stream
+            return args, kwargs
+
+        handle = model.model.layers[args.inject_layer].register_forward_pre_hook(
+            hook, with_kwargs=True)
+        try:
+            out = model.model(input_ids=batch["input_ids"].to(device),
+                              attention_mask=batch["attention_mask"].to(device),
+                              sidecar_enabled=False)
+        finally:
+            handle.remove()
+        return out.last_hidden_state, injected.get("rms")
+
     def features_of(batch, roll):
         features = dequant(batch["ngram_raw"]).flatten(-2).to(device)
         return features.roll(1, dims=0) if roll else features
 
     def evaluate(readout, roll):
-        total, counted = 0.0, 0
+        total, counted, per_document = 0.0, 0, []
         for batch, masks in batches(eval_docs, tokenizer, collator, args.batch, args.tokens):
-            hidden = hidden_of(batch)
             targets = batch["input_ids"][:, 1:].to(device)
             keep = masks[:, :-1].to(device) & batch["attention_mask"][:, 1:].bool().to(device)
-            state = hidden[:, :-1]
-            if readout is not None:
-                state = state + readout(features_of(batch, roll)[:, :-1], state).to(state.dtype)
+            if readout is not None and args.inject_layer >= 0:
+                with torch.no_grad():
+                    hidden, _ = hidden_with_injection(batch, readout, features_of(batch, roll))
+                state = hidden[:, :-1]
+            else:
+                state = hidden_of(batch)[:, :-1]
+                if readout is not None:
+                    state = state + readout(features_of(batch, roll)[:, :-1],
+                                            state).to(state.dtype)
             with torch.no_grad():
                 loss, count = chunked_ce(state, head, targets, keep)
+                for row in range(state.shape[0]):
+                    row_loss, row_count = chunked_ce(state[row:row + 1], head,
+                                                     targets[row:row + 1], keep[row:row + 1])
+                    per_document.append((float(row_loss), row_count))
             total += float(loss)
             counted += count
-        return total / max(counted, 1), counted
+        return total / max(counted, 1), counted, per_document
 
     results = {"train_docs": len(train_docs), "eval_docs": len(eval_docs),
-               "tokens": args.tokens, "lr": args.lr, "epochs": args.epochs, "seed": args.seed}
-    baseline, eval_tokens = evaluate(None, False)
+               "tokens": args.tokens, "lr": args.lr, "epochs": args.epochs, "seed": args.seed,
+               "inject_layer": args.inject_layer, "combiner": args.combiner}
+    baseline, eval_tokens, baseline_documents = evaluate(None, False)
     results["baseline_nll"] = baseline
     results["eval_assistant_tokens"] = eval_tokens
     print("baseline assistant NLL %.4f over %d tokens" % (baseline, eval_tokens))
 
-    plan = {"table": (False, 0), "shuffled_control": (True, 0),
-            "gate1": (False, 1), "gate4": (False, 4)}
+    plan = {
+        "table": (False, 0, "mean2", True),
+        "shuffled_control": (True, 0, "mean2", True),
+        "gate1": (False, 1, args.combiner, True),
+        "gate4": (False, 4, args.combiner, True),
+        "gate4_sum": (False, 4, "sum", True),
+        "gate4_frozen": (False, 4, args.combiner, False),
+    }
     for name in args.arms:
-        roll, directions = plan[name]
+        roll, directions, combiner, trainable = plan[name]
         torch.manual_seed(args.seed)
-        readout = Readout(hidden_size, directions).to(device).to(torch.float32)
-        optimizer = torch.optim.AdamW(readout.parameters(), lr=args.lr)
+        readout = Readout(hidden_size, directions, combiner, trainable)
+        readout = readout.to(device).to(torch.float32)
+        optimizer = torch.optim.AdamW(
+            [p for p in readout.parameters() if p.requires_grad], lr=args.lr)
         started = time.perf_counter()
         seen = 0
         for epoch in range(args.epochs):
             for index, (batch, masks) in enumerate(
                     batches(train_docs, tokenizer, collator, args.batch, args.tokens)):
-                hidden = hidden_of(batch)
                 targets = batch["input_ids"][:, 1:].to(device)
                 keep = masks[:, :-1].to(device) & batch["attention_mask"][:, 1:].bool().to(device)
                 count = int(keep.sum())
                 if not count:
                     continue
-                stream = hidden[:, :-1]
-                state = stream + readout(features_of(batch, roll)[:, :-1], stream).to(hidden.dtype)
+                if args.inject_layer >= 0:
+                    hidden, injection_rms = hidden_with_injection(
+                        batch, readout, features_of(batch, roll))
+                    state = hidden[:, :-1]
+                else:
+                    hidden = hidden_of(batch)
+                    stream = hidden[:, :-1]
+                    state = stream + readout(features_of(batch, roll)[:, :-1],
+                                             stream).to(hidden.dtype)
+                    injection_rms = None
                 optimizer.zero_grad(set_to_none=True)
                 loss, _ = chunked_ce(state, head, targets, keep, backward=True, scale=1.0 / count)
                 optimizer.step()
                 seen += count
                 if index % 32 == 0:
-                    print("  %s epoch %d batch %d  train NLL %.4f  %d tokens"
-                          % (name, epoch, index, float(loss) / count, seen), flush=True)
-        trained, _ = evaluate(readout, roll)
+                    print("  %s epoch %d batch %d  train NLL %.4f  %d tokens%s"
+                          % (name, epoch, index, float(loss) / count, seen,
+                             "" if injection_rms is None
+                             else "  injection rms %.4f" % injection_rms), flush=True)
+        trained, _, documents = evaluate(readout, roll)
         results[name] = {
             "eval_nll": trained,
             "delta_vs_baseline": trained - baseline,
             "readout_norm": readout.value.weight.float().norm().item(),
             "gate_norm": (readout.gate.float().norm().item() if directions else None),
+            "combiner": combiner if directions else None,
+            "gate_trainable": trainable if directions else None,
             "train_tokens": seen,
             "seconds": time.perf_counter() - started,
+            "per_document": documents,
         }
         print("%s: eval NLL %.4f  delta %+.4f  |W| %.3f"
               % (name, trained, trained - baseline, results[name]["readout_norm"]), flush=True)
+
+    def paired(left, right, draws=10000, seed=0):
+        """Bootstrap over documents, the unit the arms actually share."""
+        import numpy as np
+        delta = np.array([a[0] - b[0] for a, b in zip(left, right)])
+        tokens = np.array([a[1] for a in left])
+        rng = np.random.default_rng(seed)
+        index = rng.integers(0, len(delta), (draws, len(delta)))
+        samples = delta[index].sum(1) / tokens[index].sum(1)
+        return {"estimate": float(delta.sum() / tokens.sum()),
+                "ci95": np.quantile(samples, [0.025, 0.975]).tolist(),
+                "documents": len(delta)}
+
+    if "table" in args.arms:
+        results["paired_against_linear"] = {}
+        for name in args.arms:
+            if name == "table":
+                continue
+            stats = paired(results[name]["per_document"], results["table"]["per_document"])
+            results["paired_against_linear"][name] = stats
+            print("%-14s minus linear  %+.6f [%+.6f, %+.6f] over %d documents"
+                  % (name, stats["estimate"], *stats["ci95"], stats["documents"]))
 
     if "table" in args.arms and "shuffled_control" in args.arms:
         results["table_gain_over_control"] = (results["shuffled_control"]["delta_vs_baseline"]

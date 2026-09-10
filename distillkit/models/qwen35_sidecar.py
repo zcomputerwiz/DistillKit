@@ -28,6 +28,7 @@ from distillkit.gated_residual import GatedResidual
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
+from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
 from distillkit.ple_sidecar import PLESidecar
 
 # flash-linear-attention, when installed, is bound by transformers at import time with
@@ -49,6 +50,7 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         "sidecar_gate_init_std": 0.02,
         "sidecar_per_channel_gate": True,
         "sidecar_variant": "gated_residual",
+        "sidecar_gate_directions": 2,
     }
     for name, value in defaults.items():
         if not hasattr(config, name):
@@ -59,8 +61,16 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         raise ValueError("sidecar_num_heads must be positive")
     if config.sidecar_head_dim <= 0 or config.sidecar_head_dim % IQ4NL_BLOCK:
         raise ValueError("sidecar_head_dim must be a positive multiple of 32")
-    if config.sidecar_variant not in ("gated_residual", "ple"):
-        raise ValueError("sidecar_variant must be 'gated_residual' or 'ple'")
+    if config.sidecar_variant not in ("gated_residual", "ple", "ple_gated"):
+        raise ValueError("sidecar_variant must be 'gated_residual', 'ple' or 'ple_gated'")
+    if config.sidecar_gate_directions < 1:
+        raise ValueError("sidecar_gate_directions must be positive")
+    if config.sidecar_variant == "ple_gated" and not getattr(
+            config, "residual_stream_enabled", False):
+        raise ValueError(
+            "the 'ple_gated' sidecar reads a widened residual; enable residual_stream "
+            "or use 'ple', which is the single-stream transcription"
+        )
     if config.sidecar_num_branches < 1 or config.sidecar_gate_init_std < 0:
         raise ValueError("sidecar branches must be positive and gate init std nonnegative")
 
@@ -83,6 +93,9 @@ learned sidecar weights never resets a sibling that was present in the checkpoin
             nn.init.normal_(module.weight, std=module._sidecar_gate_init_std)
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
+        elif isinstance(module, DirectionGatedPLESidecar):
+            # A bare Parameter carries no init mark of its own; see the note there.
+            nn.init.normal_(module.gate, std=module.gate_init_std)
         elif isinstance(module, IQ4NLDequant):
             # Non-persistent buffers are also rematerialized empty by HF loading.
             module.kvalues.copy_(torch.tensor(IQ4NL_KVALUES, device=module.kvalues.device))
@@ -165,7 +178,54 @@ class _PLENGramSidecar(nn.Module):
         return self.ple.gate_report(hidden_states, self.dequant(raw).flatten(-2))
 
 
+class _DirectionGatedNGramSidecar(nn.Module):
+    """``DirectionGatedPLESidecar`` over this fork's dequantized rows.
+
+    Unlike ``_PLENGramSidecar`` this consumes the whole widened stream at once rather
+    than being applied to each branch in turn. That difference is the point: the gate is
+    a readout of the stream it is admitting into, so per-branch admission only means
+    anything if the branches are presented together.
+    """
+
+    def __init__(self, config: Qwen3_5TextConfig):
+        super().__init__()
+        self.num_heads = config.sidecar_num_heads
+        self.bytes_per_head = config.sidecar_head_dim // IQ4NL_BLOCK * IQ4NL_TYPE_SIZE
+        self.dequant = IQ4NLDequant(out_dtype=torch.float32)
+        self.ple = DirectionGatedPLESidecar(
+            config.hidden_size,
+            config.sidecar_num_heads * config.sidecar_head_dim,
+            hc_count=config.residual_stream_num_branches,
+            gate_directions=config.sidecar_gate_directions,
+            rms_norm_eps=config.rms_norm_eps,
+        )
+
+    def _features(self, stream, ngram_raw):
+        expected = (*stream.shape[:2], self.num_heads, self.bytes_per_head)
+        if ngram_raw is None:
+            raise ValueError("ngram_raw is required while sidecar_enabled=True")
+        if ngram_raw.dtype != torch.uint8 or tuple(ngram_raw.shape) != expected:
+            raise ValueError(f"ngram_raw must be uint8 with shape {expected}")
+        raw = ngram_raw.to(device=stream.device, non_blocking=True)
+        return self.dequant(raw).flatten(-2)
+
+    # The widened layer checks this to decide whether to hand over the whole stream.
+    reads_widened_stream = True
+
+    def forward(self, stream, ngram_raw, sidecar_enabled=True):
+        if not sidecar_enabled:
+            # The control arm: bypassed entirely rather than fed zeros, because a zero
+            # n-gram row is still a row the gate would score.
+            return stream
+        return self.ple(stream, self._features(stream, ngram_raw))
+
+    def gate_report(self, prefix="ple"):
+        return self.ple.gate_report(prefix)
+
+
 def _build_sidecar(config: Qwen3_5TextConfig) -> nn.Module:
+    if config.sidecar_variant == "ple_gated":
+        return _DirectionGatedNGramSidecar(config)
     if config.sidecar_variant == "ple":
         return _PLENGramSidecar(config)
     return _NGramSidecar(config)

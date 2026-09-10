@@ -58,12 +58,17 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
                 position_ids=None, past_key_values=None, ngram_raw=None,
                 sidecar_enabled=True, **kwargs):
         if self.sidecar is not None:
-            # Applying the original sidecar independently preserves its trained
-            # behavior and exact arithmetic while allowing divergent branches.
-            hidden_states = torch.stack([
-                self.sidecar(branch.contiguous(), ngram_raw, sidecar_enabled)
-                for branch in hidden_states.unbind(-2)
-            ], dim=-2)
+            if getattr(self.sidecar, "reads_widened_stream", False):
+                # Per-stream admission over one shared value: the gate is a readout of
+                # the branch it admits into, so the branches have to arrive together.
+                hidden_states = self.sidecar(hidden_states, ngram_raw, sidecar_enabled)
+            else:
+                # Applying the original sidecar independently preserves its trained
+                # behavior and exact arithmetic while allowing divergent branches.
+                hidden_states = torch.stack([
+                    self.sidecar(branch.contiguous(), ngram_raw, sidecar_enabled)
+                    for branch in hidden_states.unbind(-2)
+                ], dim=-2)
         block_input, weights = self.attn_residual.read(hidden_states, self.input_layernorm)
         if self.block_type == "linear_attention":
             output = self.linear_attn(hidden_states=block_input,

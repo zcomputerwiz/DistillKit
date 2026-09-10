@@ -147,13 +147,25 @@ class SidecarConfig(BaseModel):
     prefault: bool = True
     layer_index: int = Field(default=1, ge=0)
     num_branches: int = Field(default=4, ge=1)
-    variant: Literal["gated_residual", "ple"] = Field(
+    variant: Literal["gated_residual", "ple", "ple_gated"] = Field(
         default="gated_residual",
         description=(
             "gated_residual: the original design -- features added ungated, then a "
-            "learned multi-branch gate on the sum. ple: Flash-Next's integration, where "
-            "the gate is a query-key dot product between the stream and the n-gram "
-            "embedding. num_branches is ignored by ple, which has no branches."
+            "learned multi-branch gate on the sum. ple: Flash-Next's integration "
+            "transcribed, where the gate is a query-key dot product between the stream "
+            "and the n-gram embedding. ple_gated: the same integration with the key path "
+            "replaced by learned directions, one gate per residual branch over a shared "
+            "value -- it requires residual_stream and ignores num_branches, taking its "
+            "stream count from there. See gate_directions."
+        ),
+    )
+    gate_directions: int = Field(
+        default=2, ge=1,
+        description=(
+            "ple_gated only: learned directions per residual branch, combined as "
+            "2*mean so every width starts at an admission of 1.0. One direction was "
+            "indistinguishable from four on a single stream; the default is 2 because "
+            "that ablation could not test per-branch admission, which is the point here."
         ),
     )
 
