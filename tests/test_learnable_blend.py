@@ -138,3 +138,37 @@ def test_a_learned_blend_survives_a_checkpoint_round_trip():
     scheduled = _module(blend=0.10, learnable=False)
     scheduled.load_state_dict(module.state_dict())
     assert float(scheduled.blend) == pytest.approx(0.37)
+
+
+def test_the_hybrid_optimizer_gets_the_blend_group_at_construction():
+    """MixedMuonAdamW locks its groups, so adding one afterwards is refused."""
+    from distillkit.optimizers import mixed_parameter_groups
+
+    model = torch.nn.Module()
+    model.routing = _module(blend=0.10)
+    model.dense = torch.nn.Linear(8, 8)
+    groups = mixed_parameter_groups(model, blend_lr=2e-3)
+    blend = [g for g in groups if any(p is model.routing.blend for p in g["params"])]
+    assert len(blend) == 1, "the blend needs a group to itself"
+    assert blend[0]["lr"] == 2e-3 and blend[0]["weight_decay"] == 0.0
+    assert len(blend[0]["params"]) == 1, "nothing else should share its rate"
+    # Everything else keeps the run's rate by carrying no group-level override.
+    assert all("lr" not in g for g in groups if g is not blend[0])
+
+
+def test_group_construction_refuses_a_blend_rate_with_nothing_to_apply_it_to():
+    from distillkit.optimizers import mixed_parameter_groups
+
+    model = torch.nn.Module()
+    model.routing = _module(learnable=False)
+    with pytest.raises(ValueError, match="no learnable blend"):
+        mixed_parameter_groups(model, blend_lr=2e-3)
+
+
+def test_omitting_the_blend_rate_leaves_grouping_untouched():
+    from distillkit.optimizers import mixed_parameter_groups
+
+    model = torch.nn.Module()
+    model.routing = _module(blend=0.10)
+    model.dense = torch.nn.Linear(8, 8)
+    assert all("lr" not in g for g in mixed_parameter_groups(model))

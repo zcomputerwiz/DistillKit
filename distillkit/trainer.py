@@ -390,6 +390,7 @@ class HybridDistillationTrainer(DistillationTrainer):
     def create_optimizer(self):
         from distillkit.optimizers import build_mixed_optimizer
 
+        blend_lr = getattr(getattr(self.config, "residual_stream", None), "blend_lr", None)
         if self.optimizer is None and self.config.optimizer.strategy == "hybrid":
             self.optimizer = build_mixed_optimizer(
                 self.model,
@@ -399,7 +400,11 @@ class HybridDistillationTrainer(DistillationTrainer):
                 betas=(self.args.adam_beta1, self.args.adam_beta2),
                 eps=self.args.adam_epsilon,
                 include_frozen=True,
+                # MixedMuonAdamW locks its groups, so the blend's own rate has to be
+                # part of the construction rather than added afterwards.
+                blend_lr=blend_lr,
             )
+            blend_lr = None
         elif self.optimizer is None and self.config.optimizer.unfreeze_at_step:
             # HF filters currently frozen parameters; a later unfreeze needs them
             # registered from the outset, even though their state stays unallocated.
@@ -415,11 +420,9 @@ class HybridDistillationTrainer(DistillationTrainer):
             self.optimizer, unwrapped,
             getattr(self.config.optimizer, "sidecar_lr", None),
         )
+        # Only for the plain-AdamW path; the hybrid optimizer took it at construction.
         # After the sidecar split, so the blend leaves whichever group that put it in.
-        _apply_blend_lr(
-            self.optimizer, unwrapped,
-            getattr(getattr(self.config, "residual_stream", None), "blend_lr", None),
-        )
+        _apply_blend_lr(self.optimizer, unwrapped, blend_lr)
         return self.optimizer
 
 

@@ -17,6 +17,7 @@ from transformers import TrainerCallback
 
 from distillkit.gated_residual import GatedResidual
 from distillkit.widened_residual import WidenedResidual
+from distillkit.hyper_connection import HyperConnection
 from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
 from distillkit.ple_sidecar import PLESidecar
 
@@ -96,15 +97,22 @@ def _auxiliary_parameter_ids(model: nn.Module) -> set[int]:
         result.update(id(p) for name, p in model.named_parameters() if name in names)
     for name, module in model.named_modules():
         parts = set(name.split("."))
-        if isinstance(module, (GatedResidual, WidenedResidual)) or parts.intersection(
+        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)) or parts.intersection(
             {"sidecar", "W_side_proj", "distillation_projections"}
         ):
             result.update(id(p) for p in module.parameters())
     return result
 
 
+def _learnable_blend_ids(model: nn.Module) -> set[int]:
+    from distillkit.hyper_connection import HyperConnection
+
+    return {id(module.blend) for module in model.modules()
+            if isinstance(module, HyperConnection) and module.learnable_blend}
+
+
 def mixed_parameter_groups(
-    model: nn.Module, *, include_frozen: bool = True
+    model: nn.Module, *, include_frozen: bool = True, blend_lr: float | None = None
 ) -> list[dict[str, Any]]:
     """Route hidden nn.Linear matrices to Muon, everything else to AdamW.
 
@@ -112,7 +120,18 @@ def mixed_parameter_groups(
     vectors use AdamW. Frozen parameters are included by default so a later
     single-process unfreeze cannot silently drop the backbone. Optimizer states
     remain lazy while their gradients are None.
+
+    ``blend_lr`` puts the learned hyper-connection blends in a group of their own at
+    their own rate. It has to happen here rather than by adding a group afterwards,
+    because ``MixedMuonAdamW`` locks its groups at construction so a later unfreeze
+    cannot silently drop parameters. The blend needs a separate rate at all because
+    AdamW moves a parameter by roughly ``lr`` per step: at the run's 1e-4 a 72-step
+    budget is 0.0072, so a blend starting at 0.10 could reach 0.107 and the run would
+    report that it wanted to stay put.
     """
+    blend_ids = _learnable_blend_ids(model) if blend_lr is not None else set()
+    if blend_lr is not None and not blend_ids:
+        raise ValueError("blend_lr was set but no learnable blend parameter exists")
     adam_ids = _auxiliary_parameter_ids(model)
     linear_ids = set()
     for name, module in model.named_modules():
@@ -126,7 +145,7 @@ def mixed_parameter_groups(
         if head is not None:
             adam_ids.update(id(p) for p in head.parameters())
 
-    buckets: dict[tuple[str, bool], dict[str, Any]] = {}
+    buckets: dict[tuple[str, bool, bool], dict[str, Any]] = {}
     seen = set()
     for name, parameter in model.named_parameters():
         if id(parameter) in seen or (not include_frozen and not parameter.requires_grad):
@@ -139,9 +158,16 @@ def mixed_parameter_groups(
         )
         kind = "muon" if use_muon else "adamw"
         decay = parameter.ndim >= 2
+        is_blend = id(parameter) in blend_ids
+        options: dict[str, Any] = {}
+        if is_blend:
+            # Decay on an interpolation coefficient pulls it toward "no donor" for
+            # reasons unrelated to the objective, which is the question being asked.
+            options = {"lr": blend_lr, "weight_decay": 0.0}
         group = buckets.setdefault(
-            (kind, decay),
-            {"optimizer_kind": kind, "decay": decay, "params": [], "param_names": []},
+            (kind, decay, is_blend),
+            {"optimizer_kind": kind, "decay": decay, "params": [], "param_names": [],
+             **options},
         )
         group["params"].append(parameter)
         group["param_names"].append(name)
@@ -254,8 +280,9 @@ class MixedMuonAdamW(torch.optim.Optimizer):
         self._bind_children()
 
 
-def build_mixed_optimizer(model: nn.Module, *, include_frozen: bool = True, **kwargs):
-    groups = mixed_parameter_groups(model, include_frozen=include_frozen)
+def build_mixed_optimizer(model: nn.Module, *, include_frozen: bool = True,
+                          blend_lr: float | None = None, **kwargs):
+    groups = mixed_parameter_groups(model, include_frozen=include_frozen, blend_lr=blend_lr)
     _refuse_trainable_muon_shards(model, groups)
     return MixedMuonAdamW(groups, **kwargs)
 
@@ -355,7 +382,7 @@ class UnfreezeBackboneCallback(TrainerCallback):
 def architecture_metrics(model: nn.Module) -> dict[str, float]:
     report = {}
     for name, module in model.named_modules():
-        if isinstance(module, (GatedResidual, WidenedResidual)):
+        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, (PLESidecar, DirectionGatedPLESidecar)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
