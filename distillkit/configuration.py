@@ -290,15 +290,13 @@ class OptimizerConfig(BaseModel):
     log_every_n_steps: int = Field(default=100, ge=1)
 
 
-    @model_validator(mode="after")
-    def sidecar_lr_needs_adamw(self):
-        if self.sidecar_lr is not None and self.strategy != "adamw":
-            raise ValueError(
-                "optimizer.sidecar_lr requires strategy=adamw; MixedMuonAdamW refuses "
-                "added parameter groups, and under hybrid the auxiliary parameters are "
-                "already routed to AdamW as their own bucket"
-            )
-        return self
+    # sidecar_lr used to require strategy=adamw, because it was applied by adding a
+    # parameter group and MixedMuonAdamW refuses that. `mixed_parameter_groups` now
+    # takes the rate at construction and emits the sidecar as its own bucket, so the
+    # hybrid strategy supports it too and the old refusal is gone. Under hybrid the
+    # rate covers the sidecar module alone, not the widening routing beside it --
+    # `sidecar_module_parameter_ids` rather than `architecture_parameter_ids` -- so a
+    # depth or scale comparison changes one thing rather than two.
 
 
 class DistillationRunConfig(BaseModel):

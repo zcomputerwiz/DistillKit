@@ -113,12 +113,35 @@ def test_the_sidecar_actually_moves_further():
     assert results[SIDECAR_LR] > 5 * results[None], results
 
 
-def test_config_refuses_the_combination_that_cannot_work():
-    """MixedMuonAdamW deliberately disallows added parameter groups."""
+def test_both_strategies_accept_a_sidecar_rate():
+    """Hybrid used to be refused, because the rate was applied by adding a parameter
+    group and MixedMuonAdamW disallows that. It is taken at construction now, so the
+    refusal is gone and the sidecar gets its own bucket either way."""
     OptimizerConfig(strategy="adamw", sidecar_lr=1e-4)
-    with pytest.raises(ValueError, match="requires strategy=adamw"):
-        OptimizerConfig(strategy="hybrid", sidecar_lr=1e-4)
-    OptimizerConfig(strategy="hybrid")            # no override: still fine
+    OptimizerConfig(strategy="hybrid", sidecar_lr=1e-4)
+    OptimizerConfig(strategy="hybrid")
+
+
+def test_the_hybrid_rate_covers_the_sidecar_and_not_the_widening_beside_it():
+    """architecture_parameter_ids also names attn_residual/mlp_residual on every layer.
+    A depth or scale comparison that moved those too would change two things at once."""
+    import torch
+    from distillkit.optimizers import mixed_parameter_groups, sidecar_module_parameter_ids
+    from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
+    from tests.test_ple_gated_sidecar import _widened_config
+
+    model = Qwen35WidenedForCausalLM(_widened_config(layers=3))
+    sidecar = sidecar_module_parameter_ids(model)
+    assert sidecar, "the fixture has a sidecar"
+    widening = {id(p) for layer in model.model.layers
+                for p in list(layer.attn_residual.parameters())
+                + list(layer.mlp_residual.parameters())}
+    assert not (sidecar & widening)
+
+    groups = mixed_parameter_groups(model, sidecar_lr=1e-5)
+    rated = {id(p) for g in groups if g.get("lr") == 1e-5 for p in g["params"]}
+    assert rated == sidecar
+    assert not (rated & widening)
 
 
 def test_the_loss_scaffolding_keeps_the_backbone_rate():

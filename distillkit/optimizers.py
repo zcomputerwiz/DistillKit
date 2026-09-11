@@ -104,6 +104,20 @@ def _auxiliary_parameter_ids(model: nn.Module) -> set[int]:
     return result
 
 
+def sidecar_module_parameter_ids(model: nn.Module) -> set[int]:
+    """Just the sidecar module, not the widening routing beside it.
+
+    `architecture_parameter_ids` also covers `attn_residual`/`mlp_residual`, which
+    every layer carries. Giving the injection its own rate has to leave those alone,
+    or a depth comparison changes two things at once.
+    """
+    result = set()
+    for name, module in model.named_modules():
+        if name.split(".")[-1] == "sidecar":
+            result.update(id(p) for p in module.parameters())
+    return result
+
+
 def _learnable_blend_ids(model: nn.Module) -> set[int]:
     from distillkit.hyper_connection import HyperConnection
 
@@ -112,7 +126,8 @@ def _learnable_blend_ids(model: nn.Module) -> set[int]:
 
 
 def mixed_parameter_groups(
-    model: nn.Module, *, include_frozen: bool = True, blend_lr: float | None = None
+    model: nn.Module, *, include_frozen: bool = True, blend_lr: float | None = None,
+    sidecar_lr: float | None = None,
 ) -> list[dict[str, Any]]:
     """Route hidden nn.Linear matrices to Muon, everything else to AdamW.
 
@@ -132,6 +147,13 @@ def mixed_parameter_groups(
     blend_ids = _learnable_blend_ids(model) if blend_lr is not None else set()
     if blend_lr is not None and not blend_ids:
         raise ValueError("blend_lr was set but no learnable blend parameter exists")
+    # Same construction-time split as the blend, and for the same reason:
+    # MixedMuonAdamW locks its groups, so `_apply_sidecar_lr`'s add_param_group is
+    # refused outright under the hybrid strategy.
+    sidecar_ids = sidecar_module_parameter_ids(model) if sidecar_lr is not None else set()
+    if sidecar_lr is not None and not sidecar_ids:
+        raise ValueError("sidecar_lr was set but the model has no sidecar")
+    sidecar_ids -= blend_ids
     adam_ids = _auxiliary_parameter_ids(model)
     linear_ids = set()
     for name, module in model.named_modules():
@@ -145,7 +167,7 @@ def mixed_parameter_groups(
         if head is not None:
             adam_ids.update(id(p) for p in head.parameters())
 
-    buckets: dict[tuple[str, bool, bool], dict[str, Any]] = {}
+    buckets: dict[tuple[str, bool, bool, bool], dict[str, Any]] = {}
     seen = set()
     for name, parameter in model.named_parameters():
         if id(parameter) in seen or (not include_frozen and not parameter.requires_grad):
@@ -159,13 +181,16 @@ def mixed_parameter_groups(
         kind = "muon" if use_muon else "adamw"
         decay = parameter.ndim >= 2
         is_blend = id(parameter) in blend_ids
+        is_sidecar = id(parameter) in sidecar_ids
         options: dict[str, Any] = {}
+        if is_sidecar:
+            options = {"lr": sidecar_lr}
         if is_blend:
             # Decay on an interpolation coefficient pulls it toward "no donor" for
             # reasons unrelated to the objective, which is the question being asked.
             options = {"lr": blend_lr, "weight_decay": 0.0}
         group = buckets.setdefault(
-            (kind, decay, is_blend),
+            (kind, decay, is_blend, is_sidecar),
             {"optimizer_kind": kind, "decay": decay, "params": [], "param_names": [],
              **options},
         )
@@ -281,8 +306,10 @@ class MixedMuonAdamW(torch.optim.Optimizer):
 
 
 def build_mixed_optimizer(model: nn.Module, *, include_frozen: bool = True,
-                          blend_lr: float | None = None, **kwargs):
-    groups = mixed_parameter_groups(model, include_frozen=include_frozen, blend_lr=blend_lr)
+                          blend_lr: float | None = None, sidecar_lr: float | None = None,
+                          **kwargs):
+    groups = mixed_parameter_groups(model, include_frozen=include_frozen,
+                                    blend_lr=blend_lr, sidecar_lr=sidecar_lr)
     _refuse_trainable_muon_shards(model, groups)
     return MixedMuonAdamW(groups, **kwargs)
 

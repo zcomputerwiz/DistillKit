@@ -35,7 +35,11 @@ ARMS = (BASELINE, CONTROL,
         "win-A3-nosidecar-stage1-1m",
         "win-A3-lr3e05-stage1-1m",
         "win-A3-lr1e05-stage1-1m",
-        "win-A3-lr3e06-stage1-1m") + tuple(sorted(
+        "win-A3-lr3e06-stage1-1m",
+        "win-B2-shuffled-stage1-1m",
+        "win-B1-real-stage1-1m",
+        "win-C2-L1-shuffled-stage1-1m",
+        "win-C1-L1-real-stage1-1m") + tuple(sorted(
             (path.name[len("reply-"):-len(".json")]
              for path in BASE.glob("reply-widened-plegated-L*-stage1-1m.json")),
             key=lambda name: int(name.split("-L")[1].split("-")[0])))

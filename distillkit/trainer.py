@@ -391,6 +391,7 @@ class HybridDistillationTrainer(DistillationTrainer):
         from distillkit.optimizers import build_mixed_optimizer
 
         blend_lr = getattr(getattr(self.config, "residual_stream", None), "blend_lr", None)
+        sidecar_lr = getattr(self.config.optimizer, "sidecar_lr", None)
         if self.optimizer is None and self.config.optimizer.strategy == "hybrid":
             self.optimizer = build_mixed_optimizer(
                 self.model,
@@ -400,11 +401,12 @@ class HybridDistillationTrainer(DistillationTrainer):
                 betas=(self.args.adam_beta1, self.args.adam_beta2),
                 eps=self.args.adam_epsilon,
                 include_frozen=True,
-                # MixedMuonAdamW locks its groups, so the blend's own rate has to be
-                # part of the construction rather than added afterwards.
+                # MixedMuonAdamW locks its groups, so these rates have to be part
+                # of the construction rather than added afterwards.
                 blend_lr=blend_lr,
+                sidecar_lr=sidecar_lr,
             )
-            blend_lr = None
+            blend_lr = sidecar_lr = None
         elif self.optimizer is None and self.config.optimizer.unfreeze_at_step:
             # HF filters currently frozen parameters; a later unfreeze needs them
             # registered from the outset, even though their state stays unallocated.
@@ -416,10 +418,8 @@ class HybridDistillationTrainer(DistillationTrainer):
         else:
             self.optimizer = super().create_optimizer()
         unwrapped = self.accelerator.unwrap_model(self.model)
-        _apply_sidecar_lr(
-            self.optimizer, unwrapped,
-            getattr(self.config.optimizer, "sidecar_lr", None),
-        )
+        # None under the hybrid strategy, which already took it at construction.
+        _apply_sidecar_lr(self.optimizer, unwrapped, sidecar_lr)
         # Only for the plain-AdamW path; the hybrid optimizer took it at construction.
         # After the sidecar split, so the blend leaves whichever group that put it in.
         _apply_blend_lr(self.optimizer, unwrapped, blend_lr)
