@@ -30,6 +30,11 @@ ARMS = (BASELINE, CONTROL,
 
 def load(path, role="assistant"):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
+    # `evaluate` writes {"complete": false} before it loads anything, so a run that
+    # died leaves a file that exists and holds no scores. Say which, rather than
+    # failing on a KeyError three frames down.
+    if not data.get("complete", True) or "records" not in data:
+        raise ValueError("%s is an incomplete evaluation; rerun or delete it" % path)
     records = data["records"]["nll"]
     ids = [r["id"] for r in records]
     modes = {}

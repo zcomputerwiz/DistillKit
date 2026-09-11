@@ -1027,6 +1027,55 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## Depth was the answer, and eval_loss said the opposite (2026-09-10)
+
+Every arm this project has trained has made the model *worse* at generating when its
+sidecar is switched on. That cost, `enabled - bypassed` on assistant tokens, has been
+the headline failure since the first sidecar run. Three arms differing only in
+`sidecar.layer_index`, everything else matched -- same widening at n_r=2, same 1M
+cache, same anchors, same 72 steps:
+
+| injection layer | the sidecar's own cost | vs the pre-retrofit student |
+| --- | ---: | ---: |
+| 1 (transcription) | +0.032436 [+0.028300, +0.036439] | +0.030562 |
+| 1 (gated) | +0.027667 [+0.024094, +0.031201] | +0.025921 |
+| 1 (gated, fp32 pin) | +0.027164 [+0.023385, +0.030855] | +0.025406 |
+| **16** | **+0.013505 [+0.010156, +0.016654]** | +0.011075 |
+| **28** | **-0.006970 [-0.008048, -0.005945]** | **-0.009454 [-0.011612, -0.007413]** |
+
+**At layer 28 the sidecar helps.** The interval excludes zero, the trend is monotone in
+depth, and it is the first arm in the project to beat the pre-retrofit student on
+assistant-only NLL at all. The bypassed column moves between -0.0017 and -0.0025 across
+every arm, so this is the adapter and not the backbone.
+
+384 documents, 156,565 assistant tokens, paired percentile bootstrap over documents.
+
+### I read this backwards for an hour, off `eval_loss`
+
+Layer 28 finished at `eval_loss` 1.19 against layer 1's 0.6865 and I reported that late
+injection looked bad. `eval_loss` is 0.7 sparse KL to a memory-free teacher plus 0.3
+cosine to that teacher's hidden states, and this document has a standing note about it
+being the wrong thing to celebrate. On the measure that is about generating, the
+ordering is exactly reversed. The two disagree by enough to flip the conclusion, which
+is a fact about the objective rather than a detail of this run.
+
+The telemetry reads differently too. Layer 28 trained to `value_norm` 11.54 against
+layer 1's 3.16, with the gate 95% open -- which I described as the sidecar shouting to
+be heard. The depth profile says the collapsed stream's RMS is 0.050 at layer 1 and
+0.770 at layer 28, fifteen times larger. It was scaling correctly, not shouting.
+
+### What this does not say
+
+Layer 28's `eval_loss` was still falling steeply at the step budget's end (2.541,
+2.397, 2.175, 1.937, 1.674, 1.424, 1.221, 1.19), so it won while undertrained. The
+comparison is at matched budget, which is the fair comparison, but it is not this arm's
+ceiling.
+
+And it is *our* trained reader that benefits from depth. Flash-Next's own injected
+vector sits at mean |cosine| 0.0146-0.0160 against the collapsed stream at all
+thirty-three depths, against a 0.0158 random floor -- flat, no preferential layer. The
+borrowed reader has no depth that suits it; the learned one does.
+
 ## The flat gate was scale, not learning rate (2026-09-10)
 
 The first direction-gated run left `gate_std` at 0.03475 against upstream's 0.080-0.228,
