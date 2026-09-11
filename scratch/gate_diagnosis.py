@@ -722,19 +722,66 @@ def taps(checkpoint, device="cuda:0", split="screen"):
             print("  %-14s %+.6f [%+.6f, %+.6f]" % (label, cost, low, high))
 
 
+# --- score a fixed calibration, with an interval ------------------------------
+
+
+def apply_scalars(checkpoint, alpha, beta, bias, temperature, device="cuda:0",
+                  split="screen", grade="content"):
+    """Evaluate one (alpha, beta, bias, temperature) with a paired bootstrap.
+
+    `calibrate` reports sums, which is enough to see alpha and beta go to a boundary but
+    not enough to say whether a small calibrated gain is distinguishable from bypass.
+    The signed content fit lands at -0.000524, which is exactly the size where that
+    matters -- and the same scalars have to be scorable on the shuffled arm, since an
+    inverted write that helps there too is a generic regulariser rather than content.
+    """
+    from scratch.row_novelty import by_document, bootstrap
+
+    model, collator = load(checkpoint, device)
+    records = corpus(split, grade=grade)
+    cal = Calibration().to(device)
+    cal.gate_delta = cal.conv_delta = None
+    with torch.no_grad():
+        cal.raw_alpha.fill_(alpha)
+        cal.raw_beta.fill_(beta)
+        cal.bias.fill_(bias)
+        cal.raw_temperature.fill_(temperature)
+
+    bypassed, counts = per_token_nll(model, collator, records, device, bypass=True)
+    with instrumented(model, cal):
+        enabled, _ = per_token_nll(model, collator, records, device)
+    documents = len(counts)
+    packed = {"doc": np.repeat(np.arange(documents), counts),
+              "enabled": enabled, "bypassed": bypassed}
+    mask = np.ones(len(enabled), bool)
+    a, b, tokens = by_document(packed, mask, documents)
+    cost, low, high = bootstrap(a - b, tokens)
+    print(json.dumps({"checkpoint": Path(checkpoint).name, "split": split, "grade": grade,
+                      "alpha": alpha, "beta": beta, "bias": bias,
+                      "temperature": temperature, "tokens": int(tokens.sum()),
+                      "bypassed_nll": float(b.sum() / tokens.sum()),
+                      "calibrated_nll": float(a.sum() / tokens.sum()),
+                      "cost": cost, "ci": [low, high]}, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     for name in ("verify", "oracle", "calibrate", "logistic", "sensitivity", "deciles",
-                 "taps"):
+                 "taps", "apply"):
         command = sub.add_parser(name)
         command.add_argument("--checkpoint", required=True)
         command.add_argument("--device", default="cuda:0")
-        if name in ("oracle", "logistic", "sensitivity", "deciles", "taps"):
+        if name in ("oracle", "logistic", "sensitivity", "deciles", "taps", "apply"):
             command.add_argument("--split", default="screen")
-        if name in ("oracle", "calibrate", "logistic"):
+        if name in ("oracle", "calibrate", "logistic", "apply"):
             command.add_argument("--grade", default="content",
                                  choices=("content", "layout", "all"))
+        if name == "apply":
+            command.add_argument("--alpha", type=float, required=True)
+            command.add_argument("--beta", type=float, required=True)
+            command.add_argument("--bias", type=float, default=0.0)
+            command.add_argument("--temperature", type=float, default=1.0)
         if name == "oracle":
             command.add_argument("--limit", type=int, default=None)
         if name == "calibrate":
@@ -758,6 +805,9 @@ def main():
         return deciles(args.checkpoint, args.split)
     if args.command == "taps":
         return taps(args.checkpoint, args.device, args.split)
+    if args.command == "apply":
+        return apply_scalars(args.checkpoint, args.alpha, args.beta, args.bias,
+                             args.temperature, args.device, args.split, args.grade)
     return sensitivity(args.checkpoint, args.split)
 
 

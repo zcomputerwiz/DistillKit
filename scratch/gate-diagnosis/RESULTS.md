@@ -30,8 +30,12 @@ off, and the calibrated model reproduces bypassed exactly (0.469513 against 0.46
 generalising from the split it was fitted on to the one it was not.
 
 On layout the convolution wants to be **6× stronger** and was still climbing at step 150,
-so 6.048 is a lower bound. The whole useful output of this module is `short_conv(value)`,
-which is the one branch the gate never touches.
+so 6.048 is a lower bound.
+
+> **Do not read α\*=0 as "the value write carries nothing."** It was read that way here
+> at first, and the follow-up below shows it is wrong: α and β are substitutes, because
+> `c(v)` is a filter over the same `v`. Scored separately at the checkpoint's own scales,
+> the gated value write is 81% of the layout gain and the convolution is 22%.
 
 ## The gate is not selecting, and cannot
 
@@ -114,12 +118,104 @@ gate.
    β reach zero, at which point they are unidentifiable and mean nothing; in the layout
    fit the temperature goes to its 1e-3 floor, which is the fit flattening the gate into
    a constant because its ranking is worthless.
-2. **"The convolution bypasses admission."** Confirmed, and it matters — but the branch
-   it bypasses with is the only one that works.
+2. **"The convolution bypasses admission."** Confirmed as a fact about the code. Its
+   weight is smaller than it looked from the fit: scored alone the convolution is
+   −0.022354 on layout and +0.000749 on content, against the gated value write's
+   −0.083207 and +0.002060. Gating it is worth at most 0.0007 on content.
 3. **"A context-only gate is underinformed for semantics."** Confirmed, and adding the
    value read does not fix it. That hypothesis is not the one to build on.
 
-The finding none of the three anticipated: **α = 0 under both grades.** The gated value
-write — the entire thing the gate exists to admit — is worth nothing anywhere. The gate
-is admission control over a path that should not exist, and the path that works goes
-around it.
+The finding none of the three anticipated: **α = 0 under both grades** in the constrained
+fit. That is a statement about where a constrained optimum sits, not about which path
+carries the signal — see the correction in the follow-up. What it does establish, and
+what survives everything below, is that on content the best available setting of this
+module is off, and that no per-token feature tested can tell the two cases apart.
+
+---
+
+# Follow-up: signed scalars, the norm ratio, and the convolution taps
+
+Three frozen-checkpoint measurements, no training.
+
+## 1. The value write is not backwards — it is just small
+
+Dropping the α, β ≥ 0 clamp, the content fit goes meaningfully negative:
+α\* = **−0.51932**, β\* = **−0.72262**. Taken alone that says the learned direction is
+usable but wrong-signed, which would be a parameterisation bug worth fixing rather than
+a useless read.
+
+The shuffled arm says otherwise. Applying C1's fitted scalars to each checkpoint:
+
+| checkpoint | α | β | content cost | 95% |
+|---|---|---|---|---|
+| C1 real | −0.5193 | −0.7226 | **−0.000518** | [−0.000721, −0.000307] |
+| **C2 shuffled** | −0.5193 | −0.7226 | **−0.000432** | [−0.000630, −0.000232] |
+
+Overlapping intervals, 0.000086 apart. **Inverting the write helps the content-free
+control just as much.** Subtracting half of a small near-orthogonal vector is a generic
+regulariser, not recovered content. There is no sign bug; the direction simply carries
+nothing usable, and −0.0005 is what noise-cancellation is worth.
+
+## 2. ‖v‖/‖h‖ is an identity detector, not a confidence one
+
+Sidecar cost by decile of the norm ratio:
+
+| decile | all tokens | layout share | content only | layout only |
+|---|---|---|---|---|
+| 1 | +0.002390 | 2.9% | +0.002454 | −0.001309 |
+| 5 | −0.003735 | 5.7% | +0.004194 | **−0.457970** |
+| 6 | **−0.034843** | 7.7% | +0.002391 | −0.297577 |
+| 10 | +0.005697 | 3.9% | +0.005746 | +0.003277 |
+
+Within content the deciles run +0.001853 to +0.005746 — flat to mildly worsening, no
+benefit at any ratio. The structure in the pooled column is composition: layout share
+swings 2.9%→7.7% and decile 6's −0.0348 is those tokens. Its 0.5362 AUC on "the next
+token is layout" was real and useless: it detects the token class, which is what we
+already had. **Discard it as an admission variable.**
+
+## 3. The temporal filter is not the mechanism — and the value write is
+
+Cumulative tap ablation, kernel index 3 instantaneous (impulse-verified, not derived):
+
+| kept taps | layout | content |
+|---|---|---|
+| conv off (α=1, β=0) | −0.083207 | +0.002060 |
+| t | −0.096041 | +0.002789 |
+| t, t−3 | −0.098330 | +0.003009 |
+| t, t−3, t−6 | −0.100545 | +0.003302 |
+| full | −0.103020 | +0.003512 |
+
+And the two paths scored separately at the checkpoint's own scales:
+
+| configuration | layout | content |
+|---|---|---|
+| (α=1, β=0) gated value only | **−0.083207** | +0.002060 |
+| (α=0, β=1) convolution only | −0.022354 | +0.000749 |
+| (α=1, β=1) the checkpoint | −0.103020 | +0.003512 |
+
+Nearly additive. **The gated value write is 81% of the layout gain; the convolution is
+22%; the three delayed taps together are 6.8%.** Codex's "tiny causal sequence model
+over n-gram memory" is not what is happening — temporal mixing is a minor term.
+
+### Correcting the earlier reading
+
+The layout fit's α\*=0, β\*=6 was read here as "the whole useful output is
+`short_conv(value)`". **That was wrong.** α and β are substitutes, because `c(v)` is a
+filter over the same `v`: with β free to reach 6 the convolution can supply what the
+value path supplied, slightly better (−0.1279 against −0.1030). It does not follow that
+the value path contributes nothing at the scales it was trained at — scored alone it is
+four times the convolution. A constrained optimum at a boundary does not identify which
+path carries the signal when the paths are not independent.
+
+## Where that leaves the redesign
+
+Every path helps layout and hurts content, in rough proportion to its magnitude, and no
+per-token feature separates the two cases (every AUC 0.4965–0.5026 against an instrument
+ceiling of 0.5181). The only lever that worked is global scale, and on content its
+optimum is zero. Retiring `value_proj` from the residual write is not supported — it is
+the larger of the two paths. Gating the convolution is worth at most 0.000749 on content.
+
+What survives untouched is the direction finding: corr(z₀, z₁) = −0.8066 with AUCs of
+0.5206 and 0.4783 on the same question, cancelling to 0.4997. One direction instead of
+two averaged ones is a change with a measured reason behind it, independent of
+everything above.
