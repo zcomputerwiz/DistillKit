@@ -587,16 +587,152 @@ def sensitivity(checkpoint, split="screen"):
     print("  read every predictor AUC against that, not against 1.0")
 
 
+# --- is |v|/|h| an admission variable, or newline identity leaking? -----------
+
+
+def deciles(checkpoint, split="screen", bins=10):
+    """Sidecar cost against the value write's relative size, within each token class.
+
+    `|v|/|h|` beat every other feature at predicting that the next token is layout
+    (0.5362, against the gradient oracle's own 0.5181 on the same question), which makes
+    it the cheapest admission variable on offer -- one norm ratio, no projection. But
+    the same number would appear if large writes simply happen at newlines, in which
+    case it is an identity detector wearing a confidence detector's clothes. The test
+    that separates those is whether the cost still varies across deciles *within
+    content*, where there are no newlines left to detect.
+
+    Joins the per-token NLL from `row_novelty score` to the per-stream norms recorded by
+    `oracle --grade all`: both replay the same bundle records over the same assistant
+    targets in the same order, asserted below rather than assumed.
+    """
+    from scratch.row_novelty import OUT as ROWS, by_document, bootstrap, target_token_ids
+
+    name = Path(checkpoint).name
+    recorded = dict(np.load(OUT / ("oracle-%s-%s-all.npz" % (name, split)), allow_pickle=True))
+    scores = dict(np.load(ROWS / ("tokens-%s.npz" % name), allow_pickle=True))
+    records = load_json(BUNDLE)["splits"][split]["nll"]
+    targets = target_token_ids(records)
+    heads = len(recorded["q"]) // len(scores["k"])
+    if len(scores["k"]) != len(targets) or heads * len(targets) != len(recorded["q"]):
+        raise ValueError("the oracle and the per-token scores cover different tokens")
+
+    # |v| is shared across streams and |h| is not, so the ratio is per stream; the mean
+    # is what a single admission variable would have to work from.
+    ratio = recorded["ratio"].reshape(len(targets), heads).mean(axis=1)
+    is_layout = np.isin(targets, LAYOUT_TOKEN_IDS)
+    documents = len(scores["doc_ids"])
+
+    for label, keep in (("all assistant tokens", np.ones(len(targets), bool)),
+                        ("content only", ~is_layout), ("layout only", is_layout)):
+        edges = np.quantile(ratio[keep], np.linspace(0, 1, bins + 1))
+        edges[-1] = np.inf
+        print("\n%s (%d tokens)" % (label, keep.sum()))
+        print("  decile  |v|/|h| range        tokens   layout%%   sidecar cost  [95%]")
+        for index in range(bins):
+            mask = keep & (ratio >= edges[index]) & (ratio < edges[index + 1])
+            if not mask.sum():
+                continue
+            enabled, bypassed, tokens = by_document(scores, mask, documents)
+            cost, low, high = bootstrap(enabled - bypassed, tokens)
+            print("  %4d    %.4f - %.4f  %7d   %5.1f%%   %+.6f [%+.6f, %+.6f]"
+                  % (index + 1, edges[index], min(edges[index + 1], ratio[keep].max()),
+                     int(mask.sum()), 100 * is_layout[mask].mean(), cost, low, high))
+
+
+# --- what is the convolution actually doing? ----------------------------------
+
+
+#: Which source position each kernel index reads, at kernel_size 4 and dilation 3.
+#: The module pads (K-1)*dilation = 9 on the left, so output[t] = sum_k w[k] x[t+3k-9]:
+#: index 3 is the instantaneous tap and 0 is the oldest. Derived, then pinned by
+#: `tests/test_gate_diagnosis.py` with an impulse, because an off-by-one here would
+#: reverse the conclusion it is used to draw.
+TAP_OFFSETS = (-9, -6, -3, 0)
+
+#: Cumulative ablations, newest tap first.
+TAP_SETS = (("conv off", ()), ("t only", (3,)), ("t, t-3", (2, 3)),
+            ("t, t-3, t-6", (1, 2, 3)), ("full", (0, 1, 2, 3)))
+
+
+@torch.inference_mode()
+def per_token_nll(model, collator, records, device, bypass=False):
+    """Assistant-target NLL, one value per token, in the bundle's order."""
+    values, counts = [], []
+    for record, targets in records:
+        ids = record["ids"]
+        batch = {k: v.to(device) for k, v in collator([record]).items()}
+        positions = torch.arange(0, len(ids) - 1, device=device)
+        logits = model(**batch, use_cache=False, logits_to_keep=positions,
+                       sidecar_enabled=not bypass).logits[0].float()
+        index = torch.as_tensor(targets - 1, device=device)
+        target = torch.as_tensor([ids[i] for i in targets], device=device)
+        values.append(F.cross_entropy(logits[index], target, reduction="none").cpu().numpy())
+        counts.append(len(targets))
+    return np.concatenate(values), np.array(counts)
+
+
+def taps(checkpoint, device="cuda:0", split="screen"):
+    """Does the layout gain come from the table read, or from the delayed taps?
+
+    The convolution is dilated by ngram_size, so it mixes table-derived features across
+    t, t-3, t-6 and t-9 -- a tiny causal sequence model over n-gram memory rather than a
+    lookup. If the instantaneous tap alone recovers the layout gain, the mechanism is
+    "inject n-gram knowledge". If the gain needs the delayed taps, the mechanism is
+    "run a temporal filter over n-gram memory", which is a different thing to build.
+    """
+    from scratch.row_novelty import by_document, bootstrap
+
+    model, collator = load(checkpoint, device)
+    ple = model.model.layers[model.config.sidecar_layer_index].sidecar.ple
+    records = corpus(split, grade="all")
+    targets = np.concatenate([np.array([r["ids"][i] for i in t]) for r, t in records])
+    is_layout = np.isin(targets, LAYOUT_TOKEN_IDS)
+
+    bypassed, counts = per_token_nll(model, collator, records, device, bypass=True)
+    documents = len(counts)
+    document_of = np.repeat(np.arange(documents), counts)
+    print("%d documents, %d assistant tokens, %d layout"
+          % (documents, len(targets), is_layout.sum()))
+    print("kernel index -> source position: %s"
+          % ", ".join("%d: t%+d" % (k, TAP_OFFSETS[k]) for k in range(len(TAP_OFFSETS))))
+
+    saved = ple.conv1d.weight.detach().clone()
+    rows = []
+    try:
+        for label, keep in TAP_SETS:
+            with torch.no_grad():
+                ple.conv1d.weight.copy_(saved)
+                for index in range(saved.shape[-1]):
+                    if index not in keep:
+                        ple.conv1d.weight[..., index] = 0.0
+            enabled, _ = per_token_nll(model, collator, records, device)
+            rows.append((label, enabled))
+            print("  scored %s" % label, flush=True)
+    finally:
+        with torch.no_grad():
+            ple.conv1d.weight.copy_(saved)
+
+    for name, mask in (("all", np.ones(len(targets), bool)),
+                       ("content", ~is_layout), ("layout", is_layout)):
+        print("\n%s (%d tokens): sidecar cost against bypassed" % (name, mask.sum()))
+        for label, enabled in rows:
+            packed = {"doc": document_of, "enabled": enabled, "bypassed": bypassed}
+            a, b, tokens = by_document(packed, mask, documents)
+            cost, low, high = bootstrap(a - b, tokens)
+            print("  %-14s %+.6f [%+.6f, %+.6f]" % (label, cost, low, high))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("verify", "oracle", "calibrate", "logistic", "sensitivity"):
+    for name in ("verify", "oracle", "calibrate", "logistic", "sensitivity", "deciles",
+                 "taps"):
         command = sub.add_parser(name)
         command.add_argument("--checkpoint", required=True)
         command.add_argument("--device", default="cuda:0")
-        if name in ("oracle", "logistic", "sensitivity"):
+        if name in ("oracle", "logistic", "sensitivity", "deciles", "taps"):
             command.add_argument("--split", default="screen")
-        if name != "verify":
+        if name in ("oracle", "calibrate", "logistic"):
             command.add_argument("--grade", default="content",
                                  choices=("content", "layout", "all"))
         if name == "oracle":
@@ -618,6 +754,10 @@ def main():
                          args.calibration_documents, args.grade, args.signed)
     if args.command == "logistic":
         return logistic(args.checkpoint, args.split, args.grade)
+    if args.command == "deciles":
+        return deciles(args.checkpoint, args.split)
+    if args.command == "taps":
+        return taps(args.checkpoint, args.device, args.split)
     return sensitivity(args.checkpoint, args.split)
 
 

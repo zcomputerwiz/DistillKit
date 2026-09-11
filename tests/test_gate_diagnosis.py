@@ -151,3 +151,23 @@ def test_logistic_regression_recovers_a_separating_direction():
     labels = (features[:, 0] > 0).astype(np.float32)
     weight, _, _, _ = gate_diagnosis.fit_logistic(features, labels)
     assert weight[0] > 1.0 and abs(weight[1]) < abs(weight[0]) / 2
+
+
+def test_each_kernel_index_reads_the_position_the_tap_map_claims(module):
+    """The tap ablation's whole conclusion turns on which index is the instantaneous
+    tap. The module pads (K-1)*dilation on the left, so output[t] = sum_k w[k] x[t+3k-9]
+    and index 3 is `t` -- but that is a derivation, and an off-by-one would reverse the
+    reading. An impulse settles it."""
+    length, taps = 24, module.conv1d.weight.shape[-1]
+    for index in range(taps):
+        with torch.no_grad():
+            module.conv1d.weight.zero_()
+            module.conv1d.weight[..., index] = 1.0
+        value = torch.zeros(1, length, module.hidden_size)
+        value[0, 12] = 1.0                      # an impulse at t = 12
+        responded = module._short_conv(value)[0, :, 0].abs().sum(-1).nonzero().ravel()
+        assert responded.numel(), "tap %d produced no output at all" % index
+        offset = gate_diagnosis.TAP_OFFSETS[index]
+        assert responded[0].item() == 12 - offset, (
+            "kernel index %d first responds at t=%d, so it reads t%+d, not t%+d"
+            % (index, responded[0].item(), -(responded[0].item() - 12), offset))
