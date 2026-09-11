@@ -128,3 +128,24 @@ def test_a_width_mismatch_is_refused_rather_than_reshaped(tmp_path):
 def test_a_missing_extraction_says_how_to_make_one(tmp_path):
     with pytest.raises(FileNotFoundError, match="extract_flashnext_hc"):
         initialise_widened_residual(_Model(), tmp_path, "proportional")
+
+
+def test_the_write_offset_stops_the_donor_write_stacking_on_the_identity_write(tmp_path):
+    """The failure that cost a run: a (1, 2) multiplier 64 sublayers deep.
+
+    `weights = (1 + write_offset) + lambda_write * sigmoid(write_logits)`, so turning
+    `lambda_write` on and leaving the offset at zero keeps the identity write and adds
+    the donor's on top. Measured on the model that produced: a backbone +10.10 nats
+    worse than the pre-retrofit student.
+    """
+    model = _Model()
+    module = model.model.layers[0].attn_residual
+    initialise_widened_residual(model, _donor(tmp_path, range(8)), "proportional")
+    assert float(module.write_offset.mean()) == -1.0
+
+    torch.manual_seed(0)
+    states = torch.randn(2, 3, BRANCHES, HIDDEN)
+    with torch.no_grad():
+        weights = module.read(states, torch.nn.RMSNorm(HIDDEN))[1]
+    # sigmoid alone: a gate, not a gain.
+    assert weights.min() > 0.0 and weights.max() < 1.0, weights

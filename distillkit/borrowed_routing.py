@@ -20,11 +20,31 @@ happen. ``branch_gain_delta`` is the trap's sharp edge, because it rides on the 
 and *does* take effect, so half the transfer would work and half would not.
 
 Flash-Next has no equivalent of these lambdas -- its ``hc_*`` tensors are the routing,
-not a deviation from an identity route -- so borrowing sets them to one, which is the
-closest reading of "the donor's gate, fully on". That deliberately gives up identity at
-load: a borrowed model does not reproduce the un-widened student at step zero, and it
-is not supposed to. ``bypassed`` still means what it meant, since it removes the
-sidecar and leaves the widening.
+not a deviation from an identity route -- so borrowing sets them to one. That
+deliberately gives up identity at load: a borrowed model does not reproduce the
+un-widened student at step zero, and it is not supposed to. ``bypassed`` still means
+what it meant, since it removes the sidecar and leaves the widening.
+
+**And the write offset has to go to -1, which the first attempt missed.** Turning
+``lambda_write`` on without it leaves ``weights = 1 + sigmoid(write_logits)``, a
+per-sublayer multiplier in (1, 2) averaging about 1.5. That is not "the donor's write":
+it is the donor's write stacked on top of the identity write, 64 sublayers deep.
+RMSNorm stops it from overflowing, but each layer's contribution becomes negligible
+against the accumulated carry and the pretrained function is gone -- measured, a
+backbone **+10.10 nats** worse than the pre-retrofit student on assistant tokens, which
+72 steps did not come close to recovering. With ``write_offset = -1`` the write is
+``sigmoid(write_logits)`` in (0, 1), which is the donor's gate doing the donor's job.
+
+That episode is also a warning about the headline metric. The ruined run scored
+``enabled - bypassed`` of **-0.021723**, the best number in the table, because both
+sides of the subtraction were destroyed equally. The sidecar's own cost is only
+meaningful next to the arm's absolute NLL.
+
+**A known remaining mismatch.** ``_combine`` reads
+``normalized[read_index] + (correction * normalized).sum(-2)``: one branch is always
+read at full weight and the gate only adds to it. Flash-Next's read is a weighted
+combination with no such anchor, and this module cannot express that, so the read side
+is close rather than equal even after the offsets are set.
 
 **The layer correspondence is the unresolved part.** Flash-Next has 48 blocks to this
 student's 32, and the depth sweep (``PROGRESS.md``, 2026-09-10) found this student wants
@@ -120,11 +140,14 @@ def initialise_widened_residual(model, directory, how="proportional") -> dict:
                 with torch.no_grad():
                     target.copy_(source.to(device=target.device, dtype=target.dtype))
                 copied += 1
-            # Without this the three borrowed matrices are multiplied by zero and the
-            # transfer is inert. See the module note.
+            # Without the lambdas the three borrowed matrices are multiplied by zero
+            # and the transfer is inert; without the -1 write offset the donor's write
+            # stacks on top of the identity write instead of replacing it. See the
+            # module note for what each of those costs.
             with torch.no_grad():
                 module.lambda_read.fill_(1.0)
                 module.lambda_write.fill_(1.0)
+                module.write_offset.fill_(-1.0)
 
     report = {"directory": str(directory), "map": how, "layers": len(layers),
               "donor_blocks": len(blocks), "tensors_copied": copied,
