@@ -16,12 +16,12 @@ model: D:/DeepThought/Projects/HybridModel/student-hf
 optimizer:
   freeze_backbone: true
   log_every_n_steps: 5
-  strategy: hybrid
-  unfreeze_at_step: null
   stage1_trainable_layers:
   - 20
   - 28
-output_path: D:/DeepThought/Projects/HybridModel/runs/win-A3-nosidecar-stage1-1m
+  strategy: hybrid
+  unfreeze_at_step: null
+output_path: D:/DeepThought/Projects/HybridModel/runs/win-A3-lr1e05-stage1-1m
 project_name: hybridmodel-sidecar
 residual_stream:
   lowrank: 64
@@ -45,7 +45,7 @@ training_args:
   gradient_checkpointing: true
   gradient_checkpointing_kwargs:
     use_reentrant: false
-  learning_rate: 0.0001
+  learning_rate: 1.0e-05
   length_column_name: length
   logging_steps: 5
   lr_scheduler_type: constant_with_warmup
