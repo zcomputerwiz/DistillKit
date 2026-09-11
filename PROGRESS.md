@@ -1027,6 +1027,61 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## The borrowed routing is rescaling, not borrowing (2026-09-11)
+
+`scratch/shuffle_donor.py` builds a donor whose tensors keep their shapes and their
+exact value multisets and have had their elements permuted: identical scale,
+distribution and norm, no structure. Verified on block 36, all eight tensors, norms
+agreeing to four decimals. If a shuffled donor works as well as the real one, nothing is
+being borrowed.
+
+Both arms: n_r=4, lowrank=320, Flash-Next Gated Residual routing initialised from the
+donor by the proportional map, `ple_gated` sidecar at layer 24, one learnable blend per
+sublayer starting at 0.10 with its own 2e-3. 384 documents, 156,565 assistant tokens.
+
+| | enabled | bypassed | enabled - bypassed |
+| --- | ---: | ---: | ---: |
+| real donor | +0.052896 [+0.047268, +0.058358] | +0.037194 | +0.015702 |
+| **shuffled donor** | **+0.052698 [+0.046925, +0.058360]** | +0.041978 | +0.010721 |
+
+**They are indistinguishable.** The gap on enabled NLL is 0.0002 inside intervals 0.011
+wide. Destroying every bit of structure in the donor's routing changed nothing, so the
+small-blend effect Codex found before training -- 0.5039 at blend 0.10 against 0.5176 at
+0 -- is the interpolation rescaling the residual, not Flash-Next's trained weights
+contributing anything. Codex flagged exactly this risk before the control existed:
+"small-blend improvements ... may reflect generic rescaling rather than useful donor
+knowledge; a matched zero/random-donor control would be needed to attribute them."
+
+**Both arms are also worse than doing none of it.** +0.053 against the pre-retrofit
+student, where `widened-plegated-L24-stage1-1m` is at **-0.008860** with an intact
+backbone. The whole n_r=4 / lowrank=320 / donor-routing direction costs about 0.06 nats
+against widening to two branches with our own identity-anchored routing. And the
+sidecar's own cost goes from -0.008860 under the old routing to +0.015702 under this
+one: the thing that finally made the sidecar help stops working here.
+
+### Where the blends went, and why it does not mean what it looks like
+
+59 of 64 routes asked for *more* donor: mean 0.1547 from a 0.10 start, range 0.0375 to
+0.1992, MLP routes (0.1643) consistently above attention routes (0.1450), nearly flat
+with depth. That reads as "the model wants this" and it is not, because the shuffled arm
+gets the same NLL -- what the blend is asking for is a scale, and a permuted donor
+supplies the same scale.
+
+`eval_loss` pointed the other way again: 0.7628 real against 1.342 shuffled, a gap that
+looks decisive and predicts nothing. That is the ninth time today the training objective
+has ordered arms backwards against assistant NLL.
+
+### What this does and does not close
+
+It closes the specific hope: that Flash-Next's *trained* plumbing would carry its own
+table's rows better than ours. Random numbers with the same distribution did equally
+well, so no.
+
+It does not test a different layer map, a longer budget, or a large blend approached
+slowly. It also leaves one cheap question open -- whether the routing *shape* matters at
+all, or only the magnitude -- which a constant residual rescale with no donor would
+answer.
+
 ## Borrowing Flash-Next's routing: two failures and what they localise (2026-09-11)
 
 ``WidenedResidual`` was written as a transcription of Flash-Next's ``hc_attn_*`` /
