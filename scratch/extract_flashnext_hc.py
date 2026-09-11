@@ -48,12 +48,18 @@ SHARD = ("C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-N
          "snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/"
          "Qwen3.8-Flash-Next-UD-IQ4_XS-%05d-of-00003.gguf")
 
+#: Every block routes its attention and its FFN sublayer separately, which is exactly
+#: the ``attn_residual`` / ``mlp_residual`` pair ``WidenedDecoderLayer`` holds. Taking
+#: only the attention half would leave the MLP routing at its identity initialisation
+#: and call the result "borrowed".
+SUBLAYERS = {"hc_attn": "attn_residual", "hc_ffn": "mlp_residual"}
+
 #: GGUF name suffix -> (our attribute, whether it is a matrix rather than a vector)
 ROUTING = {
-    "hc_attn_norm.weight": ("branch_gain", False),
-    "hc_attn_down.weight": ("W_down.weight", True),
-    "hc_attn_up.weight": ("W_up.weight", True),
-    "hc_attn_inject.weight": ("W_write.weight", True),
+    "norm.weight": ("branch_gain", False),
+    "down.weight": ("W_down.weight", True),
+    "up.weight": ("W_up.weight", True),
+    "inject.weight": ("W_write.weight", True),
 }
 
 
@@ -139,51 +145,59 @@ def main():
         reader, shard = find_shard(layer)
         found = {t.name.split(".", 2)[2]: t for t in reader.tensors
                  if t.name.startswith("blk.%d." % layer)}
-        missing = [name for name in ROUTING if name not in found]
+        missing = ["%s_%s" % (prefix, name) for prefix in SUBLAYERS for name in ROUTING
+                   if "%s_%s" % (prefix, name) not in found]
         if missing:
             print("blk.%d: no hyper-connection routing (%s); skipping"
                   % (layer, ", ".join(missing)))
             continue
         held = {}
-        for name, (attribute, is_matrix) in ROUTING.items():
-            tensor = found[name]
-            values = torch.from_numpy(dequantize(tensor))
-            gguf_shape = tuple(int(s) for s in tensor.shape)
-            if is_matrix:
-                # GGUF reports (ne0, ne1) with ne0 -- the contracted dimension --
-                # varying fastest, so the row-major buffer is already
-                # (out_features, in_features): exactly nn.Linear's weight layout.
-                # Reshaping is the whole conversion; transposing would break it.
-                values = values.reshape(gguf_shape[1], gguf_shape[0]).contiguous()
-            else:
-                values = values.reshape(-1)
-            if attribute == "branch_gain":
-                if values.numel() != width:
-                    raise ValueError("hc_attn_norm is %d, expected %d" % (values.numel(), width))
-                # WidenedResidual stores the deviation from unit gain, not the gain.
-                held["branch_gain_delta"] = (values.view(arguments.branches, arguments.hidden)
-                                             - 1.0).contiguous()
-            else:
-                held[attribute] = values
-        expected = {
-            "W_down.weight": (held["W_down.weight"].shape[0], width),
-            "W_up.weight": (width, held["W_down.weight"].shape[0]),
-            "W_write.weight": (arguments.branches, width),
-        }
-        for attribute, want in expected.items():
-            if tuple(held[attribute].shape) != want:
-                raise ValueError("%s came out %s, expected %s -- check the transpose"
-                                 % (attribute, tuple(held[attribute].shape), want))
+        for prefix, sublayer in SUBLAYERS.items():
+            for name, (attribute, is_matrix) in ROUTING.items():
+                tensor = found["%s_%s" % (prefix, name)]
+                values = torch.from_numpy(dequantize(tensor).copy())
+                gguf_shape = tuple(int(s) for s in tensor.shape)
+                if is_matrix:
+                    # GGUF reports (ne0, ne1) with ne0 -- the contracted dimension --
+                    # varying fastest, so the row-major buffer is already
+                    # (out_features, in_features): exactly nn.Linear's weight layout.
+                    # Reshaping is the whole conversion; transposing would break it.
+                    values = values.reshape(gguf_shape[1], gguf_shape[0]).contiguous()
+                else:
+                    values = values.reshape(-1)
+                if attribute == "branch_gain":
+                    if values.numel() != width:
+                        raise ValueError("%s_norm is %d, expected %d"
+                                         % (prefix, values.numel(), width))
+                    # WidenedResidual stores the deviation from unit gain, not the gain.
+                    held["%s.branch_gain_delta" % sublayer] = (
+                        values.view(arguments.branches, arguments.hidden) - 1.0).contiguous()
+                else:
+                    held["%s.%s" % (sublayer, attribute)] = values
+        for sublayer in SUBLAYERS.values():
+            lowrank = held["%s.W_down.weight" % sublayer].shape[0]
+            expected = {
+                "W_down.weight": (lowrank, width),
+                "W_up.weight": (width, lowrank),
+                "W_write.weight": (arguments.branches, width),
+                "branch_gain_delta": (arguments.branches, arguments.hidden),
+            }
+            for attribute, want in expected.items():
+                actual = tuple(held["%s.%s" % (sublayer, attribute)].shape)
+                if actual != want:
+                    raise ValueError("%s.%s came out %s, expected %s -- check the layout"
+                                     % (sublayer, attribute, actual, want))
         path = output / ("layer-%02d.pt" % layer)
         torch.save(held, path)
+        lowranks = {name: int(held["%s.W_down.weight" % name].shape[0])
+                    for name in SUBLAYERS.values()}
         manifest["layers"][str(layer)] = {
-            "shard": shard, "file": path.name, "lowrank": int(held["W_down.weight"].shape[0]),
+            "shard": shard, "file": path.name, "lowrank": lowranks,
             "shapes": {key: list(value.shape) for key, value in held.items()},
             "norms": {key: float(value.float().norm()) for key, value in held.items()},
         }
-        print("blk.%d -> %s  lowrank=%d  %s" % (
-            layer, path.name, held["W_down.weight"].shape[0],
-            {key: tuple(value.shape) for key, value in held.items()}))
+        print("blk.%d -> %s  %d tensors, lowrank %s"
+              % (layer, path.name, len(held), lowranks))
 
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print("\nwrote", output / "manifest.json")
