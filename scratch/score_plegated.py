@@ -21,7 +21,11 @@ BASELINE = "student-hf"
 CONTROL = "widened-ple-stage1-1m"
 # Every arm is scored against the transcription. Add a name here once its reply bundle
 # exists; the file name follows from it. An arm that is not there yet is skipped.
-ARMS = (BASELINE, CONTROL, "widened-plegated-stage1-1m", "widened-plegated-fp32-stage1-1m")
+ARMS = (BASELINE, CONTROL,
+        "widened-plegated-stage1-1m",
+        "widened-plegated-fp32-stage1-1m",
+        "widened-plegated-L16-stage1-1m",
+        "widened-plegated-L28-stage1-1m")
 
 
 def load(path, role="assistant"):
