@@ -109,11 +109,20 @@ class Calibration(nn.Module):
         self.conv_delta = None          # [batch, seq, hc, 1] when probing
         self.recorded = {}
 
+    #: Whether the write scales may go negative. Off by default: the question is
+    #: whether these paths should be attenuated, not whether an inverted sidecar can
+    #: rescue NLL. Turned on deliberately, it answers a different and narrower
+    #: question -- alpha pinned at the 0 boundary only says the optimum is <= 0, and
+    #: an optimum meaningfully below 0 would mean the value direction is systematically
+    #: wrong-signed, which is a parameterisation bug rather than a useless read.
+    signed = False
+
     def project(self):
         """alpha, beta >= 0 and temperature > 0, applied after each optimiser step."""
         with torch.no_grad():
-            self.raw_alpha.clamp_(min=0.0)
-            self.raw_beta.clamp_(min=0.0)
+            if not self.signed:
+                self.raw_alpha.clamp_(min=0.0)
+                self.raw_beta.clamp_(min=0.0)
             self.raw_temperature.clamp_(min=1e-3)
 
     def arm_probes(self, shape, device):
@@ -417,12 +426,13 @@ def scored(model, collator, records, device, cal, bypass=False):
 
 
 def calibrate(checkpoint, device="cuda:0", steps=150, batch=6, lr=0.05,
-              calibration_documents=128, grade="content", seed=20260911):
+              calibration_documents=128, grade="content", signed=False, seed=20260911):
     """Fit alpha, beta, bias, temperature on `confirmation`, report on `screen`."""
     model, collator = load(checkpoint, device)
     fitting = corpus("confirmation", calibration_documents, grade)
     testing = corpus("screen", grade=grade)
     cal = Calibration().to(device)
+    cal.signed = signed
     cal.gate_delta = cal.conv_delta = None
     optimiser = torch.optim.Adam(cal.parameters(), lr=lr)
     rng = np.random.default_rng(seed)
@@ -472,10 +482,12 @@ def calibrate(checkpoint, device="cuda:0", steps=150, batch=6, lr=0.05,
 
     OUT.mkdir(parents=True, exist_ok=True)
     write = {"checkpoint": str(checkpoint), "fitted": fitted, "grade": grade,
+             "signed": signed,
              "calibration_documents": len(fitting), "steps": steps,
              "screen": {label: {"sum_nll": total, "tokens": count}
                         for label, total, count in rows}}
-    (OUT / ("calibration-%s-%s.json" % (Path(checkpoint).name, grade))).write_text(
+    (OUT / ("calibration-%s-%s%s.json"
+            % (Path(checkpoint).name, grade, "-signed" if signed else ""))).write_text(
         json.dumps(write, indent=2), encoding="utf-8")
 
 
@@ -538,14 +550,51 @@ def logistic(checkpoint, split="screen", grade="content", folds=5, seed=20260911
                  ", ".join("%s %+.3f" % (n, w) for n, w in zip(names, weight.tolist()))))
 
 
+# --- how sharp is this instrument? --------------------------------------------
+
+
+def sensitivity(checkpoint, split="screen"):
+    """Score the oracle against a distinction already known to be large.
+
+    An AUC near 0.5 only means "no signal" if the instrument could have shown one.
+    The layout/content split is the reference: those two token classes differ by
+    -0.103 against +0.0035 nats, a 30x effect in the direction the sidecar is supposed
+    to work, established independently of any gradient. Whatever AUC the oracle gives
+    *that* is the ceiling a per-token predictor could plausibly reach here, and every
+    other AUC in this script should be read against it rather than against 1.0.
+
+    Needs the `--grade all` oracle, since the content grade has no layout tokens in it.
+    """
+    name = Path(checkpoint).name
+    packed = dict(np.load(OUT / ("oracle-%s-%s-all.npz" % (name, split)), allow_pickle=True))
+    records = corpus(split, grade="all")
+    targets = np.concatenate([np.array([record["ids"][i] for i in picked])
+                              for record, picked in records])
+    heads = len(packed["q"]) // len(targets)
+    targets = np.repeat(targets, heads)
+    if len(targets) != len(packed["q"]):
+        raise ValueError("the oracle and the bundle disagree about which tokens were scored")
+
+    is_layout = np.isin(targets, LAYOUT_TOKEN_IDS)
+    print("%s on %s: %d layout verdicts, %d content"
+          % (name, split, is_layout.sum(), (~is_layout).sum()))
+    for label, mask in (("layout", is_layout), ("content", ~is_layout)):
+        q = packed["q"][mask]
+        print("  %-8s mean q %+.4e  %.1f%% want opening  median |q| %.2e"
+              % (label, q.mean(), 100 * (q < 0).mean(), np.median(np.abs(q))))
+    print("\n  the oracle's own AUC on a known 30x effect: %.4f"
+          % auc(-packed["q"], is_layout))
+    print("  read every predictor AUC against that, not against 1.0")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    for name in ("verify", "oracle", "calibrate", "logistic"):
+    for name in ("verify", "oracle", "calibrate", "logistic", "sensitivity"):
         command = sub.add_parser(name)
         command.add_argument("--checkpoint", required=True)
         command.add_argument("--device", default="cuda:0")
-        if name in ("oracle", "logistic"):
+        if name in ("oracle", "logistic", "sensitivity"):
             command.add_argument("--split", default="screen")
         if name != "verify":
             command.add_argument("--grade", default="content",
@@ -557,6 +606,8 @@ def main():
             command.add_argument("--batch", type=int, default=6)
             command.add_argument("--lr", type=float, default=0.05)
             command.add_argument("--calibration-documents", type=int, default=128)
+            command.add_argument("--signed", action="store_true",
+                                 help="let alpha and beta go negative")
     args = parser.parse_args()
     if args.command == "verify":
         return verify(args.checkpoint, args.device)
@@ -564,8 +615,10 @@ def main():
         return oracle(args.checkpoint, args.device, args.split, args.limit, args.grade)
     if args.command == "calibrate":
         return calibrate(args.checkpoint, args.device, args.steps, args.batch, args.lr,
-                         args.calibration_documents, args.grade)
-    return logistic(args.checkpoint, args.split, args.grade)
+                         args.calibration_documents, args.grade, args.signed)
+    if args.command == "logistic":
+        return logistic(args.checkpoint, args.split, args.grade)
+    return sensitivity(args.checkpoint, args.split)
 
 
 if __name__ == "__main__":
