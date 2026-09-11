@@ -575,7 +575,8 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
             table.load_resident()
         elif config.sidecar.prefault:
             table.prefault()
-        collator = SidecarDataCollator(base_collator, table)
+        collator = SidecarDataCollator(base_collator, table,
+                                       shuffle_context=config.sidecar.shuffle_context)
     from distillkit.optimizers import ReleaseEvalCacheCallback
 
     # Evaluation carves the allocator's pool into its own shapes, and Windows cannot
@@ -603,6 +604,13 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
             world_size=training_arguments.world_size,
         )
         if config.optimizer.freeze_backbone:
+            window = config.optimizer.stage1_trainable_layers
+            if window is not None:
+                if not hasattr(model, "set_stage1_trainable_layers"):
+                    raise ValueError(
+                        "stage1_trainable_layers needs the widened model class")
+                model.set_stage1_trainable_layers(window)
+                LOG.info("Stage 1 also trains decoder layers [%d, %d)", *window)
             frozen_names = freeze_backbone_for_stage1(model)
             if hasattr(model, "enable_input_require_grads"):
                 model.enable_input_require_grads()

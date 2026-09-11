@@ -212,10 +212,46 @@ class Qwen35WidenedForCausalLM(_WidenedWeightInit, Qwen3_5ForCausalLM):
             use_cache=use_cache, logits_to_keep=logits_to_keep, ngram_raw=ngram_raw,
             sidecar_enabled=sidecar_enabled, output_hidden_states=output_hidden_states, **kwargs)
 
+    #: Decoder layers that stage 1 trains alongside the adapter, as [start, stop).
+    #: Empty by default: stage 1 exists to train the adapter against a fixed backbone.
+    stage1_trainable_layers: tuple[int, int] | None = None
+
+    def set_stage1_trainable_layers(self, window):
+        """Open a contiguous decoder window for stage-1 training.
+
+        Naming these through `stage1_parameter_names` rather than unfreezing them
+        afterwards is what keeps the rest of the machinery consistent: the same list
+        feeds `freeze_backbone_for_stage1` and `_auxiliary_parameter_ids`, so the window
+        stays trainable *and* routes to AdamW rather than Muon -- which it has to, since
+        Newton-Schulz does not commute with tensor-parallel slicing and
+        `_refuse_trainable_muon_shards` rejects the combination outright.
+        """
+        if window is None:
+            self.stage1_trainable_layers = None
+            return
+        start, stop = (int(value) for value in window)
+        depth = self.config.num_hidden_layers
+        if not 0 <= start < stop <= depth:
+            raise ValueError(
+                f"stage1 trainable window [{start}, {stop}) outside 0..{depth}")
+        self.stage1_trainable_layers = (start, stop)
+
+    def _in_stage1_window(self, name):
+        window = self.stage1_trainable_layers
+        if window is None:
+            return False
+        parts = name.split(".")
+        if "layers" not in parts:
+            return False
+        index = parts.index("layers") + 1
+        return index < len(parts) and parts[index].isdigit() and (
+            window[0] <= int(parts[index]) < window[1])
+
     def stage1_parameter_names(self):
-        return [name for name, _ in self.named_parameters() if any(
-            part in name.split(".") for part in
-            ("attn_residual", "mlp_residual", "sidecar", "distillation_projections"))]
+        return [name for name, _ in self.named_parameters()
+                if self._in_stage1_window(name) or any(
+                    part in name.split(".") for part in
+                    ("attn_residual", "mlp_residual", "sidecar", "distillation_projections"))]
 
     def freeze_backbone(self):
         names = set(self.stage1_parameter_names())

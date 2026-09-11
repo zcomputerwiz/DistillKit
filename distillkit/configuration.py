@@ -144,6 +144,16 @@ class TeacherDatasetConfig(BaseModel):
 class SidecarConfig(BaseModel):
     table_path: str | None = None
     enabled: bool = True
+    shuffle_context: int = Field(
+        default=0,
+        description=(
+            "The matched control: roll the token stream this many positions before "
+            "hashing, so every n-gram row is a real row fetched for the wrong context. "
+            "Gather pattern, hit rate, value distribution and row norms are all "
+            "preserved and only the correspondence to this text is lost. An arm that "
+            "improves as much with this set is not using the table's content."
+        ),
+    )
     resident: bool = False
     prefault: bool = True
     layer_index: int = Field(default=1, ge=0)
@@ -265,6 +275,17 @@ class OptimizerConfig(BaseModel):
         ),
     )
     freeze_backbone: bool = True
+    stage1_trainable_layers: tuple[int, int] | None = Field(
+        default=None,
+        description=(
+            "Decoder layers [start, stop) that stage 1 trains alongside the adapter, "
+            "leaving the rest frozen. Tests whether the pretrained consumer layers "
+            "around the injection point are the bottleneck rather than retrieval. They "
+            "are named through stage1_parameter_names, so they route to AdamW rather "
+            "than Muon -- required, since Newton-Schulz does not commute with "
+            "tensor-parallel slicing."
+        ),
+    )
     unfreeze_at_step: int | None = Field(default=None, ge=1)
     log_every_n_steps: int = Field(default=100, ge=1)
 

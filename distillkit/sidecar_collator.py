@@ -19,9 +19,17 @@ Windows. A mapped table is reopened in each spawned worker, never pickled as 28 
 of array contents. The OS page cache is shared between those mappings.
 """
 
-    def __init__(self, base_collator, table: GGUFNGramTable, hasher: NGramHasher | None = None):
+    def __init__(self, base_collator, table: GGUFNGramTable, hasher: NGramHasher | None = None,
+                 shuffle_context: int = 0):
         self.base_collator = base_collator
         self.table = table
+        #: The matched control. A nonzero value rolls the token stream by that many
+        #: positions *before* hashing, so every row is a real table row fetched for the
+        #: wrong context: the gather pattern, the hit rate, the value distribution and
+        #: the row norms are all preserved, and only the correspondence to this text is
+        #: gone. Shuffling the retrieved bytes instead would break the IQ4_NL block
+        #: structure and test dequantisation rather than the table.
+        self.shuffle_context = int(shuffle_context)
         self.hasher = hasher if hasher is not None else NGramHasher()
         cfg = self.hasher.config
         if table.spec.head_dim != cfg.head_dim or table.spec.n_rows != self.hasher.padded_vocab_size:
@@ -46,7 +54,8 @@ of array contents. The OS page cache is shared between those mappings.
             raise ValueError("input_ids are outside the hasher's unigram vocabulary")
         if self.table is None:
             self.table = GGUFNGramTable(**self._table_factory)
-        rows = self.hasher.row_indices(ids)
+        rows = self.hasher.row_indices(
+            ids.roll(self.shuffle_context, dims=-1) if self.shuffle_context else ids)
         raw = np.ascontiguousarray(self.table.gather_raw(rows))
         if raw.dtype != np.uint8:
             raise ValueError("table must return raw uint8 IQ4_NL rows")
