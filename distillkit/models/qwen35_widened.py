@@ -23,12 +23,16 @@ from distillkit.models.qwen35_sidecar import (
 from distillkit.widened_residual import (
     WidenedResidual, collapse_residual, offload_stream_boundaries,
 )
+from distillkit.hyper_connection import HyperConnection
 
 
 class _WidenedWeightInit(_SidecarWeightInit):
     @torch.no_grad()
     def _init_weights(self, module):
         super()._init_weights(module)
+        if isinstance(module, HyperConnection):
+            init.zeros_(module.branch_gain_delta)
+            init.constant_(module.blend, module.initial_blend)
         if isinstance(module, WidenedResidual):
             # HF marks loaded tensors individually; its init helpers preserve them
             # even when a sibling tensor is absent from a partial checkpoint.
@@ -45,8 +49,18 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
         options = dict(hidden_size=config.hidden_size,
                        num_branches=config.residual_stream_num_branches,
                        lowrank=config.residual_stream_lowrank, layer_idx=layer_idx)
-        self.attn_residual = WidenedResidual(**options)
-        self.mlp_residual = WidenedResidual(**options)
+        routing = getattr(config, "residual_stream_routing", "widened")
+        if routing not in ("widened", "flash_next"):
+            raise ValueError(f"Unknown residual stream routing: {routing}")
+        route = WidenedResidual
+        if routing == "flash_next":
+            route = HyperConnection
+            options.update(blend=getattr(config, "residual_stream_blend", 0.0),
+                           norm_eps=config.rms_norm_eps,
+                           learnable_blend=getattr(
+                               config, "residual_stream_learnable_blend", False))
+        self.attn_residual = route(**options)
+        self.mlp_residual = route(**options)
         self.sidecar = (_build_sidecar(config) if config.residual_stream_sidecar
                         and layer_idx == config.sidecar_layer_index else None)
 

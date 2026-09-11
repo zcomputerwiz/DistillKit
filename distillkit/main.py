@@ -263,8 +263,10 @@ def load_student_model(
         if residual_stream is None:
             raise ValueError("Widened checkpoint requires its matching residual_stream run configuration")
         expected = (text_config.residual_stream_num_branches, text_config.residual_stream_lowrank,
-                    getattr(text_config, "residual_stream_sidecar", False))
-        requested = (residual_stream.num_branches, residual_stream.lowrank, config.sidecar is not None)
+                    getattr(text_config, "residual_stream_sidecar", False),
+                    getattr(text_config, "residual_stream_routing", "widened"))
+        requested = (residual_stream.num_branches, residual_stream.lowrank, config.sidecar is not None,
+                     residual_stream.routing)
         if expected != requested:
             raise ValueError(f"Widened checkpoint architecture {expected} differs from requested {requested}")
         if config.sidecar is not None and (
@@ -290,6 +292,9 @@ def load_student_model(
             text_config.residual_stream_num_branches = residual_stream.num_branches
             text_config.residual_stream_lowrank = residual_stream.lowrank
             text_config.residual_stream_sidecar = config.sidecar is not None
+            text_config.residual_stream_routing = residual_stream.routing
+            text_config.residual_stream_blend = residual_stream.blend
+            text_config.residual_stream_learnable_blend = residual_stream.learnable_blend
         extra_kwargs["config"] = text_config
     model = auto_cls.from_pretrained(
         config.train_model,
@@ -577,6 +582,12 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
     # defragment; this belongs to every run, not just the ones with an optimizer
     # section. See ReleaseEvalCacheCallback.
     callbacks = [ReleaseEvalCacheCallback()]
+    if config.residual_stream and config.residual_stream.routing == "flash_next":
+        from distillkit.hyper_connection import HyperConnectionWarmupCallback
+        stream = config.residual_stream
+        if stream.blend_warmup_steps:
+            callbacks.append(HyperConnectionWarmupCallback(
+                stream.blend, stream.blend_target, stream.blend_warmup_steps))
     if config.optimizer:
         from distillkit.optimizers import (
             validate_optimizer_backend, freeze_backbone_for_stage1,

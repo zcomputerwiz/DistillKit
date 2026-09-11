@@ -63,7 +63,7 @@ Blend is a scheduled FP32 buffer, not an AdamW parameter. Keeping it at zero
 deliberately makes the donor inert; use the warmup callback to activate it.
 """
     def __init__(self, hidden_size, num_branches=4, lowrank=320, layer_idx=0,
-                 blend=0.0, norm_eps=1e-6):
+                 blend=0.0, norm_eps=1e-6, learnable_blend=False):
         super().__init__()
         if min(hidden_size, num_branches, lowrank) < 1 or norm_eps <= 0:
             raise ValueError("routing dimensions and norm_eps must be positive")
@@ -71,7 +71,18 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.read_index = layer_idx % num_branches
         self.norm_eps = norm_eps
         self.initial_blend = float(blend)
-        self.register_buffer("blend", torch.tensor(float(blend), dtype=torch.float32))
+        self.learnable_blend = bool(learnable_blend)
+        # fp32 either way. bfloat16 spacing at 0.10 is 2.44e-4 against an AdamW step of
+        # roughly `lr`, so a bf16 blend at a useful initialisation is bit-frozen exactly
+        # the way `sharpness` was; see ple_gated_sidecar.py and PROGRESS.md 2026-09-10.
+        value = torch.tensor(float(blend), dtype=torch.float32)
+        if self.learnable_blend:
+            # A learned blend stays a device tensor and stays in the graph, so the CPU
+            # pin and the constant-folded endpoints in `read` are both off for it. The
+            # state_dict key is the same either way, so checkpoints cross between modes.
+            self.blend = nn.Parameter(value)
+        else:
+            self.register_buffer("blend", value)
         self.set_blend(blend)
         # Extraction stores GGUF norm scale minus one, independently of student.
         self.branch_gain_delta = nn.Parameter(torch.zeros(num_branches, hidden_size))
@@ -82,14 +93,16 @@ deliberately makes the donor inert; use the warmup callback to activate it.
     def _apply(self, fn, recurse=True):
         blend = self.blend
         result = super()._apply(fn, recurse)
-        # fp32 so a scheduled 0.015 survives a bf16 cast, and on the CPU because
-        # `read` consumes it as a Python scalar and nothing else ever does. A CUDA
-        # scalar here costs a device synchronisation on every one of this model's 64
-        # sublayers -- 2.35 ms per forward, doubled by gradient checkpointing's
-        # recompute -- to fetch a number the CPU itself wrote. Keeping it host-side
-        # removes the stall without a shadow copy that could drift from the buffer
-        # on a load path that does not go through `set_blend`.
-        self.blend = blend.to(device="cpu", dtype=torch.float32)
+        # fp32 always. A *scheduled* blend also goes to the CPU, because `read` consumes
+        # it as a Python scalar and nothing else ever does, and a CUDA scalar there
+        # costs a device synchronisation on each of this model's 64 sublayers -- 2.35 ms
+        # per forward, doubled by gradient checkpointing's recompute -- to fetch a
+        # number the CPU itself wrote. A *learned* blend has to sit where the arithmetic
+        # is, so it follows the module like any other parameter.
+        if self.learnable_blend:
+            self.blend.data = self.blend.data.to(dtype=torch.float32)
+        else:
+            self.blend = blend.to(device="cpu", dtype=torch.float32)
         return result
 
     @torch.no_grad()
@@ -100,6 +113,8 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.blend.fill_(value)
 
     def read(self, states, norm):
+        if self.learnable_blend:
+            return self._read_learned(states, norm)
         alpha = float(self.blend)
         if alpha == 0:
             # Skip donor arithmetic entirely: even poisoned donor weights cannot
@@ -120,6 +135,39 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         original = norm(states[..., self.read_index, :])
         return (original + alpha * (donor - original)).contiguous(), 1 + alpha * (weights - 1)
 
+    def _donor(self, states, norm):
+        """Donor read, donor write weights, and the student's own block input."""
+        normalized = torch.stack([
+            _BranchNorm.apply(branch, 1.0 + gain.to(torch.promote_types(
+                gain.dtype, torch.float32)), self.norm_eps)
+            for branch, gain in zip(states.unbind(-2), self.branch_gain_delta)
+        ], dim=-2)
+        flattened = normalized.flatten(-2)
+        logits = self.W_up(F.silu(self.W_down(flattened) / self.num_branches))
+        donor = _GatedMean.apply(normalized, logits.unflatten(
+            -1, (self.num_branches, self.hidden_size)))
+        weights = 2 * torch.sigmoid(self.W_write(flattened) / self.num_branches)
+        return donor, weights, norm(states[..., self.read_index, :])
+
+    def _read_learned(self, states, norm):
+        """The same interpolation with the blend kept in the graph.
+
+        No constant-folded endpoint here. Skipping the donor at blend == 0 would skip
+        its gradient too, and the parameter could never leave zero -- the same
+        zero-multiplier trap that made the first borrowed-routing transfer inert, in a
+        form that would read as "the blend decided it wanted nothing".
+
+        The derivative is well behaved at both ends: d(x_a)/d(alpha) is
+        `donor - student`, which does not vanish at alpha = 0, so the parameter can
+        move off any starting value. It is deliberately unbounded -- where it settles
+        is the measurement, and clamping to [0, 1] would pin it at a boundary with zero
+        gradient and no way back.
+        """
+        donor, weights, original = self._donor(states, norm)
+        alpha = self.blend.to(donor.dtype)
+        return ((original + alpha * (donor - original)).contiguous(),
+                1 + alpha * (weights - 1))
+
     def write(self, states, output, weights):
         if weights is None:
             return states + output.unsqueeze(-2)
@@ -131,6 +179,7 @@ deliberately makes the donor inert; use the warmup callback to activate it.
     @torch.no_grad()
     def gate_report(self, prefix="residual_stream"):
         return {f"{prefix}/blend": float(self.blend),
+                f"{prefix}/blend_learnable": float(self.learnable_blend),
                 f"{prefix}/donor_norm_delta": self.branch_gain_delta.float().norm().item()}
 
 

@@ -181,13 +181,19 @@ class ResidualStreamConfig(BaseModel):
     """Persistent residual widening; omit this section for the original model."""
     num_branches: int = Field(default=2, ge=1)
     lowrank: int = Field(default=64, ge=1)
+    routing: Literal["widened", "flash_next"] = Field(
+        default="widened", description="Legacy identity-anchored routing or donor Gated Residual arithmetic.")
+    blend: float = Field(default=0.0, ge=0, le=1, allow_inf_nan=False,
+                         description="Flash-Next interpolation: 0 is exact student, 1 is donor routing.")
+    blend_target: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    blend_warmup_steps: int = Field(default=0, ge=0,
+        description="Optimizer steps to interpolate blend to blend_target; 0 keeps blend fixed.")
     init_from: str | None = Field(
         default=None,
         description=(
             "Directory of extracted Flash-Next hyper-connection routing "
-            "(scratch/extract_flashnext_hc.py). WidenedResidual is a transcription of "
-            "that routing and has always trained from an identity initialisation while "
-            "the trained weights sat unused in the GGUF. Requires num_branches and "
+            "(scratch/extract_flashnext_hc.py). Select routing=flash_next for donor "
+            "semantics; widened preserves the historical borrowed initialization. Requires num_branches and "
             "lowrank to match the extraction -- 4 and 320 -- because every tensor is "
             "sized 4*2560; a mismatch is refused rather than reshaped. Initialisation "
             "only: the routing trains from there like any other parameter."
@@ -204,6 +210,42 @@ class ResidualStreamConfig(BaseModel):
             "the stack demonstrably does not transfer. This is an experiment handle."
         ),
     )
+
+    learnable_blend: bool = Field(
+        default=False,
+        description=(
+            "Train the blend instead of scheduling it, one scalar per sublayer, so the "
+            "run reports where each of them wants to sit rather than being told. It is "
+            "unbounded on purpose -- where it settles is the measurement. Mutually "
+            "exclusive with blend_warmup_steps, which would overwrite it every step. "
+            "Needs blend_lr: the shared 1e-4 moves a parameter about lr per step, so 72 "
+            "steps is a budget of 0.0072 and a blend starting at 0.10 could reach 0.107."
+        ),
+    )
+    blend_lr: float | None = Field(
+        default=None, gt=0,
+        description=(
+            "Learning rate for the blend scalars alone, leaving everything else on its "
+            "own rate. Reaching 0.25 from 0.10 inside 72 steps needs about 2e-3, and "
+            "0.50 needs about 5.6e-3."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_blend_routing(self):
+        if self.routing != "flash_next" and (
+            self.blend != 0 or self.blend_target != 1 or self.blend_warmup_steps
+            or self.learnable_blend or self.blend_lr is not None
+        ):
+            raise ValueError("blend settings require routing=flash_next")
+        if self.learnable_blend and self.blend_warmup_steps:
+            raise ValueError(
+                "learnable_blend and blend_warmup_steps both write the blend; the "
+                "warmup callback would overwrite the learned value after every step"
+            )
+        if self.blend_lr is not None and not self.learnable_blend:
+            raise ValueError("blend_lr only applies with learnable_blend")
+        return self
 
 
 class OptimizerConfig(BaseModel):

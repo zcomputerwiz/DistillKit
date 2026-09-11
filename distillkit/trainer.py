@@ -410,9 +410,15 @@ class HybridDistillationTrainer(DistillationTrainer):
             )
         else:
             self.optimizer = super().create_optimizer()
+        unwrapped = self.accelerator.unwrap_model(self.model)
         _apply_sidecar_lr(
-            self.optimizer, self.accelerator.unwrap_model(self.model),
+            self.optimizer, unwrapped,
             getattr(self.config.optimizer, "sidecar_lr", None),
+        )
+        # After the sidecar split, so the blend leaves whichever group that put it in.
+        _apply_blend_lr(
+            self.optimizer, unwrapped,
+            getattr(getattr(self.config, "residual_stream", None), "blend_lr", None),
         )
         return self.optimizer
 
@@ -452,4 +458,37 @@ def _apply_sidecar_lr(optimizer, model, sidecar_lr):
         optimizer.add_param_group(
             {"params": params, "lr": sidecar_lr, "weight_decay": weight_decay}
         )
+    return optimizer
+
+
+def _apply_blend_lr(optimizer, model, blend_lr):
+    """Give the learned blend scalars their own rate, after every other regrouping.
+
+    AdamW moves a parameter by roughly ``lr`` per step whatever its gradient, so at the
+    run's 1e-4 a 72-step budget is 0.0072: a blend initialised at 0.10 could reach 0.107
+    and the run would report that it "wants" to stay put. That is the same arithmetic
+    that made a learning-rate sweep the wrong knob for the sidecar gate -- PROGRESS.md,
+    2026-09-10 -- and it is why this is a separate group rather than a hyperparameter
+    inherited from the backbone.
+
+    Weight decay is forced to zero. These are interpolation coefficients, not weights,
+    and decaying them would pull the blend toward "no donor" for reasons unrelated to
+    the objective -- which is precisely the question being asked.
+    """
+    if blend_lr is None:
+        return optimizer
+    from distillkit.hyper_connection import HyperConnection
+
+    blends = {id(module.blend) for module in model.modules()
+              if isinstance(module, HyperConnection) and module.learnable_blend}
+    if not blends:
+        raise ValueError("blend_lr was set but no learnable blend parameter exists")
+    moved = []
+    for group in optimizer.param_groups:
+        kept = []
+        for parameter in group["params"]:
+            (moved if id(parameter) in blends else kept).append(parameter)
+        group["params"] = kept
+    if moved:
+        optimizer.add_param_group({"params": moved, "lr": blend_lr, "weight_decay": 0.0})
     return optimizer
