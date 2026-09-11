@@ -21,11 +21,15 @@ BASELINE = "student-hf"
 CONTROL = "widened-ple-stage1-1m"
 # Every arm is scored against the transcription. Add a name here once its reply bundle
 # exists; the file name follows from it. An arm that is not there yet is skipped.
+# The fixed arms, plus every depth-sweep arm that has been evaluated. Discovering the
+# sweep rather than listing it means a new layer needs no edit here, and an arm whose
+# evaluation died leaves no file and so is simply absent.
 ARMS = (BASELINE, CONTROL,
         "widened-plegated-stage1-1m",
-        "widened-plegated-fp32-stage1-1m",
-        "widened-plegated-L16-stage1-1m",
-        "widened-plegated-L28-stage1-1m")
+        "widened-plegated-fp32-stage1-1m") + tuple(sorted(
+            (path.name[len("reply-"):-len(".json")]
+             for path in BASE.glob("reply-widened-plegated-L*-stage1-1m.json")),
+            key=lambda name: int(name.split("-L")[1].split("-")[0])))
 
 
 def load(path, role="assistant"):

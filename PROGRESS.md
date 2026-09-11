@@ -1027,6 +1027,44 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## The depth curve has a basin, and it bottoms at layer 24 (2026-09-10)
+
+Eight arms differing only in `sidecar.layer_index`, everything else matched. The
+sidecar's own cost on assistant tokens, `enabled - bypassed`, 384 documents and 156,565
+assistant tokens each:
+
+| injection layer | the sidecar's own cost |
+| ---: | ---: |
+| 1 | +0.027164 [+0.023385, +0.030855] |
+| 8 | +0.020909 [+0.016918, +0.024673] |
+| 16 | +0.013505 [+0.010156, +0.016654] |
+| 20 | -0.004396 [-0.006644, -0.002191] |
+| **24** | **-0.008860 [-0.010407, -0.007387]** |
+| 26 | -0.007842 [-0.009086, -0.006679] |
+| 28 | -0.006970 [-0.008048, -0.005945] |
+| 30 | -0.006218 [-0.007176, -0.005300] |
+
+**It is not monotone.** The three-point version of this table -- 1, 16, 28 -- looked like
+"deeper is better" and it is not: the curve crosses zero between 16 and 20, bottoms at
+**layer 24**, and then walks back toward zero through 26, 28 and 30. L24 against L28 is
+-0.008860 against -0.006970 with non-overlapping intervals, so the optimum is real.
+
+The rise after 24 is the shape you would expect from running out of stack: what is
+injected has to be integrated by the layers above it, and past 24 there are not enough
+of them left. The basin is broad -- every layer from 20 to 30 has the sidecar helping --
+but 24 is the best point and that is where the borrowed-routing work should be built.
+
+`eval_loss` ordered these backwards at every single depth, exactly as it did for the
+first three. Layer 8 finished at 0.7321 against layer 1's 0.6865 while being 0.0063
+nats *better* on assistant NLL.
+
+### The layer-index correspondence is not proportional
+
+Flash-Next puts its PLE at its own block 1, near the bottom of 48 layers. This student
+wants it at 24 of 32, three quarters of the way up. So "the same place in the stack" is
+not what transfers, and a depth-proportional index map is an assumption to test rather
+than a fact to build on.
+
 ## Depth was the answer, and eval_loss said the opposite (2026-09-10)
 
 Every arm this project has trained has made the model *worse* at generating when its
