@@ -1027,6 +1027,62 @@ matrix: exactly as many parameters as `key_proj`, so there is nothing left to bo
 **What survives the download is the architecture, not the numbers.** Four gates over a
 shared value is worth building; the `hc_count = 4` weights are not worth loading.
 
+## Borrowing Flash-Next's routing: two failures and what they localise (2026-09-11)
+
+``WidenedResidual`` was written as a transcription of Flash-Next's ``hc_attn_*`` /
+``hc_ffn_*`` routing, and ``scratch/extract_flashnext_hc.py`` now pulls all 48 blocks
+out of the GGUF into our parameter layout. The extraction is validated against an
+independent HF copy of ``blk.1.ple`` on both conventions -- layout (relative error
+0.0054, Q8_0 noise) and scale-versus-deviation (``GGUF - 1 == HF`` exactly) -- so what
+follows is not an extraction bug.
+
+Loading those trained tensors as an initialisation destroys the model. Assistant-only
+NLL against the pre-retrofit student, 384 documents:
+
+| | enabled | bypassed | enabled - bypassed |
+| --- | ---: | ---: | ---: |
+| stacked write | +10.0818 | +10.1035 | -0.021723 |
+| ``write_offset = -1`` | **+9.4300** | **+9.4834** | **-0.053430** |
+
+### The transcription matches in shape, not in function
+
+``_combine`` computes
+
+```text
+correction = read_offset + lambda_read * sigmoid(gate_logits)
+value      = normalized[read_index] + (correction * normalized).sum(-2)
+weights    = (1 + write_offset) + lambda_write * sigmoid(write_logits)
+```
+
+**The write defect, found and fixed, worth 0.65 nats.** ``lambda_write = 1`` with
+``write_offset = 0`` does not give the donor's write; it gives the donor's write
+*stacked on the identity write*, a per-sublayer multiplier in (1, 2) averaging about
+1.5, 64 sublayers deep. RMSNorm stops it overflowing, so instead every layer's
+contribution becomes negligible against the accumulated carry. ``write_offset = -1``
+makes the write ``sigmoid(write_logits)`` in (0, 1), and recovered 0.65 nats of ten.
+
+**The read defect, which this module cannot express.** ``value`` always reads branch
+``read_index`` at full weight and the gate only *adds* to it, so with four branches and
+corrections in (0, 1) it is roughly ``branch[k] + 2*(mean branch)``. Flash-Next's read
+is a weighted combination with no unconditional anchor. The borrowed ``W_down``/
+``W_up`` produce exactly that read gate, so they are being used as an addition to an
+ungated read rather than as the read. No value of ``read_offset`` repairs it, because
+the anchor term is not gated at all. That the write fix moved only 6% of the gap is
+consistent with this being the larger defect.
+
+**Neither lambda is Flash-Next's.** Its ``hc_*`` tensors *are* the routing; ours is an
+identity-anchored variant with the donor's routing as a learned deviation. The two are
+not the same function, and the shapes matching hid that for a full day.
+
+### The headline metric inverts on a broken backbone
+
+Both ruined runs scored *better* on ``enabled - bypassed`` than any working arm, and
+the worse of the two scored better than the other: -0.021723 at +10.08 nats,
+-0.053430 at +9.43. The subtraction cancels a destroyed backbone. Every depth-sweep
+conclusion still stands, because those arms all had intact backbones -- bypassed within
+-0.0017 to -0.0025 of the student -- but the sidecar's own cost is only meaningful
+beside the arm's absolute NLL, and this document has been quoting it alone.
+
 ## The depth curve has a basin, and it bottoms at layer 24 (2026-09-10)
 
 Eight arms differing only in `sidecar.layer_index`, everything else matched. The
