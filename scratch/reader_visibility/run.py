@@ -90,7 +90,14 @@ CONFIG_FILE = "examples/qwen35_widened_plegated_stage1_1m.yml"
 
 #: Each arm names one key of ``reader_representations``. ``query`` is the control that
 #: makes the others mean something: the reader has to beat the stream it reads.
-ARMS = ("raw_table", "query", "ungated_value", "gated_value", "convolution", "reader_update")
+ARMS = ("raw_table", "query", "ungated_value", "upstream_value", "gated_value",
+        "convolution", "reader_update")
+
+#: Flash-Next's own trained value projection, from the layer this sidecar transcribes.
+#: Its hidden size is 2560, the same as the student's, so the map from dequantized
+#: table rows into *its* residual basis applies without reshaping. Whether that basis
+#: is any use to a different model is the question; this is the arm that asks it.
+UPSTREAM_LAYER = Path("../flash-next-ple/ple_layer.pt")
 #: Arms that also get a donor-shuffled twin. The table is the source and the update is
 #: the sink; the stages between them inherit whatever those two establish.
 SHUFFLED = ("raw_table", "reader_update")
@@ -127,6 +134,45 @@ def load_model(dtype):
         model.float()
     model.requires_grad_(False).eval()
     return model, info
+
+
+@torch.no_grad()
+def depth_profile(model, batch, layer_index, injected, positions):
+    """Where in *this* model's stack does the borrowed vector actually belong?
+
+    Flash-Next injects its PLE at its own layer 2 and the rest of its stack is trained
+    around that. A different model's layer 1 is not the same place: the same depth
+    index need not be the same representation. So this reports, at every layer, the
+    RMS of the collapsed residual stream and the mean absolute cosine between the
+    stream and the vector being injected.
+
+    Neither is proof of a correspondence -- cosine to a residual stream is a weak
+    signal and a matching RMS only says the scales are compatible -- but a vector that
+    is orders of magnitude off the stream's scale, or orthogonal to it everywhere, is
+    not going to be absorbed wherever it is put, and that is worth knowing before
+    training anything.
+    """
+    from distillkit.models.qwen35_widened import collapse_residual
+
+    indices = list(range(model.config.num_hidden_layers + 1))
+    with AnchorTap(model, indices) as tap:
+        model(**batch, use_cache=False, logits_to_keep=1, return_dict=True)
+    states = tap.states()
+    reference = injected[0, positions].float()
+    reference = reference / reference.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+    rows = []
+    for index in indices:
+        state = states[index]
+        if state.ndim == 4:
+            state = collapse_residual(state)
+        stream = state[0, positions].float().to(reference.device)
+        rows.append({
+            "layer": index,
+            "stream_rms": float(stream.pow(2).mean().sqrt()),
+            "cosine": float((stream / stream.norm(dim=-1, keepdim=True).clamp_min(1e-6)
+                             * reference).sum(-1).abs().mean()),
+        })
+    return rows
 
 
 @torch.no_grad()
@@ -252,6 +298,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docs", type=int, default=61,
                         help="documents to draw from the eval pool, split by a hash of the id")
+    parser.add_argument("--depth-profile", action="store_true",
+                        help="stream RMS and |cosine| to the injected vector, per layer")
     parser.add_argument("--identity-readout", action="store_true",
                         help="also ask each representation to name the token at its own position")
     parser.add_argument("--dtype", choices=["bf16", "fp32"], default="bf16")
@@ -287,6 +335,13 @@ def main():
     layer_index = model.config.sidecar_layer_index
     anchor = model.config.num_hidden_layers
     reader = model.model.layers[layer_index].sidecar.ple
+    upstream = None
+    if UPSTREAM_LAYER.exists():
+        upstream = torch.load(UPSTREAM_LAYER, map_location="cpu",
+                              weights_only=False)["value_proj.weight"]
+        if upstream.shape != (model.config.hidden_size, reader.feature_dim):
+            raise ValueError(f"upstream value_proj is {tuple(upstream.shape)}, expected "
+                             f"{(model.config.hidden_size, reader.feature_dim)}")
     tokenizer = AutoTokenizer.from_pretrained("../student-hf")
     source = OfflineHiddenStateSignalSource("../teacher-cache-1m")
     raw_config = yaml.safe_load(Path(CONFIG_FILE).read_text(encoding="utf-8"))
@@ -313,7 +368,7 @@ def main():
          arms=ARMS, shuffled=SHUFFLED, torch_version=torch.__version__)
 
     # One forward per document, then everything else is arithmetic on what it captured.
-    captured = {}
+    captured, profiles = {}, []
     for split, rows in splits.items():
         for row in rows:
             ids = texts[row["id"]]
@@ -328,7 +383,8 @@ def main():
                      reason="no assistant predictor positions")
                 continue
             held = capture(model, batch, layer_index, anchor)
-            parts = reader_representations(reader, held["query"], held["features"])
+            parts = reader_representations(reader, held["query"], held["features"],
+                                           upstream_value_weight=upstream)
             captured[row["id"]] = {
                 "split": split, "length": len(ids), "assistant": total,
                 "positions": positions, "targets": targets,
@@ -339,6 +395,15 @@ def main():
                 "alignment": digest([row["id"], targets.tolist()]),
                 **{arm: flatten(parts[arm], positions) for arm in ARMS},
             }
+            if arguments.depth_profile and split == "test" and len(profiles) < 8:
+                for which in ("upstream_value", "ungated_value"):
+                    if which not in parts:
+                        continue
+                    value = parts[which]
+                    value = value if value.ndim == 3 else value.mean(-2)
+                    profiles.append({"doc_id": row["id"], "representation": which,
+                                     "layers": depth_profile(model, batch, layer_index,
+                                                             value, positions)})
             emit("captured", doc_id=row["id"], split=split, length=len(ids),
                  assistant_positions=int(len(positions)), assistant_total=int(total),
                  peak_memory=[torch.cuda.max_memory_allocated(i) for i in range(2)])
@@ -437,7 +502,7 @@ def main():
         # NLL and top-1 against the uniform-over-vocabulary floor, with the shuffled
         # arm as the control that says whether it is reading this document at all.
         report["identity_readout"] = {}
-        for arm in ("raw_table", "ungated_value", "reader_update"):
+        for arm in ("raw_table", "ungated_value", "upstream_value", "reader_update"):
             for control in ("real", "shuffled"):
                 donors = None
                 if control == "shuffled":
@@ -465,6 +530,24 @@ def main():
                          "tokens": len(values), "input_dim": int(fit_rows[1].shape[-1])}
                 report["identity_readout"][label] = entry
                 emit("identity", arm=label, **entry)
+
+    if profiles:
+        # Averaged over documents, per representation: one row per layer.
+        summary = {}
+        for entry in profiles:
+            for row in entry["layers"]:
+                key = (entry["representation"], row["layer"])
+                bucket = summary.setdefault(key, {"stream_rms": [], "cosine": []})
+                bucket["stream_rms"].append(row["stream_rms"])
+                bucket["cosine"].append(row["cosine"])
+        report["depth_profile"] = [
+            {"representation": name, "layer": layer,
+             "stream_rms": float(np.mean(values["stream_rms"])),
+             "cosine": float(np.mean(values["cosine"]))}
+            for (name, layer), values in sorted(summary.items())]
+        report["depth_profile_documents"] = len({e["doc_id"] for e in profiles})
+        for row in report["depth_profile"]:
+            emit("depth", **row)
 
     write_json(output, report)
     emit("complete", output=str(output))
