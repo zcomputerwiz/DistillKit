@@ -297,6 +297,14 @@ def load_student_model(
     )
     LOG.info("Loaded model.")
 
+    if residual_stream is not None and residual_stream.init_from:
+        # Before sharding and before the optimizer: this writes parameters in place,
+        # and a copy after either would be copying into the wrong object.
+        from distillkit.borrowed_routing import initialise_widened_residual
+
+        LOG.info("Borrowed routing: %s", initialise_widened_residual(
+            model, residual_stream.init_from, residual_stream.init_layer_map))
+
     model_vocab_size = model.get_input_embeddings().weight.shape[0]
     required_vocab_size = max(tokenizer_vocab_size, signal_vocab_size or 0)
     if config.sidecar is not None or residual_stream is not None:

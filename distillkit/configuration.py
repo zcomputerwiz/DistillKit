@@ -181,6 +181,29 @@ class ResidualStreamConfig(BaseModel):
     """Persistent residual widening; omit this section for the original model."""
     num_branches: int = Field(default=2, ge=1)
     lowrank: int = Field(default=64, ge=1)
+    init_from: str | None = Field(
+        default=None,
+        description=(
+            "Directory of extracted Flash-Next hyper-connection routing "
+            "(scratch/extract_flashnext_hc.py). WidenedResidual is a transcription of "
+            "that routing and has always trained from an identity initialisation while "
+            "the trained weights sat unused in the GGUF. Requires num_branches and "
+            "lowrank to match the extraction -- 4 and 320 -- because every tensor is "
+            "sized 4*2560; a mismatch is refused rather than reshaped. Initialisation "
+            "only: the routing trains from there like any other parameter."
+        ),
+    )
+    init_layer_map: Literal["proportional", "identity"] = Field(
+        default="proportional",
+        description=(
+            "How this model's layer i picks a donor block. Flash-Next has 48 layers to "
+            "this student's 32, so 'proportional' takes block round(i * donors / ours) "
+            "and 'identity' takes block i, using only the bottom 32. Neither is known "
+            "to be right: the depth sweep found this student wants the sidecar at layer "
+            "24 of 32 while Flash-Next puts its PLE at block 1 of 48, so position in "
+            "the stack demonstrably does not transfer. This is an experiment handle."
+        ),
+    )
 
 
 class OptimizerConfig(BaseModel):

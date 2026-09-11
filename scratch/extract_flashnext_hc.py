@@ -109,20 +109,45 @@ def verify_against_hf(reader, reference=Path("../flash-next-ple/ple_layer.pt")):
         print("  scale ok:  norm_%-5s GGUF - 1 == HF exactly" % suffix)
 
 
-def find_shard(layer):
-    """Which of the three shards holds this block. Shard 1 carries only metadata."""
+def open_shards():
+    """Both weight-bearing shards, read once. Shard 1 carries only metadata.
+
+    Opening a reader per layer costs a full header scan per layer, which is minutes
+    over 48 blocks and seconds over all of them this way.
+    """
     from gguf import GGUFReader
 
-    for index in (2, 3):
-        reader = GGUFReader(SHARD % index, mode="r")
-        if any(t.name.startswith("blk.%d." % layer) for t in reader.tensors):
-            return reader, index
-    raise KeyError("no shard holds blk.%d" % layer)
+    readers = {index: GGUFReader(SHARD % index, mode="r") for index in (2, 3)}
+    wanted = {"%s_%s" % (prefix, name) for prefix in SUBLAYERS for name in ROUTING}
+    index = {}
+    for shard, reader in readers.items():
+        held: dict[int, set[str]] = {}
+        for tensor in reader.tensors:
+            if tensor.name.startswith("blk."):
+                parts = tensor.name.split(".", 2)
+                held.setdefault(int(parts[1]), set()).add(parts[2])
+        for block, names in held.items():
+            # A block can straddle the shard boundary -- blk.14 has eight tensors in
+            # shard 2 and its whole routing in shard 3 -- so index the shard that
+            # holds the routing rather than the first shard the block appears in.
+            if wanted <= names:
+                index[block] = (reader, shard)
+    return readers, index
+
+
+def find_shard(layer, index=None):
+    """Which of the shards holds this block."""
+    if index is None:
+        index = open_shards()[1]
+    if layer not in index:
+        raise KeyError("no shard holds blk.%d" % layer)
+    return index[layer]
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--layers", type=int, nargs="+", default=[1, 2, 3])
+    parser.add_argument("--layers", nargs="+", default=["all"],
+                        help='block indices, or "all" for every block with routing')
     parser.add_argument("--branches", type=int, default=4)
     parser.add_argument("--hidden", type=int, default=2560)
     parser.add_argument("--output", default="../flash-next-hc")
@@ -136,13 +161,20 @@ def main():
     manifest = {"source": SHARD % 2, "branches": arguments.branches,
                 "hidden": arguments.hidden, "layers": {}}
 
+    readers, shard_index = open_shards()
+    if arguments.layers == ["all"]:
+        arguments.layers = sorted(shard_index)
+    else:
+        arguments.layers = [int(value) for value in arguments.layers]
+    manifest["blocks"] = sorted(shard_index)
+
     if arguments.verify:
         print("checking the extraction conventions against the HF copy of blk.1.ple:")
-        verify_against_hf(find_shard(1)[0])
+        verify_against_hf(find_shard(1, shard_index)[0])
         print()
 
     for layer in arguments.layers:
-        reader, shard = find_shard(layer)
+        reader, shard = find_shard(layer, shard_index)
         found = {t.name.split(".", 2)[2]: t for t in reader.tensors
                  if t.name.startswith("blk.%d." % layer)}
         missing = ["%s_%s" % (prefix, name) for prefix in SUBLAYERS for name in ROUTING
