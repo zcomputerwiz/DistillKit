@@ -59,6 +59,7 @@ import threading
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -120,6 +121,37 @@ def chunked_ce(hidden, head, targets, mask, chunk=256, backward=False, scale=1.0
             del logits
         total = total + loss.detach()
     return total, counted
+
+
+def per_token_ce(hidden, head, targets, mask, chunk=256):
+    """`chunked_ce` without the reduction, plus the target each loss belongs to.
+
+    The aggregate path above is left exactly as it was: it produces the numbers every
+    published capacity figure was computed from, and this runs beside it rather than
+    replacing it. What it adds is the thing the original never persisted -- which token
+    each nat was spent on -- without which the -0.0539 cannot be split into layout and
+    content at all.
+
+    Returns losses and targets in mask order, which is row-major over the batch, so a
+    caller that also tracks row-to-document mapping can attribute every value.
+    """
+    losses, kept = [], []
+    flat_hidden = hidden.reshape(-1, hidden.shape[-1])
+    flat_targets = targets.reshape(-1)
+    flat_mask = mask.reshape(-1)
+    for start in range(0, flat_hidden.shape[0], chunk):
+        stop = min(start + chunk, flat_hidden.shape[0])
+        piece = flat_mask[start:stop]
+        if not piece.any():
+            continue
+        picked = flat_targets[start:stop][piece]
+        logits = head(flat_hidden[start:stop][piece]).float()
+        losses.append(F.cross_entropy(logits, picked, reduction="none").detach().cpu())
+        kept.append(picked.detach().cpu())
+        del logits
+    if not losses:
+        return torch.zeros(0), torch.zeros(0, dtype=torch.long)
+    return torch.cat(losses), torch.cat(kept)
 
 
 class Readout(nn.Module):
@@ -205,6 +237,10 @@ def main():
     parser.add_argument("--seed", type=int, default=7,
                         help="gate direction init and nothing else; the data order is fixed")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--per-token", type=Path,
+                        help="directory to write per-token NLL, target id and document "
+                             "index for the baseline and every arm; this is what lets "
+                             "the result be split into layout and content afterwards")
     args = parser.parse_args()
     timer = threading.Timer(5400, lambda: os._exit(124))
     timer.daemon = True
@@ -287,8 +323,9 @@ def main():
         features = dequant(batch["ngram_raw"]).flatten(-2).to(device)
         return features.roll(1, dims=0) if roll else features
 
-    def evaluate(readout, roll):
+    def evaluate(readout, roll, collect=None):
         total, counted, per_document = 0.0, 0, []
+        document = 0
         for batch, masks in batches(eval_docs, tokenizer, collator, args.batch, args.tokens):
             targets = batch["input_ids"][:, 1:].to(device)
             keep = masks[:, :-1].to(device) & batch["attention_mask"][:, 1:].bool().to(device)
@@ -307,6 +344,17 @@ def main():
                     row_loss, row_count = chunked_ce(state[row:row + 1], head,
                                                      targets[row:row + 1], keep[row:row + 1])
                     per_document.append((float(row_loss), row_count))
+                    if collect is not None:
+                        # Row by row, so the document index is exact rather than inferred
+                        # from a flattened batch.
+                        row_losses, row_targets = per_token_ce(
+                            state[row:row + 1], head, targets[row:row + 1],
+                            keep[row:row + 1])
+                        collect["nll"].append(row_losses.numpy())
+                        collect["target"].append(row_targets.numpy())
+                        collect["document"].append(
+                            np.full(len(row_losses), document + row, dtype=np.int32))
+            document += state.shape[0]
             total += float(loss)
             counted += count
         return total / max(counted, 1), counted, per_document
@@ -314,7 +362,22 @@ def main():
     results = {"train_docs": len(train_docs), "eval_docs": len(eval_docs),
                "tokens": args.tokens, "lr": args.lr, "epochs": args.epochs, "seed": args.seed,
                "inject_layer": args.inject_layer, "combiner": args.combiner}
-    baseline, eval_tokens, baseline_documents = evaluate(None, False)
+    def collector():
+        return None if args.per_token is None else {
+            "nll": [], "target": [], "document": []}
+
+    def persist(name, collected):
+        if collected is None:
+            return
+        args.per_token.mkdir(parents=True, exist_ok=True)
+        packed = {key: np.concatenate(value) if value else np.zeros(0)
+                  for key, value in collected.items()}
+        np.savez(args.per_token / ("%s.npz" % name), **packed)
+        print("  wrote %d per-token values for %s" % (len(packed["nll"]), name))
+
+    baseline_collected = collector()
+    baseline, eval_tokens, baseline_documents = evaluate(None, False, baseline_collected)
+    persist("baseline", baseline_collected)
     results["baseline_nll"] = baseline
     results["eval_assistant_tokens"] = eval_tokens
     print("baseline assistant NLL %.4f over %d tokens" % (baseline, eval_tokens))
@@ -363,7 +426,9 @@ def main():
                           % (name, epoch, index, float(loss) / count, seen,
                              "" if injection_rms is None
                              else "  injection rms %.4f" % injection_rms), flush=True)
-        trained, _, documents = evaluate(readout, roll)
+        arm_collected = collector()
+        trained, _, documents = evaluate(readout, roll, arm_collected)
+        persist(name, arm_collected)
         results[name] = {
             "eval_nll": trained,
             "delta_vs_baseline": trained - baseline,
