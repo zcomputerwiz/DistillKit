@@ -3494,3 +3494,145 @@ final custom-student check remaining as #1 here, gate 4 passes in synthetic form
 Detailed results are in `ngram-reference-check.json` and
 `ngram-table-benchmark.json` alongside this report. Copies are also in the
 repository's `verification/` directory so the next session can find the evidence.
+
+
+---
+
+# The real 2B student, and the native n-gram table on it (2026-09-12)
+
+The native-table implementation landed against a *constructed* 1024-wide config because no
+real small checkpoint existed. One does now, so everything below is measured on it.
+
+## Conversion
+
+```powershell
+.\.venv\Scripts\python.exe -m distillkit.convert_gguf_student `
+  --gguf ..\StudentSourceModel\Qwen3.8-2B-BF16.gguf `
+  --output ..\student-2b-hf `
+  --tokenizer-source ..\student-stock
+```
+
+The existing converter handled it unchanged: GGUF metadata reports `general.architecture
+= qwen35`, which is what it supports. 320 tensors, 3.51 GiB, 15 MTP tensors excluded
+(`blk.24.*`, the `nextn_predict_layers = 1` block the text class does not model, listed
+individually by the converter). `eos_token_id` is the HF family's 248044, not the GGUF's
+own 248046, as the converter intends.
+
+## The reconstructed model
+
+| | |
+| --- | ---: |
+| vocab_size | 248,320 |
+| hidden_size | **2048** |
+| intermediate_size | 6144 |
+| num_hidden_layers | **24** |
+| num_attention_heads / num_key_value_heads | 8 / 2 |
+| head_dim | 256 |
+| full_attention_interval | 4 |
+| layer_types | 18 linear_attention, 6 full_attention |
+| linear key/value heads, head dims | 16 / 16, 128 / 128 |
+| linear_conv_kernel_dim | 4 |
+| tie_word_embeddings | true |
+| mtp_num_hidden_layers | 1 (excluded) |
+| rms_norm_eps | 1e-06 |
+| parameters | 1,881,825,088 (508,559,360 embedding, 1,373,265,728 non-embedding) |
+| checkpoint | 3.51 GiB, one `model.safetensors` |
+
+`Qwen3_5ForCausalLM.from_pretrained` loads it with **no missing, unexpected or mismatched
+keys and no error messages**. Deterministic bf16 forwards over ordinary text, repeated
+tokens, an EOS boundary and a 896-token sequence are all finite and correctly shaped, and
+both the linear-attention and full-attention layers execute. Continuations are coherent
+("The capital of France is Paris, and the weather there is mild." -> " The"), which is
+more than the conversion needed to prove but worth recording.
+
+## Native table geometry at 2048 wide
+
+Derived from the checkpoint, not configured: 16 heads, `2048 / 16 = 128` values per row.
+
+| | |
+| --- | ---: |
+| ngram_vocab_size_base | 131,072 |
+| head_vocab_sizes | 131,101 … 131,297 (16 distinct primes) |
+| total_vocab_size | 2,099,142 |
+| padded_vocab_size | 2,099,200 |
+| row width | 128 |
+| table parameters | **268,697,600** |
+| table weights (bf16) | 0.50 GiB |
+| model with table | 2,158,925,633 parameters |
+
+## The four gates
+
+**Identity.** With `rho = 0` the morphed model is **bitwise equal** to the converted
+checkpoint -- logits and every hidden state, max and mean difference exactly 0.0, on all
+three sequences. The internals are *not* zeroed to achieve it; only the admission scalar
+is.
+
+**Causal.** `rho = 0.5` moves logits by 1.14; wrong-context rows (a 3-position roll before
+hashing) differ from right-context rows by 1.14 and from dormant by 0.70, with every row
+still inside its head's address range. Closing `rho` restores the dormant output exactly.
+
+**Lookup.** `[1, 14, 16]` ids -> `[1, 14, 16, 128]` rows -> `[1, 14, 2048]` features.
+
+**Gradient topology**, the one with a history:
+
+| | rho | table | key_proj | value_proj | conv1d | norms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| at `rho = 0` | 0.0306 | 0 | 0 | 0 | 0 | 0 |
+| after `rho += 1e-3` | 0.0297 | 0.00257 | 0.00039 | 0.00254 | 0.00205 | ~5e-6 |
+| at `rho = 0.5` | 0.0166 | 1.2418 | 0.3283 | 1.2044 | 0.9506 | ~0.004 |
+
+No deadlock. The zero at step 0 is the derivative structure -- the write is multiplied by
+`rho` -- and one ordinary step's movement is enough to give every internal parameter
+gradient. This is the failure mode the two-stream pilot hit by zero-initialising *both*
+factors of a product, and it does not recur here.
+
+## Memory, measured through a real optimizer step
+
+One RTX 3090, backbone frozen (277,100,545 trainable of 2.16B), bf16, gradient
+checkpointing, chunked CE head, CE only. The step is inside the measurement because AdamW
+allocates its moments lazily.
+
+| seq | batch | peak allocated | peak reserved | share of 24 GiB |
+| ---: | ---: | ---: | ---: | ---: |
+| 1024 | 1 | 6.66 GiB | 8.08 GiB | 34% |
+| 2048 | 1 | 8.18 GiB | 10.03 GiB | 42% |
+| **4096** | **1** | **11.22 GiB** | **12.58 GiB** | **52%** |
+| 2048 | 2 | 11.22 GiB | 12.68 GiB | 53% |
+| 4096 | 2 | 17.31 GiB | 21.18 GiB | 88% |
+
+Constant across all of them: 4.02 GiB of weights (0.50 GiB of it the table), 0.52 GiB of
+gradients, 1.03 GiB of optimizer state, of which **1.00 GiB is the table's** -- two bf16
+moments, because this project trains bf16 parameters directly with no fp32 master copy.
+
+**The dense reference table fits comfortably on one card.** No sparse gradients, no
+row-wise optimizer, no custom storage. Nothing needs redesigning.
+
+## Collisions at this geometry
+
+Unchanged from the 1024-wide survey, as expected -- the hash is width-independent -- and
+rerun so the record is self-contained: 2048 documents, 89.66% of the table touched,
+10.93 mean touches per used row (median 4, p99 111, max 8308), 15.7% singletons, 53.0%
+bigram and 71.2% trigram per-head collision against 231,093 distinct bigrams and 439,438
+distinct trigrams. Per-*head*: each n-gram addresses eight of them, so joint confusability
+is far rarer than any single column suggests.
+
+## First run, configured but not launched
+
+`examples/qwen35_2b_native_ple_ce.yml`: seq 4096, batch 1, accumulate 8, frozen backbone,
+`assistant_cross_entropy` alone, chunked head, bf16, gradient checkpointing,
+`max_vram_fraction: 0.9`. 4096x1 is chosen over 2048x2 (same cost, longer context) and
+over 4096x2 (fits once, leaves nothing for evaluation or checkpointing).
+
+One wrinkle to decide before launching: the config schema requires a `teacher` section and
+the trainer fetches the cached signal every step even when no loss consumes it.
+`assistant_cross_entropy` ignores it, so this costs host I/O and nothing else, but the run
+is nominally teacher-attached when the experiment is deliberately teacher-free.
+
+## Reproduction
+
+```powershell
+.\.venv\Scripts\python.exe -u scratch/native_table/validate_2b.py --output scratch/native_table/validate-2b.json
+.\.venv\Scripts\python.exe -u scratch/native_table/verify_2b.py --output scratch/native_table/verify-2b.json
+.\.venv\Scripts\python.exe -u scratch/native_table/smoke.py --output scratch/native_table/memory-2b.json
+.\.venv\Scripts\python.exe -u scratch/native_table/hash_survey.py --base 131072 --embed-dim 2048 --output scratch/native_table/survey-2b.json
+```

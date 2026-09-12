@@ -1,0 +1,132 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "hidden_size": 2048,
+  "geometry": {
+    "ngram_vocab_size_base": 131072,
+    "ngram_heads": 16,
+    "head_dim": 128,
+    "feature_dim": 2048,
+    "total_vocab_size": 2099142,
+    "padded_vocab_size": 2099200,
+    "table_parameters": 268697600,
+    "head_vocab_sizes": [
+      131101,
+      131111,
+      131113,
+      131129,
+      131143,
+      131149,
+      131171,
+      131203,
+      131213,
+      131221,
+      131231,
+      131249,
+      131251,
+      131267,
+      131293,
+      131297
+    ],
+    "head_offsets": [
+      0,
+      131101,
+      262212,
+      393325,
+      524454,
+      655597,
+      786746,
+      917917,
+      1049120,
+      1180333,
+      1311554,
+      1442785,
+      1574034,
+      1705285,
+      1836552,
+      1967845
+    ],
+    "table_bytes_bf16": 537395200
+  },
+  "identity": {
+    "ordinary": {
+      "tokens": 14,
+      "bitwise_equal": true,
+      "max_logit_difference": 0.0,
+      "mean_logit_difference": 0.0,
+      "max_hidden_difference": 0.0
+    },
+    "repeated": {
+      "tokens": 81,
+      "bitwise_equal": true,
+      "max_logit_difference": 0.0,
+      "mean_logit_difference": 0.0,
+      "max_hidden_difference": 0.0
+    },
+    "long": {
+      "tokens": 256,
+      "bitwise_equal": true,
+      "max_logit_difference": 0.0,
+      "mean_logit_difference": 0.0,
+      "max_hidden_difference": 0.0
+    }
+  },
+  "causal": {
+    "rho_open_changes_logits": 1.140625,
+    "wrong_context_differs_from_right": 1.140625,
+    "wrong_context_still_changes_output": 0.69921875,
+    "closing_rho_restores_exactly": true,
+    "rows_in_range": true
+  },
+  "lookup": {
+    "ngram_ids": [
+      1,
+      14,
+      16
+    ],
+    "rows_gathered": [
+      1,
+      14,
+      16,
+      128
+    ],
+    "features": [
+      1,
+      14,
+      2048
+    ],
+    "matches_hidden_size": true
+  },
+  "gradients": {
+    "at_rho_zero": {
+      "rho": 0.0306396484375,
+      "table": 0.0,
+      "key_proj": 0.0,
+      "value_proj": 0.0,
+      "conv1d": 0.0,
+      "norm_query": 0.0,
+      "norm_key": 0.0,
+      "norm_conv": 0.0
+    },
+    "after_rho_moves": {
+      "rho": 0.0296630859375,
+      "table": 0.0025725611485540867,
+      "key_proj": 0.0003919677692465484,
+      "value_proj": 0.0025445008650422096,
+      "conv1d": 0.0020455969497561455,
+      "norm_query": 5.2806176427111495e-06,
+      "norm_key": 5.282835900288774e-06,
+      "norm_conv": 4.0913582779467106e-05
+    },
+    "fully_admitted": {
+      "rho": 0.0166015625,
+      "table": 1.2418183088302612,
+      "key_proj": 0.3282705843448639,
+      "value_proj": 1.2043863534927368,
+      "conv1d": 0.9506486058235168,
+      "norm_query": 0.004068139474838972,
+      "norm_key": 0.004068981856107712,
+      "norm_conv": 0.01860613189637661
+    }
+  },
+  "deadlock": true
+}

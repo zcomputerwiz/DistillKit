@@ -1,0 +1,72 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "device": "cuda:0",
+  "device_capacity_bytes": 25769279488,
+  "backbone_frozen": true,
+  "geometry": {
+    "ngram_vocab_size_base": 131072,
+    "ngram_heads": 16,
+    "head_dim": 128,
+    "feature_dim": 2048,
+    "total_vocab_size": 2099142,
+    "padded_vocab_size": 2099200,
+    "table_parameters": 268697600
+  },
+  "parameters": {
+    "model_total": 2158925633,
+    "trainable": 277100545,
+    "table": 268697600,
+    "ple": 8402944
+  },
+  "configurations": [
+    {
+      "tokens": 2048,
+      "batch": 2,
+      "loss": [
+        10.814940452575684,
+        10.814462661743164
+      ],
+      "weights_bytes": 4317851266,
+      "table_weight_bytes": 537395200,
+      "gradient_bytes": 554201090,
+      "optimizer_state_bytes": 1108402212,
+      "table_optimizer_state_bytes": 1074790404,
+      "peak_allocated_bytes": 12050997760,
+      "peak_reserved_bytes": 13612613632,
+      "status": "ok"
+    },
+    {
+      "tokens": 4096,
+      "batch": 2,
+      "loss": [
+        11.060346603393555,
+        11.061052322387695
+      ],
+      "weights_bytes": 4317851266,
+      "table_weight_bytes": 537395200,
+      "gradient_bytes": 554201090,
+      "optimizer_state_bytes": 1108402212,
+      "table_optimizer_state_bytes": 1074790404,
+      "peak_allocated_bytes": 18591621632,
+      "peak_reserved_bytes": 22743613440,
+      "status": "ok"
+    }
+  ],
+  "reload": {
+    "geometry_matches": true,
+    "rho_matches": true,
+    "tensors_differing": [],
+    "checkpoint_bytes": 4317889266
+  },
+  "metrics": {
+    "native_ple/rho": -0.000392913818359375,
+    "native_ple/table_weight_norm": 325.7521057128906,
+    "native_ple/value_proj_norm": 40.68159484863281,
+    "native_ple/key_proj_norm": 40.717472076416016,
+    "native_ple/conv_norm": 1.813920259475708,
+    "native_ple/gate_mean": 0.4998042583465576,
+    "native_ple/gate_std": 0.2043778896331787,
+    "native_ple/unique_rows_in_batch": 64542.0,
+    "native_ple/row_touch_fraction": 0.030745998475609757
+  }
+}

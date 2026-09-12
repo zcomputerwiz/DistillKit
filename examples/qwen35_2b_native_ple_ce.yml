@@ -1,0 +1,104 @@
+# The first native-table experiment: a student-owned trainable n-gram table, frozen
+# backbone, cross entropy only. NOT YET LAUNCHED -- this file is the configuration the
+# memory smoke test justifies, written so the run is one command when it is approved.
+#
+# Everything the objective forensics ruled out is absent: no teacher KL, no hidden-state
+# cosine, no GR, no QSA. The teacher section is present because the schema requires one
+# and because the cache is what supplies the documents; `assistant_cross_entropy` does not
+# consult its signal.
+#
+# Measured on one RTX 3090 (24 GiB), backbone frozen, bf16, gradient checkpointing,
+# chunked head, through a real optimizer step:
+#
+#   seq 1024 x1   6.66 GiB allocated   8.08 GiB reserved
+#   seq 2048 x1   8.18 GiB             10.03 GiB
+#   seq 4096 x1  11.22 GiB             12.58 GiB      <- this configuration
+#   seq 2048 x2  11.22 GiB             12.68 GiB
+#   seq 4096 x2  17.31 GiB             21.18 GiB      (88% of the card; no eval headroom)
+#
+# 4096 x 1 is chosen over 2048 x 2 -- the same cost, the longer context -- and over
+# 4096 x 2, which fits once but leaves nothing for evaluation or checkpointing on a
+# Windows WDDM card that cannot defragment.
+
+model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce
+project_name: hybridmodel-native-ple
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+sidecar:
+  enabled: true
+  # No table_path: the rows are the model's own parameters, and a native checkpoint
+  # never needs the donor GGUF again.
+  table_mode: native
+  ngram_vocab_size_base: 131072
+  variant: ple
+  layer_index: 1
+  # ple_embed_dim defaults to hidden_size, which is what puts the 16 concatenated rows
+  # at stream width: 2048 / 16 = 128 values per row, 2,099,200 rows, 268,697,600
+  # parameters, 0.50 GiB in bf16.
+
+loss_functions:
+  # Ground-truth CE on assistant tokens, and nothing else. The objective forensics
+  # (scratch/ple_forensics/RESULTS.md) found that both distillation terms invert the
+  # sidecar's effect on content: the sparse KL punishes corrections toward true tokens
+  # outside the teacher's top-64, and the hidden-state cosine recruits an upstream module
+  # as a teacher-coordinate matching actuator. A first proof of the table should not be
+  # fighting either of those.
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # Stage 1 semantics: only the sidecar trains, which here is the table, the reference
+  # PLE block and the admission scalar -- 277.1M parameters against the backbone's 1.88B.
+  freeze_backbone: true
+  unfreeze_at_step: null
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false   # no Windows wheels; training_args.bf16 sets the load dtype
+max_vram_fraction: 0.9       # 12.58 GiB reserved of 24 leaves the headroom this enforces
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: adamw_torch
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  num_train_epochs: 1
+  # The table starts random and has to learn something from scratch, unlike a retrofit
+  # nudging pretrained weights; rho starts at zero and has to travel before anything
+  # inside the block sees gradient at all.
+  learning_rate: 1.0e-4
+  lr_scheduler_type: cosine
+  warmup_steps: 50
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  eval_steps: 100
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 500
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

@@ -1,0 +1,88 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "device": "cuda:0",
+  "device_capacity_bytes": 25769279488,
+  "backbone_frozen": true,
+  "geometry": {
+    "ngram_vocab_size_base": 131072,
+    "ngram_heads": 16,
+    "head_dim": 128,
+    "feature_dim": 2048,
+    "total_vocab_size": 2099142,
+    "padded_vocab_size": 2099200,
+    "table_parameters": 268697600
+  },
+  "parameters": {
+    "model_total": 2158925633,
+    "trainable": 277100545,
+    "table": 268697600,
+    "ple": 8402944
+  },
+  "configurations": [
+    {
+      "tokens": 1024,
+      "batch": 1,
+      "loss": [
+        10.623857498168945,
+        10.623876571655273
+      ],
+      "weights_bytes": 4317851266,
+      "table_weight_bytes": 537395200,
+      "gradient_bytes": 554201090,
+      "optimizer_state_bytes": 1108402212,
+      "table_optimizer_state_bytes": 1074790404,
+      "peak_allocated_bytes": 7148680192,
+      "peak_reserved_bytes": 8673820672,
+      "status": "ok"
+    },
+    {
+      "tokens": 2048,
+      "batch": 1,
+      "loss": [
+        10.813624382019043,
+        10.814349174499512
+      ],
+      "weights_bytes": 4317851266,
+      "table_weight_bytes": 537395200,
+      "gradient_bytes": 554201090,
+      "optimizer_state_bytes": 1108402212,
+      "table_optimizer_state_bytes": 1074790404,
+      "peak_allocated_bytes": 8780694528,
+      "peak_reserved_bytes": 10766778368,
+      "status": "ok"
+    },
+    {
+      "tokens": 4096,
+      "batch": 1,
+      "loss": [
+        11.060925483703613,
+        11.060022354125977
+      ],
+      "weights_bytes": 4317851266,
+      "table_weight_bytes": 537395200,
+      "gradient_bytes": 554201090,
+      "optimizer_state_bytes": 1108402212,
+      "table_optimizer_state_bytes": 1074790404,
+      "peak_allocated_bytes": 12051014656,
+      "peak_reserved_bytes": 13507756032,
+      "status": "ok"
+    }
+  ],
+  "reload": {
+    "geometry_matches": true,
+    "rho_matches": true,
+    "tensors_differing": [],
+    "checkpoint_bytes": 4317889266
+  },
+  "metrics": {
+    "native_ple/rho": -0.000591278076171875,
+    "native_ple/table_weight_norm": 325.75244140625,
+    "native_ple/value_proj_norm": 40.683921813964844,
+    "native_ple/key_proj_norm": 40.7178955078125,
+    "native_ple/conv_norm": 1.8170429468154907,
+    "native_ple/gate_mean": 0.5040092468261719,
+    "native_ple/gate_std": 0.2071523815393448,
+    "native_ple/unique_rows_in_batch": 64542.0,
+    "native_ple/row_touch_fraction": 0.030745998475609757
+  }
+}

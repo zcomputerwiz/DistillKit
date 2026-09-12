@@ -1,0 +1,125 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "config": {
+    "vocab_size": 248320,
+    "hidden_size": 2048,
+    "intermediate_size": 6144,
+    "num_hidden_layers": 24,
+    "num_attention_heads": 8,
+    "num_key_value_heads": 2,
+    "head_dim": 256,
+    "full_attention_interval": 4,
+    "linear_num_key_heads": 16,
+    "linear_num_value_heads": 16,
+    "linear_key_head_dim": 128,
+    "linear_value_head_dim": 128,
+    "linear_conv_kernel_dim": 4,
+    "tie_word_embeddings": true,
+    "mtp_num_hidden_layers": 1,
+    "rms_norm_eps": 9.999999974752427e-07,
+    "layer_types_counts": {
+      "full_attention": 6,
+      "linear_attention": 18
+    },
+    "layer_types": [
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention",
+      "linear_attention",
+      "linear_attention",
+      "linear_attention",
+      "full_attention"
+    ]
+  },
+  "loading": {
+    "error_msgs": []
+  },
+  "parameters": {
+    "total": 1881825088,
+    "embedding": 508559360,
+    "non_embedding": 1373265728,
+    "tied_head": true
+  },
+  "checkpoint_bytes": 3763691960,
+  "smoke": {
+    "ordinary": {
+      "tokens": 14,
+      "logits_shape": [
+        1,
+        14,
+        248320
+      ],
+      "finite": true,
+      "logit_min": -8.9375,
+      "logit_max": 22.75,
+      "final_hidden_rms": 3.498037815093994,
+      "top_token": " The"
+    },
+    "repeated": {
+      "tokens": 64,
+      "logits_shape": [
+        1,
+        64,
+        248320
+      ],
+      "finite": true,
+      "logit_min": -10.4375,
+      "logit_max": 19.375,
+      "final_hidden_rms": 3.092165231704712,
+      "top_token": "hello"
+    },
+    "eos_boundary": {
+      "tokens": 25,
+      "logits_shape": [
+        1,
+        25,
+        248320
+      ],
+      "finite": true,
+      "logit_min": -9.0,
+      "logit_max": 23.875,
+      "final_hidden_rms": 3.448467254638672,
+      "top_token": " warm"
+    },
+    "long_1024": {
+      "tokens": 896,
+      "logits_shape": [
+        1,
+        896,
+        248320
+      ],
+      "finite": true,
+      "logit_min": -10.375,
+      "logit_max": 25.375,
+      "final_hidden_rms": 3.418977737426758,
+      "top_token": "\n\n"
+    }
+  },
+  "paths": {
+    "linear_attention": {
+      "layer": 0,
+      "output_finite": true
+    },
+    "full_attention": {
+      "layer": 3,
+      "output_finite": true
+    }
+  }
+}

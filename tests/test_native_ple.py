@@ -8,6 +8,7 @@ bit-identical to the stock one at load, and the two ablations the first training
 """
 
 import json
+from pathlib import Path
 
 import pytest
 import torch
@@ -304,3 +305,52 @@ def test_donor_mode_is_unchanged_and_refuses_row_ids():
         assert model(input_ids=ids, ngram_raw=raw).logits.shape[-1] == model.config.vocab_size
     with pytest.raises(ValueError, match="does not accept ngram_ids"):
         model(input_ids=ids, ngram_raw=raw, ngram_ids=torch.zeros(2, 8, 2, dtype=torch.long))
+
+
+# --- generalised geometry: nothing is pinned to the first implementation's 1024 --------
+
+
+@pytest.mark.parametrize("hidden_size,expected_row", [(1024, 64), (2048, 128), (2560, 160)])
+def test_row_width_is_derived_from_hidden_size(hidden_size, expected_row):
+    """The first implementation was built against a constructed 1024-wide config.
+
+    The real student is 2048 wide, so the row width has to come from the model rather
+    than from the width that happened to be available when this was written.
+    """
+    config = NGramHashConfig(ngram_vocab_size_base=131072, ple_embed_dim=hidden_size)
+    assert config.ngram_heads == 16
+    assert config.head_dim == expected_row
+    assert config.head_dim * 16 == hidden_size
+
+    model = build(hidden_size=hidden_size, sidecar_ple_embed_dim=hidden_size,
+                  num_attention_heads=8, num_key_value_heads=2,
+                  head_dim=hidden_size // 8, linear_key_head_dim=hidden_size // 8,
+                  linear_value_head_dim=hidden_size // 8)
+    sidecar = sidecar_of(model)
+    assert sidecar.head_dim == expected_row
+    assert sidecar.table.weight.shape[1] == expected_row
+    ids, rows = batch(model)
+    features = sidecar.features(rows, torch.zeros(*ids.shape, hidden_size))
+    assert features.shape[-1] == hidden_size
+
+
+CONVERTED_2B = Path("D:/DeepThought/Projects/HybridModel/student-2b-hf/config.json")
+
+
+@pytest.mark.skipif(not CONVERTED_2B.exists(), reason="converted 2B checkpoint not present")
+def test_the_converted_2b_config_produces_the_expected_native_geometry():
+    """Config-only, so it costs nothing: the real checkpoint's own numbers."""
+    from transformers import AutoConfig
+
+    config = AutoConfig.from_pretrained(CONVERTED_2B.parent, local_files_only=True)
+    config = getattr(config, "text_config", config)
+    config.sidecar_ngram_vocab_size_base = 131072
+    config.sidecar_ple_embed_dim = None
+
+    hash_config = native_hash_config(config)
+    assert config.hidden_size == 2048
+    assert hash_config.ple_embed_dim == 2048
+    assert hash_config.head_dim == 128
+    hasher = NGramHasher(hash_config)
+    assert hasher.padded_vocab_size == 2099200
+    assert hasher.padded_vocab_size * hash_config.head_dim == 268697600
