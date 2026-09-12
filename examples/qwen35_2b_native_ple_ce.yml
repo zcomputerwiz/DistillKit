@@ -43,8 +43,9 @@
 # Point this at the bootstrap checkpoint once rho has been opened (see the note above).
 # The base checkpoint below is an exact morph of the pretrained student -- rho is zero, so
 # the sidecar contributes nothing and nothing inside it learns until rho has moved.
-model: D:/DeepThought/Projects/HybridModel/student-2b-hf
-# model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
+model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
+# The base checkpoint, for a run that wants to open the gate itself:
+# model: D:/DeepThought/Projects/HybridModel/student-2b-hf
 output_path: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce
 project_name: hybridmodel-native-ple
 
@@ -114,12 +115,16 @@ training_args:
   # that matters. A larger effective batch is a question for after a positive signal.
   gradient_accumulation_steps: 1
   # One update = 4096 tokens, so the nominal screens land at:
-  #   100K tokens ~  24 updates      500K tokens ~ 122 updates
-  #   250K tokens ~  61 updates        1M tokens ~ 244 updates
-  # max_steps ends the run at the 1M mark and gives the cosine schedule something
-  # definite to decay over; a `num_train_epochs: 1` cosine would have been shaped by the
-  # size of the cache instead.
-  max_steps: 244
+  #   update  25 = 102,400 tokens      update 125 =   512,000
+  #   update  50 = 204,800              update 250 = 1,024,000
+  #   update  75 = 307,200
+  # 250 rather than the 244 that lands nearest 1M, because the last automatic evaluation
+  # would then be update 225: HF runs no final evaluation merely because training ended,
+  # so an endpoint off the eval cadence silently throws the endpoint away. Six extra
+  # updates is cheaper than a special-case final-eval path. max_steps also gives the
+  # cosine schedule something definite to decay over; a `num_train_epochs: 1` cosine
+  # would have been shaped by the size of the cache instead.
+  max_steps: 250
   # The table starts random and has to learn something from scratch, unlike a retrofit
   # nudging pretrained weights; rho starts at zero and has to travel before anything
   # inside the block sees gradient at all.
