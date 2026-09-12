@@ -1,0 +1,55 @@
+{
+  "summary": {
+    "arm": "A",
+    "objective": "cosine",
+    "lr": 1e-05,
+    "steps": 256,
+    "eval_tokens": 48963,
+    "assistant_nll": 0.7239063382148743,
+    "by_class": {
+      "whitespace": 0.4550842344760895,
+      "control": 2.2545526027679443,
+      "punctuation": 0.24803662300109863,
+      "lexical": 0.8785951137542725
+    },
+    "anchor_report": {
+      "hs_cosine/anchor_4": 0.6642223596572876,
+      "hs_cosine/anchor_32": 0.38524267077445984
+    },
+    "displacement": 3.951935010819914
+  },
+  "trajectory": [
+    {
+      "step": 64,
+      "whitespace": 0.3990879952907562,
+      "control": 1.956594467163086,
+      "punctuation": 0.23437561094760895,
+      "lexical": 0.6374746561050415,
+      "cosine": 0.5579415604006499
+    },
+    {
+      "step": 128,
+      "whitespace": 0.41477876901626587,
+      "control": 2.0543460845947266,
+      "punctuation": 0.23983219265937805,
+      "lexical": 0.7029686570167542,
+      "cosine": 0.5411333094816655
+    },
+    {
+      "step": 192,
+      "whitespace": 0.4288683235645294,
+      "control": 2.241743326187134,
+      "punctuation": 0.2475755512714386,
+      "lexical": 0.7933136224746704,
+      "cosine": 0.541487616719678
+    },
+    {
+      "step": 256,
+      "whitespace": 0.44182685017585754,
+      "control": 2.299828052520752,
+      "punctuation": 0.25961601734161377,
+      "lexical": 0.9372062683105469,
+      "cosine": 0.5328354453667998
+    }
+  ]
+}

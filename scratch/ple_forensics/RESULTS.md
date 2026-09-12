@@ -937,3 +937,138 @@ hypothesis: whether PLE combined with Gated Residual / HyperConnection structure
 how capacity is allocated during **joint pretraining**. Retrofitting a lane onto a
 trained backbone is not that experiment, and the donor's own routing remains uninspectable
 on this hardware.
+
+
+---
+
+# Objective forensics: the sidecar is not the problem, the target is
+
+The two-stream pilot left one question standing. The same sidecar improves content under
+plain CE and harmed it historically under distillation, so the objective is the suspect.
+Four objectives x three architectures, everything else identical -- same window, documents,
+schedule, seed, optimiser, and the project's own loss implementations called directly
+rather than reimplemented.
+
+## The matrix
+
+Held-out lexical (content) NLL, against the untrained 0.53532:
+
+| objective | A | S | M | S - A | M - A | M - S |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| ce | 0.527270 | 0.524850 | 0.527268 | **-0.002420** | -0.000002 | **+0.002418** |
+| kl | 0.576226 | 0.582370 | 0.576346 | **+0.006145** | +0.000120 | **-0.006025** |
+| cosine | 0.878595 | 1.580672 | 0.886196 | **+0.702077** | **+0.007600** | **-0.694476** |
+| combined | 0.576572 | 0.583568 | 0.576820 | **+0.006996** | **+0.000249** | **-0.006748** |
+
+Bold intervals exclude zero, paired bootstrap over documents. Secondary columns, same runs:
+
+| objective | arm | whitespace | control | punctuation |
+| --- | --- | ---: | ---: | ---: |
+| ce | A / S / M | 0.148808 / 0.147961 / 0.148613 | 0.195735 / 0.196936 / 0.193234 | 0.216538 / 0.215827 / 0.216237 |
+| kl | A / S / M | 0.321702 / 0.330082 / 0.321487 | 1.945853 / 1.884670 / 1.949476 | 0.257583 / 0.261481 / 0.257670 |
+| cosine | A / S / M | 0.455084 / 0.751764 / 0.456311 | 2.254553 / 2.370179 / 2.260881 | 0.248037 / 0.644742 / 0.249702 |
+| combined | A / S / M | 0.332671 / 0.345383 / 0.331817 | 1.963189 / 1.913892 / 1.941861 | 0.255805 / 0.259297 / 0.255879 |
+
+**CE is the only row where the sidecar helps.** Both distillation terms flip the sign on
+their own, so this is not an interaction effect. But the magnitudes are not comparable:
+cosine alone costs 0.702 nats, 114 times the KL term's 0.006. In the historical
+combination the harm is +0.006996, within a whisker of KL-alone's +0.006145 -- **the KL
+term accounts for essentially all of the historical damage**, and the cosine term's much
+larger appetite is held in check by the KL term sitting beside it.
+
+Two controls first, because the flip would be worthless if either failed. The CE row was
+re-run here on the *cached* documents with *all-position* supervision, and reproduced the
+pilot's number almost exactly (-0.002420 against -0.002639), so neither the document set
+nor the supervision coverage explains anything. And the anchor projections were
+pre-trained backbone-frozen at the historical stage-1 rate before any arm ran -- anchor
+cosine 1.01 and 1.00 at xavier init, 0.670 and 0.469 after -- so the cosine term is not
+measuring a random 2560 -> 5120 map.
+
+## What the cosine term actually does, and it is not resistance
+
+The pre-registered guess was that the teacher's representation *resists* the positions
+PLE writes hardest. The measurement says the opposite, and the opposite is worse.
+
+Per-position PLE write magnitude against per-position anchor matching error, on the
+cache's own eval split:
+
+| run | anchor 4 pearson | spearman | error, bottom write decile | top write decile |
+| --- | ---: | ---: | ---: | ---: |
+| S under cosine | **-0.639** | -0.669 | 0.522 | **0.139** |
+| M under cosine | -0.024 | -0.174 | 0.639 | 0.664 |
+| S under combined | -0.221 | -0.334 | 0.674 | 0.548 |
+| M under combined | -0.183 | -0.254 | 0.682 | 0.578 |
+
+The correlation is strongly **negative**: the harder the sidecar writes, the *better* the
+student matches the teacher's hidden state. The cosine term is not penalising the
+sidecar, it is **recruiting** it. Anchor 4 is student layer 4 and the sidecar sits at
+layer 1, which makes it the only trainable thing upstream of that anchor -- so hidden-state
+matching found a free knob and turned it:
+
+| objective | anchor-4 cosine loss, A / S / M | S's value_proj norm |
+| --- | --- | ---: |
+| cosine | 0.6642 / **0.3212** / 0.6642 | **3.5572** |
+| combined | 0.6634 / 0.6464 / 0.6634 | 0.9957 |
+
+Cosine-only training halves the anchor error and drives the write 3.6 times harder than CE
+does, and pays 0.70 nats of prediction for it. With the KL term present the same hijack is
+suppressed about twentyfold. **M's anchor-4 figure is bit-identical to A's in both rows** --
+the lane is read at layers 20-28, downstream of the anchor, so it is structurally incapable
+of being recruited. That is the shielding mechanism, demonstrated by construction rather
+than inferred.
+
+## What the KL term does: it penalises the sidecar for being right
+
+`missing_probability_handling: zero` renormalises the cached top-64 and gives every other
+token a target probability of exactly zero. A student that raises probability on a true
+token the teacher never ranked is therefore penalised for it. The sidecar's whole
+contribution is that kind of correction.
+
+S minus A on ground-truth NLL, split by whether the true token is inside the teacher's
+top-k, over 16,801 held-out cached positions (96.0% inside):
+
+| trained under | class | inside the top-k | outside it |
+| --- | --- | --- | --- |
+| ce | lexical | **-0.00552** [-0.01183, -0.00151] | **-0.01441** [-0.03044, -0.00043] |
+| ce | whitespace | **-0.00218** [-0.00408, -0.00054] | +0.00121 spans zero |
+| kl | lexical | **+0.01447** [+0.00848, +0.02107] | **+0.13396** [+0.09433, +0.18522] |
+| kl | whitespace | **+0.02326** [+0.01321, +0.03416] | **+0.41100** [+0.10821, +0.60797] |
+
+The tail is 4.9% of lexical positions. Under CE it carries **11.8%** of the sidecar's
+benefit; under KL it carries **32.2%** of the sidecar's harm. Per position the tail harm
+is 9.3 times the inside harm. The sidecar helps most exactly where the teacher's list runs
+out, and that is precisely where the truncated target punishes it hardest.
+
+It is not the whole story -- S is also worse inside the top-k under KL, and that interval
+excludes zero -- but a 6.6-fold over-representation of the tail in the damage is not a
+detail either.
+
+## Verdict
+
+*The same sidecar helps content under ground-truth CE and hurts it under both distillation
+terms, for two different and separately measured reasons. The hidden-state term recruits
+it as a representation-matching knob: it is the only trainable parameter upstream of the
+first anchor, matching error falls as its write grows (r = -0.64), and prediction pays 0.70
+nats. The output-space term punishes it for correcting toward true tokens the teacher never
+ranked: the 4.9% of positions outside the cached top-64 carry 32.2% of the harm. In the
+historical 0.7/0.3 combination the KL term dominates and reproduces the historical sign,
+while the KL term simultaneously restrains the cosine hijack twentyfold.*
+
+The architecture was never the problem. Under CE, S is the best arm in the matrix.
+
+## What follows for the training plan
+
+* **For an architecture-changing student, hidden-state imitation against fixed teacher
+  coordinates is actively dangerous**, and dangerous in proportion to how much new
+  machinery sits upstream of an anchor. Either drop it or replace it with something
+  architecture-invariant (projected CKA, learned probes). Never place an anchor downstream
+  of a new module with nothing else trainable between them.
+* **The truncated teacher target needs repair before it is used to train new capability.**
+  A top-64 with a zero tail cannot express "the student is right and I was not looking";
+  `symmetric_uniform` already exists in this codebase and was not what the historical runs
+  used.
+* **M stays a negative result as an architecture** -- it is neutral in every row -- but it is
+  a *positive* result as a shield: it is the only arm whose anchor match is unchanged from
+  stock, and it takes 92 times less damage than S under the cosine term. If hidden-state
+  matching has to stay, placing new machinery downstream of every anchor is what keeps it
+  from being recruited.

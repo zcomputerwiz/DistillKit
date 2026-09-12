@@ -1,0 +1,59 @@
+{
+  "summary": {
+    "arm": "S",
+    "objective": "kl",
+    "lr": 1e-05,
+    "steps": 256,
+    "eval_tokens": 48963,
+    "assistant_nll": 0.5028764605522156,
+    "by_class": {
+      "whitespace": 0.3300824463367462,
+      "control": 1.8846698999404907,
+      "punctuation": 0.26148098707199097,
+      "lexical": 0.5823701620101929
+    },
+    "sidecar": {
+      "ple.key_proj.weight": 51.18404769897461,
+      "ple.value_proj.weight": 0.961676836013794,
+      "ple.norm_key.weight": 0.05267013981938362,
+      "ple.norm_query.weight": 0.05267144739627838,
+      "ple.norm_conv.weight": 0.08117459714412689,
+      "ple.conv1d.weight": 0.09485398977994919
+    },
+    "displacement": 3.260145629493889
+  },
+  "trajectory": [
+    {
+      "step": 64,
+      "whitespace": 0.3090638220310211,
+      "control": 1.5025460720062256,
+      "punctuation": 0.2603767514228821,
+      "lexical": 0.5970950722694397,
+      "kl": 1.1442684509092942
+    },
+    {
+      "step": 128,
+      "whitespace": 0.31418147683143616,
+      "control": 1.7805078029632568,
+      "punctuation": 0.27102184295654297,
+      "lexical": 0.6089920997619629,
+      "kl": 0.35739559633657336
+    },
+    {
+      "step": 192,
+      "whitespace": 0.32377275824546814,
+      "control": 1.9047480821609497,
+      "punctuation": 0.27301350235939026,
+      "lexical": 0.6120998859405518,
+      "kl": 0.33504870400065556
+    },
+    {
+      "step": 256,
+      "whitespace": 0.33910879492759705,
+      "control": 1.9329426288604736,
+      "punctuation": 0.2764783203601837,
+      "lexical": 0.6188600659370422,
+      "kl": 0.3159318579128012
+    }
+  ]
+}

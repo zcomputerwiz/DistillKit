@@ -208,3 +208,13 @@ cython_debug/
 # it in about 20 seconds and it is 443 MB, past what the remote accepts. The small
 # per-token NLL bundles beside it are the evidence for a published number and stay.
 /scratch/ple_forensics/donor-streams.npz
+
+# Objective forensics: the shared anchor projections are 51 MB and deterministic --
+# regenerate with `objective_arms.py --arm A --objective cosine --train-projections
+# --lr 1e-4`. The diagnostics directory also re-runs four matrix cells to attach a
+# diagnostic to them; those per-token bundles duplicate the matrix's own, so only the
+# diagnostics themselves are tracked.
+/scratch/ple_forensics/objective/projections.pt
+/scratch/ple_forensics/objective/diagnostics/*.npz
+!/scratch/ple_forensics/objective/diagnostics/tail-*.npz
+!/scratch/ple_forensics/objective/diagnostics/write-*.npz

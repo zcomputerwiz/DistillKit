@@ -124,17 +124,28 @@ class Wiring:
     def parameters(self):
         return list(self.reads.parameters())
 
-    def logits(self, ids, ngram_raw, device):
-        """One document's full logits, under this arm's wiring."""
+    def forward(self, ids, ngram_raw, device, output_hidden_states=False):
+        """One document's model output, under this arm's wiring."""
         self.box["ngram_raw"] = ngram_raw
         self.box["memory"] = None
         inputs = torch.tensor([ids], device=device)
         mask = torch.ones(1, len(ids), dtype=torch.long, device=device)
+        # input_ids first, always. Accelerate's io_same_device hook takes the device to
+        # return outputs on from the first tensor it finds in the call's inputs, and
+        # `ngram_raw` is a CPU uint8 tensor -- leading with it silently moves the whole
+        # forward's output to the host, where the evaluation then runs at CPU speed or
+        # dies on a device mismatch.
         if self.arm == "S":
-            out = self.model(input_ids=inputs, attention_mask=mask, ngram_raw=ngram_raw)
-        else:
-            out = self.model(input_ids=inputs, attention_mask=mask, sidecar_enabled=False)
-        return out.logits[0]
+            return self.model(input_ids=inputs, attention_mask=mask,
+                              output_hidden_states=output_hidden_states,
+                              ngram_raw=ngram_raw)
+        return self.model(input_ids=inputs, attention_mask=mask,
+                          output_hidden_states=output_hidden_states,
+                          sidecar_enabled=False)
+
+    def logits(self, ids, ngram_raw, device):
+        """One document's full logits, under this arm's wiring."""
+        return self.forward(ids, ngram_raw, device).logits[0]
 
     def diagnostics(self, positions):
         """Per-token read strength and read-to-stream norm ratio at `positions`."""
@@ -179,7 +190,7 @@ def evaluate(wiring, documents, tokenizer, hasher, table, whitespace_index, limi
         del everything_logits
         target = torch.as_tensor([ids[i] for i in targets], device=logits.device)
         everything = torch.logsumexp(logits, dim=-1)
-        within = torch.logsumexp(logits[:, whitespace_index], dim=-1)
+        within = torch.logsumexp(logits[:, whitespace_index.to(logits.device)], dim=-1)
         picked = logits.gather(1, target.unsqueeze(1)).squeeze(1)
         out["nll"].append((everything - picked).cpu().numpy())
         out["detect"].append((everything - within).cpu().numpy())
