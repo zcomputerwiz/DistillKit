@@ -3616,17 +3616,79 @@ bigram and 71.2% trigram per-head collision against 231,093 distinct bigrams and
 distinct trigrams. Per-*head*: each n-gram addresses eight of them, so joint confusability
 is far rarer than any single column suggests.
 
+## The execution path, measured
+
+Three things were changed for speed, and each one is a place where a run could quietly
+train something slightly different, so `tests/test_frozen_prefix.py` pins all three
+against the ordinary path on the loss *and every trainable gradient*, not just the
+forward:
+
+- **The frozen prefix leaves autograd.** Nothing before the injection point can move, so
+  the graph autograd builds across the embedding and decoder layer 0 is constructed and
+  discarded. `distillkit/frozen_prefix.py` runs that stretch under `no_grad` and refuses
+  if anything in it still requires grad. The suffix stays differentiable -- the table
+  learns through its Jacobian -- and `main.py` skips the whole thing when
+  `unfreeze_at_step` is set, since the prefix would then need the gradients this discards.
+- **Checkpointing is non-reentrant.** The legacy `enable_input_require_grads` hook exists
+  because reentrant checkpointing drops the graph when a checkpointed block's inputs do
+  not require grad. Non-reentrant has no such requirement, and installing the hook anyway
+  would defeat the no-grad prefix by making every prefix activation differentiable again.
+  It is now conditional in `main.py` and in `freeze_backbone`.
+- **The head is chunked**, which is what makes the 248k-wide vocabulary affordable at
+  sequence 4096.
+
+Measured on one RTX 3090, twelve timed steps each through a real AdamW update
+(`scratch/native_table/benchmark.json`):
+
+| configuration | tok/s | step | allocated | reserved |
+| --- | --- | --- | --- | --- |
+| 4096 x1, checkpointing on | 2456 | 1.667 s | 12.26 GiB | 13.74 GiB |
+| 4096 x2, checkpointing on | 2221 | 3.688 s | 18.34 GiB | 19.03 GiB |
+| 4096 x1, checkpointing off | refused | -- | 22.44 GiB | 24.02 GiB |
+| 4096 x2, checkpointing off | refused | -- | 39.37 GiB | 50.64 GiB |
+
+Checkpointing off is 21% faster per token (2966 tok/s) and needs the entire card to get
+it. Batch 2 is slower per token *and* holds 19 GiB. So 4096 x 1 with accumulation 8 is
+both the fastest and the roomiest way to spend 32,768 tokens per update, and it is what
+the config uses.
+
+### The 50 GiB lesson
+
+The batch-2 no-checkpointing row above was not refused the first time it was run. Windows
+WDDM does not raise `OutOfMemoryError` when a configuration outgrows the card: the driver
+satisfies the allocation out of shared system memory and the step completes, at 100.5 s
+against 1.38 s for work that fits, while host RAM fills until the desktop suffers. The
+benchmark's `except torch.OutOfMemoryError` never fired, and it spent twenty minutes
+timing a configuration nobody can use.
+
+`scratch/native_table/vram_guard.py` now closes this, in two layers: the allocator is
+capped with `set_per_process_memory_fraction`, which turns an oversized allocation into an
+ordinary `OutOfMemoryError` before the driver is ever asked to page anything, and reserved
+VRAM plus process RSS are checked after *every* step, warmup included, catching what the
+cap cannot -- workspace memory taken outside the caching allocator, and host RAM starting
+to climb. Both limbs have a self-check (`python scratch/native_table/vram_guard.py`).
+`smoke.py` uses the same guard.
+
 ## First run, configured but not launched
 
 `examples/qwen35_2b_native_ple_ce.yml`: seq 4096, batch 1, accumulate 8, frozen backbone,
-`assistant_cross_entropy` alone, chunked head, bf16, gradient checkpointing,
-`max_vram_fraction: 0.9`. 4096x1 is chosen over 2048x2 (same cost, longer context) and
-over 4096x2 (fits once, leaves nothing for evaluation or checkpointing).
+`assistant_cross_entropy` alone, chunked head, bf16, non-reentrant gradient checkpointing,
+`max_vram_fraction: 0.9`.
 
-One wrinkle to decide before launching: the config schema requires a `teacher` section and
-the trainer fetches the cached signal every step even when no loss consumes it.
-`assistant_cross_entropy` ignores it, so this costs host I/O and nothing else, but the run
-is nominally teacher-attached when the experiment is deliberately teacher-free.
+`rho` starts at exactly zero, so nothing inside the block receives gradient until `rho`
+itself has moved -- and under accumulation 8 the first update lands after 32,768 tokens, a
+third of a 100K screen spent training one scalar. `scratch/native_table/bootstrap_rho.py`
+opens the gate separately with accumulation 1: one forward, one backward, one update, 4,096
+tokens. Measured: rho 0 -> 1.0014e-4, backbone bitwise unchanged, and the table, both
+projections and the convolution all carrying gradient afterwards. Nothing is hand
+initialised; rho moves because the loss asks it to, which is the only way the run can still
+claim to begin as an exact morph. The main run starts from that checkpoint and the 4,096
+tokens are reported separately from the experiment's own budget.
+
+The teacher section remains in the config because the schema requires one and because the
+cache supplies the documents. No teacher signal is read: `assistant_cross_entropy` declares
+`requires_teacher_signal() == False` and the trainer now skips the per-microbatch fetch
+entirely.
 
 ## Reproduction
 

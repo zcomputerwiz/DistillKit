@@ -439,14 +439,20 @@ table path. Use this class explicitly when reloading a saved sidecar checkpoint.
             if name.startswith(prefix) or name.startswith("distillation_projections.")
         ]
 
-    def freeze_backbone(self) -> None:
+    def freeze_backbone(self, input_require_grads: bool = True) -> None:
+        """Train only the sidecar. ``input_require_grads`` installs the legacy hook.
+
+        Reentrant checkpointing sees frozen embedding outputs and drops the graph before
+        reaching our trainable layer, so it needs differentiable embeddings forced on it.
+        Non-reentrant checkpointing does not, and the hook is actively harmful there: it
+        makes every activation in the frozen prefix differentiable and retained for a
+        backward pass that cannot use it. Pass ``False`` for that path, which is what
+        ``distillkit.frozen_prefix.no_grad_prefix`` is built to exploit.
+        """
         names = set(self.stage1_parameter_names())
         for name, parameter in self.named_parameters():
             parameter.requires_grad_(name in names)
-        # Reentrant checkpointing otherwise sees frozen embedding outputs and drops
-        # the graph before reaching our trainable layer. This hook only supplies
-        # differentiable embeddings, never any sidecar data or batch state.
-        if not hasattr(self, "_require_grads_hook"):
+        if input_require_grads and not hasattr(self, "_require_grads_hook"):
             self.enable_input_require_grads()
             self._sidecar_enabled_input_grads = True
 

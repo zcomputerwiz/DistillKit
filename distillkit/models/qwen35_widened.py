@@ -253,11 +253,11 @@ class Qwen35WidenedForCausalLM(_WidenedWeightInit, Qwen3_5ForCausalLM):
                     part in name.split(".") for part in
                     ("attn_residual", "mlp_residual", "sidecar", "distillation_projections"))]
 
-    def freeze_backbone(self):
+    def freeze_backbone(self, input_require_grads: bool = True):
         names = set(self.stage1_parameter_names())
         for name, parameter in self.named_parameters():
             parameter.requires_grad_(name in names)
-        if not hasattr(self, "_require_grads_hook"):
+        if input_require_grads and not hasattr(self, "_require_grads_hook"):
             self.enable_input_require_grads()
 
     def unfreeze_backbone(self):

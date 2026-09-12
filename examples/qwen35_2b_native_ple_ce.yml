@@ -8,20 +8,42 @@
 # `assistant_cross_entropy` declares `requires_teacher_signal() == False`, so the trainer
 # skips the per-microbatch cache fetch entirely.
 #
-# Measured on one RTX 3090 (24 GiB), backbone frozen, bf16, gradient checkpointing,
-# chunked head, through a real optimizer step:
+# Measured on one RTX 3090 (24 GiB), CUDA_VISIBLE_DEVICES=0, backbone frozen with the
+# prefix outside autograd, bf16, chunked head, non-reentrant checkpointing, twelve timed
+# steps each through a real AdamW update (scratch/native_table/benchmark.json):
 #
-#   seq 1024 x1   6.66 GiB allocated   8.08 GiB reserved
-#   seq 2048 x1   8.18 GiB             10.03 GiB
-#   seq 4096 x1  11.22 GiB             12.58 GiB      <- this configuration
-#   seq 2048 x2  11.22 GiB             12.68 GiB
-#   seq 4096 x2  17.31 GiB             21.18 GiB      (88% of the card; no eval headroom)
+#   seq 4096 x1  checkpointing on   2456 tok/s   1.667 s/step   12.26 / 13.74 GiB  <- this
+#   seq 4096 x2  checkpointing on   2221 tok/s   3.688 s/step   18.34 / 19.03 GiB
+#   seq 4096 x1  checkpointing off  refused: needs 22.4 GiB allocated, 24.0 GiB reserved
+#   seq 4096 x2  checkpointing off  refused: needs 39.4 GiB allocated, 50.6 GiB reserved
 #
-# 4096 x 1 is chosen over 2048 x 2 -- the same cost, the longer context -- and over
-# 4096 x 2, which fits once but leaves nothing for evaluation or checkpointing on a
-# Windows WDDM card that cannot defragment.
+# Checkpointing off is 21% faster per token (2966 tok/s) and takes the entire card to get
+# it, so it is disqualified rather than chosen. Batch 2 is slower per token AND holds 19
+# GiB, so batch 1 with accumulation 8 is both the fastest and the roomiest way to spend
+# 32,768 tokens per update.
+#
+# The refusals above are enforced, not observed: Windows WDDM does not raise on an
+# oversized allocation, it pages to host RAM and runs about seventy times slower, so
+# `max_vram_fraction` caps the allocator and the benchmark checks reserved VRAM and host
+# RSS after every step (scratch/native_table/vram_guard.py).
+#
+# rho starts at exactly zero, which means nothing inside the block receives gradient until
+# rho itself has moved -- under accumulation 8 that first update costs 32,768 tokens. It
+# is opened separately instead:
+#
+#   .venv/Scripts/python.exe scratch/native_table/bootstrap_rho.py \
+#       --output D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
+#
+# One forward, one backward, one update, 4,096 tokens: rho 0 -> 1.0014e-4, backbone
+# bitwise unchanged, and the table, both projections and the convolution all carrying
+# gradient afterwards. Point `model:` at that checkpoint and the 4,096 tokens it spent are
+# reported separately from the experiment's own budget.
 
+# Point this at the bootstrap checkpoint once rho has been opened (see the note
+# above); the base checkpoint below starts rho at zero and spends the first 32,768
+# tokens of the run moving one scalar.
 model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+# model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
 output_path: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce
 project_name: hybridmodel-native-ple
 

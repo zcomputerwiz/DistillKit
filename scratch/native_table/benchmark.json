@@ -1,0 +1,61 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "tokens": 4096,
+  "device_capacity_bytes": 25769279488,
+  "device_name": "NVIDIA GeForce RTX 3090",
+  "visible_devices": 1,
+  "memory_fraction": 0.85,
+  "results": [
+    {
+      "tokens": 4096,
+      "batch": 1,
+      "status": "oom",
+      "error": "CUDA out of memory. Tried to allocate 1.89 GiB. GPU 0 has a total capacity of 24.00 GiB of which 2.72 GiB is free. 20.40 GiB allowed; Of the allocated memory 17.96 GiB is allocated by PyTorch, and 2.04 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "checkpointing": false,
+      "label": "checkpointing_off_batch_1"
+    },
+    {
+      "tokens": 4096,
+      "batch": 2,
+      "status": "oom",
+      "error": "CUDA out of memory. Tried to allocate 96.00 MiB. GPU 0 has a total capacity of 24.00 GiB of which 2.36 GiB is free. 20.40 GiB allowed; Of the allocated memory 20.20 GiB is allocated by PyTorch, and 171.43 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)",
+      "checkpointing": false,
+      "label": "checkpointing_off_batch_2"
+    },
+    {
+      "tokens": 4096,
+      "batch": 1,
+      "steps": 12,
+      "mean_step_seconds": 1.6675314166677708,
+      "median_step_seconds": 1.6674893500094186,
+      "min_step_seconds": 1.6668027999985497,
+      "tokens_per_second": 2456.387502550984,
+      "peak_allocated_bytes": 13169019392,
+      "peak_reserved_bytes": 14751367168,
+      "loss_first": 11.061135292053223,
+      "loss_last": 11.058283805847168,
+      "all_finite": true,
+      "status": "ok",
+      "checkpointing": true,
+      "label": "checkpointing_on_batch_1"
+    },
+    {
+      "tokens": 4096,
+      "batch": 2,
+      "steps": 12,
+      "mean_step_seconds": 3.688229933332574,
+      "median_step_seconds": 3.6883662499967613,
+      "min_step_seconds": 3.6863107999961358,
+      "tokens_per_second": 2221.03756643126,
+      "peak_allocated_bytes": 19693843456,
+      "peak_reserved_bytes": 20436746240,
+      "loss_first": 11.058721542358398,
+      "loss_last": 11.043662071228027,
+      "all_finite": true,
+      "status": "ok",
+      "checkpointing": true,
+      "label": "checkpointing_on_batch_2"
+    }
+  ],
+  "trainable_parameters": 277100545
+}

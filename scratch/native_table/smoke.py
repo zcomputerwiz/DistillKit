@@ -21,8 +21,10 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import torch
+from vram_guard import Spilled, baseline, cap, spill_check
 
 DEFAULT_MODEL = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 
@@ -55,8 +57,14 @@ def build(model_path, base, device, freeze_backbone=True):
     return model, sidecar, config
 
 
-def measure(model, sidecar, hasher, tokens, batch, lr, device, steps=2):
-    """One configuration, through a real optimizer step, reporting peak memory."""
+def measure(model, sidecar, hasher, tokens, batch, lr, device, steps=2,
+            budget=0.85):
+    """One configuration, through a real optimizer step, reporting peak memory.
+
+    Checked after every step rather than only at the end: on WDDM an oversized
+    configuration does not fail, it pages to host RAM and keeps going, so the guard has to
+    fire on the step that does it. See vram_guard.
+    """
     ids = torch.arange(1000, 1000 + tokens, dtype=torch.long) % 200000
     rows = hasher.row_indices(ids.unsqueeze(0).expand(batch, -1).contiguous())
     inputs = ids.unsqueeze(0).expand(batch, -1).contiguous().to(device)
@@ -67,8 +75,10 @@ def measure(model, sidecar, hasher, tokens, batch, lr, device, steps=2):
     model.train()
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
+    capacity = torch.cuda.mem_get_info(torch.device(device).index or 0)[1]
+    baseline_rss = baseline()
     losses = []
-    for _ in range(steps):
+    for step in range(steps):
         optimizer.zero_grad(set_to_none=True)
         out = model(input_ids=inputs,
                     attention_mask=torch.ones_like(inputs),
@@ -77,6 +87,8 @@ def measure(model, sidecar, hasher, tokens, batch, lr, device, steps=2):
         optimizer.step()
         losses.append(float(out.loss.detach()))
         del out
+        torch.cuda.synchronize()
+        spill_check(budget, capacity, baseline_rss, "step %d" % step)
 
     def total(tensors):
         return sum(t.numel() * t.element_size() for t in tensors if t is not None)
@@ -107,6 +119,10 @@ def main():
     parser.add_argument("--batch", type=int, nargs="+", default=[1])
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--train-backbone", action="store_true")
+    parser.add_argument("--budget", type=float, default=0.85,
+                        help="fraction of the card this process may take; enforced by "
+                             "the allocator so an oversized configuration fails fast "
+                             "instead of paging into system RAM")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -118,7 +134,7 @@ def main():
     model, sidecar, config = build(args.model, args.base, args.device,
                                    freeze_backbone=not args.train_backbone)
     hasher = NGramHasher(native_hash_config(config))
-    _, capacity = torch.cuda.mem_get_info(torch.device(args.device).index or 0)
+    _, capacity = cap(args.device, args.budget)
     report = {
         "model": args.model, "device": args.device,
         "device_capacity_bytes": int(capacity),
@@ -137,11 +153,13 @@ def main():
     for batch in args.batch:
         for tokens in args.seq:
             try:
-                result = measure(model, sidecar, hasher, tokens, batch, args.lr, args.device)
+                result = measure(model, sidecar, hasher, tokens, batch, args.lr,
+                                 args.device, budget=args.budget)
                 result["status"] = "ok"
-            except torch.OutOfMemoryError as error:
+            except (torch.OutOfMemoryError, Spilled) as error:
                 torch.cuda.empty_cache()
-                result = {"tokens": tokens, "batch": batch, "status": "oom",
+                result = {"tokens": tokens, "batch": batch,
+                          "status": "spilled" if isinstance(error, Spilled) else "oom",
                           "error": str(error).split("\n")[0]}
             report["configurations"].append(result)
             print(json.dumps(result), flush=True)

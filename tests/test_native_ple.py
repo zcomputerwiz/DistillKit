@@ -354,3 +354,16 @@ def test_the_converted_2b_config_produces_the_expected_native_geometry():
     hasher = NGramHasher(hash_config)
     assert hasher.padded_vocab_size == 2099200
     assert hasher.padded_vocab_size * hash_config.head_dim == 268697600
+
+
+def test_the_chunked_table_norm_is_the_ordinary_norm():
+    """Logging must not materialise a gibibyte of fp32 to report one scalar."""
+    from distillkit.native_ple import _chunked_norm
+
+    torch.manual_seed(0)
+    weight = (torch.randn(300, 8) * 3).to(torch.bfloat16)
+    assert _chunked_norm(weight, rows=64) == pytest.approx(
+        float(weight.float().norm()), rel=1e-5)
+    # One slice and many slices agree, so the accumulator is not losing the tail.
+    assert _chunked_norm(weight, rows=4096) == pytest.approx(
+        _chunked_norm(weight, rows=7), rel=1e-6)

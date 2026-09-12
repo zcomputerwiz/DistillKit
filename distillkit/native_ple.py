@@ -71,6 +71,20 @@ def native_hash_config(config) -> NGramHashConfig:
     )
 
 
+def _chunked_norm(weight: torch.Tensor, rows: int = 1 << 16) -> float:
+    """Frobenius norm of a large table without a full-size fp32 copy.
+
+    ``weight.float().norm()`` on the 2.1M x 128 native table materialises roughly a
+    gibibyte of temporary fp32 every time the metrics callback fires. Summing squares a
+    slice at a time costs 32 MiB and gives the same number, accumulated in fp32 so the
+    2.7e8 additions do not lose the tail in bf16.
+    """
+    total = torch.zeros((), dtype=torch.float32, device=weight.device)
+    for start in range(0, weight.shape[0], rows):
+        total += weight[start:start + rows].float().pow(2).sum()
+    return float(total.sqrt())
+
+
 class NativePLESidecar(nn.Module):
     """``h -> h + rho * PLE(h, table[ngram_ids])``, with the table owned by the model."""
 
@@ -143,7 +157,7 @@ class NativePLESidecar(nn.Module):
         """
         report = {
             f"{prefix}/rho": self.rho.float().item(),
-            f"{prefix}/table_weight_norm": self.table.weight.float().norm().item(),
+            f"{prefix}/table_weight_norm": _chunked_norm(self.table.weight),
             f"{prefix}/value_proj_norm": self.ple.value_proj.weight.float().norm().item(),
             f"{prefix}/key_proj_norm": self.ple.key_proj.weight.float().norm().item(),
             f"{prefix}/conv_norm": self.ple.conv1d.weight.float().norm().item(),

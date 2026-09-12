@@ -26,6 +26,7 @@ from distillkit.configuration import (
     TeacherDatasetConfig,
     TeacherModelConfig,
 )
+from distillkit.frozen_prefix import no_grad_prefix
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
@@ -708,8 +709,35 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
                 model.set_stage1_trainable_layers(window)
                 LOG.info("Stage 1 also trains decoder layers [%d, %d)", *window)
             frozen_names = freeze_backbone_for_stage1(model)
-            if hasattr(model, "enable_input_require_grads"):
+            # Only reentrant checkpointing needs this. It drops the graph when a
+            # checkpointed block's inputs do not require grad, which a frozen prefix
+            # guarantees, so the hook exists to force differentiable embeddings.
+            # Non-reentrant checkpointing has no such requirement, and installing the
+            # hook there is actively harmful: every activation before the first
+            # trainable module becomes differentiable and is retained for a backward
+            # pass that cannot use it. See distillkit/frozen_prefix.py.
+            checkpointing = config.training_args.get("gradient_checkpointing")
+            reentrant = (config.training_args.get("gradient_checkpointing_kwargs") or {}
+                         ).get("use_reentrant", True)
+            if checkpointing and reentrant and hasattr(model, "enable_input_require_grads"):
                 model.enable_input_require_grads()
+            elif not config.optimizer.unfreeze_at_step:
+                # Nothing before the injection point can move, so the graph autograd
+                # builds across the embedding and the prefix layers is constructed and
+                # then discarded. Running that stretch under no_grad is the same
+                # arithmetic without the retained activations. Only the prefix: the
+                # suffix stays differentiable because the table learns through its
+                # Jacobian. Skipped when the backbone unfreezes mid-run, since the
+                # prefix would then need the gradients this discards.
+                index = getattr(model.config, "sidecar_layer_index", None)
+                if index is not None:
+                    try:
+                        no_grad_prefix(model, upto_layer=index)
+                    except ValueError as error:
+                        LOG.info("Prefix stays in autograd: %s", error)
+                    else:
+                        LOG.info("Embeddings and decoder layers [0, %d) run outside "
+                                 "autograd", index)
             if config.optimizer.unfreeze_at_step:
                 callbacks.append(UnfreezeBackboneCallback(config.optimizer.unfreeze_at_step, frozen_names))
         callbacks.append(ArchitectureMetricsCallback(config.optimizer.log_every_n_steps))
