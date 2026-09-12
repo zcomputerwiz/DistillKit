@@ -208,9 +208,11 @@ def main():
         return 0
 
     # A snapshot, so the arms' actual parameter displacement can be compared rather than
-    # assumed. AdamW's update is per-coordinate scale-invariant -- scaling a gradient by c
-    # leaves m/sqrt(v) unchanged -- so removing a term from the loss does not obviously
-    # shrink the step, whatever the denominator does to the loss value.
+    # assumed. AdamW is approximately scale-insensitive per coordinate -- scaling a gradient
+    # by c leaves m/sqrt(v) unchanged in the idealised case -- so removing a term from the
+    # loss does not obviously shrink the step, whatever the denominator does to the loss
+    # value. Approximately: momentum history, eps, clipping and weight decay can break it,
+    # which is why this is measured here instead of assumed.
     initial = [parameter.detach().to("cpu", torch.float32).clone() for parameter in trainable]
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=0.0)
     scheduler = torch.optim.lr_scheduler.LambdaLR(

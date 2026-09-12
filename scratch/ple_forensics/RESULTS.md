@@ -411,9 +411,12 @@ moves.
 82.7% share of the NLL, not lower. Per unit of its own objective, selection is 21.4× as
 gradient-dense as content while detection is only 2.3×.
 
-Removing the selection term takes **24.5%** of the window's total gradient energy
-(0.3357 of 1.3713). That is what arm B is doing, and it is not a rounding error. It does
-not follow that content's share grows to fill it: gradient magnitude is not conserved.
+Removing the selection term takes **24.5% of the measured share-weighted gradient
+energy in the trainable window** (0.3357 of 1.3713). That phrasing is the strict one and
+should be used verbatim: it is measured gradient energy, *not* optimizer-update energy —
+see the final section, where the two are shown to come apart. That is what arm B is
+doing, and it is not a rounding error. It does not follow that content's share grows to
+fill it: gradient magnitude is not conserved.
 
 Gradient cosines are consistent with the whole-model measurement — everything close to
 orthogonal:
@@ -528,8 +531,8 @@ repurposes freed capacity".
 
 The pre-registered confound sat inside that distinction: B uses A's denominator and so
 was assumed to take a smaller step. **It does not** -- measured later at 97.8% of A's
-displacement, because AdamW's update is per-coordinate scale-invariant. See the final
-section; the caveat is withdrawn.
+displacement, because AdamW is approximately scale-insensitive per coordinate. See the
+final section; the caveat is withdrawn.
 
 ## What would change the verdict
 
@@ -667,14 +670,24 @@ measured rather than asserted. At 1e-5, over 256 steps:
 | A | 1.752729 | 0.004525 |
 | B | 1.714111 | 0.004425 |
 
-**B travelled 97.8% as far as A, not 75.5%.** AdamW's update is per-coordinate
-scale-invariant — scaling a gradient by `c` leaves `m̂/√v̂` unchanged — so removing a
-quarter of the gradient energy barely changes the distance travelled. The confound does
-not exist, and the 1e-5 null is cleaner than it was claimed to be.
+**B travelled 97.8% as far as A, not 75.5%.** AdamW is approximately scale-insensitive
+per coordinate — scaling a gradient by `c` leaves `m̂/√v̂` unchanged in the idealised
+case — so a 24.5% reduction in measured gradient energy does not produce a comparable
+reduction in parameter travel. The confound does not exist, and the 1e-5 null is cleaner
+than it was claimed to be.
 
-This is the same property that produced two earlier findings in this project: `sharpness`
+Do not upgrade this to exact scale invariance in general. Momentum history, `eps`,
+gradient clipping, decoupled weight decay, and any change in the sparsity or support of
+the gradient can all break the equivalence. What is claimed here is the measurement:
+97.8% travel for a 24.5% energy reduction, in this window and setup.
+
+The same approximate property produced two earlier findings in this project: `sharpness`
 sitting bit-identical for 72 steps, and AdamW moving ~`lr` per element regardless of
 gradient size. It should have been applied here the first time.
+
+It also fixes the terminology. The 24.5% is **share-weighted gradient energy measured in
+the trainable window**. It is not optimizer-update energy, and this arm is what
+establishes the difference.
 
 ## Explicit reallocation via rate
 
@@ -698,6 +711,10 @@ B does **not** tolerate a higher rate. Removing a quarter of the gradient energy
 move the optimum, did not flatten the overfitting cliff, and did not open any regime A
 could not already reach. The `ws select` columns confirm the intervention is live
 throughout: B sits at 0.29–0.34 against A's 0.073–0.091 at every rate.
+
+Scope this claim explicitly: it holds across the tested range 3e-6 to 3e-5 in this
+training setup — this window, corpus, horizon, optimiser and denominator. It is not a
+statement about all rates or all setups.
 
 ## Final verdict on responsibility transfer
 
@@ -724,3 +741,71 @@ can keep teaching whitespace-selection representations even with the token-level
 masked, which would break the decomposition this design rests on. It would now be testing
 whether a *different* objective shows a separation that plain CE does not, which is a new
 question rather than a confirmation of this one.
+
+
+---
+
+# Branch closed: A/B/D responsibility transfer, negative
+
+Marked complete. No further training runs on this branch unless a new mechanism predicts
+a qualitatively different outcome.
+
+## Final defensible claim
+
+> Conditional whitespace selection is a large and nearly orthogonal gradient workload in
+> the tested Qwen3.5 window. Removing it substantially changes whitespace learning but
+> leaves content learning essentially unchanged across the tested CE learning-rate range.
+> The optimizer does not naturally redirect the removed workload toward content, and
+> increasing learning rate does not reveal a content advantage. This branch therefore
+> provides no evidence that whitespace-selection offload frees useful content capacity in
+> an already-trained single-stream backbone.
+
+## The geometry
+
+Observed behaviour is well described by
+
+    g_A ≈ g_C + g_WS,    g_C ⊥ g_WS
+
+Removing the whitespace term gives `g_B ≈ g_C`, but it does **not** give
+`g_C → α·g_C` for any `α > 1`. Gradient energy is not a conserved budget the optimizer
+redistributes. The removed whitespace-selection direction simply disappears.
+
+## Wording that must not drift
+
+* Never write that whitespace learning happens "at content's expense". A and B follow
+  essentially the same content curve despite large differences in whitespace-selection
+  learning.
+* The 24.5% is **measured share-weighted gradient energy in the trainable window**, never
+  optimizer-update energy.
+* AdamW is **approximately** scale-insensitive per coordinate under common conditions.
+  Momentum history, `eps`, clipping, weight decay and changing gradient support can break
+  the equivalence.
+* The LR result is scoped to the tested range and setup.
+
+## Arm D
+
+Not built, and not to be built on this evidence. D would restore the whitespace-selection
+capability deliberately removed from B, but there is no B content advantage to preserve.
+At best D recovers whitespace performance and returns to approximately A-like overall
+behaviour, which does not justify another training branch.
+
+## Distillation replication
+
+Held. The `0.7` sparse top-k KL + `0.3` hidden-state cosine objective does not preserve
+the CE decomposition this design rests on: the hidden-state term can still teach
+representations associated with whitespace selection even when the token-level selection
+loss is masked. Running it now would ask a different question — *does this particular
+distillation objective create structural/content interference that plain CE does not?* —
+which may be worth asking later but is not a confirmation of the offload hypothesis.
+
+## Architectural implication
+
+This weakens the **retrofit hypothesis**: that PLE frees an already-trained backbone by
+taking over easy local/structural work. Within this window, setup and rate range, it does
+not.
+
+It does **not** rule out the stronger **donor-native hypothesis**: that PLE combined with
+Gated Residual / HyperConnection structure influences how representational capacity is
+allocated during joint pretraining. That remains unresolved — donor GR/HC routing could
+not be inspected on the available hardware — and it is the live question this branch
+leaves behind.

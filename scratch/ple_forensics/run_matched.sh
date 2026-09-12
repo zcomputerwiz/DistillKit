@@ -2,7 +2,7 @@
 # The optional arm, testing a different claim: explicitly reallocating the removed update
 # magnitude to content.
 #
-# Under AdamW the update is per-coordinate scale-invariant, so removing a loss term does
+# AdamW is approximately scale-insensitive per coordinate, so removing a loss term does
 # not obviously shrink the step; every run now reports its actual parameter displacement
 # so the assumption is measured rather than asserted. The meaningful version of "give B
 # the magnitude A had" is therefore not a rescaled loss but a higher rate: if B has less
