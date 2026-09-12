@@ -58,12 +58,24 @@ def sparse_kl_div_inner(
     if missing == MissingProbabilityHandling.SYMMETRIC_UNIFORM:
         # if the teacher's logprobs don't sum to 1, we assume the remaining
         # probability mass in *both* the teacher and student is distributed
-        # uniformly over the token indices missing from the teacher's distribution
-        log_teacher_missing = torch.log1p(-teacher_prob_sum.clamp(min=eps, max=1 - eps))
+        # uniformly over the token indices missing from the teacher's distribution.
+        # The uniform factor cancels between the two sides, so what this actually
+        # computes is the grouped-tail term `p_tail * log(p_tail / q_tail)`, which
+        # asserts only the mass the cache knows about. See tests/test_grouped_tail.py.
+        #
+        # The upper clamp has to come from the tensor's own dtype. `1 - eps` with the
+        # default eps of 1e-8 rounds to exactly 1.0 in fp32 -- fp32 spacing near 1 is
+        # 1.19e-7 -- so the clamp did nothing, `log1p(-1.0)` returned -inf for any
+        # position whose top-k already covered the mass, and a teacher tail of ~0 then
+        # made `0 * inf` a NaN that took the whole run with it. That is every position
+        # in a well-covered capture: this path could not run at all on real data.
+        upper = 1.0 - torch.finfo(teacher_prob_sum.dtype).eps
+        log_teacher_missing = torch.log1p(-teacher_prob_sum.clamp(min=eps, max=upper))
         student_probs = sparse_student_logprobs.to(torch.float32).exp_()
         student_prob_sum = student_probs.sum(dim=-1)
         del student_probs
-        log_student_missing = torch.log1p(-student_prob_sum.clamp(min=eps, max=1 - eps))
+        upper = 1.0 - torch.finfo(student_prob_sum.dtype).eps
+        log_student_missing = torch.log1p(-student_prob_sum.clamp(min=eps, max=upper))
         del student_prob_sum
         missing_kl = torch.exp(log_teacher_missing) * (
             log_teacher_missing - log_student_missing

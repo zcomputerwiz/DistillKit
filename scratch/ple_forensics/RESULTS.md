@@ -1072,3 +1072,108 @@ The architecture was never the problem. Under CE, S is the best arm in the matri
   stock, and it takes 92 times less damage than S under the cosine term. If hidden-state
   matching has to stay, placing new machinery downstream of every anchor is what keeps it
   from being recruited.
+
+
+---
+
+# The target repair: grouping the tail is not the fix, keeping CE is
+
+The forensics named the zero tail as the KL term's mechanism, and the proposed repair was
+to distil over the cached top-k plus one aggregate bucket carrying the omitted mass:
+
+    L = -sum_i p_i log q_i  -  p_tail log q_tail
+
+Three things came out of testing it, and only the third was expected.
+
+## `symmetric_uniform` is already the grouped tail
+
+The repair needs no new loss function. Spreading the tail uniformly over the same `V - k`
+support on *both* sides cancels the per-token factor::
+
+    sum_{i not in k} (p_tail/(V-k)) log[(p_tail/(V-k)) / (q_tail/(V-k))]
+        = p_tail log(p_tail / q_tail)
+
+so `MissingProbabilityHandling.SYMMETRIC_UNIFORM` computes the grouped-tail objective
+under a name describing an assumption it does not make -- the uniform tail is vacuous
+because it never survives the ratio. Checked against the formula written independently:
+the values differ by exactly the coarsened teacher's entropy (-10.147993 against
+-10.147994 in fp64) and the gradients agree to 2e-8. `tests/test_grouped_tail.py` pins
+both, along with the direction that matters: given a teacher keeping 0.6 and omitting 0.4,
+grouped-tail prefers the student that puts 0.40 outside the list and the zero tail prefers
+the student that puts 0.05 there.
+
+The tail is worth carrying: mean 0.0043 over the capture, above 0.01 at 5.1% of positions,
+up to 0.872.
+
+## It could not have been used, and that is a fixed bug now
+
+The first real-data step under `symmetric_uniform` produced NaN everywhere. The clamp
+guarding `log1p(-x)` was written as `1 - eps` with the default `eps = 1e-8`, and fp32
+spacing near 1 is 1.19e-7, so `1 - 1e-8` rounds to exactly 1.0 and the clamp did nothing.
+Any position whose top-k already covered the mass gave `log1p(-1.0) = -inf`, and a teacher
+tail of ~0 turned that into `0 * inf`. This corpus's median retained mass is 1.0000, so
+that is most positions. The upper bound now comes from the tensor's own dtype. Anyone who
+tried this option before would have seen NaN and concluded the option was broken rather
+than the clamp.
+
+## Grouping the tail alone does not fix the sign flip
+
+Held-out lexical NLL, against the untrained 0.53532, with the earlier rows for context:
+
+| objective | A | S | M | S - A |
+| --- | ---: | ---: | ---: | --- |
+| ce | 0.527270 | 0.524850 | 0.527268 | **-0.002420** |
+| kl (zero tail) | 0.576226 | 0.582370 | 0.576346 | **+0.006145** |
+| grouped (tail carried) | 0.576302 | 0.583015 | 0.576411 | **+0.006713** |
+| 0.5 ce + 0.5 grouped | 0.543177 | 0.543359 | 0.542903 | +0.000182 [-0.001190, +0.001451] |
+| combined (historical) | 0.576572 | 0.583568 | 0.576820 | **+0.006996** |
+
+**Repairing the tail changes nothing**: +0.006713 against the zero tail's +0.006145, both
+intervals excluding zero, the harm if anything slightly larger. The tail diagnostic had
+already said this without being asked -- the tail carried 32.2% of the harm, which means
+the other 67.8% was inside the teacher's list, where grouping has no effect. The zero tail
+is a real defect and fixing it is right, but it was not the load-bearing part.
+
+**Restoring ground-truth CE is what removes the harm.** At 0.5 CE + 0.5 grouped, S - A
+falls to +0.000182 with an interval spanning zero: 38 times smaller than the historical
+objective's, and no longer distinguishable from no effect. That is the pre-registered
+success condition met, and it is met by the CE term rather than by the tail repair.
+
+## The teacher term still costs content at this horizon
+
+The other half of the success condition is not met. Arm A under 0.5 ce + 0.5 grouped
+scores 0.543177 against 0.527270 under CE alone -- **adding teacher supervision costs
+0.0159 nats of content**, sixty-five times the sidecar effect being argued about. The same
+holds for every teacher-bearing row in the matrix.
+
+This is not evidence that distillation is worthless; it is evidence that held-out
+ground-truth NLL over 256 steps cannot see what distillation is for. The evaluation metric
+*is* the CE objective, so the arm trained directly on it wins by construction, and any
+benefit from dark knowledge would have to show up as generalisation elsewhere. But it does
+mean this setup cannot currently demonstrate a teacher-supervision benefit at all, and a
+weighting sweep would be tuning against a metric that structurally prefers `lambda_kd = 0`.
+Whatever justifies the teacher term has to be measured on something else before the
+weights are chosen.
+
+## Two smaller results
+
+The remaining S - A under the repaired target is still concentrated in the tail -- 4.9% of
+lexical positions carrying **44.0%** of a shift that is no longer significant -- so the
+mechanism is unchanged in shape, only in size.
+
+And under `0.5 ce + 0.5 grouped`, M - A on lexical is -0.000274 with the interval excluding
+zero: the first row in the whole programme where the private lane is measurably better than
+stock. It is 0.05% of A's own movement and nothing should be built on it, but it is the
+only positive sign M has produced.
+
+## Where this leaves the target
+
+* **Keep ground-truth CE.** It is what removes the sidecar penalty, and it is the only term
+  that can reward a correction toward a token the capture never ranked.
+* **Use the grouped tail anyway.** It costs nothing, it says only what the cache knows, and
+  the alternative is a target that actively penalises being right. Use
+  `missing_probability_handling: symmetric_uniform`; it is the grouped-tail objective and
+  it now runs.
+* **Do not weight-sweep `lambda_kd` against held-out NLL.** That metric is the CE objective
+  and will always prefer dropping the teacher.
+* **Hidden-state cosine stays out**, unchanged from the previous section.

@@ -9,11 +9,32 @@ distillation objective, so the objective is the remaining suspect, not the sidec
 Same three architectures as ``costream_arms.py`` -- A stock, S the sidecar writing into
 the ordinary residual, M the sidecar writing into a private lane -- under four objectives:
 
-    ce        plain cross entropy over every supervised position
-    kl        0.7-weight term alone: sparse top-k teacher KL, temperature 1.0,
-              missing_probability_handling=zero, sparse_chunk_length=256
-    cosine    0.3-weight term alone: hidden-state cosine against the cached anchors
-    combined  (0.7 * kl + 0.3 * cosine) / 1.0, the historical objective exactly
+    ce         plain cross entropy over every supervised position
+    kl         0.7-weight term alone: sparse top-k teacher KL, temperature 1.0,
+               missing_probability_handling=zero, sparse_chunk_length=256
+    cosine     0.3-weight term alone: hidden-state cosine against the cached anchors
+    combined   (0.7 * kl + 0.3 * cosine) / 1.0, the historical objective exactly
+    grouped    the same sparse KL with the tail grouped instead of zeroed
+    grouped_ce (0.5 * ce + 0.5 * grouped) / 1.0, the proposed replacement target
+
+**Grouped tail is ``symmetric_uniform``, exactly.** The proposed repair is to distil over
+the K cached tokens plus one aggregate bucket carrying the omitted mass::
+
+    L = -sum_i p_i log q_i  -  p_tail log q_tail
+
+and this codebase's ``MissingProbabilityHandling.SYMMETRIC_UNIFORM`` already computes it.
+Spreading the tail uniformly over the same ``V - K`` support on both sides makes the
+per-token factor cancel::
+
+    sum_{i not in K} (p_tail/(V-K)) log[(p_tail/(V-K)) / (q_tail/(V-K))]
+        = p_tail log(p_tail / q_tail)
+
+so the "uniform" assumption is vacuous and the option is the grouped-tail objective under
+a misleading name. Measured against the formula above, written independently: the values
+differ by exactly the coarsened teacher's entropy (-10.147993 against -10.147994 on a
+random fp64 case) and the gradients agree to 2e-8. ``tests/test_grouped_tail.py`` pins it.
+The repair therefore needs no new loss function, only a different flag -- and the tail is
+real: mean 0.0043, above 0.01 at 5.1% of positions, up to 0.872.
 
 Every loss is the project's own implementation called directly -- ``KLDLoss``,
 ``HiddenStateCosineLoss``, ``HiddenStateMapping``, ``OfflineHiddenStateSignalSource`` --
@@ -91,28 +112,46 @@ def cached_documents(cache, limit, max_tokens):
     return chosen
 
 
-def objective_loss(objective, outputs, signal, mask, mapping, losses):
+#: What each objective is made of. The trainer computes `sum(w_i L_i) / sum(w_i)`, so a
+#: single-term objective is its term and the divisor is only ever interesting for a mix.
+OBJECTIVES = {
+    "ce": {"ce": 1.0},
+    "kl": {"kl": 1.0},
+    "cosine": {"cosine": 1.0},
+    "combined": {"kl": KL_WEIGHT, "cosine": COSINE_WEIGHT},
+    "grouped": {"grouped": 1.0},
+    "grouped_ce": {"ce": 0.5, "grouped": 0.5},
+}
+
+
+def cross_entropy(outputs, ids):
+    """Ground-truth CE at every position, the term that survives a truncated teacher."""
+    logits = outputs.logits[0, :-1].float()
+    target = torch.as_tensor(ids[1:], device=logits.device)
+    return (torch.logsumexp(logits, dim=-1)
+            - logits.gather(1, target.unsqueeze(1)).squeeze(1)).mean()
+
+
+def objective_loss(objective, outputs, ids, signal, mask, mapping, losses):
     """One document's loss and its components, under the named objective.
 
-    Each term is normalised the way the trainer normalises it -- the KL by the supervised
-    position count, the cosine by position count per anchor and then averaged over
-    anchors -- and the combined objective divides by the sum of the weights, which is the
-    trainer's `total_loss / sum(weights)` with 0.7 and 0.3 summing to 1.
+    Each term is normalised the way the trainer normalises it -- the divergences by the
+    supervised position count, the cosine by position count per anchor and then averaged
+    over anchors -- and a mixture divides by the sum of its weights.
     """
+    weights = OBJECTIVES[objective]
     parts = {}
-    if objective in ("kl", "combined"):
-        parts["kl"] = losses["kl"](outputs, signal, mask=mask)
-    if objective in ("cosine", "combined"):
+    if "ce" in weights:
+        parts["ce"] = cross_entropy(outputs, ids)
+    for name in ("kl", "grouped"):
+        if name in weights:
+            parts[name] = losses[name](outputs, signal, mask=mask)
+    if "cosine" in weights:
         parts["cosine"] = losses["cosine"](outputs, signal, mask=mask,
                                            hidden_state_mapping=mapping)
-    if objective != "combined":
-        return parts[objective], parts
-    # The trainer reduces onto the device of the first loss and divides by the summed
-    # weights; with 0.7 and 0.3 that divisor is 1, and it is kept explicit rather than
-    # folded away so the weights can be changed without silently rescaling the rate.
-    device = parts["kl"].device
-    total = KL_WEIGHT * parts["kl"] + COSINE_WEIGHT * parts["cosine"].to(device)
-    return total / (KL_WEIGHT + COSINE_WEIGHT), parts
+    device = parts[next(iter(weights))].device
+    total = sum(weight * parts[name].to(device) for name, weight in weights.items())
+    return total / sum(weights.values()), parts
 
 
 @torch.inference_mode()
@@ -235,8 +274,7 @@ def write_vs_cosine(wiring, sidecar, mapping, source, doc_ids, hasher, table, de
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arm", choices=["A", "S", "M"], required=True)
-    parser.add_argument("--objective", choices=["ce", "kl", "cosine", "combined"],
-                        required=True)
+    parser.add_argument("--objective", choices=list(OBJECTIVES), required=True)
     parser.add_argument("--cache", default=CACHE)
     parser.add_argument("--gguf", default=DEFAULT_GGUF)
     parser.add_argument("--train-docs", type=int, default=512)
@@ -268,8 +306,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
-    needs_teacher = args.objective != "ce"
-    needs_hidden = args.objective in ("cosine", "combined")
+    weights = OBJECTIVES[args.objective]
+    needs_teacher = bool({"kl", "grouped", "cosine"} & set(weights))
+    needs_hidden = "cosine" in weights
 
     from transformers import AutoConfig, AutoTokenizer
 
@@ -344,6 +383,13 @@ def main():
     losses = {"kl": KLDLoss(temperature=1.0,
                             missing_probability_handling=MissingProbabilityHandling.ZERO,
                             sparse_chunk_length=256),
+              # The grouped tail, under its existing name. Same temperature, same
+              # chunking; the only difference is that the omitted mass is carried rather
+              # than asserted to be zero.
+              "grouped": KLDLoss(
+                  temperature=1.0,
+                  missing_probability_handling=MissingProbabilityHandling.SYMMETRIC_UNIFORM,
+                  sparse_chunk_length=256),
               "cosine": HiddenStateCosineLoss()}
     device = model.get_input_embeddings().weight.device
     whitespace_index = torch.as_tensor(
@@ -360,18 +406,16 @@ def main():
         ids = cached["input_ids"].astype(np.int64).tolist()
         raw = ngram_raw_of(ids, hasher, table)
         outputs = wiring.forward(ids, raw, device, output_hidden_states=needs_hidden)
-        if args.objective == "ce":
-            logits = outputs.logits[0, :-1].float()
-            target = torch.as_tensor(ids[1:], device=logits.device)
-            value = (torch.logsumexp(logits, dim=-1)
-                     - logits.gather(1, target.unsqueeze(1)).squeeze(1)).mean()
-            return value, {"ce": value}
-        batch = {"input_ids": torch.tensor([ids], device=device),
-                 "attention_mask": torch.ones(1, len(ids), dtype=torch.long, device=device),
-                 "doc_id": [doc_id]}
-        signal = source.get_signal(batch, return_hidden_states=needs_hidden)
-        mask = torch.ones(1, len(ids), 1, dtype=torch.bool, device=outputs.logits.device)
-        return objective_loss(args.objective, outputs, signal, mask, mapping, losses)
+        signal, mask = None, None
+        if needs_teacher:
+            batch = {"input_ids": torch.tensor([ids], device=device),
+                     "attention_mask": torch.ones(1, len(ids), dtype=torch.long,
+                                                  device=device),
+                     "doc_id": [doc_id]}
+            signal = source.get_signal(batch, return_hidden_states=needs_hidden)
+            mask = torch.ones(1, len(ids), 1, dtype=torch.bool,
+                              device=outputs.logits.device)
+        return objective_loss(args.objective, outputs, ids, signal, mask, mapping, losses)
 
     initial = [parameter.detach().to("cpu", torch.float32).clone() for parameter in trainable]
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=0.0)

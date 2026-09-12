@@ -31,8 +31,9 @@ def main():
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(STUDENT, local_files_only=True)
+    available = sorted({path.stem.split("-")[1] for path in DIAGNOSTICS.glob("tail-*-A.npz")})
     packed = {}
-    for objective in ("ce", "kl"):
+    for objective in available:
         for arm in ("A", "S"):
             path = DIAGNOSTICS / ("tail-%s-%s.npz" % (objective, arm))
             if not path.exists():
@@ -51,7 +52,7 @@ def main():
     print("%d positions, %.1f%% with the true token inside the teacher's top-k\n"
           % (len(inside), 100 * inside.mean()))
 
-    for objective in ("ce", "kl"):
+    for objective in available:
         print("%s: S minus A, split by whether the true token is in the teacher's top-k"
               % objective)
         delta = packed[(objective, "S")]["nll"] - packed[(objective, "A")]["nll"]
