@@ -1,0 +1,84 @@
+{
+  "summary": {
+    "arm": "B",
+    "lr": 1e-05,
+    "steps": 256,
+    "train_targets": 190615,
+    "eval_tokens": 48963,
+    "assistant_nll": 0.45281291007995605
+  },
+  "trajectory": [
+    {
+      "step": 32,
+      "train_content": 0.5526868377053058,
+      "train_detect": 0.08132906990776152,
+      "train_select": 0.35550656001528197,
+      "heldout_content": 0.4970649182796478,
+      "heldout_detect": 0.08970445394515991,
+      "heldout_select": 0.2997606098651886
+    },
+    {
+      "step": 64,
+      "train_content": 0.5155413322296178,
+      "train_detect": 0.07338011945032098,
+      "train_select": 0.4290157435443034,
+      "heldout_content": 0.49472329020500183,
+      "heldout_detect": 0.09089145064353943,
+      "heldout_select": 0.3036297559738159
+    },
+    {
+      "step": 96,
+      "train_content": 0.4780536860491421,
+      "train_detect": 0.06417135553072476,
+      "train_select": 0.3589038292210098,
+      "heldout_content": 0.49338299036026,
+      "heldout_detect": 0.09113544225692749,
+      "heldout_select": 0.3046630620956421
+    },
+    {
+      "step": 128,
+      "train_content": 0.511318819371702,
+      "train_detect": 0.0718399004432244,
+      "train_select": 0.3512687450501977,
+      "heldout_content": 0.4920409917831421,
+      "heldout_detect": 0.09183474630117416,
+      "heldout_select": 0.2974151372909546
+    },
+    {
+      "step": 160,
+      "train_content": 0.5118711011001031,
+      "train_detect": 0.08102019311856573,
+      "train_select": 0.413180057161268,
+      "heldout_content": 0.49272796511650085,
+      "heldout_detect": 0.09381614625453949,
+      "heldout_select": 0.3071243166923523
+    },
+    {
+      "step": 192,
+      "train_content": 0.4554893587290858,
+      "train_detect": 0.07261446915349731,
+      "train_select": 0.36182835316627804,
+      "heldout_content": 0.49251168966293335,
+      "heldout_detect": 0.08952481299638748,
+      "heldout_select": 0.3091370463371277
+    },
+    {
+      "step": 224,
+      "train_content": 0.4996543153050139,
+      "train_detect": 0.06823537305397406,
+      "train_select": 0.352194351569095,
+      "heldout_content": 0.4924214780330658,
+      "heldout_detect": 0.08943034708499908,
+      "heldout_select": 0.3062809407711029
+    },
+    {
+      "step": 256,
+      "train_content": 0.41376955104512114,
+      "train_detect": 0.07240140775846994,
+      "train_select": 0.4527816073508095,
+      "heldout_content": 0.49293938279151917,
+      "heldout_detect": 0.08658760040998459,
+      "heldout_select": 0.3130686283111572
+    }
+  ]
+}

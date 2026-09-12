@@ -75,6 +75,20 @@ def batches(documents, tokenizer, limit, size):
             yield prepared
 
 
+def decompose(logits, target, whitespace_index):
+    """Per-target full CE and its whitespace factorisation, detached, for logging.
+
+    The arm loss is what trains; this is what is reported. Separating them means the
+    trajectory shows the same quantities for A and B even though B never optimises the
+    selection term, which is what distinguishes overfitting from instability.
+    """
+    with torch.no_grad():
+        everything = torch.logsumexp(logits, dim=-1)
+        within = torch.logsumexp(logits[:, whitespace_index], dim=-1)
+        picked = logits.gather(1, target.unsqueeze(1)).squeeze(1)
+        return ((everything - picked), (everything - within), (within - picked))
+
+
 def arm_loss(logits, target, is_whitespace, whitespace_index, arm):
     """Summed loss over one document's assistant targets, under the arm's rule."""
     everything = torch.logsumexp(logits, dim=-1)
@@ -135,6 +149,13 @@ def main():
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--max-grad-norm", type=float, default=1.0)
+    parser.add_argument("--eval-every", type=int, default=0,
+                        help="held-out evaluation every N steps, on --trajectory-docs; "
+                             "0 evaluates only at the end")
+    parser.add_argument("--trajectory-docs", type=int, default=48,
+                        help="how many held-out documents the periodic evaluation uses")
+    parser.add_argument("--trajectory", type=Path,
+                        help="where to write the training/held-out trajectory as JSON")
     parser.add_argument("--baseline", action="store_true",
                         help="evaluate before training and exit; the shared reference")
     parser.add_argument("--output", type=Path, required=True)
@@ -192,6 +213,9 @@ def main():
 
     model.train()
     started, step, seen = time.perf_counter(), 0, 0
+    trajectory = []
+    running = {"content": 0.0, "content_tokens": 0, "detect": 0.0, "select": 0.0,
+               "whitespace_tokens": 0}
     for prepared in batches(train_docs, tokenizer, args.tokens, args.batch):
         optimizer.zero_grad(set_to_none=True)
         total, counted = 0.0, 0
@@ -206,6 +230,13 @@ def main():
             is_whitespace = class_of(np.array([ids[i] for i in targets]),
                                      tokenizer) == "whitespace"
             loss = arm_loss(logits, target, is_whitespace, whitespace_index, args.arm)
+            full, detect, select = decompose(logits, target, whitespace_index)
+            whitespace_rows = torch.as_tensor(is_whitespace, device=logits.device)
+            running["content"] += float(full[~whitespace_rows].sum())
+            running["content_tokens"] += int((~whitespace_rows).sum())
+            running["detect"] += float(detect[whitespace_rows].sum())
+            running["select"] += float(select[whitespace_rows].sum())
+            running["whitespace_tokens"] += int(whitespace_rows.sum())
             counted += len(targets)
             total += float(loss)
             loss_for_backward = loss / max(len(targets), 1)
@@ -220,6 +251,30 @@ def main():
             print("  step %4d  loss/token %.5f  %d targets  %.1fs"
                   % (step, total / max(counted, 1), seen, time.perf_counter() - started),
                   flush=True)
+        if args.eval_every and step % args.eval_every == 0:
+            model.eval()
+            sampled = evaluate(model, eval_docs[:args.trajectory_docs], tokenizer,
+                               whitespace_index, args.tokens, embedding_device)
+            model.train()
+            held_out = class_of(sampled["target"], tokenizer) == "whitespace"
+            point = {
+                "step": step,
+                # Training content NLL against held-out content NLL is what separates
+                # overfitting (train improves, held-out worsens) from instability (both
+                # worsen). Reported over the steps since the last point, not cumulative.
+                "train_content": running["content"] / max(running["content_tokens"], 1),
+                "train_detect": running["detect"] / max(running["whitespace_tokens"], 1),
+                "train_select": running["select"] / max(running["whitespace_tokens"], 1),
+                "heldout_content": float(sampled["nll"][~held_out].mean()),
+                "heldout_detect": float(sampled["detect"][held_out].mean()),
+                "heldout_select": float(sampled["select"][held_out].mean()),
+            }
+            trajectory.append(point)
+            print("    [%4d] train content %.5f  held-out content %.5f  "
+                  "ws detect %.5f  ws select %.5f"
+                  % (step, point["train_content"], point["heldout_content"],
+                     point["heldout_detect"], point["heldout_select"]), flush=True)
+            running = {key: 0 if "tokens" in key else 0.0 for key in running}
 
     print("trained %d steps over %d targets in %.1fs"
           % (step, seen, time.perf_counter() - started))
@@ -228,9 +283,15 @@ def main():
                       args.tokens, embedding_device)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.output, **scores)
-    print(json.dumps({"arm": args.arm, "steps": step, "train_targets": seen,
-                      "eval_tokens": int(len(scores["nll"])),
-                      "assistant_nll": float(scores["nll"].mean())}))
+    summary = {"arm": args.arm, "lr": args.lr, "steps": step, "train_targets": seen,
+               "eval_tokens": int(len(scores["nll"])),
+               "assistant_nll": float(scores["nll"].mean())}
+    if args.trajectory:
+        args.trajectory.parent.mkdir(parents=True, exist_ok=True)
+        args.trajectory.write_text(
+            json.dumps({"summary": summary, "trajectory": trajectory}, indent=2),
+            encoding="utf-8")
+    print(json.dumps(summary))
     return 0
 
 

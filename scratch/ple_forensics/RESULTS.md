@@ -161,9 +161,9 @@ positions, so `cos(grad L_layout, grad L_content)` is exactly "do these two obje
 want to move the same weights the same way". Activation gradients live at different
 positions for the two classes and have no natural pairing.
 
-## Where the backbone's update energy goes
+## Where the backbone's gradient energy goes
 
-| class | share of tokens | share of update energy | over/under |
+| class | share of tokens | share of gradient energy | over/under |
 | --- | ---: | ---: | ---: |
 | lexical | 70.3% | 68.0% | 0.97× |
 | **whitespace** | **11.6%** | **21.7%** | **1.87×** |
@@ -173,8 +173,14 @@ positions for the two classes and have no natural pairing.
 Per unit of its own mean loss, whitespace is 11.8× as gradient-dense as content and
 control is 270×; both figures are inflated for a rare class by the 1/n averaging inside
 the class mean, which is why the share-weighted column is the one that answers the
-question. Weighted, **whitespace consumes 21.7% of the backbone's update energy on 11.6%
-of the positions.** That is the "meaningful gradient energy" the gate asked for.
+question. Weighted, **whitespace consumes 21.7% of the backbone's gradient energy on
+11.6% of the positions.** That is the "meaningful gradient energy" the gate asked for.
+
+Gradient energy, not optimiser update magnitude. AdamW normalises per coordinate and
+moves roughly `lr` per element almost regardless of gradient size -- a fact this project
+established when it found `sharpness` bit-identical across 72 steps -- so a share of the
+gradient does not translate into the same share of the step. Every "share of the update"
+phrasing below has been corrected to say gradient.
 
 ## But the gradients are orthogonal, not conflicting
 
@@ -193,7 +199,7 @@ small.
 ## Verdict: the gate passes, with a caveat that shapes the arms
 
 By the stated criterion — meaningful energy, weak alignment — this proceeds. Whitespace
-is taking a fifth of the update on an eighth of the tokens.
+is taking a fifth of the gradient energy on an eighth of the tokens.
 
 The caveat is what orthogonality implies. Three cases the diagnostic could have found:
 
@@ -201,8 +207,9 @@ The caveat is what orthogonality implies. Three cases the diagnostic could have 
   The strongest case to proceed, and not what was found.
 * **A near 1.** Layout is already doing content's work; removing it takes that away.
   Would have stopped the experiment. Also not what was found.
-* **A ≈ 0.** Neither. Removing layout frees *capacity* — a fifth of the update budget —
-  but no direction.
+* **A ≈ 0.** Neither. Removing layout removes a workload — a fifth of the gradient
+  energy — but no direction, and a gradient is not a conserved budget that something
+  else then inherits.
 
 The third is what is here, and it matters for the design: if the mechanism is purely
 capacity reallocation, then **arm B (masked loss, no sidecar) already implements the
@@ -404,8 +411,9 @@ moves.
 82.7% share of the NLL, not lower. Per unit of its own objective, selection is 21.4× as
 gradient-dense as content while detection is only 2.3×.
 
-Removing the selection term takes **24.5%** of the window's total update energy
-(0.3357 of 1.3713). That is what arm B is doing, and it is not a rounding error.
+Removing the selection term takes **24.5%** of the window's total gradient energy
+(0.3357 of 1.3713). That is what arm B is doing, and it is not a rounding error. It does
+not follow that content's share grows to fill it: gradient magnitude is not conserved.
 
 Gradient cosines are consistent with the whole-model measurement — everything close to
 orthogonal:
@@ -425,7 +433,7 @@ normalises against all non-whitespace targets.
 
 Every pre-training gate now passes:
 
-* whitespace takes a fifth of the update, orthogonally to content;
+* whitespace takes a fifth of the gradient energy, orthogonally to content;
 * the router is free and near-perfect (AUC 0.9994);
 * 82.7% of the whitespace loss and **90.4% of its gradient** is the selection term an
   expert could take;
@@ -483,39 +491,160 @@ Both arms are **worse on content than the untrained model**:
 | B − baseline | **+0.025747** [+0.006860, +0.040844] | −0.059679 |
 
 256 steps of plain CE on this window makes the model dramatically better at whitespace
-(A gains 0.263 nats) and measurably worse at content, and that is true whether or not
-whitespace selection is in the objective. The backbone spends continued training on
-whitespace at content's expense — which is the phenomenon the offload hypothesis was
-about — and **taking whitespace selection away did not redirect that spending.** B simply
-did less total useful work: it gained 0.060 on whitespace instead of 0.263, for the same
-content cost.
+(A gains 0.263 nats) and measurably worse at content. **That degradation is not caused by
+whitespace learning.** A and B lose content to within 0.00008 of each other, and B barely
+trained whitespace selection at all. Whatever degrades content here does so whether or not
+whitespace selection is in the objective — which is what Phase 0's near-orthogonal
+gradients already predicted.
 
-That makes this a clean negative for responsibility transfer, with one honest caveat
-about the platform. The claim was that freed budget goes to content; the measurement is
-that it goes nowhere. But it is measured in a regime where content is degrading in both
-arms, so what was actually tested is "does removing whitespace selection slow the
-degradation", not "does it accelerate improvement". A regime where A improves content
-would be a stronger platform for the same question.
+An earlier draft said the backbone spends training on whitespace "at content's expense".
+The data does not support that and it is withdrawn.
 
-The pre-registered confound also stands and now matters more: B uses the same denominator
-as A, so it takes a roughly 24.5% smaller effective step. B matched A's content number
-while spending less — which is, if anything, mild evidence that the whitespace gradient
-was not harming content either.
+What B does show is that the removed workload simply disappears. B gained 0.060 on
+whitespace against A's 0.263, for the same content cost — less total useful work, not
+different work.
+
+That is a clean negative for *natural* reallocation, with one honest caveat about the
+platform: it is measured in a regime where content degrades in both arms, so what was
+tested is whether removing selection slows the degradation, not whether it accelerates
+improvement.
+
+### Natural against explicit reallocation
+
+The distinction everything downstream depends on. For A the gradient is
+`g_A = g_C + g_WS`; for B it is `g_B = g_C`. Because `g_C` and `g_WS` are near-orthogonal,
+removing `g_WS` does **not** imply `g_C → 1.25 g_C`. Gradient magnitude is not a conserved
+budget that the remaining term inherits.
+
+So arm B as run tests: *does removing whitespace-selection work naturally improve content
+optimisation?* Answer so far, no.
+
+A step-matched or LR-raised B tests something different — *if the removed update magnitude
+is **explicitly reallocated to content**, does content improve?* That is a worthwhile
+engineering question and it is **not** the automatic-capacity-offload hypothesis. Should
+such an arm win, the claim it supports is "offloading whitespace permits more aggressive
+content-directed optimisation at the same overall update magnitude", never "the backbone
+repurposes freed capacity".
+
+The pre-registered confound sits inside that distinction: B uses A's denominator and so
+takes a smaller step, which is exactly why a step-matched arm would be measuring explicit
+rather than natural reallocation.
 
 ## What would change the verdict
 
-Two follow-ups, in the order they would be worth running, both of which were listed as
-"only if needed":
+1. **An arm-A-only LR sweep, first and cheapest.** Find a regime where held-out content
+   NLL is flat or improving rather than degrading — 3e-6, 1e-5, 2e-5, 3e-5, everything
+   else held. Logging train content NLL alongside held-out separates the two
+   explanations: train improving while held-out worsens is overfitting or domain
+   adaptation; train worsening too is optimisation instability.
+2. **Repeat matched A/B** once A actually learns content. B ≈ A there is a strong negative
+   for natural reallocation; B < A means interference exists at longer horizon or lower
+   rate and D is back on the table; B > A means the whitespace gradient was regularising.
+3. **Step-matched B, optionally and last**, labelled as explicit reallocation and never as
+   evidence that removal frees capacity by itself.
 
-1. **Matched-step / LR sensitivity.** Give B the step magnitude A has, and sweep the rate
-   until arm A improves content rather than degrading it. If B−A stays at zero across a
-   regime where A is actually learning content, the negative is solid.
-2. **Distillation-objective replication.** Every other arm in this ledger trained against
-   0.7 sparse top-k KL + 0.3 hidden-state cosine, under which this window at this rate is
-   known to improve. Plain CE was chosen for the pilot because it makes the whitespace
-   factorisation exact; it is also the reason arm A behaves unlike every other arm here.
+**Distillation replication is deliberately held.** The 0.7 sparse KL + 0.3 hidden-state
+cosine objective breaks the clean CE decomposition, because the hidden-state term can keep
+teaching whitespace-selection *representations* even with the token-level selection loss
+masked. Establish whether any A/B separation exists under CE first.
 
-Until one of those runs, the defensible statement is narrow: *under plain-CE continued
-training on this window, removing conditional whitespace-selection training does not
-improve content modelling, and the freed quarter of the update energy is not
-reallocated.*
+The defensible statement meanwhile: *under the tested plain-CE regime, conditional
+whitespace selection is a large, nearly orthogonal gradient workload, but removing it does
+not naturally redirect optimisation toward content — the removed gradient magnitude simply
+disappears.*
+
+
+---
+
+# The LR sweep, and matched A/B in a regime that learns
+
+The A/B pilot ran at 3e-5, where arm A *degrades* held-out content. That is a weak
+platform: what it tested was whether removing whitespace selection slows a degradation,
+not whether it accelerates an improvement. Arm A alone, across rates, everything else
+held — same window, corpus, splits, horizon, optimiser, denominator.
+
+## Finding a regime
+
+Full held-out content NLL against the untrained model (0.48779):
+
+| lr | content | vs baseline | ws select |
+| --- | ---: | ---: | ---: |
+| 3e-6 | 0.46757 | −0.02022 | 0.08340 |
+| **1e-5** | **0.45918** | **−0.02861** | 0.07350 |
+| 2e-5 | 0.47779 | −0.01000 | 0.08022 |
+| 3e-5 | 0.51361 | **+0.02583** | 0.09136 |
+
+**3e-5 was past the edge.** At 1e-5 arm A improves content by 0.0286 nats.
+
+## Overfitting, not instability
+
+Logging train content beside held-out separates the two explanations:
+
+| lr | held-out content, s32 → s256 | train content, s32 → s256 |
+| --- | --- | --- |
+| 3e-6 | 0.5079 → 0.4957 (down) | 0.5619 → 0.4355 (down) |
+| 1e-5 | 0.4973 → 0.4934 (down, then flat) | 0.5532 → 0.4138 (down) |
+| 2e-5 | 0.5005 → **0.5176** (up) | 0.5472 → 0.4227 (down) |
+| 3e-5 | 0.5157 → **0.5548** (up) | 0.5462 → 0.4571 (down) |
+
+Train content improves at **every** rate; held-out diverges only at 2e-5 and above. That
+is overfitting or domain adaptation, not optimisation instability. (The train column
+sawtooths because each point covers a different 32-step window of documents; the trend is
+what matters.)
+
+Separately: whitespace selection collapses from 0.35620 to 0.073–0.091 at *every* rate,
+including 3e-6. It is learned fast and cheaply regardless — consistent with the large,
+independent workload Phase 0 measured.
+
+## Matched A/B at 1e-5
+
+Both arms re-run with identical settings, differing only in whether `-log P(w | WS)`
+contributes at whitespace targets.
+
+| arm | content | whitespace | ws detect | ws select |
+| --- | ---: | ---: | ---: | ---: |
+| baseline | 0.48779 | 0.42634 | 0.07014 | 0.35620 |
+| A | 0.45918 | 0.14187 | 0.06837 | 0.07350 |
+| B | 0.45891 | 0.41289 | 0.06828 | 0.34461 |
+
+Both arms now genuinely learn content:
+
+| | content vs baseline |
+| --- | --- |
+| A | −0.028605 [−0.040481, −0.019068] |
+| B | −0.028881 [−0.040758, −0.019382] |
+
+    B - A on content:  -0.000276  [-0.000551, +0.000005]   spans zero
+
+The arm landed as designed again — B lost selection (+0.271112 [+0.228936, +0.325898])
+and kept detection (−0.000089 [−0.000421, +0.000236]).
+
+## Verdict
+
+This is the pre-registered **B ≈ A** outcome, now measured in a regime where arm A
+improves content by 0.0286 nats rather than degrading it. Removing a workload that is
+90.4% of the whitespace gradient energy and roughly a quarter of everything the window
+spends changes content by −0.000276 — about **1% of A's own content gain**, with an
+interval touching zero.
+
+So the negative is not an artefact of the bad 3e-5 platform. It holds where the backbone
+is demonstrably learning content.
+
+**Whitespace-selection learning is a large, nearly orthogonal workload. Removing it
+removes the workload; the optimiser does not redirect the freed gradient magnitude toward
+content. The removed magnitude simply disappears.**
+
+Arm D remains unbuilt: there is no natural content benefit for a sidecar to preserve.
+
+## What is left
+
+Only the optional arm, and it tests a different claim. A step-matched or LR-raised B —
+**explicitly reallocating the removed update magnitude to content** — would ask whether
+content improves when the freed magnitude is *put* there rather than expected to migrate
+on its own. If it wins, the supported claim is "offloading whitespace permits more
+aggressive content-directed optimisation at the same overall update magnitude", never
+"the backbone repurposes freed capacity".
+
+Distillation replication stays held, for the reason it was held: the hidden-state term can
+keep teaching whitespace-selection representations even with the token-level selection
+loss masked, which would break the decomposition this whole design rests on.
