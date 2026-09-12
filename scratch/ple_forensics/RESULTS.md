@@ -379,3 +379,60 @@ The first is used, because the hypothesis is about what the gradient points at r
 than how big it is, and because it makes B and D identical to A except for the removed
 terms. The effective-step confound is real and is the first thing to vary if B minus A
 comes out marginal.
+
+
+---
+
+# Is selection a share of the *update*, or only of the loss?
+
+The router check put selection at 82.7% of the whitespace NLL. Arm B removes a gradient,
+not a loss, and the two can diverge — a term can dominate the loss and contribute little
+to the update, or the reverse. So this is measured over the exact window arms A and B
+will train: decoder layers 20–28, the tuned A3 window, **all 1.01B parameters in it**
+rather than the sampled matrices used earlier, because that is the set that actually
+moves.
+
+48 documents, 2,179 whitespace and 17,381 content targets.
+
+| term | per objective | share-weighted | tokens |
+| --- | ---: | ---: | ---: |
+| detect `−log P(WS)` | 2.2626 | 0.0356 | 2,179 |
+| **select `−log P(w\|WS)`** | **21.3586** | **0.3357** | 2,179 |
+| content (full-vocab CE) | 1.0000 | 1.0000 | 17,381 |
+
+**Of the whitespace contribution to the update, selection is 90.4%** — higher than its
+82.7% share of the NLL, not lower. Per unit of its own objective, selection is 21.4× as
+gradient-dense as content while detection is only 2.3×.
+
+Removing the selection term takes **24.5%** of the window's total update energy
+(0.3357 of 1.3713). That is what arm B is doing, and it is not a rounding error.
+
+Gradient cosines are consistent with the whole-model measurement — everything close to
+orthogonal:
+
+| pair | cosine |
+| --- | ---: |
+| select vs content | +0.0147 |
+| detect vs content | −0.0136 |
+| select vs detect | −0.0154 |
+
+Note these figures are not directly comparable to the earlier whole-model
+`whitespace R_share = 0.3184`: that used a sampled matrix set across all 32 layers and
+normalised against the lexical class, this uses every parameter in layers 20–28 and
+normalises against all non-whitespace targets.
+
+## Where that leaves the arms
+
+Every pre-training gate now passes:
+
+* whitespace takes a fifth of the update, orthogonally to content;
+* the router is free and near-perfect (AUC 0.9994);
+* 82.7% of the whitespace loss and **90.4% of its gradient** is the selection term an
+  expert could take;
+* removing it is 24.5% of what the trainable window spends.
+
+Arms A and B are next, and B versus A on content is the stop gate. The claim under test
+is deliberately narrow: *removing conditional whitespace-selection training from the
+backbone improves content optimisation, and the n-gram sidecar can take that selection
+task over without losing whitespace prediction.* Not semantic capacity offload —
+optimisation-budget transfer, until something supports the stronger reading.
