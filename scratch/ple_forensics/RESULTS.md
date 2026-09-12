@@ -140,3 +140,78 @@ conditional on this. Entropy as an admission feature would still need the within
 control — the `‖v‖/‖h‖` result scored 0.5362 on "next token is layout" and was flat
 inside content — but there is now very little content signal for any admission rule to
 gate toward.
+
+---
+
+# Phase 0 of the offload experiment: the gradient gate
+
+The offload hypothesis is different from everything measured above. It does not claim
+the sidecar predicts content better — it claims that if a cheap external memory takes
+over repetitive structural prediction, the backbone stops spending capacity there and
+can put it into content. That is falsifiable before any training.
+
+`python scratch/ple_forensics/gradient_conflict.py --documents 64`, on the frozen
+pre-retrofit student, 64 held-out documents, 27,531 assistant targets. Gradients are
+taken against a labelled *sample* of each layer's parameters — the attention output
+projection and the MLP down projection, 40 matrices over 32 layers, 965M parameters —
+because all 4B will not fit twice over beside the model.
+
+Parameter gradients rather than activation gradients: parameters are shared across
+positions, so `cos(grad L_layout, grad L_content)` is exactly "do these two objectives
+want to move the same weights the same way". Activation gradients live at different
+positions for the two classes and have no natural pairing.
+
+## Where the backbone's update energy goes
+
+| class | share of tokens | share of update energy | over/under |
+| --- | ---: | ---: | ---: |
+| lexical | 70.3% | 68.0% | 0.97× |
+| **whitespace** | **11.6%** | **21.7%** | **1.87×** |
+| punctuation | 17.4% | 8.6% | 0.49× |
+| control | 0.7% | 1.7% | 2.42× |
+
+Per unit of its own mean loss, whitespace is 11.8× as gradient-dense as content and
+control is 270×; both figures are inflated for a rare class by the 1/n averaging inside
+the class mean, which is why the share-weighted column is the one that answers the
+question. Weighted, **whitespace consumes 21.7% of the backbone's update energy on 11.6%
+of the positions.** That is the "meaningful gradient energy" the gate asked for.
+
+## But the gradients are orthogonal, not conflicting
+
+| class | A = cos with content gradient |
+| --- | ---: |
+| whitespace | **−0.0050** |
+| control | +0.0006 |
+| punctuation | +0.0110 |
+
+Random vectors in 965M dimensions sit at 3.5e-5, so these are 20–300× the chance floor
+and not noise — and they are still, for practical purposes, orthogonal. Whitespace turns
+slightly negative with depth (+0.011 at layer 0, −0.008 at layer 28, −0.066 at 31) while
+its energy ratio rises monotonically (5.2 → 30.7), so what conflict exists is late and
+small.
+
+## Verdict: the gate passes, with a caveat that shapes the arms
+
+By the stated criterion — meaningful energy, weak alignment — this proceeds. Whitespace
+is taking a fifth of the update on an eighth of the tokens.
+
+The caveat is what orthogonality implies. Three cases the diagnostic could have found:
+
+* **Strongly negative A.** Layout actively fights content; removing it frees direction.
+  The strongest case to proceed, and not what was found.
+* **A near 1.** Layout is already doing content's work; removing it takes that away.
+  Would have stopped the experiment. Also not what was found.
+* **A ≈ 0.** Neither. Removing layout frees *capacity* — a fifth of the update budget —
+  but no direction.
+
+The third is what is here, and it matters for the design: if the mechanism is purely
+capacity reallocation, then **arm B (masked loss, no sidecar) already implements the
+entire hypothesised mechanism.** The sidecar in arm D does not change what the backbone
+optimises; it only preserves the layout competence that B throws away.
+
+So the predicted signature is `D − A ≈ B − A` on content, with D and B separating on
+layout rather than on content. That is still a result worth having — "layout can be
+offloaded to a cheap memory at no cost to layout capability, and it buys X nats of
+content" is an engineering claim — but the content gain would be attributable to
+reweighting, not to the sidecar. Codex is right that B is mandatory; on this evidence B
+is closer to the main arm than to a control.
