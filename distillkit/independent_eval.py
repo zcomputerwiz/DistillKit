@@ -316,6 +316,7 @@ def forward_logits(model, batch, mode, positions):
         kwargs["sidecar_enabled"] = mode == "enabled"
     else:
         kwargs.pop("ngram_raw", None)
+        kwargs.pop("ngram_ids", None)
     with complete_bypass(model, has_sidecar and mode == "full_bypass"):
         return model(**kwargs).logits
 

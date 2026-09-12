@@ -367,3 +367,46 @@ def test_the_chunked_table_norm_is_the_ordinary_norm():
     # One slice and many slices agree, so the accumulator is not losing the tail.
     assert _chunked_norm(weight, rows=4096) == pytest.approx(
         _chunked_norm(weight, rows=7), rel=1e-6)
+
+
+def test_the_trainer_forwards_native_row_indices():
+    """A native run collates `ngram_ids`; the model refuses the batch without them.
+
+    The donor path emits `ngram_raw` and was the only key compute_loss forwarded, so a
+    native run reached the model with its row indices dropped and died on the first step
+    with "ngram_ids is required for a native n-gram table" -- after loading 2B parameters
+    and building the optimizer. The collator and the model were both right; the trainer
+    was the one link between them that only knew about donor batches.
+    """
+    import threading
+    from types import SimpleNamespace
+
+    from distillkit.trainer import DistillationTrainer
+
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def model(**kwargs):
+        seen.update(kwargs)
+        raise Stop
+
+    trainer = SimpleNamespace(
+        model=SimpleNamespace(config=SimpleNamespace(num_hidden_layers=2)),
+        need_hidden_states=False, need_model_loss=False, chunked_head=False,
+        _kept_bf16_outputs=True, hidden_state_mapping=None,
+        _loss_log_local=threading.local(),
+        config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),
+                               sidecar=SimpleNamespace(enabled=True),
+                               tensor_parallel=False))
+
+    ids = torch.arange(6).reshape(1, 6)
+    batch = {"input_ids": ids, "attention_mask": torch.ones_like(ids),
+             "labels": ids.clone(), "ngram_ids": torch.zeros(1, 6, 16, dtype=torch.long)}
+    try:
+        DistillationTrainer.compute_loss(trainer, model, batch)
+    except Stop:
+        pass
+    assert "ngram_ids" in seen, "the native row indices never reached the model"
+    assert seen["sidecar_enabled"] is True

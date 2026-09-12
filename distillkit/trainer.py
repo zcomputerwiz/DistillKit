@@ -250,7 +250,11 @@ class DistillationTrainer(SFTTrainer):
         # Withhold labels unless a configured loss reads student_outputs.loss: the
         # model would otherwise run a full-vocabulary cross-entropy whose result is
         # discarded, paying for it in both compute and activation memory.
-        forwarded = ["input_ids", "attention_mask", "position_ids", "ngram_raw"]
+        # ngram_raw is donor collation (frozen GGUF bytes); ngram_ids is native
+        # collation (row indices, looked up inside the forward where the lookup can
+        # take a gradient). A run emits one or the other, never both.
+        forwarded = ["input_ids", "attention_mask", "position_ids", "ngram_raw",
+                     "ngram_ids"]
         if self.need_model_loss:
             forwarded.append("labels")
         # accelerate wraps the prepared forward so every bf16 tensor it returns is
