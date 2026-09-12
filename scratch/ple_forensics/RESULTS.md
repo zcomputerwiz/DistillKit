@@ -809,3 +809,131 @@ Gated Residual / HyperConnection structure influences how representational capac
 allocated during joint pretraining. That remains unresolved — donor GR/HC routing could
 not be inspected on the available hardware — and it is the live question this branch
 leaves behind.
+
+
+---
+
+# The two-stream pilot: does a private lane buy what removal did not?
+
+The offload branch ruled out loss removal. What it left standing was representational
+separation -- PLE may only pay when local information has a separately maintained state,
+with joint training learning when to read it. This is the smallest student-native test of
+that, and it is negative on every criterion the design set out.
+
+## The arms
+
+Three arms, plain cross entropy throughout, identical documents, token budget, window
+(decoder layers 20-28), schedule, seed and optimiser. The objective is not what varies.
+
+    A   stock continued training, no sidecar, no lane.
+    S   the retrofit: the PLE sidecar writes into the ordinary residual at layer 1.
+    M   the same sidecar writing into a private lane, read back at each window layer as
+
+            h  <-  h + s_l * g_l(h) * m,      m = PLE(h_1, features)
+
+``g_l`` sees the current stream and nothing else -- no token class, no target. Every arm
+is bitwise stock at initialisation. Three rates around the known CE optimum, so a null
+cannot be blamed on the platform the way the first A/B pilot's 3e-5 could.
+
+## One implementation finding worth keeping
+
+The obvious design zero-initialises the read scale ``s_l`` as well as the sidecar's
+``value_proj``, so the read is manifestly inert at step 0. **That deadlocks.** The
+contribution is a product ``s_l * g_l(h) * m``: with ``value_proj`` at zero the lane is
+empty and ``s_l`` gets no gradient, and with ``s_l`` at zero the lane is the value's only
+path to the loss so ``value_proj`` gets none either. The first version ran four steps
+with every read scale still exactly 0.0. Zero belongs in the write, not in both: ``s_l``
+starts at 1 and the model is still bitwise stock, because ``m`` is exactly zero until the
+write moves. ``tests/test_memory_lane.py`` pins this.
+
+## Results
+
+Held-out lexical (content) NLL, against the untrained 0.53532:
+
+| lr | A | S | M | S - A | M - A | M - S |
+| --- | ---: | ---: | ---: | --- | --- | --- |
+| 3e-6 | 0.530048 | 0.528443 | 0.529889 | **-0.001605** | -0.000159 | **+0.001446** |
+| 1e-5 | 0.522585 | 0.519945 | 0.522395 | **-0.002639** | -0.000189 | **+0.002450** |
+| 2e-5 | 0.544699 | 0.542232 | 0.544598 | **-0.002468** | -0.000101 | **+0.002366** |
+
+Bold intervals exclude zero; every ``M - A`` interval spans it. Whitespace over the same
+runs, against the untrained 0.42653:
+
+| lr | A | S | M | M with the lane shut |
+| --- | ---: | ---: | ---: | ---: |
+| 3e-6 | 0.154004 | 0.151396 | 0.152486 | 0.155012 |
+| 1e-5 | 0.142036 | 0.141179 | 0.142131 | 0.142112 |
+| 2e-5 | 0.147909 | 0.146944 | 0.147666 | 0.147851 |
+
+## The premise that did not reproduce
+
+The design expected M to keep S's layout gain *without S's content damage*. Under plain
+CE **there is no content damage to remove**: S improves lexical NLL at all three rates,
+by 0.0016 to 0.0026, with intervals excluding zero. C1's content harm (+0.003512) was
+measured under the distillation objective, not this one, so the comparison the pilot was
+built around does not exist here. What the arms actually measure is which of two
+placements of the same sidecar helps content more, and the answer is the single stream.
+
+## M against A, and against S
+
+M does not beat A on content at any rate: -0.000159, -0.000189, -0.000101, every interval
+touching zero. Arm A itself moves content by -0.005272 at 3e-6 and -0.012736 at 1e-5, and
++0.009277 at 2e-5 where it is past the edge exactly as the earlier sweep found, so the
+null is measured in a regime that demonstrably learns. M loses to S on content at every
+rate, and that interval excludes zero every time.
+
+On layout M recovers part of S's gain -- 58% at 3e-6 (0.001518 of 0.002608), 25% at 2e-5
+(0.000243 of 0.000965), and none at 1e-5, where M is a hair worse than A -- so even at
+matched layout effect it does not reach S. The write itself is not the problem:
+at 2e-5 M's ``value_proj`` norm is 0.7559 against S's 1.0105, so the lane is written at
+three quarters of the retrofit's magnitude and still buys less.
+
+## The causal ablation
+
+The same trained M with every read forced to zero:
+
+| lr | lexical ON - OFF | whitespace ON - OFF | control ON - OFF |
+| --- | --- | --- | --- |
+| 3e-6 | +0.000097 spans zero | **-0.002526** | **-0.036529** |
+| 1e-5 | -0.000002 spans zero | +0.000019 spans zero | **-0.009602** |
+| 2e-5 | +0.000179 spans zero | -0.000185 spans zero | **-0.004561** |
+
+So the lane is not inert -- it is causally load-bearing for **control/protocol tokens at
+every rate**, and for whitespace at the lowest rate. It is causally nothing for content,
+which is the one column the hypothesis needed.
+
+## The reads did not specialise
+
+Read strength ``alpha = s_l * g_l(h)`` by token class, with no class supervision anywhere:
+
+| layer | whitespace | control | punctuation | lexical |
+| --- | ---: | ---: | ---: | ---: |
+| L20 | 0.5126 | 0.5249 | 0.5112 | 0.5103 |
+| L24 | 0.5156 | 0.5418 | 0.5082 | 0.5169 |
+| L28 | 0.4853 | 0.4982 | 0.4838 | 0.4941 |
+
+The largest between-class gap in alpha is 0.0336, at L24, at all three rates -- control is
+consistently the most-read class, which is the one place the ablation also shows an
+effect, but the spread is a rounding error next to the gate's range. The read-to-stream
+norm ratio is 0.0002 to 0.0007: the lane contributes about a twentieth of a percent of
+the residual's magnitude. Joint training did not learn ``whitespace -> strong read,
+content -> weak read``. It learned one nearly constant admission.
+
+## Verdict
+
+Three of the four pre-registered stop conditions fire: the learned reads are effectively
+uniform, the lane is ignored for everything but protocol markers, and M cannot beat S at
+matched layout effect. The fourth does not fire only because S had no content penalty to
+reproduce.
+
+*A private residual lane, written by the same sidecar and read through learned
+context-dependent gates, does not recover content capacity that direct residual injection
+costs -- because in plain CE direct injection costs none -- and it delivers less layout
+benefit than direct injection for a comparable write. Separation is not the missing
+ingredient in an already-trained single-stream backbone.*
+
+Two streams failed, so four are not next. What this does not touch is the donor-native
+hypothesis: whether PLE combined with Gated Residual / HyperConnection structure changes
+how capacity is allocated during **joint pretraining**. Retrofitting a lane onto a
+trained backbone is not that experiment, and the donor's own routing remains uninspectable
+on this hardware.

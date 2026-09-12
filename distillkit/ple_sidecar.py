@@ -170,7 +170,14 @@ class PLESidecar(nn.Module):
         gated = F.silu(self.conv1d(gated))
         return gated.transpose(1, 2)
 
-    def forward(self, hidden_states: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
+    def write(self, hidden_states: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
+        """The module's contribution, *before* it is added to the stream.
+
+        ``forward`` adds it; a caller that maintains a separate residual lane keeps it
+        apart instead. Splitting the two is not cosmetic: recovering the contribution as
+        ``forward(h, f) - h`` in bf16 loses most of a small write to the exponent of the
+        stream it was added to, which is precisely the regime this module starts in.
+        """
         features = features.to(dtype=hidden_states.dtype)
         key_normed = self.norm_key(self.key_proj(features))
         value = self.value_proj(features)
@@ -198,8 +205,10 @@ class PLESidecar(nn.Module):
                 ])
         gated_value = gate.to(value.dtype) * value
 
-        output = gated_value + self._short_conv(self.norm_conv(gated_value))
-        return hidden_states + output
+        return gated_value + self._short_conv(self.norm_conv(gated_value))
+
+    def forward(self, hidden_states: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
+        return hidden_states + self.write(hidden_states, features)
 
     @torch.no_grad()
     def gate_report(self, prefix: str = "ple") -> dict:

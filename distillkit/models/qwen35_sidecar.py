@@ -180,19 +180,25 @@ class _PLENGramSidecar(nn.Module):
             rms_norm_eps=config.rms_norm_eps,
         )
 
-    def forward(self, hidden_states, ngram_raw, sidecar_enabled=True):
-        if not sidecar_enabled:
-            # The control arm: the module is bypassed entirely rather than fed zeros,
-            # because a zero n-gram row is still a row the gate would score.
-            return hidden_states
+    def features(self, hidden_states, ngram_raw):
         expected = (*hidden_states.shape[:2], self.num_heads, self.bytes_per_head)
         if ngram_raw is None:
             raise ValueError("ngram_raw is required while sidecar_enabled=True")
         if ngram_raw.dtype != torch.uint8 or tuple(ngram_raw.shape) != expected:
             raise ValueError(f"ngram_raw must be uint8 with shape {expected}")
         raw = ngram_raw.to(device=hidden_states.device, non_blocking=True)
-        features = self.dequant(raw).flatten(-2)
-        return self.ple(hidden_states, features)
+        return self.dequant(raw).flatten(-2)
+
+    def write(self, hidden_states, ngram_raw):
+        """The PLE contribution alone, for a caller keeping it out of the stream."""
+        return self.ple.write(hidden_states, self.features(hidden_states, ngram_raw))
+
+    def forward(self, hidden_states, ngram_raw, sidecar_enabled=True):
+        if not sidecar_enabled:
+            # The control arm: the module is bypassed entirely rather than fed zeros,
+            # because a zero n-gram row is still a row the gate would score.
+            return hidden_states
+        return self.ple(hidden_states, self.features(hidden_states, ngram_raw))
 
     def gate_report(self, hidden_states, ngram_raw):
         raw = ngram_raw.to(device=hidden_states.device, non_blocking=True)
