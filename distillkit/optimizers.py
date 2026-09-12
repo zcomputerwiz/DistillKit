@@ -407,12 +407,16 @@ class UnfreezeBackboneCallback(TrainerCallback):
 
 @torch.no_grad()
 def architecture_metrics(model: nn.Module) -> dict[str, float]:
+    from distillkit.donor_reader import DonorReaderTransplant
+
     report = {}
     for name, module in model.named_modules():
         if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, (PLESidecar, DirectionGatedPLESidecar)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
+        if isinstance(module, DonorReaderTransplant):
+            report.update(module.reader_report(prefix=f"architecture/{name}"))
         if name.split(".")[-1] == "W_side_proj" and isinstance(module, nn.Linear):
             report[f"architecture/{name}/weight_norm"] = module.weight.float().norm().item()
     return report

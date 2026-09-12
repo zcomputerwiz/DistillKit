@@ -28,6 +28,7 @@ flash attention keeps the upstream behaviour.
 from __future__ import annotations
 
 import logging
+import os
 
 import torch
 
@@ -41,6 +42,11 @@ def fused_kernel_supports_gqa() -> bool:
 
     Probed rather than assumed: it depends on the build's kernels, not the model.
     """
+    # On Windows, querying a busy/misbehaving driver can itself crash the process.
+    # Respect an explicit CPU-only environment before touching the CUDA runtime.
+    visible = os.environ.get("CUDA_VISIBLE_DEVICES")
+    if visible is not None and visible.strip().lower() in ("", "-1", "none"):
+        return True
     if not torch.cuda.is_available():
         return True  # nothing to fix; leave upstream behaviour alone
     from torch.nn.attention import SDPBackend, sdpa_kernel

@@ -158,7 +158,7 @@ class SidecarConfig(BaseModel):
     prefault: bool = True
     layer_index: int = Field(default=1, ge=0)
     num_branches: int = Field(default=4, ge=1)
-    variant: Literal["gated_residual", "ple", "ple_gated"] = Field(
+    variant: Literal["gated_residual", "ple", "ple_gated", "donor_reader"] = Field(
         default="gated_residual",
         description=(
             "gated_residual: the original design -- features added ungated, then a "
@@ -167,7 +167,9 @@ class SidecarConfig(BaseModel):
             "and the n-gram embedding. ple_gated: the same integration with the key path "
             "replaced by learned directions, one gate per residual branch over a shared "
             "value -- it requires residual_stream and ignores num_branches, taking its "
-            "stream count from there. See gate_directions."
+            "stream count from there. donor_reader: the frozen C1/Flash-Next 2x2 "
+            "reader transplant with no direct value write or gate. See the reader_* "
+            "fields."
         ),
     )
     gate_directions: int = Field(
@@ -179,11 +181,49 @@ class SidecarConfig(BaseModel):
             "that ablation could not test per-branch admission, which is the point here."
         ),
     )
+    reader_value_source: Literal["c1", "donor"] = "donor"
+    reader_conv_source: Literal["c1", "donor"] = "donor"
+    reader_c1_reference: str | None = Field(
+        default=None,
+        description="C1 checkpoint directory (or tensor file) used only to initialize frozen reader weights.",
+    )
+    reader_donor_reference: str | None = Field(
+        default=None,
+        description="Flash-Next ple_layer.pt (or checkpoint) used only to initialize frozen reader weights.",
+    )
+    reader_collapse: Literal["mixer", "equal_mean", "single", "scalar", "pca_rank1"] = Field(
+        default="mixer",
+        description=(
+            "donor-conv collapse: 10,240-parameter per-channel mixer, equal mean, "
+            "one stream, offline-fitted scalar mixture, or offline PCA rank-1 weights. "
+            "C1's two convolution streams always use their fixed equal mean."
+        ),
+    )
+    reader_single_stream: int = Field(default=0, ge=0, le=3)
+    reader_collapse_weights: list[float] | None = None
+    reader_rho: float = Field(
+        default=0.0, allow_inf_nan=False,
+        description="Residual admission scalar. Zero gives exact stock-model identity at load.",
+    )
 
     @model_validator(mode="after")
     def require_table(self):
         if self.enabled and not self.table_path:
             raise ValueError("sidecar.table_path is required when enabled")
+        if self.variant == "donor_reader":
+            if (self.reader_value_source == "c1" or self.reader_conv_source == "c1") \
+                    and not self.reader_c1_reference:
+                raise ValueError("donor_reader C1 arms require sidecar.reader_c1_reference")
+            if (self.reader_value_source == "donor" or self.reader_conv_source == "donor") \
+                    and not self.reader_donor_reference:
+                raise ValueError("donor_reader donor arms require sidecar.reader_donor_reference")
+            if self.reader_conv_source == "donor" and self.reader_collapse in ("scalar", "pca_rank1"):
+                if self.reader_collapse_weights is None or len(self.reader_collapse_weights) != 4:
+                    raise ValueError(f"{self.reader_collapse} collapse requires four weights")
+            if self.reader_conv_source == "c1" and self.reader_collapse != "equal_mean":
+                # The field controls the four donor banks. Make the C1 reduction explicit
+                # in experiment YAML instead of silently ignoring a requested probe.
+                raise ValueError("C1 convolution arms require reader_collapse: equal_mean")
         return self
 
 

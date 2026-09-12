@@ -187,3 +187,6 @@ cython_debug/
 /scratch/eval-20260910/*.log
 !/scratch/eval-20260910/legacy-loading-audit.json
 /scratch/eval-screen/
+# Rebuildable donor-reader captures (held-out rows and four-stream tensors are tens of
+# MB); keep their compact JSON/Markdown analyses reviewable.
+/scratch/donor-reader-*.npz

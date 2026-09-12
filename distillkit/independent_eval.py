@@ -114,6 +114,10 @@ ROLE_MARKER = re.compile(r"<\|im_start\|>(\w+)\n")
 # counted as template rather than as anything the model was asked to produce.
 EMPTY_THINK = re.compile(r"\A<think>\s*</think>\s*")
 ROLES = ("system", "user", "assistant", "template")
+# Qwen3.5 IDs used by the diagnosed corpus for newline and the two think tags. The
+# assistant/content and assistant/layout split is reported from the same logits and
+# records as every other role metric, so factorial arms cannot drift onto a new corpus.
+LAYOUT_TOKEN_IDS = frozenset((198, 248068, 248069))
 
 
 def role_spans(text, offsets):
@@ -349,6 +353,18 @@ def score_sequences(model, features, collator, mode, device):
                     continue
                 taken = values[[index - start for index in picked]]
                 record["by_role"][role] = {"sum_nll": float(taken.sum()), "tokens": len(picked)}
+            assistant = [index for low, high in roles.get("assistant", [])
+                         for index in range(max(low, start), min(high, len(feature["ids"]))) ]
+            layout = [index for index in assistant if feature["ids"][index] in LAYOUT_TOKEN_IDS]
+            content = [index for index in assistant if feature["ids"][index] not in LAYOUT_TOKEN_IDS]
+            template = [index for low, high in roles.get("template", [])
+                        for index in range(max(low, start), min(high, len(feature["ids"]))) ]
+            for label, picked in (("content", content), ("layout", layout),
+                                  ("structural", sorted(set(layout + template)))):
+                if picked:
+                    taken = values[[index - start for index in picked]]
+                    record["by_role"][label] = {
+                        "sum_nll": float(taken.sum()), "tokens": len(picked)}
         results.append(record)
     return results
 
@@ -415,6 +431,13 @@ def evaluate(args):
         if set(tasks) != set(args.tasks) or any(not v for v in tasks.values()):
             raise ValueError("requested evaluation tasks are missing or empty")
         model, audit = load_checkpoint(args.checkpoint, args.device, torch.bfloat16)
+        if args.rho is not None:
+            if audit["variant"] != "donor_reader":
+                raise ValueError("--rho is only valid for a donor_reader checkpoint")
+            reader = model.model.layers[model.config.sidecar_layer_index].sidecar.reader
+            with torch.no_grad():
+                reader.rho.weight.fill_(args.rho)
+            audit["rho_override"] = float(args.rho)
         table = None
         if audit["variant"]:
             from distillkit.ngram_table import GGUFNGramTable
@@ -601,6 +624,10 @@ def main():
     run.add_argument("--split", choices=["screen", "confirmation"], default="screen")
     run.add_argument("--tasks", nargs="+", choices=["nll", "mmlu", "arc"], default=["nll", "mmlu", "arc"])
     run.add_argument("--limit", type=int, default=0)
+    run.add_argument(
+        "--rho", type=float,
+        help="override a donor-reader residual scalar for a frozen pre-training sweep",
+    )
     run.add_argument("--max-seconds", type=int, choices=range(1, 571), default=540, metavar="1..570")
     run.add_argument("--output", required=True)
     run.set_defaults(func=evaluate)

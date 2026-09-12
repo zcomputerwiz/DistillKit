@@ -1,0 +1,68 @@
+# Frozen donor-reader factorial arm 1: C1 value projection + C1 convolution.
+# GPU execution is intentionally deferred; see docs/donor_reader_transplant.md.
+model: D:/DeepThought/Projects/HybridModel/student-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/transplant-c1-value-c1-conv
+project_name: hybridmodel-sidecar
+sequence_length: 4096
+dataset:
+  seed: 42
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  cache_dtype: float8_e4m3fn
+tensor_parallel: true
+chunked_head: true
+sortish_batching: true
+sidecar:
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  resident: true
+  prefault: true
+  layer_index: 1
+  variant: donor_reader
+  reader_value_source: c1
+  reader_conv_source: c1
+  reader_c1_reference: D:/DeepThought/Projects/HybridModel/runs/win-C1-L1-real-stage1-1m
+  reader_collapse: equal_mean
+  reader_rho: 0.0
+loss_functions:
+  - function: kl
+    weight: 1.0
+    temperature: 1.0
+    missing_probability_handling: zero
+    sparse_chunk_length: 256
+optimizer:
+  strategy: hybrid
+  freeze_backbone: true
+  unfreeze_at_step: null
+  sidecar_lr: 1.0e-4
+  log_every_n_steps: 5
+use_flash_attention: false
+functionary_packing: false
+chunked_cross_entropy: true
+max_vram_fraction: 0.95
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  per_device_train_batch_size: 4
+  length_column_name: length
+  gradient_accumulation_steps: 4
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  num_train_epochs: 1
+  learning_rate: 1.0e-4
+  lr_scheduler_type: constant_with_warmup
+  warmup_steps: 20
+  max_grad_norm: 1.0
+  logging_steps: 5
+  eval_strategy: steps
+  eval_steps: 10
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 200
+  save_total_limit: 2
+  report_to: tensorboard
+  seed: 42
+

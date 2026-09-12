@@ -25,6 +25,7 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
 )
 
 from distillkit.gated_residual import GatedResidual
+from distillkit.donor_reader import DonorReaderTransplant
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
@@ -51,6 +52,12 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         "sidecar_per_channel_gate": True,
         "sidecar_variant": "gated_residual",
         "sidecar_gate_directions": 2,
+        "sidecar_value_source": "donor",
+        "sidecar_conv_source": "donor",
+        "sidecar_reader_collapse": "mixer",
+        "sidecar_reader_single_stream": 0,
+        "sidecar_reader_collapse_weights": None,
+        "sidecar_reader_rho": 0.0,
     }
     for name, value in defaults.items():
         if not hasattr(config, name):
@@ -61,8 +68,9 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         raise ValueError("sidecar_num_heads must be positive")
     if config.sidecar_head_dim <= 0 or config.sidecar_head_dim % IQ4NL_BLOCK:
         raise ValueError("sidecar_head_dim must be a positive multiple of 32")
-    if config.sidecar_variant not in ("gated_residual", "ple", "ple_gated"):
-        raise ValueError("sidecar_variant must be 'gated_residual', 'ple' or 'ple_gated'")
+    if config.sidecar_variant not in ("gated_residual", "ple", "ple_gated", "donor_reader"):
+        raise ValueError(
+            "sidecar_variant must be 'gated_residual', 'ple', 'ple_gated' or 'donor_reader'")
     if config.sidecar_gate_directions < 1:
         raise ValueError("sidecar_gate_directions must be positive")
     if config.sidecar_variant == "ple_gated" and not getattr(
@@ -70,6 +78,12 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         raise ValueError(
             "the 'ple_gated' sidecar reads a widened residual; enable residual_stream "
             "or use 'ple', which is the single-stream transcription"
+        )
+    if config.sidecar_variant == "donor_reader" and getattr(
+            config, "residual_stream_enabled", False):
+        raise ValueError(
+            "donor_reader is a single-stream transplant; do not enable residual_stream "
+            "or rebuild Flash-Next hyper-connections"
         )
     if config.sidecar_num_branches < 1 or config.sidecar_gate_init_std < 0:
         raise ValueError("sidecar branches must be positive and gate init std nonnegative")
@@ -89,6 +103,8 @@ learned sidecar weights never resets a sibling that was present in the checkpoin
         mode = getattr(module, "_sidecar_weight_init", None)
         if mode == "zero":
             nn.init.zeros_(module.weight)
+        elif mode == "reader":
+            module.reset_parameters()
         elif mode == "gate":
             nn.init.normal_(module.weight, std=module._sidecar_gate_init_std)
             if module.bias is not None:
@@ -228,7 +244,45 @@ class _DirectionGatedNGramSidecar(nn.Module):
         return self.ple.gate_report(prefix)
 
 
+class _DonorReaderNGramSidecar(nn.Module):
+    """Frozen table reader transplant at one ordinary residual injection point."""
+
+    def __init__(self, config: Qwen3_5TextConfig):
+        super().__init__()
+        self.num_heads = config.sidecar_num_heads
+        self.bytes_per_head = config.sidecar_head_dim // IQ4NL_BLOCK * IQ4NL_TYPE_SIZE
+        self.dequant = IQ4NLDequant(out_dtype=torch.float32)
+        self.reader = DonorReaderTransplant(
+            config.hidden_size,
+            config.sidecar_num_heads * config.sidecar_head_dim,
+            value_source=config.sidecar_value_source,
+            conv_source=config.sidecar_conv_source,
+            collapse=config.sidecar_reader_collapse,
+            single_stream=config.sidecar_reader_single_stream,
+            collapse_weights=config.sidecar_reader_collapse_weights,
+            rho=config.sidecar_reader_rho,
+            rms_norm_eps=config.rms_norm_eps,
+        )
+
+    def forward(self, hidden_states, ngram_raw, sidecar_enabled=True):
+        if not sidecar_enabled:
+            return hidden_states
+        expected = (*hidden_states.shape[:2], self.num_heads, self.bytes_per_head)
+        if ngram_raw is None:
+            raise ValueError("ngram_raw is required while sidecar_enabled=True")
+        if ngram_raw.dtype != torch.uint8 or tuple(ngram_raw.shape) != expected:
+            raise ValueError(f"ngram_raw must be uint8 with shape {expected}")
+        raw = ngram_raw.to(device=hidden_states.device, non_blocking=True)
+        table_rows = self.dequant(raw).flatten(-2)
+        return self.reader(hidden_states, table_rows)
+
+    def gate_report(self, prefix="reader"):
+        return self.reader.reader_report(prefix)
+
+
 def _build_sidecar(config: Qwen3_5TextConfig) -> nn.Module:
+    if config.sidecar_variant == "donor_reader":
+        return _DonorReaderNGramSidecar(config)
     if config.sidecar_variant == "ple_gated":
         return _DirectionGatedNGramSidecar(config)
     if config.sidecar_variant == "ple":
@@ -359,11 +413,19 @@ table path. Use this class explicitly when reloading a saved sidecar checkpoint.
         before optimizer/distributed setup avoids that; the gated residual remains
         trainable.
         """
-        self.model.layers[self.config.sidecar_layer_index].sidecar.W_side_proj.requires_grad_(False)
+        sidecar = self.model.layers[self.config.sidecar_layer_index].sidecar
+        if hasattr(sidecar, "W_side_proj"):
+            sidecar.W_side_proj.requires_grad_(False)
+        else:
+            # PLE-style variants are bypassed as a whole. A disabled training control
+            # must not leave rho/mixer as unused DDP parameters.
+            sidecar.requires_grad_(False)
 
     @torch.no_grad()
     def gate_report(self, prefix="sidecar") -> dict[str, float]:
         sidecar = self.model.layers[self.config.sidecar_layer_index].sidecar
+        if hasattr(sidecar, "reader"):
+            return sidecar.reader.reader_report(f"{prefix}/reader")
         report = sidecar.gated_residual.gate_report(f"{prefix}/gated_residual")
         report[f"{prefix}/W_side_proj_norm"] = sidecar.W_side_proj.weight.float().norm().item()
         return report

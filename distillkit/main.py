@@ -259,6 +259,7 @@ def load_student_model(
         "trust_remote_code") if key in extra_kwargs}
     stock_config = transformers.AutoConfig.from_pretrained(config.train_model, **config_kwargs)
     text_config = getattr(stock_config, "text_config", stock_config)
+    saved_sidecar_variant = getattr(text_config, "sidecar_variant", None)
     if getattr(text_config, "residual_stream_enabled", False):
         if residual_stream is None:
             raise ValueError("Widened checkpoint requires its matching residual_stream run configuration")
@@ -283,10 +284,34 @@ def load_student_model(
             raise ValueError("Widened checkpoint sidecar architecture differs from requested sidecar")
     if config.sidecar is not None or residual_stream is not None:
         if config.sidecar is not None:
+            if saved_sidecar_variant == "donor_reader":
+                expected = (
+                    text_config.sidecar_value_source,
+                    text_config.sidecar_conv_source,
+                    text_config.sidecar_reader_collapse,
+                    text_config.sidecar_reader_single_stream,
+                    getattr(text_config, "sidecar_reader_collapse_weights", None),
+                )
+                requested = (
+                    config.sidecar.reader_value_source,
+                    config.sidecar.reader_conv_source,
+                    config.sidecar.reader_collapse,
+                    config.sidecar.reader_single_stream,
+                    config.sidecar.reader_collapse_weights,
+                )
+                if expected != requested:
+                    raise ValueError(
+                        f"Saved donor-reader arm {expected} differs from requested {requested}")
             text_config.sidecar_layer_index = config.sidecar.layer_index
             text_config.sidecar_num_branches = config.sidecar.num_branches
             text_config.sidecar_variant = config.sidecar.variant
             text_config.sidecar_gate_directions = config.sidecar.gate_directions
+            text_config.sidecar_value_source = config.sidecar.reader_value_source
+            text_config.sidecar_conv_source = config.sidecar.reader_conv_source
+            text_config.sidecar_reader_collapse = config.sidecar.reader_collapse
+            text_config.sidecar_reader_single_stream = config.sidecar.reader_single_stream
+            text_config.sidecar_reader_collapse_weights = config.sidecar.reader_collapse_weights
+            text_config.sidecar_reader_rho = config.sidecar.reader_rho
         if residual_stream is not None:
             text_config.residual_stream_enabled = True
             text_config.residual_stream_num_branches = residual_stream.num_branches
@@ -301,6 +326,44 @@ def load_student_model(
         **extra_kwargs,
     )
     LOG.info("Loaded model.")
+
+    if config.sidecar is not None and config.sidecar.variant == "donor_reader" \
+            and saved_sidecar_variant != "donor_reader":
+        # Populate after from_pretrained has materialised missing sidecar tensors, but
+        # before sharding/optimizer construction. Saved transplant checkpoints already
+        # carry these frozen tensors and must replay them rather than consulting a
+        # machine-local source path again.
+        from distillkit.donor_reader import initialise_transplant_reader
+
+        LOG.info("Initialized donor-reader arm: %s", initialise_transplant_reader(
+            model,
+            c1_reference=config.sidecar.reader_c1_reference,
+            donor_reference=config.sidecar.reader_donor_reference,
+        ))
+
+    if config.sidecar is not None and config.sidecar.variant == "donor_reader":
+        # Transformers can materialize parameters missing from a stock checkpoint
+        # with requires_grad=True even when their module constructors froze them.
+        # Reassert the transplant contract before sharding and optimizer creation,
+        # including when resuming a saved donor-reader checkpoint.
+        reader = model.model.layers[config.sidecar.layer_index].sidecar.reader
+        reader.enforce_trainability()
+        reader_trainable = {
+            name: parameter.numel()
+            for name, parameter in reader.named_parameters()
+            if parameter.requires_grad
+        }
+        expected_reader_trainable = (
+            {"mixer.weight": 4 * reader.hidden_size, "rho.weight": 1}
+            if reader.collapse == "mixer"
+            else {"rho.weight": 1}
+        )
+        if reader_trainable != expected_reader_trainable:
+            raise RuntimeError(
+                "Donor-reader freeze contract violated: "
+                f"expected {expected_reader_trainable}, got {reader_trainable}"
+            )
+        LOG.info("Donor-reader trainable parameters: %s", reader_trainable)
 
     if residual_stream is not None and residual_stream.init_from:
         # Before sharding and before the optimizer: this writes parameters in place,
@@ -436,7 +499,8 @@ def load_tokenizer(config: DistillationRunConfig) -> transformers.PreTrainedToke
     )
 
 
-def do_distill(config: DistillationRunConfig, config_source: str | None = None):
+def do_distill(config: DistillationRunConfig, config_source: str | None = None,
+               initialise_only: bool = False):
     os.makedirs(config.output_path, exist_ok=True)
     if config_source is None:
         config_source = yaml.safe_dump(config.model_dump(mode="json", by_alias=True))
@@ -477,6 +541,17 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
         )
 
     model = load_student_model(config, tokenizer_vocab_size, signal_vocab_size)
+    if initialise_only:
+        # The frozen rho sweep grades an arm *before* any optimizer step, so the
+        # thing it grades has to be the model training would have started from --
+        # same config parsing, same reference loading, same trainability contract.
+        # Saved here rather than after sharding: a sharded save is a different code
+        # path, and nothing below this point can run without touching the optimizer.
+        LOG.info("Saving initialised model without training to %s", config.output_path)
+        model.save_pretrained(config.output_path)
+        tokenizer.save_pretrained(config.output_path)
+        LOG.info("Done.")
+        return
     if config.tensor_parallel:
         from distillkit.tp_model import shard_model
         if torch.cuda.device_count() < 2 or int(os.environ.get("WORLD_SIZE", "1")) != 1:
@@ -653,7 +728,12 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None):
     count=True,
     help="Increase verbosity of logging. Use -vv for debug level.",
 )
-def main(config_path: str, verbosity: int):
+@click.option(
+    "--initialise-only",
+    is_flag=True,
+    help="Build and save the model without training, for a frozen pre-training sweep.",
+)
+def main(config_path: str, verbosity: int, initialise_only: bool = False):
     log_level = logging.WARNING
     if verbosity >= 2:
         log_level = logging.DEBUG
@@ -663,7 +743,7 @@ def main(config_path: str, verbosity: int):
     with open(config_path, "r") as f:
         config_dict = yaml.safe_load(f)
     config = DistillationRunConfig.model_validate(config_dict)
-    do_distill(config)
+    do_distill(config, initialise_only=initialise_only)
 
 
 if __name__ == "__main__":
