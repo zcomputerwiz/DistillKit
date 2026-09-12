@@ -436,3 +436,86 @@ is deliberately narrow: *removing conditional whitespace-selection training from
 backbone improves content optimisation, and the n-gram sidecar can take that selection
 task over without losing whitespace prediction.* Not semantic capacity offload —
 optimisation-budget transfer, until something supports the stronger reading.
+
+
+---
+
+# Arms A and B: the stop gate fires
+
+Plain CE, no teacher. Layers 20–28, LR 3e-5, constant with 20-step warmup, 512 training
+documents at 1,024 tokens, batch 2, 256 steps, seed 42 — identical in both arms. The only
+difference is whether `-log P(w | WS)` contributes at whitespace targets. Scored on 124
+held-out documents, 48,963 assistant tokens, 13.2% whitespace.
+
+## Absolute NLL
+
+| arm | content | whitespace | ws detect | ws select |
+| --- | ---: | ---: | ---: | ---: |
+| baseline (untrained) | 0.48779 | 0.42634 | 0.07014 | 0.35620 |
+| A | 0.51361 | 0.16327 | 0.07190 | 0.09136 |
+| B | 0.51353 | 0.36666 | 0.07285 | 0.29380 |
+
+## The gate
+
+    B - A on content:  -0.000080  [-0.000719, +0.000603]   spans zero
+
+**Removing whitespace selection from the backbone's objective bought nothing on
+content.** By the pre-registered rule, this stops here: arm D is not built, because there
+is no content benefit for a sidecar to preserve.
+
+The arm is not broken — it did exactly what it was designed to do:
+
+| whitespace term, B − A | | |
+| --- | --- | --- |
+| detect | +0.000952 [−0.000136, +0.002048] | preserved, as intended |
+| select | +0.202440 [+0.167810, +0.247054] | lost, as intended |
+
+B stopped training selection and lost selection; it kept detection. The intervention
+landed cleanly and produced no content effect.
+
+## The part that complicates the reading
+
+Both arms are **worse on content than the untrained model**:
+
+| | content | whitespace |
+| --- | --- | --- |
+| A − baseline | **+0.025826** [+0.006911, +0.041060] | −0.263071 |
+| B − baseline | **+0.025747** [+0.006860, +0.040844] | −0.059679 |
+
+256 steps of plain CE on this window makes the model dramatically better at whitespace
+(A gains 0.263 nats) and measurably worse at content, and that is true whether or not
+whitespace selection is in the objective. The backbone spends continued training on
+whitespace at content's expense — which is the phenomenon the offload hypothesis was
+about — and **taking whitespace selection away did not redirect that spending.** B simply
+did less total useful work: it gained 0.060 on whitespace instead of 0.263, for the same
+content cost.
+
+That makes this a clean negative for responsibility transfer, with one honest caveat
+about the platform. The claim was that freed budget goes to content; the measurement is
+that it goes nowhere. But it is measured in a regime where content is degrading in both
+arms, so what was actually tested is "does removing whitespace selection slow the
+degradation", not "does it accelerate improvement". A regime where A improves content
+would be a stronger platform for the same question.
+
+The pre-registered confound also stands and now matters more: B uses the same denominator
+as A, so it takes a roughly 24.5% smaller effective step. B matched A's content number
+while spending less — which is, if anything, mild evidence that the whitespace gradient
+was not harming content either.
+
+## What would change the verdict
+
+Two follow-ups, in the order they would be worth running, both of which were listed as
+"only if needed":
+
+1. **Matched-step / LR sensitivity.** Give B the step magnitude A has, and sweep the rate
+   until arm A improves content rather than degrading it. If B−A stays at zero across a
+   regime where A is actually learning content, the negative is solid.
+2. **Distillation-objective replication.** Every other arm in this ledger trained against
+   0.7 sparse top-k KL + 0.3 hidden-state cosine, under which this window at this rate is
+   known to improve. Plain CE was chosen for the pilot because it makes the whitespace
+   factorisation exact; it is also the reason arm A behaves unlike every other arm here.
+
+Until one of those runs, the defensible statement is narrow: *under plain-CE continued
+training on this window, removing conditional whitespace-selection training does not
+improve content modelling, and the freed quarter of the update energy is not
+reallocated.*
