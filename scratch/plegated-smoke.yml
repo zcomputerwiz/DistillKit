@@ -1,0 +1,75 @@
+model: D:/DeepThought/Projects/HybridModel/student-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/plegated-smoke
+project_name: hybridmodel-sidecar
+sequence_length: 4096
+dataset:
+  seed: 42
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  anchor_layers:
+  - 8
+  - 64
+  cache_dtype: float8_e4m3fn
+tensor_parallel: true
+chunked_head: true
+sortish_batching: true
+sidecar:
+  table_path: C:/Users/Owner/.cache/huggingface/hub/models--unsloth--Qwen3.8-Flash-Next-GGUF/snapshots/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+  enabled: true
+  resident: true
+  prefault: true
+  layer_index: 1
+  num_branches: 4
+  variant: ple_gated
+  gate_directions: 2
+residual_stream:
+  num_branches: 2
+  lowrank: 64
+layer_mapping:
+- - 4
+  - 0
+- - 32
+  - 1
+loss_functions:
+- function: kl
+  weight: 0.7
+  temperature: 1.0
+  missing_probability_handling: zero
+  sparse_chunk_length: 256
+- function: hs_cosine
+  weight: 0.3
+optimizer:
+  strategy: hybrid
+  freeze_backbone: true
+  unfreeze_at_step: null
+  log_every_n_steps: 1
+use_flash_attention: false
+functionary_packing: false
+chunked_cross_entropy: true
+max_vram_fraction: 0.95
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  per_device_train_batch_size: 2
+  length_column_name: length
+  gradient_accumulation_steps: 1
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  num_train_epochs: 1
+  learning_rate: 0.0001
+  lr_scheduler_type: constant
+  warmup_steps: 0
+  max_grad_norm: 1.0
+  logging_steps: 1
+  eval_strategy: 'no'
+  eval_steps: 10
+  per_device_eval_batch_size: 1
+  save_strategy: 'no'
+  save_steps: 200
+  save_total_limit: 2
+  report_to: none
+  seed: 42
+  max_steps: 3

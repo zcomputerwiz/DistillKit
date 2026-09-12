@@ -190,3 +190,17 @@ cython_debug/
 # Rebuildable donor-reader captures (held-out rows and four-stream tensors are tens of
 # MB); keep their compact JSON/Markdown analyses reviewable.
 /scratch/donor-reader-*.npz
+
+# Rebuildable row-novelty arrays: `row_novelty.py seen` rebuilds the 31 MB training row
+# set and `score` rebuilds each 2 MB per-token bundle. RESULTS.md stays reviewable.
+/scratch/row-novelty/*.npy
+/scratch/row-novelty/*.npz
+# Triton kernel caches and HF dataset/trainer scratch are build products, not results.
+/scratch/*/triton-cache/
+/scratch/*/datasets-cache/
+/scratch/*/trainer-output/
+/scratch/eval-suite-*/
+/scratch/eval-unit-*/
+/scratch/eval-cache-*/
+/scratch/eval-*-temp-*/
+/scratch/pytest-*/

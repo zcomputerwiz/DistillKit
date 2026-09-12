@@ -1,4 +1,10 @@
-"""Initialise the widened residual from Flash-Next's trained hyper-connection routing.
+"""Initialise residual routing from Flash-Next's trained hyper-connection tensors.
+
+The historical diagnosis below describes the legacy ``WidenedResidual`` path.
+``routing=flash_next`` now loads the same tensors into ``HyperConnection`` without
+changing its explicit blend. The verified donor arithmetic also needs a mean read,
+2*sigmoid writes, and standalone donor norms. See hyper_connection.py and
+scratch/hyper-connection/REPORT.md; the old path remains unchanged for replay.
 
 ``WidenedResidual`` is a transcription of the ``hc_attn_*`` / ``hc_ffn_*`` tensors that
 every Flash-Next block carries. Until now it has trained from an identity
@@ -65,6 +71,7 @@ from pathlib import Path
 
 import torch
 from torch import nn
+from distillkit.hyper_connection import HyperConnection
 
 LOG = logging.getLogger(__name__)
 
@@ -103,7 +110,7 @@ def load_manifest(directory: Path) -> dict:
 
 
 def initialise_widened_residual(model, directory, how="proportional") -> dict:
-    """Copy donor routing into every ``WidenedResidual``. Returns what it did.
+    """Copy donor routing into each legacy/new route. Returns what it did.
 
     Shapes are checked rather than reshaped. A mismatch here means the run's
     ``num_branches`` or ``lowrank`` disagrees with the extraction, and silently
@@ -145,9 +152,10 @@ def initialise_widened_residual(model, directory, how="proportional") -> dict:
             # stacks on top of the identity write instead of replacing it. See the
             # module note for what each of those costs.
             with torch.no_grad():
-                module.lambda_read.fill_(1.0)
-                module.lambda_write.fill_(1.0)
-                module.write_offset.fill_(-1.0)
+                if not isinstance(module, HyperConnection):
+                    module.lambda_read.fill_(1.0)
+                    module.lambda_write.fill_(1.0)
+                    module.write_offset.fill_(-1.0)
 
     report = {"directory": str(directory), "map": how, "layers": len(layers),
               "donor_blocks": len(blocks), "tensors_copied": copied,
