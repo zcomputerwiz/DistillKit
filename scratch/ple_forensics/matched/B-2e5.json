@@ -1,0 +1,51 @@
+{
+  "summary": {
+    "arm": "B",
+    "lr": 2e-05,
+    "steps": 256,
+    "train_targets": 190615,
+    "eval_tokens": 48963,
+    "assistant_nll": 0.46623358130455017,
+    "displacement": 4.404653313250376,
+    "initial_norm": 387.38124449707715,
+    "relative_displacement": 0.011370331878015352
+  },
+  "trajectory": [
+    {
+      "step": 64,
+      "train_content": 0.5336897768076951,
+      "train_detect": 0.0802092401106322,
+      "train_select": 0.3548062151885845,
+      "heldout_content": 0.5040632486343384,
+      "heldout_detect": 0.09615524113178253,
+      "heldout_select": 0.26681089401245117
+    },
+    {
+      "step": 128,
+      "train_content": 0.49449646198571207,
+      "train_detect": 0.07129470585583293,
+      "train_select": 0.3110292822137011,
+      "heldout_content": 0.5060117244720459,
+      "heldout_detect": 0.09542161971330643,
+      "heldout_select": 0.2665197551250458
+    },
+    {
+      "step": 192,
+      "train_content": 0.4873341537096583,
+      "train_detect": 0.07730777179042561,
+      "train_select": 0.34240100259152434,
+      "heldout_content": 0.5089911222457886,
+      "heldout_detect": 0.08934139460325241,
+      "heldout_select": 0.28954532742500305
+    },
+    {
+      "step": 256,
+      "train_content": 0.4654148219366676,
+      "train_detect": 0.06869839102045901,
+      "train_select": 0.37614527251856533,
+      "heldout_content": 0.517099142074585,
+      "heldout_detect": 0.0864272192120552,
+      "heldout_select": 0.29444703459739685
+    }
+  ]
+}

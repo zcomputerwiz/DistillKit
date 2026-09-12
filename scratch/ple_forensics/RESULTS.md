@@ -526,9 +526,10 @@ such an arm win, the claim it supports is "offloading whitespace permits more ag
 content-directed optimisation at the same overall update magnitude", never "the backbone
 repurposes freed capacity".
 
-The pre-registered confound sits inside that distinction: B uses A's denominator and so
-takes a smaller step, which is exactly why a step-matched arm would be measuring explicit
-rather than natural reallocation.
+The pre-registered confound sat inside that distinction: B uses A's denominator and so
+was assumed to take a smaller step. **It does not** -- measured later at 97.8% of A's
+displacement, because AdamW's update is per-coordinate scale-invariant. See the final
+section; the caveat is withdrawn.
 
 ## What would change the verdict
 
@@ -648,3 +649,78 @@ aggressive content-directed optimisation at the same overall update magnitude", 
 Distillation replication stays held, for the reason it was held: the hidden-state term can
 keep teaching whitespace-selection representations even with the token-level selection
 loss masked, which would break the decomposition this whole design rests on.
+
+
+---
+
+# Explicit reallocation, and a pre-registered confound that turned out not to exist
+
+## The confound was wrong
+
+The ledger has been carrying a caveat that arm B "takes a roughly 24.5% smaller effective
+step", because it uses A's denominator with the whitespace terms absent. Every run now
+snapshots the window before training and reports the parameter displacement, so that is
+measured rather than asserted. At 1e-5, over 256 steps:
+
+| arm | ‖Δθ‖ | relative to ‖θ₀‖ = 387.38 |
+| --- | ---: | ---: |
+| A | 1.752729 | 0.004525 |
+| B | 1.714111 | 0.004425 |
+
+**B travelled 97.8% as far as A, not 75.5%.** AdamW's update is per-coordinate
+scale-invariant — scaling a gradient by `c` leaves `m̂/√v̂` unchanged — so removing a
+quarter of the gradient energy barely changes the distance travelled. The confound does
+not exist, and the 1e-5 null is cleaner than it was claimed to be.
+
+This is the same property that produced two earlier findings in this project: `sharpness`
+sitting bit-identical for 72 steps, and AdamW moving ~`lr` per element regardless of
+gradient size. It should have been applied here the first time.
+
+## Explicit reallocation via rate
+
+With the step-magnitude route closed, the meaningful version of "explicitly reallocate the
+removed magnitude to content" is **rate**: if B has less to fit, it may tolerate a rate at
+which A overfits and reach content A cannot. The full grid, content NLL against the
+untrained 0.48779:
+
+| lr | A content | B content | B − A | ws select, A | ws select, B |
+| --- | ---: | ---: | --- | ---: | ---: |
+| 3e-6 | 0.46757 | 0.46758 | +0.000008 [−0.000335, +0.000383] | 0.08340 | 0.33786 |
+| **1e-5** | **0.45918** | **0.45891** | −0.000276 [−0.000551, +0.000005] | 0.07350 | 0.34461 |
+| 2e-5 | 0.47779 | 0.47773 | −0.000055 [−0.000642, +0.000467] | 0.08022 | 0.32221 |
+| 3e-5 | 0.51361 | 0.51353 | −0.000080 [−0.000719, +0.000603] | 0.09136 | 0.29380 |
+
+**Every comparison spans zero, and the two content curves are superimposed** — they agree
+to within 0.0001 at every rate, peak at the same rate, and degrade at 3e-5 identically.
+Best content: A 0.45918, B 0.45891, both at 1e-5, 0.00027 apart.
+
+B does **not** tolerate a higher rate. Removing a quarter of the gradient energy did not
+move the optimum, did not flatten the overfitting cliff, and did not open any regime A
+could not already reach. The `ws select` columns confirm the intervention is live
+throughout: B sits at 0.29–0.34 against A's 0.073–0.091 at every rate.
+
+## Final verdict on responsibility transfer
+
+Three distinct claims were tested and all three fail:
+
+1. **Natural reallocation.** B ≈ A at matched rate, in a regime where A improves content
+   by 0.0286 nats. −0.000276, ~1% of A's own gain, interval touching zero.
+2. **Explicit reallocation via rate.** B's entire LR curve lies on A's. No rate becomes
+   available to B that was not available to A.
+3. **The step-magnitude confound** that would have muddied either. It does not exist:
+   97.8%.
+
+*Conditional whitespace selection is a large, nearly orthogonal gradient workload — 90.4%
+of the whitespace gradient energy, about a quarter of everything the trainable window
+spends. Removing it removes the workload and nothing else. The optimiser does not
+redirect the freed magnitude toward content, and it cannot be persuaded to by raising the
+rate. The removed magnitude simply disappears.*
+
+Arm D is not built. There is no content benefit, natural or engineered, for a sidecar to
+preserve.
+
+Distillation replication remains held, for the reason it was held: the hidden-state term
+can keep teaching whitespace-selection representations even with the token-level loss
+masked, which would break the decomposition this design rests on. It would now be testing
+whether a *different* objective shows a separation that plain CE does not, which is a new
+question rather than a confirmation of this one.

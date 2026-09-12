@@ -207,6 +207,11 @@ def main():
               % (scores["nll"].mean(), len(scores["nll"])))
         return 0
 
+    # A snapshot, so the arms' actual parameter displacement can be compared rather than
+    # assumed. AdamW's update is per-coordinate scale-invariant -- scaling a gradient by c
+    # leaves m/sqrt(v) unchanged -- so removing a term from the loss does not obviously
+    # shrink the step, whatever the denominator does to the loss value.
+    initial = [parameter.detach().to("cpu", torch.float32).clone() for parameter in trainable]
     optimizer = torch.optim.AdamW(trainable, lr=args.lr, weight_decay=0.0)
     scheduler = torch.optim.lr_scheduler.LambdaLR(
         optimizer, lambda step: min(1.0, (step + 1) / max(args.warmup, 1)))
@@ -283,9 +288,15 @@ def main():
                       args.tokens, embedding_device)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     np.savez(args.output, **scores)
+    moved = float(np.sqrt(sum(
+        float((parameter.detach().to("cpu", torch.float32) - start).pow(2).sum())
+        for parameter, start in zip(trainable, initial))))
+    reference = float(np.sqrt(sum(float(start.pow(2).sum()) for start in initial)))
     summary = {"arm": args.arm, "lr": args.lr, "steps": step, "train_targets": seen,
                "eval_tokens": int(len(scores["nll"])),
-               "assistant_nll": float(scores["nll"].mean())}
+               "assistant_nll": float(scores["nll"].mean()),
+               "displacement": moved, "initial_norm": reference,
+               "relative_displacement": moved / max(reference, 1e-30)}
     if args.trajectory:
         args.trajectory.parent.mkdir(parents=True, exist_ok=True)
         args.trajectory.write_text(
