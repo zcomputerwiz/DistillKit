@@ -19,8 +19,8 @@
 #
 # Checkpointing off is 21% faster per token (2966 tok/s) and takes the entire card to get
 # it, so it is disqualified rather than chosen. Batch 2 is slower per token AND holds 19
-# GiB, so batch 1 with accumulation 8 is both the fastest and the roomiest way to spend
-# 32,768 tokens per update.
+# GiB. Batch 1 is therefore both the fastest and the roomiest, and it runs at
+# accumulation 1: one optimizer update per 4,096 tokens (see training_args).
 #
 # The refusals above are enforced, not observed: Windows WDDM does not raise on an
 # oversized allocation, it pages to host RAM and runs about seventy times slower, so
@@ -28,8 +28,9 @@
 # RSS after every step (scratch/native_table/vram_guard.py).
 #
 # rho starts at exactly zero, which means nothing inside the block receives gradient until
-# rho itself has moved -- under accumulation 8 that first update costs 32,768 tokens. It
-# is opened separately instead:
+# rho itself has moved. That gate is opened before the run rather than inside it, so the
+# screen begins with a model whose table, projections and convolution are already
+# learning, and so the tokens it cost are accounted for separately:
 #
 #   .venv/Scripts/python.exe scratch/native_table/bootstrap_rho.py \
 #       --output D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
@@ -39,9 +40,9 @@
 # gradient afterwards. Point `model:` at that checkpoint and the 4,096 tokens it spent are
 # reported separately from the experiment's own budget.
 
-# Point this at the bootstrap checkpoint once rho has been opened (see the note
-# above); the base checkpoint below starts rho at zero and spends the first 32,768
-# tokens of the run moving one scalar.
+# Point this at the bootstrap checkpoint once rho has been opened (see the note above).
+# The base checkpoint below is an exact morph of the pretrained student -- rho is zero, so
+# the sidecar contributes nothing and nothing inside it learns until rho has moved.
 model: D:/DeepThought/Projects/HybridModel/student-2b-hf
 # model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-bootstrap
 output_path: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce
@@ -104,21 +105,40 @@ training_args:
   dataloader_num_workers: 0
   optim: adamw_torch
   per_device_train_batch_size: 1
-  gradient_accumulation_steps: 8
-  num_train_epochs: 1
+  # Accumulation 1, not 8. Every step in this section is an optimizer step, and at
+  # accumulation 8 each one costs 32,768 tokens, which would make the 100K screen three
+  # updates long -- the warmup alone would outlast the entire nominal 1M-token run. The
+  # benchmark says a real AdamW update every microbatch sustains 2456 tok/s at 12.26 GiB,
+  # so amortizing the optimizer buys nothing worth three orders of magnitude fewer
+  # updates. The table is random and newly admitted: updates per token is the quantity
+  # that matters. A larger effective batch is a question for after a positive signal.
+  gradient_accumulation_steps: 1
+  # One update = 4096 tokens, so the nominal screens land at:
+  #   100K tokens ~  24 updates      500K tokens ~ 122 updates
+  #   250K tokens ~  61 updates        1M tokens ~ 244 updates
+  # max_steps ends the run at the 1M mark and gives the cosine schedule something
+  # definite to decay over; a `num_train_epochs: 1` cosine would have been shaped by the
+  # size of the cache instead.
+  max_steps: 244
   # The table starts random and has to learn something from scratch, unlike a retrofit
   # nudging pretrained weights; rho starts at zero and has to travel before anything
   # inside the block sees gradient at all.
   learning_rate: 1.0e-4
   lr_scheduler_type: cosine
-  warmup_steps: 50
+  warmup_steps: 5
   max_grad_norm: 1.0
-  logging_steps: 10
+  logging_steps: 5
   eval_strategy: steps
-  eval_steps: 100
+  # Every 25 updates is roughly every 100K tokens, so the milestones read off directly:
+  # update 25 is the 100K screen, 50 and 75 bracket 250K, 125 is 500K, 250 is 1M. Logged
+  # `supervised_tokens` is the exact count -- positions that carried gradient, padding and
+  # unsupervised positions excluded -- and is what the screens should be reported against.
+  eval_steps: 25
   per_device_eval_batch_size: 1
   save_strategy: steps
-  save_steps: 500
+  # 2.15B parameters go to disk on every save whether or not they moved, so this is
+  # deliberately coarser than the eval cadence: every 60 updates is roughly 250K tokens.
+  save_steps: 60
   save_total_limit: 2
   report_to: tensorboard
   seed: 42

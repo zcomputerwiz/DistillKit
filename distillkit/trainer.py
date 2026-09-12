@@ -41,6 +41,11 @@ class DistillationTrainer(SFTTrainer):
         super().__init__(model, *args, **kwargs)
         self.true_vocab_size = true_vocab_size
         self.config = config
+        # What the run actually learned from, as opposed to what it read. Padding and
+        # unsupervised positions are excluded, so a screen measured in tokens is
+        # measured in the tokens that carried gradient. Accumulated on device and read
+        # only at log time, because a per-microbatch .item() is a synchronisation.
+        self._supervised_tokens = None
 
         self.loss_functions = [create_loss_func(lfc) for lfc in config.loss_functions]
         self.need_hidden_states = any(
@@ -308,6 +313,9 @@ class DistillationTrainer(SFTTrainer):
             valid_mask = valid_mask & inputs["attention_mask"].bool().unsqueeze(-1)
         if not valid_mask.any():
             raise ValueError("Distillation batch contains no supervised token positions")
+        counted = valid_mask.any(-1).sum()
+        running = getattr(self, "_supervised_tokens", None)
+        self._supervised_tokens = counted if running is None else running + counted
         # A CE-only run has nothing to ask the teacher, and asking anyway costs a
         # per-microbatch cache read that is then thrown away.
         signal: TeacherSignal | None = None
@@ -378,6 +386,17 @@ class DistillationTrainer(SFTTrainer):
         else:
             pending_logs.append(metrics)
         return total_loss
+
+
+    def log(self, logs, start_time=None):
+        """Report supervised tokens alongside the loss.
+
+        A 100K screen is only meaningful if 100K counts the positions that actually
+        carried gradient; sequence length times step count counts padding too.
+        """
+        if self._supervised_tokens is not None:
+            logs["supervised_tokens"] = float(self._supervised_tokens)
+        super().log(logs, start_time=start_time)
 
 
 class HybridDistillationTrainer(DistillationTrainer):

@@ -519,3 +519,61 @@ def test_every_divergence_still_asks_for_the_signal():
     for name in ("hs_cosine", "hs_mse"):
         loss = create_loss_func(LossFunctionConfig(function=name, weight=1.0))
         assert loss.requires_teacher_signal() is True
+
+
+def test_supervised_tokens_counts_what_actually_carried_gradient():
+    """A screen measured in tokens has to count the positions that taught the model.
+
+    Sequence length times step count also counts padding and every position masked out of
+    the loss, which at short screens is the difference between a 100K run and a claim of
+    one.
+    """
+    import threading
+    from types import SimpleNamespace
+
+    import torch
+
+    from distillkit.configuration import LossFunctionConfig
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+    from distillkit.trainer import DistillationTrainer, create_loss_func
+    from test_sidecar_model import tiny_config
+
+    torch.manual_seed(5)
+    config = tiny_config()
+    config.vocab_size = 128
+    model = Qwen35SidecarForCausalLM(config).eval()
+    text = "<|im_start|>user\nU<|im_start|>assistant\nAB"
+    ids = torch.tensor([list(map(ord, text))])
+
+    cfgs = [LossFunctionConfig(function="assistant_cross_entropy", weight=1.0)]
+    losses = [create_loss_func(cfgs[0])]
+    trainer = SimpleNamespace(
+        model=model, need_hidden_states=False, need_model_loss=False,
+        need_token_targets=True, need_teacher_signal=False,
+        _kept_bf16_outputs=True, chunked_head=True, true_vocab_size=128,
+        hidden_state_mapping=None, _head_chunk_length=4,
+        processing_class=_CharacterTokenizer(),
+        accelerator=SimpleNamespace(unwrap_model=lambda x: x),
+        signal_source=SimpleNamespace(get_signal=lambda *a, **kw: None),
+        _loss_log_local=threading.local(), log=lambda *a: None,
+        config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),
+                               sidecar=SimpleNamespace(enabled=False),
+                               loss_functions=cfgs),
+        loss_functions=losses)
+
+    outputs = model(input_ids=ids, attention_mask=torch.ones_like(ids),
+                    sidecar_enabled=False, output_hidden_states=True, logits_to_keep=1)
+
+    # Half the batch is padding, and padding must not be counted.
+    mask = torch.ones_like(ids)
+    mask[:, ids.shape[1] // 2:] = 0
+    labels = ids.clone()
+    labels[:, ids.shape[1] // 2:] = -100
+    supervised = int(labels.ge(0).logical_and(mask.bool()).sum())
+
+    batch = {"input_ids": ids, "attention_mask": mask, "labels": labels}
+    DistillationTrainer.total_distillation_loss(trainer, outputs, batch)
+    assert int(trainer._supervised_tokens) == supervised
+
+    DistillationTrainer.total_distillation_loss(trainer, outputs, batch)
+    assert int(trainer._supervised_tokens) == 2 * supervised, "the count must accumulate"

@@ -3648,9 +3648,28 @@ Measured on one RTX 3090, twelve timed steps each through a real AdamW update
 | 4096 x2, checkpointing off | refused | -- | 39.37 GiB | 50.64 GiB |
 
 Checkpointing off is 21% faster per token (2966 tok/s) and needs the entire card to get
-it. Batch 2 is slower per token *and* holds 19 GiB. So 4096 x 1 with accumulation 8 is
-both the fastest and the roomiest way to spend 32,768 tokens per update, and it is what
-the config uses.
+it. Batch 2 is slower per token *and* holds 19 GiB. So 4096 x 1 with non-reentrant
+checkpointing is both the fastest and the roomiest configuration, and it is what the
+config uses.
+
+### Accumulation 1, because updates are the scarce resource here
+
+The first draft of the config accumulated 8 microbatches, which at 4096 tokens makes one
+optimizer update cost 32,768 tokens. The screens are then absurd: 100K tokens is three
+updates, 1M is thirty-one, and a fifty-step warmup outlasts the entire nominal run. The
+benchmark settles the tradeoff -- a real AdamW update every single microbatch still
+sustains 2456 tok/s at 12.26 GiB -- so amortizing the optimizer buys nothing worth an
+order of magnitude fewer updates. At accumulation 1 the same 100K tokens buys about 24
+updates, and the schedule is retargeted to match: warmup 5, evaluate every 25 updates
+(roughly every 100K tokens, so update 25 is the 100K screen, 125 is 500K, 244 ends the run
+at 1M), save every 60. The table is random and newly admitted; updates per token is the
+quantity that decides whether it learns anything at all. A larger effective batch is a
+question for after a positive signal, not before one.
+
+The trainer now logs `supervised_tokens`: positions that actually carried gradient, with
+padding and unsupervised positions excluded. Sequence length times step count counts
+padding too, and a screen measured in tokens should be measured in the tokens that taught
+the model something.
 
 ### The 50 GiB lesson
 
@@ -3676,10 +3695,10 @@ to climb. Both limbs have a self-check (`python scratch/native_table/vram_guard.
 `max_vram_fraction: 0.9`.
 
 `rho` starts at exactly zero, so nothing inside the block receives gradient until `rho`
-itself has moved -- and under accumulation 8 the first update lands after 32,768 tokens, a
-third of a 100K screen spent training one scalar. `scratch/native_table/bootstrap_rho.py`
-opens the gate separately with accumulation 1: one forward, one backward, one update, 4,096
-tokens. Measured: rho 0 -> 1.0014e-4, backbone bitwise unchanged, and the table, both
+itself has moved. `scratch/native_table/bootstrap_rho.py` opens that gate before the run
+rather than inside it: one forward, one backward, one update, 4,096 tokens, so the screen
+begins with a model whose internals are already learning and the tokens it cost are
+accounted for separately. Measured: rho 0 -> 1.0014e-4, backbone bitwise unchanged, and the table, both
 projections and the convolution all carrying gradient afterwards. Nothing is hand
 initialised; rho moves because the loss asks it to, which is the only way the run can still
 claim to begin as an exact morph. The main run starts from that checkpoint and the 4,096
