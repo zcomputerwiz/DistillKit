@@ -274,6 +274,10 @@ def load_student_model(
             text_config.sidecar_layer_index != config.sidecar.layer_index
             or text_config.sidecar_num_branches != config.sidecar.num_branches
             or text_config.sidecar_variant != config.sidecar.variant
+            # A native table and a donor table are different architectures with
+            # differently shaped state dicts; reloading one as the other is a silent
+            # correctness bug rather than a resize.
+            or getattr(text_config, "sidecar_table_mode", "donor") != config.sidecar.table_mode
             # Only ple_gated has directions. Comparing them unconditionally would
             # reject every checkpoint saved before the field existed, whose config
             # carries no such key and whose variant does not use one.
@@ -312,6 +316,9 @@ def load_student_model(
             text_config.sidecar_reader_single_stream = config.sidecar.reader_single_stream
             text_config.sidecar_reader_collapse_weights = config.sidecar.reader_collapse_weights
             text_config.sidecar_reader_rho = config.sidecar.reader_rho
+            text_config.sidecar_table_mode = config.sidecar.table_mode
+            text_config.sidecar_ngram_vocab_size_base = config.sidecar.ngram_vocab_size_base
+            text_config.sidecar_ple_embed_dim = config.sidecar.ple_embed_dim
         if residual_stream is not None:
             text_config.residual_stream_enabled = True
             text_config.residual_stream_num_branches = residual_stream.num_branches
@@ -641,17 +648,31 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
             collator if collator is not None else DataCollatorForLanguageModeling(
                 pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id)
         )
-        table = GGUFNGramTable(config.sidecar.table_path)
-        if config.sidecar.resident:
-            # training_arguments, not the Accelerator created before SFTConfig: building
-            # SFTConfig resets AcceleratorState, after which that instance raises.
-            if training_arguments.world_size > 1:
-                raise ValueError("Resident table duplication across distributed ranks is unsupported; use memmap")
-            table.load_resident()
-        elif config.sidecar.prefault:
-            table.prefault()
-        collator = SidecarDataCollator(base_collator, table,
-                                       shuffle_context=config.sidecar.shuffle_context)
+        table = None
+        hasher = None
+        if config.sidecar.table_mode == "native":
+            # No GGUF at all: the rows are model parameters, so collation stops at the
+            # indices. The hash geometry has to be the model's own -- a collator hashing
+            # into a different address space than the table it feeds is an out-of-range
+            # lookup at best and silently wrong rows at worst.
+            from distillkit.native_ple import native_hash_config
+            from distillkit.ngram_hash import NGramHasher
+            text_config = getattr(model.config, "text_config", model.config)
+            hasher = NGramHasher(native_hash_config(text_config))
+        else:
+            table = GGUFNGramTable(config.sidecar.table_path)
+            if config.sidecar.resident:
+                # training_arguments, not the Accelerator created before SFTConfig:
+                # building SFTConfig resets AcceleratorState, after which that instance
+                # raises.
+                if training_arguments.world_size > 1:
+                    raise ValueError("Resident table duplication across distributed ranks is unsupported; use memmap")
+                table.load_resident()
+            elif config.sidecar.prefault:
+                table.prefault()
+        collator = SidecarDataCollator(base_collator, table, hasher=hasher,
+                                       shuffle_context=config.sidecar.shuffle_context,
+                                       mode=config.sidecar.table_mode)
     from distillkit.optimizers import ReleaseEvalCacheCallback
 
     # Evaluation carves the allocator's pool into its own shapes, and Windows cannot

@@ -144,6 +144,33 @@ class TeacherDatasetConfig(BaseModel):
 class SidecarConfig(BaseModel):
     table_path: str | None = None
     enabled: bool = True
+    table_mode: Literal["donor", "native"] = Field(
+        default="donor",
+        description=(
+            "donor: gather rows from the frozen Flash-Next GGUF capture, the historical "
+            "path. native: the student owns a fresh trainable n-gram table, sized by "
+            "ngram_vocab_size_base and ple_embed_dim, and a native checkpoint never "
+            "needs the GGUF again. Stated explicitly rather than inferred from whether "
+            "table_path is set, because a checkpoint has to say which model it is."
+        ),
+    )
+    ngram_vocab_size_base: int = Field(
+        default=131072, ge=2,
+        description=(
+            "native only: the base address space per n-gram head. The reference "
+            "construction takes 16 distinct primes just above this, so the table is "
+            "roughly 16x this many rows. Not tuned -- see the collision survey in "
+            "scratch/native_table/."
+        ),
+    )
+    ple_embed_dim: int | None = Field(
+        default=None,
+        description=(
+            "native only: the concatenated width of the 16 retrieved rows. Defaults to "
+            "the student's hidden size, which is what makes the rows land at stream "
+            "width with no projection; head_dim is this divided by 16."
+        ),
+    )
     shuffle_context: int = Field(
         default=0,
         description=(
@@ -208,7 +235,17 @@ class SidecarConfig(BaseModel):
 
     @model_validator(mode="after")
     def require_table(self):
-        if self.enabled and not self.table_path:
+        if self.table_mode == "native":
+            if self.table_path:
+                raise ValueError(
+                    "sidecar.table_path is a donor capture; a native table trains its own "
+                    "rows. Drop the path or set table_mode: donor")
+            if self.variant != "ple":
+                raise ValueError("a native n-gram table is only wired for variant: ple")
+            width = self.ple_embed_dim
+            if width is not None and width % 16:
+                raise ValueError("sidecar.ple_embed_dim must divide into 16 n-gram heads")
+        elif self.enabled and not self.table_path:
             raise ValueError("sidecar.table_path is required when enabled")
         if self.variant == "donor_reader":
             if (self.reader_value_source == "c1" or self.reader_conv_source == "c1") \

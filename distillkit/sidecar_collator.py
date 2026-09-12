@@ -19,8 +19,19 @@ Windows. A mapped table is reopened in each spawned worker, never pickled as 28 
 of array contents. The OS page cache is shared between those mappings.
 """
 
-    def __init__(self, base_collator, table: GGUFNGramTable, hasher: NGramHasher | None = None,
-                 shuffle_context: int = 0):
+    def __init__(self, base_collator, table: GGUFNGramTable | None = None,
+                 hasher: NGramHasher | None = None, shuffle_context: int = 0,
+                 mode: str = "donor"):
+        if mode not in ("donor", "native"):
+            raise ValueError("mode must be 'donor' or 'native'")
+        #: Donor collation gathers frozen GGUF bytes and emits ``ngram_raw``. Native
+        #: collation stops at the row indices and emits ``ngram_ids``: the table is a
+        #: model parameter, so the lookup belongs in the forward pass where it can take
+        #: a gradient, not here. The mode is explicit -- a native run handed a donor
+        #: batch, or the reverse, is refused by the model rather than reinterpreted.
+        self.mode = mode
+        if mode == "donor" and table is None:
+            raise ValueError("donor collation requires a GGUF table")
         self.base_collator = base_collator
         self.table = table
         #: The matched control. A nonzero value rolls the token stream by that many
@@ -32,7 +43,8 @@ of array contents. The OS page cache is shared between those mappings.
         self.shuffle_context = int(shuffle_context)
         self.hasher = hasher if hasher is not None else NGramHasher()
         cfg = self.hasher.config
-        if table.spec.head_dim != cfg.head_dim or table.spec.n_rows != self.hasher.padded_vocab_size:
+        if table is not None and (table.spec.head_dim != cfg.head_dim
+                                  or table.spec.n_rows != self.hasher.padded_vocab_size):
             raise ValueError("table geometry does not match the n-gram hash configuration")
         self._table_factory = None
 
@@ -52,6 +64,14 @@ of array contents. The OS page cache is shared between those mappings.
             ids = ids.masked_fill(~mask.bool(), self.hasher.config.eos_token_id)
         if ids.numel() and (ids.min() < 0 or ids.max() >= self.hasher.config.vocab_size):
             raise ValueError("input_ids are outside the hasher's unigram vocabulary")
+        if self.mode == "native":
+            # `shuffle_context` still applies, and in native mode it is exactly the
+            # ablation we want: real rows the model has learned, fetched for the wrong
+            # n-gram. Nothing about the lookup, the value distribution or the row norms
+            # changes -- only the correspondence between this text and the row identity.
+            batch["ngram_ids"] = self.hasher.row_indices(
+                ids.roll(self.shuffle_context, dims=-1) if self.shuffle_context else ids)
+            return batch
         if self.table is None:
             self.table = GGUFNGramTable(**self._table_factory)
         rows = self.hasher.row_indices(

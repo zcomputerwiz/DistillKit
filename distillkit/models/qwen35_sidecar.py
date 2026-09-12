@@ -29,6 +29,7 @@ from distillkit.donor_reader import DonorReaderTransplant
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
 from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
+from distillkit.native_ple import NativePLESidecar
 from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
 from distillkit.ple_sidecar import PLESidecar
 
@@ -58,10 +59,30 @@ def _set_sidecar_defaults(config: Qwen3_5TextConfig) -> None:
         "sidecar_reader_single_stream": 0,
         "sidecar_reader_collapse_weights": None,
         "sidecar_reader_rho": 0.0,
+        # Donor keeps the historical meaning: rows come from the frozen GGUF capture and
+        # arrive as `ngram_raw` bytes. Native owns its own trainable table and takes
+        # `ngram_ids`. The mode is stored rather than inferred from whether a table path
+        # happens to be configured -- a checkpoint has to say which model it is.
+        "sidecar_table_mode": "donor",
+        "sidecar_ngram_vocab_size_base": 131072,
+        "sidecar_ple_embed_dim": None,
     }
     for name, value in defaults.items():
         if not hasattr(config, name):
             setattr(config, name, value)
+    if config.sidecar_table_mode not in ("donor", "native"):
+        raise ValueError("sidecar_table_mode must be 'donor' or 'native'")
+    if config.sidecar_table_mode == "native":
+        if config.sidecar_variant != "ple":
+            raise ValueError("a native n-gram table is only wired for the 'ple' variant")
+        if config.sidecar_ngram_vocab_size_base < 2:
+            raise ValueError("sidecar_ngram_vocab_size_base must be at least 2")
+        width = config.sidecar_ple_embed_dim or config.hidden_size
+        # 16 heads is (ngram_size - 1) * heads_per_ngram at the reference's 3 and 8, and
+        # the concatenated rows have to land at the width the PLE block reads.
+        if width % 16:
+            raise ValueError(
+                "sidecar_ple_embed_dim must divide into 16 n-gram heads; %d does not" % width)
     if not 0 <= config.sidecar_layer_index < config.num_hidden_layers:
         raise ValueError("sidecar_layer_index must identify an existing decoder layer")
     if config.sidecar_num_heads <= 0:
@@ -109,6 +130,12 @@ learned sidecar weights never resets a sibling that was present in the checkpoin
             nn.init.normal_(module.weight, std=module._sidecar_gate_init_std)
             if module.bias is not None:
                 nn.init.zeros_(module.bias)
+        elif isinstance(module, NativePLESidecar):
+            # `rho` is a bare Parameter, so no module-level init mark reaches it and
+            # `from_pretrained` would leave whatever it materialised. Zero is the whole
+            # function-preservation guarantee, so re-assert it at the hook that always
+            # runs. Everything else in the block keeps its reference initialisation.
+            nn.init.zeros_(module.rho)
         elif isinstance(module, DirectionGatedPLESidecar):
             # Bare Parameters carry no init mark of their own; see the note there.
             # `from_pretrained` can hand back bfloat16 storage whichever way it
@@ -287,6 +314,8 @@ class _DonorReaderNGramSidecar(nn.Module):
 
 
 def _build_sidecar(config: Qwen3_5TextConfig) -> nn.Module:
+    if config.sidecar_table_mode == "native":
+        return NativePLESidecar(config)
     if config.sidecar_variant == "donor_reader":
         return _DonorReaderNGramSidecar(config)
     if config.sidecar_variant == "ple_gated":
@@ -301,9 +330,11 @@ class _SidecarDecoderLayer(Qwen3_5DecoderLayer):
         super().__init__(config, layer_idx)
         self.sidecar = _build_sidecar(config) if layer_idx == config.sidecar_layer_index else None
 
-    def forward(self, hidden_states, *args, ngram_raw=None, sidecar_enabled=True, **kwargs):
+    def forward(self, hidden_states, *args, ngram_raw=None, ngram_ids=None,
+                sidecar_enabled=True, **kwargs):
         if self.sidecar is not None:
-            hidden_states = self.sidecar(hidden_states, ngram_raw, sidecar_enabled)
+            rows = ngram_ids if isinstance(self.sidecar, NativePLESidecar) else ngram_raw
+            hidden_states = self.sidecar(hidden_states, rows, sidecar_enabled)
         return super().forward(hidden_states, *args, **kwargs)
 
 
@@ -364,12 +395,26 @@ table path. Use this class explicitly when reloading a saved sidecar checkpoint.
         use_cache=None,
         logits_to_keep=0,
         ngram_raw=None,
+        ngram_ids=None,
         sidecar_enabled=True,
         output_hidden_states=None,
         **kwargs,
     ):
-        if sidecar_enabled and ngram_raw is None:
-            raise ValueError("ngram_raw is required; use SidecarDataCollator or sidecar_enabled=False")
+        # One representation per table mode, and never a silent substitution: a native
+        # table handed donor bytes, or a donor table handed row ids, is a configuration
+        # mistake that would otherwise show up as a quiet accuracy difference.
+        native = self.config.sidecar_table_mode == "native"
+        if sidecar_enabled:
+            wanted, unwanted = ("ngram_ids", ngram_raw) if native else ("ngram_raw", ngram_ids)
+            if (ngram_ids if native else ngram_raw) is None:
+                raise ValueError(
+                    "%s is required for a %s n-gram table; use SidecarDataCollator or "
+                    "sidecar_enabled=False" % (wanted, "native" if native else "donor"))
+            if unwanted is not None:
+                raise ValueError(
+                    "a %s n-gram table does not accept %s"
+                    % ("native" if native else "donor",
+                       "ngram_raw" if native else "ngram_ids"))
         if output_hidden_states is not None:
             kwargs["output_hidden_states"] = output_hidden_states
         return super().forward(
@@ -382,6 +427,7 @@ table path. Use this class explicitly when reloading a saved sidecar checkpoint.
             use_cache=use_cache,
             logits_to_keep=logits_to_keep,
             ngram_raw=ngram_raw,
+            ngram_ids=ngram_ids,
             sidecar_enabled=sidecar_enabled,
             **kwargs,
         )

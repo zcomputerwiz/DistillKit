@@ -408,12 +408,15 @@ class UnfreezeBackboneCallback(TrainerCallback):
 @torch.no_grad()
 def architecture_metrics(model: nn.Module) -> dict[str, float]:
     from distillkit.donor_reader import DonorReaderTransplant
+    from distillkit.native_ple import NativePLESidecar
 
     report = {}
     for name, module in model.named_modules():
         if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, (PLESidecar, DirectionGatedPLESidecar)):
+            report.update(module.gate_report(prefix=f"architecture/{name}"))
+        if isinstance(module, NativePLESidecar):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, DonorReaderTransplant):
             report.update(module.reader_report(prefix=f"architecture/{name}"))

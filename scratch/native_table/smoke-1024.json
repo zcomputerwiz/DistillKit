@@ -1,0 +1,72 @@
+{
+  "geometry": {
+    "ngram_vocab_size_base": 131072,
+    "ngram_heads": 16,
+    "head_dim": 64,
+    "feature_dim": 1024,
+    "total_vocab_size": 2099142,
+    "padded_vocab_size": 2099200,
+    "table_parameters": 134348800
+  },
+  "hidden_size": 1024,
+  "parameters": {
+    "table": 134348800,
+    "model_total": 524411905,
+    "model_without_table": 390063105,
+    "table_share": 0.2561894547378744
+  },
+  "table_bytes": {
+    "bf16": 268697600,
+    "fp16": 268697600,
+    "fp32": 537395200,
+    "fp8": 134348800
+  },
+  "adamw_state_bytes_predicted": 1074790400,
+  "step0_gradients": {
+    "rho": 0.0634765625,
+    "table": 0.0,
+    "value_proj": 0.0
+  },
+  "loss": [
+    12.609710693359375,
+    11.323827743530273,
+    2.5795485973358154,
+    0.041554104536771774
+  ],
+  "after": {
+    "rho": -0.0032196044921875,
+    "table": 231.7811279296875
+  },
+  "rho_moved": true,
+  "table_moved": true,
+  "final_gradients": {
+    "rho": 0.000324249267578125,
+    "table": 8.642673492431641e-07,
+    "value_proj": 1.955777406692505e-07
+  },
+  "metrics": {
+    "native_ple/rho": -0.0032196044921875,
+    "native_ple/table_weight_norm": 231.7811279296875,
+    "native_ple/value_proj_norm": 20.576875686645508,
+    "native_ple/key_proj_norm": 20.54387664794922,
+    "native_ple/conv_norm": 1.2847425937652588,
+    "native_ple/gate_mean": 0.6750221252441406,
+    "native_ple/gate_std": 0.3773317337036133,
+    "native_ple/unique_rows_in_batch": 200.0,
+    "native_ple/row_touch_fraction": 9.527439024390244e-05
+  },
+  "adamw_state_bytes_measured": {
+    "total": 2097648084,
+    "table": 537395204
+  },
+  "peak_vram_bytes": 5526502912,
+  "ablation_on_off_differs": true,
+  "repeat_forward_max_difference": 0.0,
+  "reload": {
+    "geometry_matches": true,
+    "rho_matches": true,
+    "missing_or_extra_tensors": [],
+    "tensors_differing": [],
+    "logits_max_difference": 0.125
+  }
+}

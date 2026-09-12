@@ -122,6 +122,7 @@ class PLESidecar(nn.Module):
         conv_kernel_size: int = 4,
         ngram_size: int = 3,
         rms_norm_eps: float = 1e-6,
+        identity_init: bool = True,
     ):
         super().__init__()
         if hidden_size <= 0 or feature_dim <= 0:
@@ -159,9 +160,16 @@ class PLESidecar(nn.Module):
         # backbone's own 0.5262). Zeroing the convolution too makes silu(conv(.)) exactly
         # zero, so the output starts as gated_value alone and both branches grow from
         # nothing.
-        for zeroed in (self.value_proj, self.conv1d):
-            nn.init.zeros_(zeroed.weight)
-            zeroed._sidecar_weight_init = "zero"
+        #: ``identity_init=False`` is the reference initialisation: the module starts as
+        #: upstream's, not as the identity. That is correct only when something *outside*
+        #: the block holds the model at its pretrained function -- a native-table run puts
+        #: a zero admission scalar there, so the reference internals can be left alone.
+        #: See distillkit/native_ple.py. Retrofits keep the default.
+        self.identity_init = identity_init
+        if identity_init:
+            for zeroed in (self.value_proj, self.conv1d):
+                nn.init.zeros_(zeroed.weight)
+                zeroed._sidecar_weight_init = "zero"
 
     def _short_conv(self, gated: torch.Tensor) -> torch.Tensor:
         """Causal dilated depthwise convolution, left-padded so position t sees only <= t."""
