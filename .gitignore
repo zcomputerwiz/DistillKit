@@ -204,3 +204,7 @@ cython_debug/
 /scratch/eval-cache-*/
 /scratch/eval-*-temp-*/
 /scratch/pytest-*/
+# Rebuildable donor branch capture: `analyze_donor_reader capture-streams` regenerates
+# it in about 20 seconds and it is 443 MB, past what the remote accepts. The small
+# per-token NLL bundles beside it are the evidence for a published number and stay.
+/scratch/ple_forensics/donor-streams.npz

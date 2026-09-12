@@ -215,3 +215,79 @@ offloaded to a cheap memory at no cost to layout capability, and it buys X nats 
 content" is an engineering claim — but the content gain would be attributable to
 reweighting, not to the sidecar. Codex is right that B is mandatory; on this evidence B
 is closer to the main arm than to a control.
+
+
+---
+
+# Branch specialisation in the donor: what could be tested, and the answer
+
+## Most of it cannot be run here
+
+Flash-Next is **360 GB in bf16** — 48 layers, 512 experts, top-10 routing, per its own
+`model.safetensors.index.json`. What is on this machine is a **93.7 GB IQ4_XS GGUF** and
+an HF snapshot carrying config, index and tokenizer and **no weights at all** (13 MB).
+The hardware is 2×24 GB VRAM and 128 GB RAM, and running llama.cpp is out under a
+standing constraint.
+
+The branchwise gradient matrix and the causal branch ablation — the two pieces named as
+decisive — both need a full forward, and the gradient one a full backward, through that
+model. Neither is reachable. The same applies to the gate statistics and the
+HyperConnection routing, which depend on the donor's residual stream.
+
+## Two of the proposed metrics are the same metric
+
+For the direct PLE write, `delta h_s = g_s v`, every branch receives the same 2560-D
+value, so
+
+    e_s = ||g_s v||^2 / sum_j ||g_j v||^2 = g_s^2 / sum_j g_j^2
+
+The branch energy fraction is a pure function of the gate vector and does not involve `v`
+at all. **Direct branch-energy specialisation and gate-amplitude specialisation are one
+measurement, not two** — and neither can be computed without the donor's hidden state.
+
+## The convolution path is reachable, and it is the informative one
+
+The convolution's input is `v = value_proj(rows)`, which depends only on the n-gram table
+and the token ids — no hidden state anywhere. And the four filter banks are genuinely
+distinct (flattened cosine −0.216 to +0.506, from the donor preflight), so they are the
+one component that could specialise *without* the gate.
+
+12,000 held-out screen positions, donor `value_proj` and all four donor conv banks, CPU:
+
+| class | tokens | branch 0 | branch 1 | branch 2 | branch 3 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| whitespace | 1,380 | 0.0091 | 0.8628 | 0.0600 | 0.0681 |
+| control | 93 | 0.0097 | 0.8582 | 0.0617 | 0.0704 |
+| punctuation | 2,152 | 0.0091 | 0.8622 | 0.0603 | 0.0684 |
+| lexical | 8,375 | 0.0091 | 0.8639 | 0.0596 | 0.0674 |
+
+whitespace minus lexical, per branch: −0.00005, −0.00111, +0.00043, +0.00073. **All four
+span zero.** The largest class gap anywhere is 0.0011 against an even split of 0.25.
+
+**The stop rule fires: branch specialisation is not supported in the convolution path.**
+
+The banks are wildly *uneven* — branch 1 carries 86.3% of the energy, matching the
+preflight's PCA finding that one donor stream explains 91.05% — but that imbalance is
+identical for every token class. The bank is near rank-one, and it is near rank-one the
+same way for whitespace as for content.
+
+## The gate path, by inference rather than measurement
+
+It cannot be measured here, but there is prior evidence against it. The reader-visibility
+analysis found that on upstream's *own trained weights* the keys come out nearly
+collinear — mean pairwise cosine 0.81 to 0.96 — and that substituting the **mean** key
+for every position reproduced 65–93% of the gate. A gate that a constant reproduces to
+that degree is not performing class-dependent routing.
+
+So of the four mechanisms specialisation could come from: branch-specific conv filters
+are measured and null; class-dependent gate amplitudes are unmeasurable here but
+independently unlikely; HyperConnection routing at other layers and causal branch effects
+remain untested and need the donor.
+
+## Decision
+
+Per the stated rule, this proceeds to the A/B/D offload experiment as designed. The
+caveat from the gradient gate stands and is the one that matters for how those arms are
+read: whitespace and content gradients are orthogonal, so the mechanism under test is
+capacity reallocation, arm B implements all of it, and B is closer to the main arm than
+to a control.
