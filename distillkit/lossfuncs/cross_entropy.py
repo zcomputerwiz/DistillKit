@@ -75,6 +75,9 @@ class AssistantCrossEntropyLoss(LossFunctionBase):
     def accepts_head_context(self):
         return True
 
+    def requires_teacher_signal(self) -> bool:
+        return False
+
     def requires_token_targets(self):
         return True
 
@@ -118,6 +121,10 @@ class CrossEntropyLoss(LossFunctionBase):
     @classmethod
     def name(cls) -> str:
         return "cross_entropy"
+
+    @override
+    def requires_teacher_signal(self) -> bool:
+        return False
 
     @override
     def requires_model_loss(self) -> bool:

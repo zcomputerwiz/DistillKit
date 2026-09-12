@@ -256,6 +256,18 @@ class LossFunctionBase(ABC):
         """Whether the trainer must supply labels and an assistant-token mask."""
         return False
 
+    def requires_teacher_signal(self) -> bool:
+        """True if this loss reads the teacher's distribution or hidden states.
+
+        Almost every loss here does, which is why the default is True and only the
+        ground-truth cross entropies opt out. A run configured with CE alone otherwise
+        pays for a cached-teacher read on every microbatch -- top-k ids, top-k logprobs
+        and, if any anchor is configured, the fp8 hidden states -- and then discards all
+        of it. That is the native-table experiment's shape exactly: deliberately
+        teacher-free, but attached to a cache because the schema wants a teacher section.
+        """
+        return True
+
     @abstractmethod
     def __init__(self, **kwargs) -> None: ...
 

@@ -367,7 +367,7 @@ def test_trainer_assistant_ce_shares_chunked_forward_and_preserves_existing_kl()
         generation_temperature=1., hidden_states=None,vocab_size=128)
     cfgs = [LossFunctionConfig(function='kl',weight=.7,temperature=1.,sparse_chunk_length=4)]
     trainer = SimpleNamespace(model=model, need_hidden_states=False, need_model_loss=False,
-        need_token_targets=False, _kept_bf16_outputs=True, chunked_head=True,
+        need_token_targets=False, need_teacher_signal=True, _kept_bf16_outputs=True, chunked_head=True,
         true_vocab_size=128, hidden_state_mapping=None, _head_chunk_length=4,
         processing_class=_CharacterTokenizer(), accelerator=SimpleNamespace(unwrap_model=lambda x:x),
         signal_source=SimpleNamespace(get_signal=lambda *a,**kw:signal),
@@ -452,3 +452,70 @@ def test_assistant_ce_peak_memory_is_bounded_across_vocabulary_sizes():
         del hidden,head,labels,assistant
     # Increasing vocab 4x must not add a sequence-wide logits allocation.
     assert peaks[1][1]-peaks[0][1] < (peaks[1][0]-peaks[0][0])/2
+
+
+def test_a_ce_only_run_never_reads_the_teacher_cache():
+    """The guard: no configured loss wants the signal, so none is fetched.
+
+    A native-table or any other ground-truth-CE run is attached to a teacher cache only
+    because the schema requires a teacher section. Without this, every microbatch paid
+    for a per-document read of top-k ids and logprobs -- and, with an anchor configured,
+    the fp8 hidden states -- and discarded all of it.
+    """
+    import threading
+    from types import SimpleNamespace
+
+    import torch
+
+    from distillkit.configuration import LossFunctionConfig
+    from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
+    from distillkit.trainer import DistillationTrainer, create_loss_func
+    from test_sidecar_model import tiny_config
+
+    torch.manual_seed(5)
+    config = tiny_config()
+    config.vocab_size = 128
+    model = Qwen35SidecarForCausalLM(config).eval()
+    text = "<|im_start|>user\nU<|im_start|>assistant\nAB"
+    ids = torch.tensor([list(map(ord, text))])
+
+    fetches = []
+    cfgs = [LossFunctionConfig(function="assistant_cross_entropy", weight=1.0)]
+    losses = [create_loss_func(cfgs[0])]
+    trainer = SimpleNamespace(
+        model=model, need_hidden_states=False, need_model_loss=False,
+        need_token_targets=True,
+        need_teacher_signal=any(lf.requires_teacher_signal() for lf in losses),
+        _kept_bf16_outputs=True, chunked_head=True, true_vocab_size=128,
+        hidden_state_mapping=None, _head_chunk_length=4,
+        processing_class=_CharacterTokenizer(),
+        accelerator=SimpleNamespace(unwrap_model=lambda x: x),
+        signal_source=SimpleNamespace(
+            get_signal=lambda *a, **kw: fetches.append(1)),
+        _loss_log_local=threading.local(), log=lambda *a: None,
+        config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),
+                               sidecar=SimpleNamespace(enabled=False),
+                               loss_functions=cfgs),
+        loss_functions=losses)
+
+    assert trainer.need_teacher_signal is False
+    outputs = model(input_ids=ids, attention_mask=torch.ones_like(ids),
+                    sidecar_enabled=False, output_hidden_states=True, logits_to_keep=1)
+    loss = DistillationTrainer.total_distillation_loss(
+        trainer, outputs, {"input_ids": ids, "attention_mask": torch.ones_like(ids),
+                           "labels": ids})
+    assert torch.isfinite(loss)
+    assert fetches == [], "a CE-only run fetched a teacher signal it cannot use"
+
+
+def test_every_divergence_still_asks_for_the_signal():
+    from distillkit.configuration import LossFunctionConfig
+    from distillkit.trainer import create_loss_func
+
+    for name in ("kl", "jsd", "tvd"):
+        loss = create_loss_func(
+            LossFunctionConfig(function=name, weight=1.0, temperature=1.0))
+        assert loss.requires_teacher_signal() is True
+    for name in ("hs_cosine", "hs_mse"):
+        loss = create_loss_func(LossFunctionConfig(function=name, weight=1.0))
+        assert loss.requires_teacher_signal() is True

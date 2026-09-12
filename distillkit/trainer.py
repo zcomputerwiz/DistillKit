@@ -48,6 +48,9 @@ class DistillationTrainer(SFTTrainer):
         )
         self.need_model_loss = any(lf.requires_model_loss() for lf in self.loss_functions)
         self.need_token_targets = any(lf.requires_token_targets() for lf in self.loss_functions)
+        self.need_teacher_signal = any(
+            lf.requires_teacher_signal() for lf in self.loss_functions
+        )
 
         # The stock causal-LM loss keeps a full fp32 copy of the logits alive for
         # backward. Over a 248k-wide head that measured 2.84 GB where the chunked
@@ -305,10 +308,14 @@ class DistillationTrainer(SFTTrainer):
             valid_mask = valid_mask & inputs["attention_mask"].bool().unsqueeze(-1)
         if not valid_mask.any():
             raise ValueError("Distillation batch contains no supervised token positions")
-        signal: TeacherSignal = self.signal_source.get_signal(
-            inputs,
-            return_hidden_states=self.need_hidden_states,
-        )
+        # A CE-only run has nothing to ask the teacher, and asking anyway costs a
+        # per-microbatch cache read that is then thrown away.
+        signal: TeacherSignal | None = None
+        if self.need_teacher_signal:
+            signal = self.signal_source.get_signal(
+                inputs,
+                return_hidden_states=self.need_hidden_states,
+            )
 
         head_context = None
         if self.chunked_head:

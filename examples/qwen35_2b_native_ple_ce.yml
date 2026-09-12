@@ -3,9 +3,10 @@
 # memory smoke test justifies, written so the run is one command when it is approved.
 #
 # Everything the objective forensics ruled out is absent: no teacher KL, no hidden-state
-# cosine, no GR, no QSA. The teacher section is present because the schema requires one
-# and because the cache is what supplies the documents; `assistant_cross_entropy` does not
-# consult its signal.
+# cosine, no GR, no QSA. The teacher section is present because the schema requires one and
+# because the cache is what supplies the documents. No teacher signal is ever read:
+# `assistant_cross_entropy` declares `requires_teacher_signal() == False`, so the trainer
+# skips the per-microbatch cache fetch entirely.
 #
 # Measured on one RTX 3090 (24 GiB), backbone frozen, bf16, gradient checkpointing,
 # chunked head, through a real optimizer step:
