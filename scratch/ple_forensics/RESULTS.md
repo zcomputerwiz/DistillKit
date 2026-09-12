@@ -271,23 +271,111 @@ preflight's PCA finding that one donor stream explains 91.05% — but that imbal
 identical for every token class. The bank is near rank-one, and it is near rank-one the
 same way for whitespace as for content.
 
-## The gate path, by inference rather than measurement
+## Scope of this null: the conv banks only
 
-It cannot be measured here, but there is prior evidence against it. The reader-visibility
-analysis found that on upstream's *own trained weights* the keys come out nearly
-collinear — mean pairwise cosine 0.81 to 0.96 — and that substituting the **mean** key
-for every position reproduced 65–93% of the gate. A gate that a constant reproduces to
-that degree is not performing class-dependent routing.
+**Donor GR/HC specialisation is unresolved, not refuted.** The measurement above covers
+one of the four mechanisms specialisation could come from — branch-specific conv filters
+— and says nothing about the other three. Class-dependent gate amplitudes,
+HyperConnection read/write routing, and causal branch effects all need the donor's
+residual stream, and the donor cannot be run here.
 
-So of the four mechanisms specialisation could come from: branch-specific conv filters
-are measured and null; class-dependent gate amplitudes are unmeasurable here but
-independently unlikely; HyperConnection routing at other layers and causal branch effects
-remain untested and need the donor.
+An earlier draft of this section argued the gate path was "independently unlikely" from
+the reader-visibility finding that upstream's trained keys are nearly collinear (pairwise
+cosine 0.81–0.96) with the mean key reproducing 65–93% of the gate. That inference does
+not hold and is withdrawn. It concerns the *PLE gate*, which is not the GR/HC routing;
+and 65–93% reproduced by a constant leaves 7–35% that is not, which is exactly where
+class-dependence would live. A null in the conv banks is not evidence about the gate.
 
 ## Decision
 
-Per the stated rule, this proceeds to the A/B/D offload experiment as designed. The
-caveat from the gradient gate stands and is the one that matters for how those arms are
-read: whitespace and content gradients are orthogonal, so the mechanism under test is
-capacity reallocation, arm B implements all of it, and B is closer to the main arm than
-to a control.
+Proceed to a **whitespace-only** A/B/D offload experiment, with donor GR/HC
+specialisation recorded as unresolved rather than settled. Nothing below infers anything
+about the donor's routing from the conv-bank null.
+
+The gradient gate's caveat is what shapes how the arms are read: whitespace and content
+gradients are orthogonal, so the mechanism under test is capacity reallocation, arm B
+implements all of it, and **B versus A on content is the first stop gate** — if masking
+the loss alone buys nothing, there is nothing for a sidecar to preserve on top of.
+
+Two constraints on the build, both from the routing problem rather than from any donor
+finding:
+
+* Arm D's sidecar is a **sparse whitespace expert plus a context-only mixture router**,
+  `P = pi(context) P_expert + (1 - pi(context)) P_backbone`, over the full vocabulary.
+  Routing on the ground-truth class would leak the answer, and a reduced-vocabulary head
+  under oracle routing does not produce an NLL comparable to arm A's.
+* Arms B and D must normalise the backbone loss identically. If B averages over content
+  tokens and D averages over a different denominator, the two are not comparable and the
+  mandatory B-vs-D contrast is meaningless.
+
+
+---
+
+# Router predictability, and whether there is work to offload
+
+Arm D needs `P = pi(context) P_expert + (1 - pi(context)) P_backbone` over the full
+vocabulary. Routing on the ground-truth class would leak the answer, so `pi` has to come
+from context — and the cheapest candidate costs nothing to build: the frozen backbone's
+own whitespace mass, `pi = sum_{w in whitespace} P_backbone(w)`. 440 whitespace token
+types across the full 248,320-token vocabulary; 64 held-out documents, 27,531 assistant
+positions, 11.6% whitespace.
+
+## The router is essentially free
+
+| | |
+| --- | ---: |
+| AUC of `pi` against the actual class | **0.9994** |
+| mean `pi` at whitespace | 0.9559 |
+| mean `pi` elsewhere | 0.0075 |
+
+| threshold | fires on | precision | whitespace recalled |
+| --- | ---: | ---: | ---: |
+| `pi` >= 0.5 | 11.7% | 95.5% | 96.8% |
+| `pi` >= 0.8 | 11.0% | 98.2% | 93.2% |
+| `pi` >= 0.9 | 10.5% | 99.1% | 90.1% |
+
+The backbone already knows when whitespace is coming, almost perfectly, and that
+knowledge is available without any oracle and without training anything.
+
+## And most of the whitespace NLL is the part an expert can take
+
+At a whitespace position the loss factors exactly:
+
+    -log P(w) = -log P(whitespace) + -log P(w | whitespace)
+                 \_____ detection ____/   \_____ selection ____/
+
+Detection cannot be offloaded — the router has to do it anyway, and the router is the
+backbone. Selection can.
+
+| | nats | share | per token |
+| --- | ---: | ---: | ---: |
+| total whitespace NLL | 1477.68 | | 0.4641 |
+| detection | 255.70 | 17.3% | 0.0803 |
+| **selection** | **1221.97** | **82.7%** | **0.3838** |
+
+**82.7% of the whitespace NLL is offloadable.** Detection is nearly free precisely
+because the router is so good; what costs is choosing *which* whitespace token — which
+run of spaces, how many newlines — among 440 types. That is local, structural, repetitive
+work, and it is exactly what the capacity probe showed the table doing: layout NLL
+1.0002 to 0.1744.
+
+Both gates pass. Arm D has a well-posed target: 0.3838 nats per whitespace token, on
+11.6% of positions, reachable by a router that already works.
+
+## Normalisation, before the arms are built
+
+Arms B and D must normalise the backbone loss identically or the mandatory B-vs-D
+contrast is meaningless. Two defensible conventions, and they test different things:
+
+* **Same denominator as A** (total assistant tokens, whitespace terms simply absent).
+  B and D are then exactly A minus the whitespace contributions, which is the clean
+  counterfactual for "the backbone stops spending gradient there". It also means B and D
+  take slightly smaller steps than A, so part of any difference is an effective learning
+  rate change.
+* **Own denominator** (mean over content tokens). Step magnitude matches A, but B and D
+  are now also *upweighting* content, which is a second intervention.
+
+The first is used, because the hypothesis is about what the gradient points at rather
+than how big it is, and because it makes B and D identical to A except for the removed
+terms. The effective-step confound is real and is the first thing to vary if B minus A
+comes out marginal.
