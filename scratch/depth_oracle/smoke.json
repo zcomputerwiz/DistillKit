@@ -1,0 +1,413 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "bundle": "scratch/independent-eval/full-bundle-384.json",
+  "device_name": "NVIDIA GeForce RTX 3090",
+  "documents": 6,
+  "flops_per_token": {
+    "mlp": 1811939328,
+    "other": 934588032,
+    "head": 1017118720,
+    "total": 3763646080,
+    "mlp_per_layer": 75497472,
+    "layers": 24
+  },
+  "baseline": {
+    "tokens": 2923,
+    "by_class": {
+      "content": {
+        "nll": 1.2582347849859703,
+        "baseline_nll": 1.2582347849859703,
+        "tokens": 1923
+      },
+      "control": {
+        "nll": 0.0493492297647184,
+        "baseline_nll": 0.0493492297647184,
+        "tokens": 26
+      },
+      "fine:content": {
+        "nll": 1.2582347849859703,
+        "baseline_nll": 1.2582347849859703,
+        "tokens": 1923
+      },
+      "fine:control": {
+        "nll": 0.0493492297647184,
+        "baseline_nll": 0.0493492297647184,
+        "tokens": 26
+      },
+      "fine:newline": {
+        "nll": 0.5491878746251391,
+        "baseline_nll": 0.5491878746251391,
+        "tokens": 232
+      },
+      "fine:punctuation": {
+        "nll": 0.40082416475108207,
+        "baseline_nll": 0.40082416475108207,
+        "tokens": 616
+      },
+      "fine:whitespace": {
+        "nll": 0.4056841753833309,
+        "baseline_nll": 0.4056841753833309,
+        "tokens": 126
+      },
+      "layout": {
+        "nll": 0.4986809860651731,
+        "baseline_nll": 0.4986809860651731,
+        "tokens": 358
+      },
+      "punctuation": {
+        "nll": 0.40082416475108207,
+        "baseline_nll": 0.40082416475108207,
+        "tokens": 616
+      }
+    },
+    "aggregate_nll": 0.9737612213478968,
+    "aggregate_baseline_nll": 0.9737612213478968,
+    "delta": {
+      "content": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "layout": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "punctuation": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "control": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "fine:content": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "fine:newline": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "fine:punctuation": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "fine:whitespace": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      },
+      "fine:control": {
+        "mean": 0.0,
+        "stderr": 0.0,
+        "t": 0.0,
+        "better": 0,
+        "n": 6
+      }
+    },
+    "top1_agreement": 1.0,
+    "savings": {
+      "ffn_calls_skipped": 0,
+      "ffn_calls_possible": 70152,
+      "ffn_flops_saved": 0,
+      "ffn_flops_fraction": 0.0,
+      "total_flops_saved": 0,
+      "total_flops_fraction": 0.0
+    }
+  },
+  "schedules": [
+    {
+      "tokens": 2923,
+      "by_class": {
+        "content": {
+          "nll": 1.2618474974054508,
+          "baseline_nll": 1.2582347849859703,
+          "tokens": 1923
+        },
+        "control": {
+          "nll": 0.03859255686269701,
+          "baseline_nll": 0.0493492297647184,
+          "tokens": 26
+        },
+        "fine:content": {
+          "nll": 1.2618474974054508,
+          "baseline_nll": 1.2582347849859703,
+          "tokens": 1923
+        },
+        "fine:control": {
+          "nll": 0.03859255686269701,
+          "baseline_nll": 0.0493492297647184,
+          "tokens": 26
+        },
+        "fine:newline": {
+          "nll": 0.5317200733341835,
+          "baseline_nll": 0.5491878746251391,
+          "tokens": 232
+        },
+        "fine:punctuation": {
+          "nll": 0.40562286419953164,
+          "baseline_nll": 0.40082416475108207,
+          "tokens": 616
+        },
+        "fine:whitespace": {
+          "nll": 0.35200680264629786,
+          "baseline_nll": 0.4056841753833309,
+          "tokens": 126
+        },
+        "layout": {
+          "nll": 0.4684690339300673,
+          "baseline_nll": 0.4986809860651731,
+          "tokens": 358
+        },
+        "punctuation": {
+          "nll": 0.40562286419953164,
+          "baseline_nll": 0.40082416475108207,
+          "tokens": 616
+        }
+      },
+      "aggregate_nll": 0.9733533159367045,
+      "aggregate_baseline_nll": 0.9737612213478968,
+      "delta": {
+        "content": {
+          "mean": 0.0034602819241815815,
+          "stderr": 0.003834380355237062,
+          "t": 0.9024357532646623,
+          "better": 2,
+          "n": 6
+        },
+        "layout": {
+          "mean": -0.033106309827164185,
+          "stderr": 0.01152925193164996,
+          "t": -2.8715054561589684,
+          "better": 5,
+          "n": 6
+        },
+        "punctuation": {
+          "mean": 0.005097606017553655,
+          "stderr": 0.003688905031045384,
+          "t": 1.3818751024092006,
+          "better": 2,
+          "n": 6
+        },
+        "control": {
+          "mean": -0.009325518119630753,
+          "stderr": 0.009367148203328087,
+          "t": -0.9955557355564691,
+          "better": 5,
+          "n": 6
+        },
+        "fine:content": {
+          "mean": 0.0034602819241815815,
+          "stderr": 0.003834380355237062,
+          "t": 0.9024357532646623,
+          "better": 2,
+          "n": 6
+        },
+        "fine:newline": {
+          "mean": -0.021073708508006436,
+          "stderr": 0.012424566369472636,
+          "t": -1.6961323141051332,
+          "better": 4,
+          "n": 6
+        },
+        "fine:punctuation": {
+          "mean": 0.005097606017553655,
+          "stderr": 0.003688905031045384,
+          "t": 1.3818751024092006,
+          "better": 2,
+          "n": 6
+        },
+        "fine:whitespace": {
+          "mean": -0.06790045855695336,
+          "stderr": 0.01462473542913251,
+          "t": -4.64285038768602,
+          "better": 6,
+          "n": 6
+        },
+        "fine:control": {
+          "mean": -0.009325518119630753,
+          "stderr": 0.009367148203328087,
+          "t": -0.9955557355564691,
+          "better": 5,
+          "n": 6
+        }
+      },
+      "top1_agreement": 0.9739993157714677,
+      "savings": {
+        "ffn_calls_skipped": 716,
+        "ffn_calls_possible": 70152,
+        "ffn_flops_saved": 54056189952,
+        "ffn_flops_fraction": 0.010206408940586156,
+        "total_flops_saved": 54056189952,
+        "total_flops_fraction": 0.004913690969874317
+      },
+      "band": [
+        8,
+        9
+      ],
+      "layers": [
+        8,
+        9
+      ],
+      "oracle": "layout"
+    },
+    {
+      "tokens": 2923,
+      "by_class": {
+        "content": {
+          "nll": 1.2624855981894019,
+          "baseline_nll": 1.2582347849859703,
+          "tokens": 1923
+        },
+        "control": {
+          "nll": 0.048671360049074616,
+          "baseline_nll": 0.0493492297647184,
+          "tokens": 26
+        },
+        "fine:content": {
+          "nll": 1.2624855981894019,
+          "baseline_nll": 1.2582347849859703,
+          "tokens": 1923
+        },
+        "fine:control": {
+          "nll": 0.048671360049074616,
+          "baseline_nll": 0.0493492297647184,
+          "tokens": 26
+        },
+        "fine:newline": {
+          "nll": 0.5371724748129852,
+          "baseline_nll": 0.5491878746251391,
+          "tokens": 232
+        },
+        "fine:punctuation": {
+          "nll": 0.4148120272658521,
+          "baseline_nll": 0.40082416475108207,
+          "tokens": 616
+        },
+        "fine:whitespace": {
+          "nll": 0.34883017132794125,
+          "baseline_nll": 0.4056841753833309,
+          "tokens": 126
+        },
+        "layout": {
+          "nll": 0.47088440151936645,
+          "baseline_nll": 0.4986809860651731,
+          "tokens": 358
+        },
+        "punctuation": {
+          "nll": 0.4148120272658521,
+          "baseline_nll": 0.40082416475108207,
+          "tokens": 616
+        }
+      },
+      "aggregate_nll": 0.9760951369206957,
+      "aggregate_baseline_nll": 0.9737612213478968,
+      "delta": {
+        "content": {
+          "mean": 0.004324239606337327,
+          "stderr": 0.008546885213175301,
+          "t": 0.50594333473338,
+          "better": 2,
+          "n": 6
+        },
+        "layout": {
+          "mean": -0.03241665104413961,
+          "stderr": 0.01513618884136103,
+          "t": -2.1416653415130584,
+          "better": 5,
+          "n": 6
+        },
+        "punctuation": {
+          "mean": 0.010329946320411062,
+          "stderr": 0.008810746004662702,
+          "t": 1.1724258439574118,
+          "better": 3,
+          "n": 6
+        },
+        "control": {
+          "mean": 0.0023321059228602315,
+          "stderr": 0.02237664286545201,
+          "t": 0.10422054536432906,
+          "better": 5,
+          "n": 6
+        },
+        "fine:content": {
+          "mean": 0.004324239606337327,
+          "stderr": 0.008546885213175301,
+          "t": 0.50594333473338,
+          "better": 2,
+          "n": 6
+        },
+        "fine:newline": {
+          "mean": -0.016168521420230158,
+          "stderr": 0.015353872261488414,
+          "t": -1.0530582217220277,
+          "better": 5,
+          "n": 6
+        },
+        "fine:punctuation": {
+          "mean": 0.010329946320411062,
+          "stderr": 0.008810746004662702,
+          "t": 1.1724258439574118,
+          "better": 3,
+          "n": 6
+        },
+        "fine:whitespace": {
+          "mean": -0.07473362661336573,
+          "stderr": 0.01844116803160426,
+          "t": -4.052543010577644,
+          "better": 6,
+          "n": 6
+        },
+        "fine:control": {
+          "mean": 0.0023321059228602315,
+          "stderr": 0.02237664286545201,
+          "t": 0.10422054536432906,
+          "better": 5,
+          "n": 6
+        }
+      },
+      "top1_agreement": 0.9531303455354089,
+      "savings": {
+        "ffn_calls_skipped": 1948,
+        "ffn_calls_possible": 70152,
+        "ffn_flops_saved": 147069075456,
+        "ffn_flops_fraction": 0.02776827460371764,
+        "total_flops_saved": 147069075456,
+        "total_flops_fraction": 0.013368533532563086
+      },
+      "band": [
+        8,
+        9
+      ],
+      "layers": [
+        8,
+        9
+      ],
+      "oracle": "layout+punctuation"
+    }
+  ],
+  "elapsed_seconds": 3.0310000000026776
+}

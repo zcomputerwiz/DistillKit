@@ -4021,6 +4021,81 @@ programme should not read the aggregate improvement, the retained ON/OFF gap, or
 retained wrong-context gap as evidence otherwise: all three are true and none of them is
 the architecture claim.
 
+## Depth-routing oracle: negative, and the ceiling is the reason
+
+The native-PLE work left an observation worth re-purposing -- local n-gram context is
+extraordinarily predictive of layout tokens -- so the next question was whether an early
+representation could identify tokens that do not need the rest of the network's compute.
+Before building a router, measure the opportunity with an oracle that cheats: classify the
+*target* token, which no deployed model knows in time, and ask how much compute perfect
+knowledge could save.
+
+40 schedules -- 10 layer bands x 4 oracles -- over the same 384-document bundle, 175,526
+scored targets, stock 2B backbone (not the PLE-coadapted model), two independent
+single-GPU workers, 942 seconds. Attention and the GatedDeltaNet state update always run;
+only the MLP residual is zeroed, and only at oracle-selected positions. The altered state
+propagates: `tests/test_ffn_skip.py` pins that an empty mask is the stock model bit for
+bit, that a skip at position t changes position t+3 and leaves t-1 alone, and that layer
+attention output is identical either way.
+
+### The ceiling, before any quality question
+
+| class | tokens | share | baseline NLL |
+| --- | ---: | ---: | ---: |
+| content | 118,090 | 67.3% | 1.7579 |
+| punctuation | 36,506 | 20.8% | 0.6112 |
+| layout | 19,201 | 10.9% | 0.5097 |
+| control | 1,729 | 1.0% | 0.6351 |
+| *of which newline* | 12,147 | 6.9% | 0.5350 |
+
+Perfect routing that skips **every** FFN in **all 24 layers** for **every** layout token
+saves 10.9% of FFN FLOPs, which is 5.3% of the model's linear FLOPs. That is the ceiling,
+and it is below the ~20% proceed threshold before a single quality measurement. Including
+punctuation raises the ceiling to 31.7% of FFN / 15.3% of model -- still short, and
+punctuation turns out not to be free.
+
+### The measured frontier
+
+| band | oracle | content | t | newline | FFN saved | model | top-1 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 12-19 | layout | +0.000780 | 1.0 | +1.779 | 3.6% | 1.8% | 0.9218 |
+| 16-21 | layout | +0.001333 | 4.1 | +0.377 | 2.7% | 1.3% | 0.9699 |
+| 16-19 | layout+punct | +0.003307 | 5.3 | +0.121 | 5.3% | 2.5% | 0.9483 |
+| 4-19 | layout+punct | +0.205520 | 29.3 | +2.591 | 21.2% | 10.2% | 0.7145 |
+| 4-19 | all | +5.381776 | 144.9 | +2.497 | 66.7% | 32.1% | 0.1230 |
+
+The best content-preserving point removes **3.6% of FFN FLOPs, 1.8% of the model**. To
+reach 21.2% of FFN FLOPs costs +0.2055 content NLL -- two hundred times the budget.
+
+### Why the "easy" tokens are not easy
+
+The schedule with the smallest content cost, 12-19 layout at +0.00078 (t = 1.0), raises
+*newline* NLL by +1.78. The tokens being skipped are the ones that get wrecked. Layout is
+cheap to predict -- 0.51 nats against content's 1.76 -- but cheap to predict is not the
+same as computed for free: those middle FFNs are what makes it cheap, and removing them
+removes the prediction. Every band above four layers shows it, up to +2.28 newline NLL for
+the widest layout skip.
+
+Top-1 agreement makes the same point from the other side. At the best schedule 7.8% of
+*all* targets change their argmax, for 1.8% of the model's compute. The intervention is not
+touching a quiet corner of the network.
+
+The negative control behaves as it should: skipping content-token FFNs costs +0.018 content
+at two layers and +4.23 at sixteen, so the harness detects damage where damage is expected.
+
+### Stopping
+
+Even with an oracle -- perfect, free, unavailable-at-inference knowledge of the target
+class -- there is no Pareto region where significant compute disappears with unchanged
+content. The ceiling for the one class that is genuinely cheap sits at 5.3% of the model,
+and the achievable point inside a 0.001 content budget is 1.8%. A router cannot beat its
+own oracle, so no router is worth building on this basis, and the phase-2 learnability
+probe did not run.
+
+Worth recording for later: this measures FFN skipping only. Whole-block skipping would
+roughly double the available FLOPs, but attention and GDN own recurrent state that later
+tokens read, and nothing here says that state is expendable.
+
 ## Reproduction
 
 ```powershell
