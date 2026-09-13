@@ -4294,6 +4294,115 @@ evidence that forcing every sublayer update into the residual stream at fixed un
 is measurably suboptimal, which is independent empirical motivation for learned residual
 admission. It says nothing about the donor GR transplant, which remains closed.
 
+## A 260-parameter gate learns the admission policy from cross-entropy alone
+
+The intervention study left a question it could not answer: fixed unit FFN admission is
+demonstrably wrong on familiar contexts, but does anything *find* that without being
+told? This is the smallest architecture that could. One learned scalar per token per
+gated layer:
+
+    h = h + g * mlp(norm(h))        g = 1 + tanh(W_out tanh(W_in x))
+
+with `W_out` and its bias zero, so initialization is exactly the stock model and the gate
+still sits where its gradient is largest. Reachable admission is (0, 2), which covers the
+whole alpha curve the intervention measured including the alpha = 0 endpoint. No
+per-channel gates, no branches, no widened stream. If a scalar cannot pay for itself
+there is no reason to believe a larger version of the same idea would.
+
+Layers 10, 12, 14 and 16, backbone frozen, ground-truth CE on assistant tokens only, no
+teacher signal of any kind, 250K supervised tokens.
+
+### The first screen was measuring its own learning rate
+
+At 3e-4 the three families came out at -0.0005, -0.0019 and -0.0035 nats of content --
+small, and ordered combined > geometry > familiarity, which is the opposite of what the
+intervention study attributed the effect to. The training log said why before any of it
+was scored: `reach`, the furthest a gate could deviate from unit admission for *any*
+input, ended between 0.06 and 0.24. A gate that can only reach 0.76 cannot express an
+alpha = 0 policy whatever cross-entropy asks of it.
+
+That is a fact from the training log, not from the evaluation, which is what makes
+raising the rate a diagnostic rather than tuning on the screen. At 3e-3 the same gates
+reach 0.46 to 0.81 and the picture inverts:
+
+| family | features | parameters | 3e-4 content | 3e-3 content | t | corpus 2 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| familiarity | 2 | 260 | -0.000495 | **-0.023510** | -19.9 | **-0.023036** |
+| geometry | 4 | 388 | -0.001890 | -0.007059 | -10.5 | -0.007761 |
+| combined | 6 | 516 | -0.003490 | -0.021461 | -18.1 | -0.021428 |
+
+Familiarity alone, at 260 parameters, beats update geometry by 3.3x and beats the
+combination that contains it. Adding the update geometry to familiarity does not help.
+That answers the question the combined arm existed for: **context carries information the
+layer cannot infer from its own proposal**, and the 3e-4 ordering was an artefact of the
+travel budget.
+
+Against the fixed rule the intervention study validated -- layer 12, alpha = 0, count >= 4,
+variance <= 0.25, which scores -0.051411 on these same documents -- the learned gate
+recovers **46%**, with no hand-chosen layer, threshold or alpha.
+
+### It transfers, and nothing is hiding behind it
+
+| class | delta | t | better docs |
+| --- | ---: | ---: | ---: |
+| content | **-0.023510** | -19.9 | 351/384 |
+| newline | -0.035944 | -17.3 | 292/384 |
+| punctuation | -0.035450 | -30.3 | 380/384 |
+| whitespace | -0.044051 | -15.1 | 298/384 |
+| control | -0.021609 | -6.8 | 297/384 |
+| aggregate | -0.026499 | -29.1 | 381/384 |
+
+Every class improves. The disjoint confirmation corpus gives -0.023036 against the
+screen's -0.023510, scored on the frozen final checkpoint with no tuning against it.
+
+Forcing `g = 1` on the trained weights reproduces the stock model to **nine decimal
+places at every checkpoint of every arm**. The delta is attributable to the gate and to
+nothing else -- that is not an assumption here, it is a number in each of the twenty-five
+evaluation records.
+
+### The gate rediscovered the mechanism
+
+Mean admission by cross-document trigram count, familiarity gate at 3e-3:
+
+| layer | unseen | 1-4 | 4-100 | 100-400 | 400-800 | 800-3000 | 3000+ |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10 | 1.0097 | 0.8350 | 0.7106 | 0.5535 | 0.5007 | 0.4627 | **0.4326** |
+| 12 | 1.0210 | 0.8272 | 0.8416 | 0.8027 | 0.7717 | 0.8041 | 0.7595 |
+| 14 | 0.9756 | 0.7879 | 0.6704 | 0.5337 | 0.4998 | 0.4542 | **0.4491** |
+| 16 | 0.9168 | 0.8064 | 0.8727 | 0.9296 | 0.9386 | **0.9947** | 0.9799 |
+
+Nobody wrote this down for it. From cross-entropy alone the gate learned to (a) admit
+unseen contexts at essentially exactly unit strength, which is the intervention's finding
+that attenuating rare contexts *hurts*; (b) cut admission monotonically as contexts get
+more familiar, down to 43-45% at layers 10 and 14; and (c) run one layer the other way,
+increasing admission with familiarity at layer 16. The geometry-only gate is flat in the
+same table to within 0.03, which is the control that says the structure is real and comes
+from the context feature.
+
+The depth assignment does not match the single-layer intervention, which found layer 12
+best and layer 10 harmful. That is not a contradiction -- the intervention moved one
+layer with the rest at stock, and this gate moves four at once -- but it does mean the
+learned policy is a *joint* one, and no single-layer ablation predicts it.
+
+### Cost
+
+260 parameters against 1.88B. Peak VRAM delta is exactly zero bytes. Forward overhead is
+somewhere between 0 and 10%: three interleaved measurements with minimum-of-six timing
+still put the spread of repeated identical work at 6-14%, larger than the effect, and the
+measured overheads do not order with feature count. The honest statement is that the cost
+is below what this machine resolves, not a number.
+
+None of this is a compute saving. The gate scales the FFN output, so it must compute the
+FFN first; `g < 1` saves nothing. This is a quality result about residual admission.
+
+### What it does not establish
+
+The backbone was frozen. A gate that improves a model which never adapted to it is
+mechanistic evidence, not an architecture result: the same discipline that stopped the
+PLE screens from being over-read applies here. Whether learned admission survives a
+backbone trained alongside it is a separate experiment with its own separately-trained
+control, and the PLE result is the reason to expect that it might not.
+
 ## Reproduction
 
 ```powershell

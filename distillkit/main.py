@@ -674,6 +674,37 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         collator = SidecarDataCollator(base_collator, table, hasher=hasher,
                                        shuffle_context=config.sidecar.shuffle_context,
                                        mode=config.sidecar.table_mode)
+    gate_handle = None
+    if config.residual_gate:
+        from distillkit.residual_gate import (TrigramFamiliarity, calibrate_gates,
+                                              gate_parameter_count,
+                                              install_residual_gates)
+        text_config = getattr(model.config, "text_config", model.config)
+        statistics = None
+        if config.residual_gate.familiarity_cache:
+            statistics = TrigramFamiliarity(config.residual_gate.familiarity_cache,
+                                            text_config.vocab_size)
+        gate_handle = install_residual_gates(
+            model, config.residual_gate.layers, family=config.residual_gate.family,
+            hidden=config.residual_gate.hidden, span=config.residual_gate.span,
+            familiarity=statistics)
+        # Before the optimizer exists, and before anything can have moved: the feature
+        # normalizer is estimated with the gate inert, so the model is the stock model
+        # for the whole pass. A batch here is one document -- the statistics being
+        # collected are per token, so padding would only dilute them.
+        device = next(model.parameters()).device
+        batches = []
+        for index in range(min(config.residual_gate.calibration_batches, len(ds_train))):
+            ids = torch.tensor([ds_train[index]["input_ids"]], device=device)
+            batches.append({"input_ids": ids,
+                            "attention_mask": torch.ones_like(ids)})
+        calibration = calibrate_gates(model, gate_handle, batches)
+        LOG.info("Residual gates on layers %s, family %s, %d parameters; feature "
+                 "normalizer frozen from %d documents",
+                 list(gate_handle.layer_indices), config.residual_gate.family,
+                 gate_parameter_count(model), len(batches))
+        LOG.debug("Gate feature normalizer: %s", calibration)
+
     from distillkit.optimizers import ReleaseEvalCacheCallback
 
     # Evaluation carves the allocator's pool into its own shapes, and Windows cannot
@@ -739,6 +770,11 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
                 # Jacobian. Skipped when the backbone unfreezes mid-run, since the
                 # prefix would then need the gradients this discards.
                 index = getattr(model.config, "sidecar_layer_index", None)
+                if index is None and config.residual_gate:
+                    # Same argument, different injection point: nothing below the
+                    # shallowest gated layer can move, so the graph autograd builds
+                    # across it is constructed and discarded.
+                    index = min(config.residual_gate.layers)
                 if index is not None:
                     try:
                         no_grad_prefix(model, upto_layer=index)
@@ -750,6 +786,11 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
             if config.optimizer.unfreeze_at_step:
                 callbacks.append(UnfreezeBackboneCallback(config.optimizer.unfreeze_at_step, frozen_names))
         callbacks.append(ArchitectureMetricsCallback(config.optimizer.log_every_n_steps))
+    if gate_handle is not None:
+        from distillkit.residual_gate import ResidualGateCheckpointCallback
+        # The backbone is frozen in stage 1, so a full checkpoint every eval would write
+        # the same 2B model five times. Only the gate changes; only the gate is saved.
+        callbacks.append(ResidualGateCheckpointCallback(config.output_path))
     trainer_class = HybridDistillationTrainer if config.optimizer else DistillationTrainer
     trainer = trainer_class(
         model=model,

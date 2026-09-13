@@ -20,6 +20,7 @@ from distillkit.widened_residual import WidenedResidual
 from distillkit.hyper_connection import HyperConnection
 from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
 from distillkit.ple_sidecar import PLESidecar
+from distillkit.residual_gate import ResidualAdmissionGate
 
 
 def validate_optimizer_backend(
@@ -97,7 +98,8 @@ def _auxiliary_parameter_ids(model: nn.Module) -> set[int]:
         result.update(id(p) for name, p in model.named_parameters() if name in names)
     for name, module in model.named_modules():
         parts = set(name.split("."))
-        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)) or parts.intersection(
+        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection,
+                              ResidualAdmissionGate)) or parts.intersection(
             {"sidecar", "W_side_proj", "distillation_projections"}
         ):
             result.update(id(p) for p in module.parameters())
@@ -444,7 +446,8 @@ def architecture_metrics(model: nn.Module) -> dict[str, float]:
 
     report = {}
     for name, module in model.named_modules():
-        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection)):
+        if isinstance(module, (GatedResidual, WidenedResidual, HyperConnection,
+                              ResidualAdmissionGate)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))
         if isinstance(module, (PLESidecar, DirectionGatedPLESidecar)):
             report.update(module.gate_report(prefix=f"architecture/{name}"))

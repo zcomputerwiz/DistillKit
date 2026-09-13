@@ -335,6 +335,72 @@ class ResidualStreamConfig(BaseModel):
         return self
 
 
+class ResidualGateConfig(BaseModel):
+    """A learned scalar on each gated layer's FFN admission; omit for the stock model.
+
+    The intervention study established that fixed unit admission is the wrong strength
+    on familiar contexts at some depths and the right one at others. This section asks
+    the model to choose, and stays deliberately minimal: one scalar per token per gated
+    layer, a handful of compact features, no per-channel or multi-branch anything. See
+    distillkit/residual_gate.py.
+    """
+    layers: list[int] = Field(
+        default_factory=list, min_length=1,
+        description=(
+            "Decoder indices to gate. The intervention evidence points at 12, 14 and 16 "
+            "(attenuation helps) and at 10 (attenuation hurts), which is why 10 belongs "
+            "in the broader variant: a gate that cannot learn different behaviour at "
+            "different depths has not been given the chance to reproduce the finding."
+        ),
+    )
+    family: Literal["familiarity", "geometry", "combined"] = Field(
+        default="familiarity",
+        description=(
+            "What the gate reads. 'familiarity' is cross-document trigram statistics, "
+            "'geometry' is the norms and cosine of the proposed update against the "
+            "state, and 'combined' is both -- which is the arm that answers whether "
+            "context carries anything the update geometry does not already imply."
+        ),
+    )
+    hidden: int = Field(default=16, ge=1,
+                        description="Width of the gate's one hidden layer.")
+    span: float = Field(
+        default=1.0, gt=0, le=1.0,
+        description=(
+            "Reachable range, (1 - span, 1 + span). The default covers the whole alpha "
+            "curve the intervention measured, including the alpha = 0 endpoint that was "
+            "best, so the parameterization is never the reason a value is unreachable."
+        ),
+    )
+    familiarity_cache: str | None = Field(
+        default=None,
+        description=(
+            "The .npz of cross-document trigram counts and residual variance, as "
+            "written by scratch/ffn_memo/build_cache.py. Required by any family that "
+            "reads familiarity. Its corpus excludes the evaluation documents by digest."
+        ),
+    )
+    calibration_batches: int = Field(
+        default=8, ge=1,
+        description=(
+            "Documents used to freeze the gate's feature normalizer before training. "
+            "The model is bitwise stock for the whole pass and the gate takes no "
+            "gradient; the resulting constants ship in the state dict."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_family_inputs(self):
+        if self.family in ("familiarity", "combined") and not self.familiarity_cache:
+            raise ValueError("family %r reads trigram statistics; set familiarity_cache"
+                             % self.family)
+        if self.family == "geometry" and self.familiarity_cache:
+            raise ValueError("a geometry gate reads no context; drop familiarity_cache")
+        if len(set(self.layers)) != len(self.layers):
+            raise ValueError("a layer cannot be gated twice")
+        return self
+
+
 class OptimizerConfig(BaseModel):
     strategy: Literal["hybrid", "adamw"] = "hybrid"
     muon_lr: float | None = Field(default=None, gt=0)
@@ -510,6 +576,7 @@ class DistillationRunConfig(BaseModel):
     )
     sidecar: SidecarConfig | None = None
     residual_stream: ResidualStreamConfig | None = None
+    residual_gate: ResidualGateConfig | None = None
     optimizer: OptimizerConfig | None = None
     trust_remote_code: bool = Field(
         default=False,
@@ -618,6 +685,7 @@ class DistillationRunConfig(BaseModel):
             raise ValueError("resident tables require dataloader_num_workers=0 to prevent worker copies")
         if self.sidecar and self.resize_embeddings_to_multiple_of is not None:
             raise ValueError("sidecar preserves the original padded vocabulary; omit embedding resize")
-        if self.optimizer and self.optimizer.freeze_backbone and not (self.sidecar or self.residual_stream):
-            raise ValueError("stage-1 backbone freezing requires a sidecar or residual_stream student")
+        if self.optimizer and self.optimizer.freeze_backbone and not (
+                self.sidecar or self.residual_stream or self.residual_gate):
+            raise ValueError("stage-1 backbone freezing requires a sidecar, residual_stream or residual_gate student")
         return self

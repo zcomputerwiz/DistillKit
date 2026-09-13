@@ -1,0 +1,58 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "tokens": 438,
+  "rounds": 6,
+  "arms": {
+    "familiarity": {
+      "gate": "D:/DeepThought/Projects/HybridModel/runs/gate-familiarity-lr3e3/gate-step284.pt",
+      "parameters": 260,
+      "layers": [
+        10,
+        12,
+        14,
+        16
+      ],
+      "gated_seconds": 0.07556139500011341,
+      "stock_seconds": 0.06856029500013391,
+      "overhead_fraction": 0.10211595501398918,
+      "gated_spread": 0.059949396114426845,
+      "stock_spread": 0.07746633820417737,
+      "peak_gated_bytes": 3994204672,
+      "peak_stock_bytes": 3994204672
+    },
+    "geometry": {
+      "gate": "D:/DeepThought/Projects/HybridModel/runs/gate-geometry-lr3e3/gate-step284.pt",
+      "parameters": 388,
+      "layers": [
+        10,
+        12,
+        14,
+        16
+      ],
+      "gated_seconds": 0.07378689000033774,
+      "stock_seconds": 0.07168106500030262,
+      "overhead_fraction": 0.029377702466142575,
+      "gated_spread": 0.10572847018832432,
+      "stock_spread": 0.08496685979163865,
+      "peak_gated_bytes": 3993166848,
+      "peak_stock_bytes": 3993166848
+    },
+    "combined": {
+      "gate": "D:/DeepThought/Projects/HybridModel/runs/gate-combined-lr3e3/gate-step284.pt",
+      "parameters": 516,
+      "layers": [
+        10,
+        12,
+        14,
+        16
+      ],
+      "gated_seconds": 0.07568866000001435,
+      "stock_seconds": 0.07108588000010059,
+      "overhead_fraction": 0.06474956770468698,
+      "gated_spread": 0.1382978639086918,
+      "stock_spread": 0.11507010955822738,
+      "peak_gated_bytes": 3994204672,
+      "peak_stock_bytes": 3994204672
+    }
+  }
+}

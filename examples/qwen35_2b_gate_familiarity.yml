@@ -1,0 +1,109 @@
+# Stage 1 of the learned-admission screen: a familiarity-conditioned scalar gate, on a
+# frozen backbone.
+#
+# The intervention study established that fixed unit FFN admission is the wrong strength
+# in an identifiable regime: on familiar contexts, scaling layer 12's proposal down
+# improved held-out content NLL by 0.0514 nats (t -39.3), monotonically in the scale
+# factor, replicated at -0.0520 on a disjoint corpus, with the sign flipping on rare
+# contexts. Neighbouring layers behaved differently -- 14 and 16 improved, 10 got worse.
+#
+# The question here is whether the model can find that policy itself from cross-entropy
+# alone. Frozen backbone first, because that is the clean mechanistic test: if a learned
+# gate cannot beat stock while a hand-chosen fixed rule does, the problem is the
+# parameterization or the optimization, not the hypothesis. Co-adaptation is a separate
+# experiment and only runs if this one is positive.
+#
+# Identical to examples/qwen35_2b_gate_geometry.yml and _gate_combined.yml except for
+# residual_gate.family, residual_gate.familiarity_cache and output_path.
+
+model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/gate-familiarity
+project_name: hybridmodel-residual-gate
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  # The same cached corpus the co-adaptation arms trained on, for data parity with every
+  # earlier screen. Its logits are not used: the objective below is ground-truth CE only.
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+residual_gate:
+  # 12, 14 and 16 are where attenuation helped; 10 is where it hurt. Gating all four is
+  # what makes the mechanistic check possible at all -- a gate that only sees layers
+  # where the answer is "admit less" cannot demonstrate that it learned depth-dependent
+  # behaviour rather than a constant.
+  layers: [10, 12, 14, 16]
+  family: familiarity
+  hidden: 16
+  # Reachable admission (0, 2), which covers the whole measured alpha curve including
+  # the alpha = 0 endpoint that was best. The parameterization is never the reason a
+  # value is out of reach.
+  span: 1.0
+  familiarity_cache: scratch/ffn_memo/cache/layer-12.npz
+  calibration_batches: 8
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # Only the gate trains. freeze_backbone_for_stage1 finds it through
+  # architecture_parameter_ids, which recognises ResidualAdmissionGate.
+  freeze_backbone: true
+  freeze_sidecar: false
+  unfreeze_at_step: null
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# The backbone is frozen and holds no optimizer state, so this run is far under the
+# co-adaptation arms' 15.5 GiB. The cap is enforced by the allocator: an overrun raises
+# instead of paging into shared system memory, which on Windows is a 70x slowdown rather
+# than an error.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # A few hundred parameters train; 8-bit moments would be pointless machinery.
+  optim: adamw_torch
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update, matching the co-adaptation
+  # screens exactly.
+  max_steps: 284
+  # The gate's output layer starts at exactly zero and has to travel far enough to bend
+  # tanh. AdamW moves a parameter about lr per step, so 284 steps at 3e-4 is a budget of
+  # 0.085 per weight; summed over 16 hidden units that reaches |tanh argument| ~ 1.4, or
+  # an admission range of roughly 0.1 to 1.9. Enough to express the measured policy
+  # several times over, without a sweep.
+  learning_rate: 3.0e-4
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens. Each evaluation writes a gate checkpoint; the backbone
+  # cannot move, so nothing else is worth writing.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: "no"
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
