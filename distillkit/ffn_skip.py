@@ -34,7 +34,8 @@ import torch
 from torch import nn
 
 __all__ = ["skip_ffn", "FFNSkip", "substitute_ffn", "FFNSubstitute", "capture_ffn",
-           "mlp_flops_per_token", "model_flops_per_token", "estimate_savings"]
+           "attenuate_ffn", "FFNAttenuate", "mlp_flops_per_token",
+           "model_flops_per_token", "estimate_savings"]
 
 
 class FFNSkip:
@@ -257,3 +258,86 @@ def capture_ffn(model: nn.Module, layers):
     finally:
         for handle in handles:
             handle.remove()
+
+
+class FFNAttenuate:
+    """Admit only ``alpha`` of the proposed FFN update at selected positions.
+
+    The decoder's ordinary update is ``h = h + mlp(norm(h))``, which admits every
+    sublayer's proposal into the residual stream at unit strength whether or not that is
+    the right amount. This scales one layer's proposal at chosen positions::
+
+        h = h + alpha * mlp(norm(h))
+
+    ``alpha = 1`` is the stock model, ``alpha = 0`` is the zeroing intervention, and the
+    values in between are what distinguish a coherent over-admission effect from an
+    artefact that only appears when the update is removed entirely.
+    """
+
+    def __init__(self, layers: dict[int, nn.Module]):
+        self._layers = layers
+        self.masks: dict[int, torch.Tensor] = {}
+        self.alphas: dict[int, float] = {}
+        self.scaled_calls = 0
+        self.total_calls = 0
+
+    def set(self, layer: int, mask: torch.Tensor, alpha: float) -> None:
+        if layer not in self._layers:
+            raise ValueError("layer %d is not intervened on" % layer)
+        self.masks[layer] = mask
+        self.alphas[layer] = float(alpha)
+
+    def clear(self) -> None:
+        self.masks.clear()
+        self.alphas.clear()
+
+    def reset_counts(self) -> None:
+        self.scaled_calls = 0
+        self.total_calls = 0
+
+    def _apply(self, layer: int, output: torch.Tensor) -> torch.Tensor:
+        self.total_calls += int(output.shape[0] * output.shape[1])
+        mask = self.masks.get(layer)
+        if mask is None:
+            return output
+        if mask.shape != output.shape[:2]:
+            raise ValueError("mask %s does not match hidden states %s"
+                             % (tuple(mask.shape), tuple(output.shape[:2])))
+        alpha = self.alphas[layer]
+        if alpha == 1.0:
+            return output
+        self.scaled_calls += int(mask.sum())
+        scale = torch.where(mask.unsqueeze(-1).to(output.device),
+                            torch.full_like(output, alpha),
+                            torch.ones_like(output))
+        return output * scale
+
+
+@contextlib.contextmanager
+def attenuate_ffn(model: nn.Module, layers):
+    """Scale the MLP update in ``layers`` by the handle's alpha where its mask is set."""
+    inner = getattr(model, "model", model)
+    if not hasattr(inner, "layers"):
+        raise ValueError("expected a decoder model with a `layers` list")
+    chosen = {}
+    for index in layers:
+        if not 0 <= index < len(inner.layers):
+            raise ValueError("layer %d outside the model's %d layers"
+                             % (index, len(inner.layers)))
+        chosen[index] = inner.layers[index]
+
+    handle = FFNAttenuate(chosen)
+    originals = {}
+    for index, layer in chosen.items():
+        originals[index] = layer.mlp.forward
+
+        def wrapped(hidden_states, _index=index, _original=originals[index],
+                    _handle=handle, **kwargs):
+            return _handle._apply(_index, _original(hidden_states, **kwargs))
+
+        layer.mlp.forward = wrapped
+    try:
+        yield handle
+    finally:
+        for index, layer in chosen.items():
+            layer.mlp.forward = originals[index]

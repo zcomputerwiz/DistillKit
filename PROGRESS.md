@@ -4182,6 +4182,118 @@ compression or fuzziness to blame -- damage content where no cache at all does n
 stop rule, the low-rank basis and fuzzy-matching phases did not run: a compressed or
 approximate lookup cannot outperform the oracle that already has the better vector.
 
+## Context-conditioned FFN attenuation: replicates, and familiarity is the signal
+
+The memoisation study closed negative but left an anomaly: zeroing layer 12's FFN residual
+on high-frequency trigram positions *improved* held-out content NLL, more so as the
+contexts got more familiar. This task tried to kill it.
+
+It survived every attempt.
+
+### The alpha curve is coherent
+
+The decoder admits every sublayer's proposal at unit strength. Scaling one layer's
+proposal at selected positions -- `h = h + alpha * mlp(norm(h))` -- gives, on 384 held-out
+documents:
+
+| mask | selected | a=0.00 | a=0.25 | a=0.50 | a=0.75 | a=1.00 | a=1.25 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| count >= 2 | 61.4% | -0.0411 | -0.0330 | -0.0228 | -0.0105 | 0.00000 | +0.0113 |
+| count >= 16 | 48.4% | -0.0460 | -0.0354 | -0.0237 | -0.0105 | 0.00000 | +0.0108 |
+| count >= 32 | 44.0% | -0.0477 | -0.0363 | -0.0240 | -0.0107 | 0.00000 | +0.0107 |
+| count >= 4, var <= 0.25 | 32.9% | **-0.0514** | -0.0383 | -0.0250 | -0.0111 | 0.00000 | +0.0107 |
+
+Monotone in both directions from unity, and *stronger* as the mask narrows. This is not a
+discontinuity at zero; over-admission is graded. `alpha = 1.00` returning exactly
+`0.000000` is the harness identity check running live in every row.
+
+### Controls discriminate, and rare contexts flip the sign
+
+At layer 12, matched density (32.9% of positions), alpha = 0:
+
+| arm | content | t | top-1 |
+| --- | ---: | ---: | ---: |
+| familiar | **-0.051411** | -39.3 | 0.9610 |
+| shuffled (class-composition preserved) | -0.012378 | -11.2 | 0.9609 |
+| random (matched density) | -0.010548 | -11.8 | 0.9615 |
+| rare contexts | **+0.010932** | +17.4 | 0.9754 |
+
+Attenuating unfamiliar contexts *hurts*. Matched-density controls recover a fifth of the
+effect, which is the part attributable to attenuating anything at all.
+
+### It is a content result
+
+| class | tokens | share | baseline | attenuated | delta | nats |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| content | 118,090 | 67.3% | 1.7579 | 1.7100 | **-0.051411** | -5,649 |
+| punctuation | 36,506 | 20.8% | 0.6112 | 0.5926 | -0.021319 | -681 |
+| newline | 12,147 | 6.9% | 0.5350 | 0.5445 | +0.010759 | +115 |
+| whitespace | 7,054 | 4.0% | 0.4661 | 0.4576 | -0.008438 | -60 |
+| control | 1,729 | 1.0% | 0.6351 | 0.6819 | +0.062547 | +81 |
+
+Content is 91% of the nats gained and punctuation improves alongside it rather than paying
+for it. The two classes that worsen contribute 196 nats against 6,390 gained. After three
+studies where structural tokens dominated the aggregate, this one is the other way round.
+
+### Corpus 2 confirms the frozen condition
+
+Condition frozen on corpus 1 before corpus 2 was scored: layer 12, alpha = 0,
+count >= 4, variance <= 0.25.
+
+| corpus | documents | selected | content | t |
+| --- | ---: | ---: | ---: | ---: |
+| screen (corpus 1) | 384 | 32.9% | -0.051411 | -39.3 |
+| confirmation (corpus 2) | 384 | 33.2% | **-0.051970** | -38.9 |
+
+Disjoint document sets, both excluded by SHA-256 from the corpus that produced the
+familiarity statistics. The effect size is the same to three decimal places.
+
+### Familiarity, not update geometry
+
+23,317 selected positions, recording what a gate could see and what happened:
+
+| trigram count | positions | mean benefit (nats) |
+| --- | ---: | ---: |
+| 4 - 94 | 4,664 | -0.0097 |
+| 94 - 394 | 4,689 | -0.0124 |
+| 394 - 784 | 5,533 | +0.0795 |
+| 784 - 3,000 | 9,221 | +0.1965 |
+| 3,000 - 4,063 | 6,062 | **+0.3544** |
+
+Strongly monotone, and negative at the bottom: attenuation only pays above roughly 400
+cross-document occurrences. The geometry buckets -- `||r||/||h||`, `cos(h, r)`, `||r||` --
+are non-monotone and unstructured over the same positions.
+
+Held-out AUC for predicting whether attenuation helped a given position: familiarity
+0.550, geometry 0.546, both 0.566. All three are close to chance.
+
+**FAMILIARITY-SPECIFIC SIGNAL**, with the important qualification that it is a
+*population* signal rather than a per-token one.
+
+### The honest shape of the effect
+
+Only 39.7% of selected positions individually improve. The mean benefit of +0.106 nats per
+selected position is carried by a minority with large gains against a majority with small
+losses. That is why the AUCs sit near chance and still the aggregate moves: a gate that
+attenuates *all* familiar positions wins on average without being able to say which ones
+it is winning on.
+
+Anyone building the router should treat that as the central design constraint, not a
+footnote. Precision-oriented routing -- picking only positions that will individually
+benefit -- is not supported by these features at these AUCs.
+
+### Scope
+
+Neighbour layers at the same condition, alpha = 0: layer 8 -0.0062, layer 10 **+0.0105**,
+layer 12 -0.0514, layer 14 -0.0339, layer 16 -0.0378. A middle-and-upper-depth phenomenon
+rather than a layer-12 quirk, but not uniform -- layer 10 moves the other way.
+
+This is a quality result, not a compute result. Only alpha = 0 could translate into skipped
+computation, and one layer at 32.9% coverage is 1.4% of model FLOPs. The value here is the
+evidence that forcing every sublayer update into the residual stream at fixed unit strength
+is measurably suboptimal, which is independent empirical motivation for learned residual
+admission. It says nothing about the donor GR transplant, which remains closed.
+
 ## Reproduction
 
 ```powershell
