@@ -5,7 +5,9 @@ from distillkit.parallel.checkpoint import (
     TensorSpec,
     consolidated_state_dict,
     load_checkpoint,
+    load_consolidated_state_dict,
     tensor_specs,
+    training_layout,
     write_layout,
 )
 
@@ -14,6 +16,8 @@ __all__ = [
     "TensorSpec",
     "consolidated_state_dict",
     "load_checkpoint",
+    "load_consolidated_state_dict",
     "tensor_specs",
+    "training_layout",
     "write_layout",
 ]

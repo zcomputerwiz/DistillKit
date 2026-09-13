@@ -15,7 +15,11 @@ from distillkit.core.chunked_head import HeadContext
 from distillkit.core.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
-from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
+from distillkit.lossfuncs import (
+    ALL_LOSS_CLASSES,
+    LossFunctionBase,
+    create_loss_function,
+)
 from distillkit.lossfuncs.hidden_state import last_anchor_report
 from distillkit.signals import OnlineSignalSource, SignalSource, TeacherSignal
 
@@ -23,12 +27,7 @@ LOG = logging.getLogger(__name__)
 
 
 def create_loss_func(cfg: LossFunctionConfig) -> LossFunctionBase:
-    for cls in ALL_LOSS_CLASSES:
-        if cfg.function.value == cls.name():
-            return cls(
-                **cfg.model_dump(exclude=["function", "weight"], exclude_none=True)
-            )
-    raise RuntimeError(f"Unknown loss function '{cfg.function}'")
+    return create_loss_function(cfg)
 
 
 # Enough batches that an ordering difference cannot hide, few enough that the
@@ -487,79 +486,16 @@ class HybridDistillationTrainer(DistillationTrainer):
             self.optimizer = super().create_optimizer()
         unwrapped = self.accelerator.unwrap_model(self.model)
         # None under the hybrid strategy, which already took it at construction.
-        _apply_sidecar_lr(self.optimizer, unwrapped, sidecar_lr)
+        apply_sidecar_lr(self.optimizer, unwrapped, sidecar_lr)
         # Only for the plain-AdamW path; the hybrid optimizer took it at construction.
         # After the sidecar split, so the blend leaves whichever group that put it in.
-        _apply_blend_lr(self.optimizer, unwrapped, blend_lr)
+        apply_blend_lr(self.optimizer, unwrapped, blend_lr)
         return self.optimizer
 
 
-def _apply_sidecar_lr(optimizer, model, sidecar_lr):
-    """Give the sidecar its own learning rate, leaving the backbone on the run's.
+from distillkit.optimizers import apply_sidecar_lr, apply_blend_lr
 
-    Stage 2 runs the backbone at 1e-5, which moves the sidecar barely at all: the
-    chained run's ``W_side_proj`` went 2.1055 -> 2.1077 across an entire epoch, and the
-    PLE module's weights did not change to five significant figures over fifty logged
-    steps. The backbone then adapts around a sidecar that is effectively frozen, which
-    is not what "unlocking both" was supposed to mean.
+# Backward compatibility shims
+_apply_sidecar_lr = apply_sidecar_lr
+_apply_blend_lr = apply_blend_lr
 
-    Splits the auxiliary parameters out of whichever groups HF put them in, preserving
-    each group's weight decay, and re-adds them at ``sidecar_lr``. Done inside
-    ``create_optimizer`` so the scheduler, built afterwards, records the right
-    ``initial_lr`` per group and scales them proportionally.
-    """
-    if sidecar_lr is None:
-        return optimizer
-    from distillkit.optimizers import architecture_parameter_ids
-
-    # Architecture only. The distillation projections are auxiliary too, but they exist
-    # solely to compute the hidden-state term; giving them a raised rate lets them fit
-    # their own objective, which is the confound that made the first sweep meaningless.
-    auxiliary = architecture_parameter_ids(model)
-    moved: dict[float, list] = {}
-    for group in optimizer.param_groups:
-        kept = []
-        for parameter in group["params"]:
-            if id(parameter) in auxiliary:
-                moved.setdefault(group.get("weight_decay", 0.0), []).append(parameter)
-            else:
-                kept.append(parameter)
-        group["params"] = kept
-    for weight_decay, params in moved.items():
-        optimizer.add_param_group(
-            {"params": params, "lr": sidecar_lr, "weight_decay": weight_decay}
-        )
-    return optimizer
-
-
-def _apply_blend_lr(optimizer, model, blend_lr):
-    """Give the learned blend scalars their own rate, after every other regrouping.
-
-    AdamW moves a parameter by roughly ``lr`` per step whatever its gradient, so at the
-    run's 1e-4 a 72-step budget is 0.0072: a blend initialised at 0.10 could reach 0.107
-    and the run would report that it "wants" to stay put. That is the same arithmetic
-    that made a learning-rate sweep the wrong knob for the sidecar gate -- PROGRESS.md,
-    2026-09-10 -- and it is why this is a separate group rather than a hyperparameter
-    inherited from the backbone.
-
-    Weight decay is forced to zero. These are interpolation coefficients, not weights,
-    and decaying them would pull the blend toward "no donor" for reasons unrelated to
-    the objective -- which is precisely the question being asked.
-    """
-    if blend_lr is None:
-        return optimizer
-    from distillkit.hyper_connection import HyperConnection
-
-    blends = {id(module.blend) for module in model.modules()
-              if isinstance(module, HyperConnection) and module.learnable_blend}
-    if not blends:
-        raise ValueError("blend_lr was set but no learnable blend parameter exists")
-    moved = []
-    for group in optimizer.param_groups:
-        kept = []
-        for parameter in group["params"]:
-            (moved if id(parameter) in blends else kept).append(parameter)
-        group["params"] = kept
-    if moved:
-        optimizer.add_param_group({"params": moved, "lr": blend_lr, "weight_decay": 0.0})
-    return optimizer

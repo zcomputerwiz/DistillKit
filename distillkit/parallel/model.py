@@ -127,6 +127,7 @@ def sharded_parameter_report(model: nn.Module) -> dict:
     Reported rather than assumed: a module that silently failed to shard still runs,
     it just uses twice the memory and none of the parallelism.
     """
+    from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
     sharded_modules = (
         TensorParallelMLP, TensorParallelAttention, TensorParallelGatedDeltaNet,
         VocabParallelEmbedding,

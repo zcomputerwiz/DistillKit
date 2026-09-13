@@ -152,3 +152,15 @@ def load_checkpoint(model, directory):
             raise ValueError("Duplicate tensors in checkpoint shards")
         state.update(shard)
     load_consolidated_state_dict(model, state)
+
+
+__all__ = [
+    "MARKER",
+    "TensorSpec",
+    "tensor_specs",
+    "consolidated_state_dict",
+    "load_consolidated_state_dict",
+    "training_layout",
+    "write_layout",
+    "load_checkpoint",
+]

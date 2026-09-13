@@ -56,6 +56,8 @@ def test_blocks_exports():
 def test_checkpoint_exports():
     assert parallel.MARKER == parallel_checkpoint.MARKER == legacy_checkpoint.MARKER
     assert parallel.consolidated_state_dict is parallel_checkpoint.consolidated_state_dict is legacy_checkpoint.consolidated_state_dict
+    assert parallel.load_consolidated_state_dict is parallel_checkpoint.load_consolidated_state_dict is legacy_checkpoint.load_consolidated_state_dict
+    assert parallel.training_layout is parallel_checkpoint.training_layout is legacy_checkpoint.training_layout
     assert parallel.write_layout is parallel_checkpoint.write_layout is legacy_checkpoint.write_layout
     assert parallel.load_checkpoint is parallel_checkpoint.load_checkpoint is legacy_checkpoint.load_checkpoint
 

@@ -36,6 +36,10 @@ def test_qwen35_exports_parity():
     assert qwen35.install_expanded_gqa_attention is qwen35_gqa.install_expanded_gqa_attention is legacy_gqa.install_expanded_gqa_attention
     assert qwen35.fused_kernel_supports_gqa is qwen35_gqa.fused_kernel_supports_gqa is legacy_gqa.fused_kernel_supports_gqa
 
+    # Model loader
+    import distillkit.main as main
+    assert models.load_student_model is main.load_student_model
+
 
 def test_model_registry_resolution():
     # 1. Widened residual stream takes precedence

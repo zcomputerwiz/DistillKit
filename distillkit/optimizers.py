@@ -557,3 +557,49 @@ class ArchitectureMetricsCallback(TrainerCallback):
             if state.log_history and state.log_history[-1].get("step") == state.global_step:
                 state.log_history[-1].update(metrics)
         return control
+
+
+def apply_sidecar_lr(optimizer, model, sidecar_lr):
+    """Give the sidecar its own learning rate, leaving the backbone on the run's."""
+    if sidecar_lr is None:
+        return optimizer
+
+    auxiliary = architecture_parameter_ids(model)
+    moved: dict[float, list] = {}
+    for group in optimizer.param_groups:
+        kept = []
+        for parameter in group["params"]:
+            if id(parameter) in auxiliary:
+                moved.setdefault(group.get("weight_decay", 0.0), []).append(parameter)
+            else:
+                kept.append(parameter)
+        group["params"] = kept
+    for weight_decay, params in moved.items():
+        optimizer.add_param_group(
+            {"params": params, "lr": sidecar_lr, "weight_decay": weight_decay}
+        )
+    return optimizer
+
+
+def apply_blend_lr(optimizer, model, blend_lr):
+    """Give the learned blend scalars their own rate, after every other regrouping."""
+    if blend_lr is None:
+        return optimizer
+
+    blends = {
+        id(module.blend)
+        for module in model.modules()
+        if isinstance(module, HyperConnection) and module.learnable_blend
+    }
+    if not blends:
+        raise ValueError("blend_lr was set but no learnable blend parameter exists")
+    moved = []
+    for group in optimizer.param_groups:
+        kept = []
+        for parameter in group["params"]:
+            (moved if id(parameter) in blends else kept).append(parameter)
+        group["params"] = kept
+    if moved:
+        optimizer.add_param_group({"params": moved, "lr": blend_lr, "weight_decay": 0.0})
+    return optimizer
+

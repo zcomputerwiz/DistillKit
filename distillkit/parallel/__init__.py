@@ -36,6 +36,8 @@ from distillkit.parallel.checkpoint import (
     MARKER,
     consolidated_state_dict,
     load_checkpoint,
+    load_consolidated_state_dict,
+    training_layout,
     write_layout,
 )
 from distillkit.parallel.sync import (
@@ -75,6 +77,8 @@ __all__ = [
     "MARKER",
     "consolidated_state_dict",
     "load_checkpoint",
+    "load_consolidated_state_dict",
+    "training_layout",
     "write_layout",
     # Sync
     "clip_grad_norm",
