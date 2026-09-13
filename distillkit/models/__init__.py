@@ -1,6 +1,16 @@
-"""Explicit model classes for DistillKit architecture extensions."""
+# Copyright 2025 Arcee AI & DistillKit Contributors
+"""Model architectures, adapters, and registry for DistillKit."""
 
-from .qwen35_sidecar import Qwen35SidecarForCausalLM
-from .qwen35_widened import Qwen35WidenedForCausalLM
+from distillkit.models.registry import (
+    register_student_model,
+    resolve_student_class,
+)
+from distillkit.models.qwen35.sidecar import Qwen35SidecarForCausalLM
+from distillkit.models.qwen35.widened import Qwen35WidenedForCausalLM
 
-__all__ = ["Qwen35SidecarForCausalLM", "Qwen35WidenedForCausalLM"]
+__all__ = [
+    "Qwen35SidecarForCausalLM",
+    "Qwen35WidenedForCausalLM",
+    "register_student_model",
+    "resolve_student_class",
+]

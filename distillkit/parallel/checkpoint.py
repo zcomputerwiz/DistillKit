@@ -11,7 +11,6 @@ from pathlib import Path
 import torch
 
 from distillkit.parallel.blocks import TensorParallelAttention
-from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
 from distillkit.parallel.linear import ColumnParallelLinear, RowParallelLinear
 from distillkit.parallel.vocab import VocabParallelEmbedding, VocabParallelHead
 
@@ -29,6 +28,8 @@ class TensorSpec:
 
 def tensor_specs(model):
     """Describe each canonical tensor exactly once, including untouched tensors."""
+    from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
+
     specs = []
     for prefix, module in model.named_modules():
         if isinstance(module, (ColumnParallelLinear, RowParallelLinear)):

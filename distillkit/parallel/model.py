@@ -35,7 +35,6 @@ from torch import nn
 
 from distillkit.parallel.collectives import peer_capable
 from distillkit.parallel.blocks import TensorParallelAttention, TensorParallelMLP
-from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
 from distillkit.parallel.sync import sync_replicated_gradients
 from distillkit.parallel.vocab import VocabParallelEmbedding, VocabParallelHead
 
@@ -73,6 +72,8 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
     # norm and rotary. The tied embedding/head is then split by rows across all cards.
     model.to(home_device)
     _shard_tied_embeddings(model, base, resolved)
+
+    from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
 
     counts = {"mlp": 0, "full_attention": 0, "linear_attention": 0}
     for layer in base.layers:

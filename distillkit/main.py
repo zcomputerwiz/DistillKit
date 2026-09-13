@@ -28,8 +28,10 @@ from distillkit.configuration import (
 )
 from distillkit.core.frozen_prefix import no_grad_prefix
 from distillkit.hsd_mapping import HiddenStateMapping
-from distillkit.gqa_dispatch import install_expanded_gqa_attention
-from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
+from distillkit.models.qwen35 import (
+    install_device_aware_linear_attention,
+    install_expanded_gqa_attention,
+)
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
 from distillkit.sharding import (
     as_device,
@@ -211,21 +213,10 @@ def load_student_model(
     tokenizer_vocab_size: int,
     signal_vocab_size: int | None = None,
 ) -> transformers.PreTrainedModel:
-    residual_stream = getattr(config, "residual_stream", None)
     if config.functionary_packing:
         monkey_patch_packing_for_model(config.train_model)
-    if residual_stream is not None:
-        from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
-        auto_cls = Qwen35WidenedForCausalLM
-    elif config.sidecar is not None:
-        from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
-        auto_cls = Qwen35SidecarForCausalLM
-    else:
-        auto_cls = getattr(transformers, config.model_auto_class, None)
-    if auto_cls is None:
-        raise ValueError(
-            f"Model class {config.model_auto_class} not found in transformers."
-        )
+    from distillkit.models import resolve_student_class
+    auto_cls = resolve_student_class(config)
     LOG.info(f"Loading model {config.train_model} with class {auto_cls}")
     extra_kwargs = {"trust_remote_code": config.trust_remote_code}
     if config.use_flash_attention:
