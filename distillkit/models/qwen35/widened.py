@@ -20,10 +20,12 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
 from distillkit.models.qwen35.sidecar import (
     _SidecarWeightInit, _set_sidecar_defaults, _build_sidecar,
 )
-from distillkit.widened_residual import (
-    WidenedResidual, collapse_residual, offload_stream_boundaries,
+from distillkit.experimental import (
+    HyperConnection,
+    WidenedResidual,
+    collapse_residual,
+    offload_stream_boundaries,
 )
-from distillkit.hyper_connection import HyperConnection
 
 
 class _WidenedWeightInit(_SidecarWeightInit):

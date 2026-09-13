@@ -24,14 +24,19 @@ from transformers.models.qwen3_5.modeling_qwen3_5 import (
     Qwen3_5TextRotaryEmbedding,
 )
 
-from distillkit.gated_residual import GatedResidual
-from distillkit.donor_reader import DonorReaderTransplant
+from distillkit.experimental import (
+    DirectionGatedPLESidecar,
+    DonorReaderTransplant,
+    GatedResidual,
+    IQ4NL_BLOCK,
+    IQ4NL_KVALUES,
+    IQ4NL_TYPE_SIZE,
+    IQ4NLDequant,
+    NativePLESidecar,
+    PLESidecar,
+)
 from distillkit.models.qwen35.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.models.qwen35.linear_attention_dispatch import install_device_aware_linear_attention
-from distillkit.ngram_table import IQ4NL_BLOCK, IQ4NL_KVALUES, IQ4NL_TYPE_SIZE, IQ4NLDequant
-from distillkit.native_ple import NativePLESidecar
-from distillkit.ple_gated_sidecar import DirectionGatedPLESidecar
-from distillkit.ple_sidecar import PLESidecar
 
 # flash-linear-attention, when installed, is bound by transformers at import time with
 # no device check, and its Triton kernels reject CPU tensors. Restore per-call
