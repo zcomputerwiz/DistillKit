@@ -4485,6 +4485,104 @@ content-first endpoint was chosen to be able to see.
 across two seeds and two corpora. Small, replicated, and the first architecture change in
 this programme to survive its own control.
 
+## Warm-started routing: every run more reproducible, the two seeds further apart
+
+The fresh-gate co-adaptation left one thing unexplained. Both seeds agreed that a learned
+gate beats the stock control on content, and agreed on almost nothing else: layer 14
+attenuated familiar contexts in one seed and layer 10 amplified them in the other, and the
+endpoint effect differed by a factor of two. The hypothesis this tests is that the
+instability comes from asking a fresh identity gate and the backbone to find a joint
+routing policy at the same time.
+
+So arm C starts co-adaptation from the policy the gate had already learned against the
+frozen backbone -- same pretrained backbone as arms A and B, same data in the same order
+(training stream digests match A and B at both seeds), same rates, same budget. Only the
+gate's starting point differs.
+
+This is not a compute-matched comparison against arm B: arm C has already spent 250K
+supervised tokens of gate-only optimisation before it begins. It is a question about
+curriculum, not about architecture, and the architecture question was already settled by
+arm A against arm B.
+
+### The answer needed a repeat design, and the repeats are the finding
+
+The first pass said C beat A at seed 42 and lost to A at seed 43. Both differences were
+around 0.003 nats, which is where an earlier observation became impossible to ignore:
+re-running one seed-43 configuration with the same seed and the same training stream
+digest had already moved A - B from -0.004525 to -0.003213. A third run of that same
+configuration gave -0.006557. **Three runs of one configuration, spread 0.0033 nats** --
+the same size as the effect under test. Determinism at the data level does not buy
+determinism at the result level; bf16 reductions and checkpointed recompute do not
+reassociate the same way twice, and 284 steps of a 1.88B backbone amplify that.
+
+A single run per cell therefore cannot answer this. Three runs per cell can:
+
+| cell | n | mean content NLL | min | max | spread |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A, seed 42 | 3 | 1.657121 | 1.656210 | 1.657693 | 0.001483 |
+| C, seed 42 | 3 | **1.655345** | 1.655087 | 1.655552 | **0.000464** |
+| A, seed 43 | 3 | **1.664216** | 1.663191 | 1.664800 | 0.001610 |
+| C, seed 43 | 3 | 1.668399 | 1.667797 | 1.668988 | 0.001191 |
+
+| seed | C - A | C - B | A - B | arms overlap |
+| --- | ---: | ---: | ---: | --- |
+| 42 | **-0.001776** | -0.003445 | -0.001669 | no |
+| 43 | **+0.004183** | -0.000953 | -0.005136 | no |
+
+Neither seed's arms overlap at all: at seed 42 the worst C run beats the best A run, and
+at seed 43 the best C run is worse than the worst A run. The opposite signs are real, not
+sampling noise.
+
+### Warm-starting reduced the wrong variance
+
+Within a seed, arm C is the *more* reproducible arm -- 0.00046 of spread against A's
+0.00148 at seed 42, 0.00119 against 0.00161 at seed 43. Between seeds it is the *less*
+reproducible one: C - A swings from -0.0018 to +0.0042 where A - B swings from -0.0017 to
+-0.0051 and keeps its sign.
+
+That is the hypothesis answered, in the opposite direction to the one it proposed. Fitting
+the routing policy to the frozen representation first makes each individual run land in a
+tighter place, and makes which place that is depend more on the seed, not less.
+
+### Why, mechanically
+
+Comparing each co-adapted policy to the frozen-stage policy it started from, over the
+layer x familiarity grid:
+
+| arm | Pearson to the Stage-1 policy | outcome against A |
+| --- | ---: | --- |
+| C, seed 42 | **+0.707** | better by 0.0018 |
+| C, seed 43 | **+0.156** | worse by 0.0042 |
+| A, seed 42 | +0.204 | -- |
+| A, seed 43 | -0.590 | -- |
+
+One seed kept the pretrained policy and won; the other rewrote it and lost. Nothing in the
+setup chooses which happens. Cross-seed policy similarity is a wash on the measure that
+was supposed to move -- Pearson 0.655 for C against 0.526 for A, but RMS 0.0384 against
+0.0345, worse on the second measure than the first is better.
+
+Arm C also leans on its gate *less* than arm A does: forcing `g = 1` costs C 0.0012 and
+0.0045 nats at the two seeds, against A's 0.0025 and 0.0068. A warm-started backbone
+co-adapts to a gate that is already doing something, and ends up needing it less.
+
+### What this corrects
+
+The fresh-gate result was reported from single runs per cell. With three runs at seed 43
+and a proper mean, A - B is -0.001669 (seed 42, n=1 for B) and -0.005136 (seed 43). The
+sign held in all five A - B measurements taken across this and the previous screen, so the
+architecture conclusion stands. The magnitudes quoted earlier -- -0.0026 and -0.0045 --
+were single draws from a distribution 0.0033 wide, and should be read as one run each, not
+as the effect size.
+
+**NEGATIVE ON THE STABILITY HYPOTHESIS.** Warm-starting is not neutral and not an
+accelerator: it is a large, resolved, seed-dependent effect in both directions. Against
+the four outcomes the task proposed, none fits -- it is not "erases initialization" (the
+initialization clearly survives at one seed and determines the result at both), not
+"accelerates but does not improve", and not uniformly an impediment. The curriculum does
+not fix the seed instability it was proposed to fix, and before routing capacity grows,
+the thing worth fixing is that a 250K-token co-adaptation of this backbone has a 0.0033
+nat noise floor that no single run can see past.
+
 ## Reproduction
 
 ```powershell

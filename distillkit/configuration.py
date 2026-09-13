@@ -380,6 +380,18 @@ class ResidualGateConfig(BaseModel):
             "reads familiarity. Its corpus excludes the evaluation documents by digest."
         ),
     )
+    init_from: str | None = Field(
+        default=None,
+        description=(
+            "A gate checkpoint to start from instead of the identity, as written by "
+            "ResidualGateCheckpointCallback. The frozen stage fits a routing policy to "
+            "a stationary pretrained representation; this is what lets co-adaptation "
+            "begin from that policy rather than rediscover one while the representation "
+            "is also moving. The checkpoint carries its own frozen feature normalizer, "
+            "so calibration_batches is unused when this is set -- recalibrating would "
+            "change the function the loaded weights were fitted for."
+        ),
+    )
     calibration_batches: int = Field(
         default=8, ge=1,
         description=(

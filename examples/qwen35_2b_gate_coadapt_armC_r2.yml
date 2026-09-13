@@ -1,0 +1,134 @@
+# Repeat r2 of arm C, seed 42. Three runs of one seed-43 configuration,
+# identical training stream digest, landed 0.0033 nats apart on A - B at the endpoint --
+# the same order as the C - A difference this experiment exists to measure. A single run
+# per cell therefore cannot answer it. Only the endpoint is checkpointed; the observation
+# is absolute content NLL, which is directly comparable between runs because evaluation
+# is deterministic.
+#
+# Arm C of the gate co-adaptation screen: the gate starts from the policy it learned
+# against the frozen backbone, not from the identity.
+#
+# The frozen stage established that a 260-parameter familiarity gate improves held-out
+# content NLL by 0.023510 nats (t -19.9), reproduces that at -0.023036 on a disjoint
+# corpus, learns a monotone familiarity policy per layer rather than a constant, and
+# recovers 46% of the hand-chosen fixed rule's gain. All of that was measured on a
+# backbone that never adapted to it.
+#
+# The PLE screens are why that is not enough. There, a memory that measurably worked on a
+# frozen backbone turned out to be redundant against a backbone trained without it:
+# content A - B came out at -0.000108 (t -0.2). Once the backbone can train, the same
+# checkpoint with the gate switched off measures how much this model has come to lean on
+# its gate, not what the gate was worth. Only a backbone trained from the same starting
+# point, on the same documents in the same order, without the gate, is the counterfactual.
+#
+# Arm A asks a fresh identity gate and the backbone to discover a joint routing policy
+# at the same time, and the two seeds it was run at agreed on the sign and disagreed on
+# nearly everything else: -0.0026 against -0.0045 on content, layer 14 attenuating
+# familiar contexts in one seed and layer 10 amplifying them in the other, and one
+# milestone crossing into the wrong sign before recovering. The hypothesis here is that
+# the instability comes from asking for both at once.
+#
+# So this arm fits the routing policy to a stationary representation first -- that is the
+# frozen stage, already run -- and only then unfreezes the backbone. The primary
+# comparison is C - A per seed: same architecture, same budget, same data, same rates,
+# differing only in where the gate starts.
+#
+# One thing this is not: an equal-compute comparison against arm B. Arm C has already
+# consumed 250K supervised tokens of gate-only optimisation before this run begins. The
+# architecture claim was settled by A against B; this asks whether the curriculum is
+# better, which is a different question and needs saying every time C - B is quoted.
+#
+# Identical to examples/qwen35_2b_gate_coadapt_armA.yml except for output_path and
+# residual_gate.init_from.
+
+model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/gate-coadapt-armC-r2
+project_name: hybridmodel-gate-coadapt
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+residual_gate:
+  # The frozen stage's winner: familiarity alone, 260 parameters, and this time its
+  # trained weights. The backbone is still the same pretrained checkpoint arms A and B
+  # started from -- only the gate differs, which is what makes C - A a statement about
+  # initialisation rather than about two different models.
+  layers: [10, 12, 14, 16]
+  family: familiarity
+  hidden: 16
+  span: 1.0
+  familiarity_cache: scratch/ffn_memo/cache/layer-12.npz
+  calibration_batches: 8
+  # The 3e-3 familiarity gate from the frozen stage: -0.023510 content on the screen,
+  # -0.023036 on the confirmation corpus. Its feature normaliser travels with it, so
+  # calibration_batches above is unused here -- recalibrating against this run's own
+  # documents would change the function these weights were fitted for.
+  init_from: scratch/residual_gate/gates/familiarity-lr3e3-step284.pt
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # Everything trains: backbone and gate.
+  freeze_backbone: false
+  freeze_sidecar: false
+  unfreeze_at_step: null
+  # Misnamed for this run and reused deliberately: _apply_sidecar_lr splits on
+  # architecture_parameter_ids, which recognises the gate, so the existing grouping gives
+  # it its own rate with no new machinery. 1e-5 on a gate that learned at 3e-3 is a way
+  # to stop it; 3e-3 on a 1.88B pretrained backbone is a way to destroy it.
+  sidecar_lr: 3.0e-3
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# Enforced by the allocator: an overrun raises instead of paging into shared system
+# memory, which on Windows is a 70x slowdown rather than an error.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # 8-bit AdamW state: two moments at one byte each over 1.88B parameters is 3.8 GiB,
+  # against 15 GiB for fp32 moments. This is what makes a fully trainable backbone fit
+  # on one 24 GiB card.
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update, matching the frozen stage
+  # and both earlier co-adaptation screens.
+  max_steps: 284
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 284
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

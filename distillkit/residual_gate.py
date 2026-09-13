@@ -17,6 +17,7 @@ from distillkit.experimental.residual_gate import (
     family_features,
     gate_parameter_count,
     install_residual_gates,
+    load_gate_checkpoint,
     remove_residual_gates,
     residual_gates,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "family_features",
     "gate_parameter_count",
     "install_residual_gates",
+    "load_gate_checkpoint",
     "remove_residual_gates",
     "residual_gates",
 ]

@@ -57,6 +57,8 @@ different function than the forward computed.
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import io
 import logging
 import math
 import os
@@ -69,6 +71,7 @@ from transformers import TrainerCallback
 __all__ = ["ResidualAdmissionGate", "ResidualGateHandle", "TrigramFamiliarity",
            "install_residual_gates", "remove_residual_gates", "residual_gates",
            "calibrate_gates", "attach_residual_gates",
+           "load_gate_checkpoint",
            "ResidualGateCheckpointCallback", "FAMILIES", "family_features",
            "gate_parameter_count"]
 
@@ -562,6 +565,12 @@ def attach_residual_gates(config, model, dataset):
     handle = install_residual_gates(model, section.layers, family=section.family,
                                     hidden=section.hidden, span=section.span,
                                     familiarity=statistics)
+    if section.init_from:
+        digest = load_gate_checkpoint(model, handle, section.init_from)
+        LOG.info("Residual gates on layers %s, family %s, %d parameters; warm-started "
+                 "from %s (sha256 %s)", list(handle.layer_indices), section.family,
+                 gate_parameter_count(model), section.init_from, digest[:16])
+        return handle
     device = next(model.parameters()).device
     batches = []
     for index in range(min(section.calibration_batches, len(dataset))):
@@ -573,3 +582,37 @@ def attach_residual_gates(config, model, dataset):
              gate_parameter_count(model), len(batches))
     LOG.debug("Gate feature normalizer: %s", calibration)
     return handle
+
+
+def load_gate_checkpoint(model, handle: ResidualGateHandle, path) -> str:
+    """Load trained gate weights into an installed gate, and prove they arrived.
+
+    A warm start is only a warm start if the gate is bitwise the one that was fitted.
+    The family and the gated layers have to agree with the checkpoint -- loading a
+    four-feature gate into a two-feature one would be caught by shape, but loading a gate
+    trained on different layers would not be, and would silently move a policy to depths
+    it was never fitted for. The normalizer travels with the weights and is asserted
+    present: an uncalibrated warm start would standardize against zeros and mean nothing.
+
+    Returns the checkpoint digest, so a run records which policy it started from.
+    """
+    payload = torch.load(path, map_location="cpu", weights_only=False)
+    if payload.get("family") != handle.family:
+        raise ValueError("gate checkpoint is family %r but this run configures %r"
+                         % (payload.get("family"), handle.family))
+    if tuple(payload.get("layers", ())) != handle.layer_indices:
+        raise ValueError("gate checkpoint covers layers %s but this run gates %s"
+                         % (tuple(payload.get("layers", ())), handle.layer_indices))
+    model.residual_gates.load_state_dict(payload["state_dict"], strict=True)
+    for index in handle.layer_indices:
+        gate = handle.gate(index)
+        if not gate.is_calibrated:
+            raise ValueError(
+                "the gate for layer %d arrived without a feature normalizer; a warm "
+                "start cannot recalibrate without changing what the weights mean" % index)
+    loaded = model.residual_gates.state_dict()
+    for key, value in payload["state_dict"].items():
+        if not torch.equal(loaded[key].cpu(), value.cpu()):
+            raise ValueError("gate parameter %s did not survive loading" % key)
+    with io.open(path, "rb") as handle_in:
+        return hashlib.sha256(handle_in.read()).hexdigest()

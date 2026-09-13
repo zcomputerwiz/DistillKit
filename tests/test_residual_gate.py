@@ -12,9 +12,10 @@ import torch
 
 from distillkit.optimizers import architecture_parameter_ids, freeze_backbone_for_stage1
 from distillkit.experimental.residual_gate import (
-    FAMILIES, ResidualAdmissionGate, TrigramFamiliarity, calibrate_gates,
-    family_features, gate_parameter_count, install_residual_gates,
-    remove_residual_gates, residual_gates)
+    FAMILIES, ResidualAdmissionGate, ResidualGateCheckpointCallback,
+    TrigramFamiliarity, calibrate_gates, family_features, gate_parameter_count,
+    install_residual_gates, load_gate_checkpoint, remove_residual_gates,
+    residual_gates)
 from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
 from tests.test_sidecar_model import tiny_config
@@ -302,5 +303,172 @@ def test_calibration_runs_on_cpu():
             gate = handle.gate(index)
             assert gate.is_calibrated
             assert float(gate.feature_std.min()) > 0
+    finally:
+        remove_residual_gates(model)
+
+
+# --- warm start ---------------------------------------------------------------
+#
+# The co-adaptation curriculum starts the gate from a policy fitted to the frozen
+# pretrained backbone rather than from the identity. That is only a different
+# initialization if three things hold exactly: the backbone is untouched, the gate
+# weights are the ones that were fitted, and the feature normalizer travels with them.
+# A warm start that silently recalibrates is a different function wearing the same
+# weights, and would look like a result.
+
+
+def trained_gate(tmp_path, model, ids, family="familiarity", step=284):
+    """A gate that has moved off identity, saved the way a run would save it."""
+    handle = calibrated(model, ids, family=family, tmp_path=tmp_path)
+    torch.manual_seed(11)
+    for index in handle.layer_indices:
+        gate = handle.gate(index)
+        gate.output.weight.data.normal_(0, 0.4)
+        gate.output.bias.data.normal_(0, 0.4)
+        gate.project.weight.data.normal_(0, 0.4)
+    callback = ResidualGateCheckpointCallback(str(tmp_path))
+    callback._write(model, step)
+    return handle, callback.written[-1]
+
+
+def test_a_warm_start_loads_the_saved_weights_exactly(tmp_path):
+    source = build()
+    ids = batch(source)
+    handle, path = trained_gate(tmp_path, source, ids)
+    saved = {key: value.clone() for key, value in source.residual_gates.state_dict().items()}
+    remove_residual_gates(source)
+
+    target = build()
+    statistics = familiarity_for(target, tmp_path)
+    fresh = install_residual_gates(target, GATED, family="familiarity",
+                                   familiarity=statistics)
+    try:
+        digest = load_gate_checkpoint(target, fresh, path)
+        assert len(digest) == 64
+        loaded = target.residual_gates.state_dict()
+        assert set(loaded) == set(saved)
+        for key, value in saved.items():
+            assert torch.equal(loaded[key], value), key
+    finally:
+        remove_residual_gates(target)
+
+
+def test_a_warm_start_carries_the_frozen_normalizer(tmp_path):
+    """Recalibrating would change the function the loaded weights were fitted for."""
+    source = build()
+    ids = batch(source)
+    handle, path = trained_gate(tmp_path, source, ids)
+    means = {index: handle.gate(index).feature_mean.clone()
+             for index in handle.layer_indices}
+    deviations = {index: handle.gate(index).feature_std.clone()
+                  for index in handle.layer_indices}
+    remove_residual_gates(source)
+
+    target = build()
+    fresh = install_residual_gates(target, GATED, family="familiarity",
+                                   familiarity=familiarity_for(target, tmp_path))
+    try:
+        assert not fresh.gate(GATED[0]).is_calibrated
+        load_gate_checkpoint(target, fresh, path)
+        for index in fresh.layer_indices:
+            gate = fresh.gate(index)
+            assert gate.is_calibrated
+            assert torch.equal(gate.feature_mean, means[index])
+            assert torch.equal(gate.feature_std, deviations[index])
+    finally:
+        remove_residual_gates(target)
+
+
+def test_a_warm_started_model_reproduces_the_model_it_was_fitted_on(tmp_path):
+    """Step zero of co-adaptation has to be the frozen-stage model, bit for bit."""
+    source = build()
+    ids = batch(source)
+    handle, path = trained_gate(tmp_path, source, ids)
+    reference = logits_of(source, ids)
+    remove_residual_gates(source)
+
+    target = build()
+    fresh = install_residual_gates(target, GATED, family="familiarity",
+                                   familiarity=familiarity_for(target, tmp_path))
+    try:
+        load_gate_checkpoint(target, fresh, path)
+        assert torch.equal(reference, logits_of(target, ids))
+    finally:
+        remove_residual_gates(target)
+
+
+def test_installing_a_gate_leaves_every_backbone_tensor_untouched(tmp_path):
+    """Arms A, B and C must start from the same backbone; only the gate differs."""
+    model = build()
+    ids = batch(model)
+    before = {name: parameter.clone()
+              for name, parameter in model.named_parameters()}
+    handle, path = trained_gate(tmp_path, model, ids)
+    remove_residual_gates(model)
+
+    fresh = install_residual_gates(model, GATED, family="familiarity",
+                                   familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, fresh, path)
+        for name, parameter in model.named_parameters():
+            if name.startswith("residual_gates."):
+                continue
+            assert torch.equal(parameter, before[name]), name
+    finally:
+        remove_residual_gates(model)
+
+
+def test_a_warm_start_refuses_a_checkpoint_from_other_layers(tmp_path):
+    """A policy moved to depths it was never fitted for would not raise on shape."""
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids)
+    remove_residual_gates(source)
+
+    target = build()
+    other = (0, 2)
+    fresh = install_residual_gates(target, other, family="familiarity",
+                                   familiarity=familiarity_for(target, tmp_path))
+    try:
+        with pytest.raises(ValueError, match="covers layers"):
+            load_gate_checkpoint(target, fresh, path)
+    finally:
+        remove_residual_gates(target)
+
+
+def test_a_warm_start_refuses_a_checkpoint_from_another_family(tmp_path):
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids, family="geometry")
+    remove_residual_gates(source)
+
+    target = build()
+    fresh = install_residual_gates(target, GATED, family="familiarity",
+                                   familiarity=familiarity_for(target, tmp_path))
+    try:
+        with pytest.raises(ValueError, match="family"):
+            load_gate_checkpoint(target, fresh, path)
+    finally:
+        remove_residual_gates(target)
+
+
+def test_a_warm_started_gate_still_trains_with_the_backbone(tmp_path):
+    """Warm start changes where training begins, not what is trainable."""
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids)
+    remove_residual_gates(source)
+
+    model = build()
+    fresh = install_residual_gates(model, GATED, family="familiarity",
+                                   familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, fresh, path)
+        loss_of(model, ids).backward()
+        for index in fresh.layer_indices:
+            grad = fresh.gate(index).output.weight.grad
+            assert grad is not None and torch.any(grad != 0)
+        embedding = model.get_input_embeddings().weight
+        assert embedding.grad is not None and torch.any(embedding.grad != 0)
     finally:
         remove_residual_gates(model)
