@@ -27,6 +27,11 @@ def create_loss_func(cfg: LossFunctionConfig) -> LossFunctionBase:
     raise RuntimeError(f"Unknown loss function '{cfg.function}'")
 
 
+def model_is_training(model) -> bool:
+    """True during a training step, False inside `evaluate`, which sets eval mode."""
+    return bool(getattr(model, "training", False))
+
+
 class DistillationTrainer(SFTTrainer):
     def __init__(
         self,
@@ -317,9 +322,13 @@ class DistillationTrainer(SFTTrainer):
             valid_mask = valid_mask & inputs["attention_mask"].bool().unsqueeze(-1)
         if not valid_mask.any():
             raise ValueError("Distillation batch contains no supervised token positions")
-        counted = valid_mask.any(-1).sum()
-        running = getattr(self, "_supervised_tokens", None)
-        self._supervised_tokens = counted if running is None else running + counted
+        # Evaluation runs through this same path, and evaluation tokens are not training
+        # tokens: counting them would inflate the x-axis of the very curve the evaluation
+        # is producing a point on.
+        if model_is_training(self.model):
+            counted = valid_mask.any(-1).sum()
+            running = getattr(self, "_supervised_tokens", None)
+            self._supervised_tokens = counted if running is None else running + counted
         # A CE-only run has nothing to ask the teacher, and asking anyway costs a
         # per-microbatch cache read that is then thrown away.
         signal: TeacherSignal | None = None

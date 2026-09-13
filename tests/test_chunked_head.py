@@ -572,8 +572,15 @@ def test_supervised_tokens_counts_what_actually_carried_gradient():
     supervised = int(labels.ge(0).logical_and(mask.bool()).sum())
 
     batch = {"input_ids": ids, "attention_mask": mask, "labels": labels}
+    model.train()
     DistillationTrainer.total_distillation_loss(trainer, outputs, batch)
     assert int(trainer._supervised_tokens) == supervised
 
     DistillationTrainer.total_distillation_loss(trainer, outputs, batch)
     assert int(trainer._supervised_tokens) == 2 * supervised, "the count must accumulate"
+
+    # Evaluation runs the same path. Its tokens are not training tokens: counting them
+    # would inflate the x-axis of the curve the evaluation is producing a point on.
+    model.eval()
+    DistillationTrainer.total_distillation_loss(trainer, outputs, batch)
+    assert int(trainer._supervised_tokens) == 2 * supervised, "evaluation was counted"
