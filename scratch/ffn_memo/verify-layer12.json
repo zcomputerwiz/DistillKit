@@ -1,0 +1,594 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "cache": "scratch\\ffn_memo\\cache",
+  "cache_manifest": {
+    "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+    "source": "D:/DeepThought/Projects/HybridModel/capture-data/heldout.jsonl",
+    "documents": 3000,
+    "tokens": 1361081,
+    "distinct_trigrams": 440433,
+    "cached_keys": 64598,
+    "min_count": 2,
+    "layers": [
+      8,
+      12,
+      16,
+      20
+    ],
+    "hidden": 2048,
+    "elapsed_seconds": 326.42199999999866,
+    "excluded_digests": 768
+  },
+  "documents": 384,
+  "flops_per_token": {
+    "mlp": 1811939328,
+    "other": 934588032,
+    "head": 1017118720,
+    "total": 3763646080,
+    "mlp_per_layer": 75497472,
+    "layers": 24
+  },
+  "results": [
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 2,
+      "max_variance": null,
+      "arm": "zero",
+      "delta": {
+        "content": {
+          "mean": -0.04111196988813323,
+          "stderr": 0.001360643740583403,
+          "t": -30.21508765439634,
+          "better": 381,
+          "n": 384
+        },
+        "layout": {
+          "mean": 0.004412063708645222,
+          "stderr": 0.0014132178871133834,
+          "t": 3.121998206276057,
+          "better": 151,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": -0.011281387338182949,
+          "stderr": 0.0012483819234665502,
+          "t": -9.036807667685865,
+          "better": 276,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.059711925617179966,
+          "stderr": 0.00912168754719109,
+          "t": 6.546148978274038,
+          "better": 132,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7202339197850736,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6784814317684871,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5143833648768713,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.6034523267572613,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.6138976561876873,
+      "top1_agreement": 0.9431309321695931,
+      "savings": {
+        "ffn_calls_skipped": 107755,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 8135230095360,
+        "ffn_flops_fraction": 0.025579069007820303,
+        "total_flops_saved": 8135230095360,
+        "total_flops_fraction": 0.012314580096993485
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 2,
+      "max_variance": null,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.006949939481710805,
+          "stderr": 0.00046985846527038724,
+          "t": 14.791559576800125,
+          "better": 85,
+          "n": 384
+        },
+        "layout": {
+          "mean": 0.0003125645878725247,
+          "stderr": 0.0009072002335938589,
+          "t": 0.3445375963300904,
+          "better": 199,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": 0.004345023144136441,
+          "stderr": 0.0006536805251783032,
+          "t": 6.6470132989678055,
+          "better": 151,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.007842801988045416,
+          "stderr": 0.0023688799890782,
+          "t": 3.310763746667166,
+          "better": 203,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7646232703401636,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6482193806468667,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5101476968638526,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.6164056007722424,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.6138976561876873,
+      "top1_agreement": 0.9741291888381208,
+      "savings": {
+        "ffn_calls_skipped": 107755,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 8135230095360,
+        "ffn_flops_fraction": 0.025579069007820303,
+        "total_flops_saved": 8135230095360,
+        "total_flops_fraction": 0.012314580096993485
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": null,
+      "arm": "zero",
+      "delta": {
+        "content": {
+          "mean": -0.04273436612632323,
+          "stderr": 0.0013424878126536153,
+          "t": -31.832219051473377,
+          "better": 383,
+          "n": 384
+        },
+        "layout": {
+          "mean": 0.003334920560263938,
+          "stderr": 0.0013432602018063882,
+          "t": 2.482706296054336,
+          "better": 155,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": -0.012334112486992801,
+          "stderr": 0.0011922209169968035,
+          "t": -10.345492442845533,
+          "better": 288,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.06046561106199313,
+          "stderr": 0.009089046051462444,
+          "t": 6.652580559019624,
+          "better": 133,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7185755569115841,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6790541388612924,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5131667498267564,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.602241021212787,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.575555758121304,
+      "top1_agreement": 0.9458142953180725,
+      "savings": {
+        "ffn_calls_skipped": 101025,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 7627132108800,
+        "ffn_flops_fraction": 0.023981489921721,
+        "total_flops_saved": 7627132108800,
+        "total_flops_fraction": 0.011545454543165206
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": null,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.0058483563908015785,
+          "stderr": 0.0004040718619701102,
+          "t": 14.473555179732339,
+          "better": 86,
+          "n": 384
+        },
+        "layout": {
+          "mean": 6.135128959085995e-06,
+          "stderr": 0.0008610658552469987,
+          "t": 0.0071250403458700835,
+          "better": 196,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": 0.0034881715311053884,
+          "stderr": 0.0006060850519235514,
+          "t": 5.755250884401236,
+          "better": 152,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.007610054457879133,
+          "stderr": 0.0022690038336276933,
+          "t": 3.3539187308080236,
+          "better": 209,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.763516510905601,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6478902774656787,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5097268735136635,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.6155001992339725,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.575555758121304,
+      "top1_agreement": 0.9761630755557581,
+      "savings": {
+        "ffn_calls_skipped": 101025,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 7627132108800,
+        "ffn_flops_fraction": 0.023981489921721,
+        "total_flops_saved": 7627132108800,
+        "total_flops_fraction": 0.011545454543165206
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 16,
+      "max_variance": null,
+      "arm": "zero",
+      "delta": {
+        "content": {
+          "mean": -0.04597442938708348,
+          "stderr": 0.0013136736733184062,
+          "t": -34.9968415450922,
+          "better": 384,
+          "n": 384
+        },
+        "layout": {
+          "mean": 0.0020966638540399637,
+          "stderr": 0.001345562093915491,
+          "t": 1.5582066881349335,
+          "better": 168,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": -0.015624136472311333,
+          "stderr": 0.001033029254601328,
+          "t": -15.12458277702995,
+          "better": 325,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.05875774505431073,
+          "stderr": 0.008938159276897948,
+          "t": 6.573808234339612,
+          "better": 138,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7153107116273392,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.676496267265788,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5116190961783136,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.5986957313453832,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.48379727219899044,
+      "top1_agreement": 0.951773526429133,
+      "savings": {
+        "ffn_calls_skipped": 84919,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 6411169824768,
+        "ffn_flops_fraction": 0.020158219674957935,
+        "total_flops_saved": 6411169824768,
+        "total_flops_fraction": 0.009704810238565169
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 16,
+      "max_variance": null,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.0038447517742565686,
+          "stderr": 0.000329832983026221,
+          "t": 11.656662529565514,
+          "better": 102,
+          "n": 384
+        },
+        "layout": {
+          "mean": -0.0007739714275212024,
+          "stderr": 0.000773597308082707,
+          "t": -1.0004836100573082,
+          "better": 196,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": 0.0015959601153768667,
+          "stderr": 0.000475992511247575,
+          "t": 3.3529101354848208,
+          "better": 181,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.008341916726857789,
+          "stderr": 0.0021726601652800295,
+          "t": 3.8394944870647163,
+          "better": 204,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7615118582991265,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6485157579887536,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5087491586519147,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.6134492046352414,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.48379727219899044,
+      "top1_agreement": 0.9798662306438932,
+      "savings": {
+        "ffn_calls_skipped": 84919,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 6411169824768,
+        "ffn_flops_fraction": 0.020158219674957935,
+        "total_flops_saved": 6411169824768,
+        "total_flops_fraction": 0.009704810238565169
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": 0.25,
+      "arm": "zero",
+      "delta": {
+        "content": {
+          "mean": -0.051411093639152465,
+          "stderr": 0.001309052333655789,
+          "t": -39.2735204830022,
+          "better": 384,
+          "n": 384
+        },
+        "layout": {
+          "mean": 0.00416689269400435,
+          "stderr": 0.0008629912380085483,
+          "t": 4.828429896484157,
+          "better": 137,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": -0.02131917544866288,
+          "stderr": 0.0009117692643817161,
+          "t": -23.382204557114264,
+          "better": 364,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.06254744238558185,
+          "stderr": 0.008519807268390476,
+          "t": 7.341415177035811,
+          "better": 100,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7100145259524162,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6818829924896481,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.512568888135568,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.5925808422194904,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.3290110866766177,
+      "top1_agreement": 0.9610086255027745,
+      "savings": {
+        "ffn_calls_skipped": 57750,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 4359979008000,
+        "ffn_flops_fraction": 0.013708795278192404,
+        "total_flops_saved": 4359979008000,
+        "total_flops_fraction": 0.00659985152059184
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": 0.25,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.00013098203729788196,
+          "stderr": 0.00014187226649151532,
+          "t": 0.9232391963352143,
+          "better": 182,
+          "n": 384
+        },
+        "layout": {
+          "mean": -0.0010115233729367237,
+          "stderr": 0.00041569074419507863,
+          "t": -2.4333555342815814,
+          "better": 200,
+          "n": 384
+        },
+        "punctuation": {
+          "mean": -0.0003328106029096051,
+          "stderr": 0.00018786431267905885,
+          "t": -1.771547763188891,
+          "better": 216,
+          "n": 384
+        },
+        "control": {
+          "mean": 0.0007154136219215596,
+          "stderr": 0.0008710449936916337,
+          "t": 0.8213279762845747,
+          "better": 239,
+          "n": 384
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.7579418247437801,
+          "baseline_nll": 1.7578517626919292,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.6362469777898985,
+          "baseline_nll": 0.6350901190347891,
+          "tokens": 1729
+        },
+        "layout": {
+          "nll": 0.5087674234490801,
+          "baseline_nll": 0.5096653558001192,
+          "tokens": 19201
+        },
+        "punctuation": {
+          "nll": 0.6110274711915147,
+          "baseline_nll": 0.6112310867550981,
+          "tokens": 36506
+        }
+      },
+      "coverage": 0.3290110866766177,
+      "top1_agreement": 0.9883550015382336,
+      "savings": {
+        "ffn_calls_skipped": 57750,
+        "ffn_calls_possible": 4212624,
+        "ffn_flops_saved": 4359979008000,
+        "ffn_flops_fraction": 0.013708795278192404,
+        "total_flops_saved": 4359979008000,
+        "total_flops_fraction": 0.00659985152059184
+      }
+    }
+  ],
+  "elapsed_seconds": 321.5630000000019
+}

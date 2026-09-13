@@ -5,6 +5,8 @@ nothing is the stock model bit for bit, skipping something changes only the MLP'
 contribution, and the change propagates causally instead of being quietly patched over.
 """
 
+import os
+
 import pytest
 import torch
 
@@ -164,3 +166,136 @@ def test_the_flops_account_is_the_swiglu_arithmetic():
     assert everything["total_flops_fraction"] < 1.0
     half = estimate_savings(flops, flops["layers"] * 50, 100)
     assert half["ffn_flops_fraction"] == pytest.approx(0.5)
+
+
+# --- residual substitution ----------------------------------------------------
+
+
+def test_substituting_the_real_residual_reproduces_the_model():
+    """The load-bearing equivalence: a perfect cache hit must change nothing.
+
+    If substituting the residual the MLP would have produced is not the stock model, then
+    every later measurement of a cache is measuring the harness instead of the cache.
+    """
+    from distillkit.ffn_skip import capture_ffn, substitute_ffn
+
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+
+    with capture_ffn(model, [1, 2]) as captured:
+        logits_of(model, ids)
+    residuals = {layer: captured[layer][0][1].clone() for layer in (1, 2)}
+
+    with substitute_ffn(model, [1, 2]) as handle:
+        for layer in (1, 2):
+            handle.set(layer, torch.ones_like(ids, dtype=torch.bool), residuals[layer])
+        replayed = logits_of(model, ids)
+        assert handle.replaced_calls == ids.numel() * 2
+    assert torch.equal(reference, replayed)
+
+
+def test_no_substitution_is_the_stock_model():
+    from distillkit.ffn_skip import substitute_ffn
+
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    with substitute_ffn(model, [0, 1, 2]) as handle:
+        assert torch.equal(reference, logits_of(model, ids))
+        assert handle.replaced_calls == 0
+        handle.set(0, torch.zeros_like(ids, dtype=torch.bool),
+                   torch.zeros(*ids.shape, model.config.hidden_size))
+        assert torch.equal(reference, logits_of(model, ids))
+
+
+def test_a_wrong_residual_changes_the_future_and_not_the_past():
+    from distillkit.ffn_skip import capture_ffn, substitute_ffn
+
+    model = build()
+    ids = batch(model, batch_size=1, length=8)
+    reference = logits_of(model, ids)
+    with capture_ffn(model, [1]) as captured:
+        logits_of(model, ids)
+    residual = captured[1][0][1].clone()
+
+    mask = torch.zeros_like(ids, dtype=torch.bool)
+    mask[0, 3] = True
+    wrong = residual.clone()
+    wrong[0, 3] = residual[0, 0]              # a residual from a different position
+    with substitute_ffn(model, [1]) as handle:
+        handle.set(1, mask, wrong)
+        changed = logits_of(model, ids)
+    assert not torch.equal(reference[0, 3], changed[0, 3])
+    assert not torch.equal(reference[0, 6], changed[0, 6])
+    assert torch.equal(reference[0, 2], changed[0, 2])
+
+
+def test_substitution_leaves_attention_and_the_weights_alone():
+    from distillkit.ffn_skip import substitute_ffn
+
+    model = build()
+    ids = batch(model)
+    before = {name: parameter.detach().clone()
+              for name, parameter in model.named_parameters()}
+    layer = model.model.layers[1]
+    attention = layer.linear_attn if hasattr(layer, "linear_attn") else layer.self_attn
+    captured = []
+    hook = attention.register_forward_hook(
+        lambda module, inputs, output: captured.append(
+            (output[0] if isinstance(output, tuple) else output).detach().clone()))
+    try:
+        logits_of(model, ids)
+        with substitute_ffn(model, [1]) as handle:
+            handle.set(1, torch.ones_like(ids, dtype=torch.bool),
+                       torch.randn(*ids.shape, model.config.hidden_size))
+            logits_of(model, ids)
+    finally:
+        hook.remove()
+    assert torch.equal(captured[0], captured[1])
+    for name, parameter in model.named_parameters():
+        assert torch.equal(before[name], parameter), name
+
+
+def test_capture_does_not_change_the_model():
+    from distillkit.ffn_skip import capture_ffn
+
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    with capture_ffn(model, [0, 1, 2]) as captured:
+        assert torch.equal(reference, logits_of(model, ids))
+    assert all(len(captured[layer]) == 1 for layer in (0, 1, 2))
+    # And the captured output is what the layer's MLP actually produced.
+    hidden_in, residual_out = captured[1][0]
+    with torch.no_grad():
+        assert torch.equal(model.model.layers[1].mlp(hidden_in), residual_out)
+
+
+def test_the_cache_corpus_never_overlaps_the_evaluation_bundle():
+    """Split hygiene, checked against the real selection logic rather than by eye."""
+    import hashlib
+    import json
+    import tempfile
+
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scratch" / "ffn_memo"))
+    from repeatability import cache_documents
+
+    texts = ["alpha beta gamma", "delta epsilon", "zeta eta theta"]
+    digests = {hashlib.sha256(texts[1].encode("utf-8")).hexdigest()}
+
+    with tempfile.TemporaryDirectory() as directory:
+        source = os.path.join(directory, "corpus.jsonl")
+        with open(source, "w", encoding="utf-8") as handle:
+            for text in texts:
+                handle.write(json.dumps({"text": text}) + "\n")
+
+        class Tokenizer:
+            def __call__(self, text):
+                return {"input_ids": [ord(c) % 97 for c in text]}
+
+        kept = cache_documents(source, Tokenizer(), digests, 10, 512)
+    assert len(kept) == 2, "the excluded document was still cached"

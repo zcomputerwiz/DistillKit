@@ -1,0 +1,48 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "documents": 200,
+  "distinct_trigrams": 43276,
+  "usable_keys": 2033,
+  "min_count": 4,
+  "layers": [
+    8,
+    12,
+    16,
+    20
+  ],
+  "by_layer": {
+    "8": {
+      "within_key_relative_variance": 0.16441919974542432,
+      "global_mean_relative_variance": 0.9464971232089976,
+      "explained_over_global": 0.8262866355177303,
+      "keys": 2033,
+      "occurrences": 39488,
+      "mean_residual_norm": 1.7144335964801678
+    },
+    "12": {
+      "within_key_relative_variance": 0.2133421751132382,
+      "global_mean_relative_variance": 0.957175914777544,
+      "explained_over_global": 0.7771128882167697,
+      "keys": 2033,
+      "occurrences": 39488,
+      "mean_residual_norm": 2.160917818195008
+    },
+    "16": {
+      "within_key_relative_variance": 0.16827491820997212,
+      "global_mean_relative_variance": 0.9560515122905938,
+      "explained_over_global": 0.8239896950669489,
+      "keys": 2033,
+      "occurrences": 39488,
+      "mean_residual_norm": 5.329282540896384
+    },
+    "20": {
+      "within_key_relative_variance": 0.18096236753176342,
+      "global_mean_relative_variance": 0.9394109969684014,
+      "explained_over_global": 0.8073661388723871,
+      "keys": 2033,
+      "occurrences": 39488,
+      "mean_residual_norm": 6.637240800682401
+    }
+  },
+  "elapsed_seconds": 20.5
+}

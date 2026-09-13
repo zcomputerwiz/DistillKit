@@ -4096,6 +4096,92 @@ Worth recording for later: this measures FFN skipping only. Whole-block skipping
 roughly double the available FLOPs, but attention and GDN own recurrent state that later
 tokens read, and nothing here says that state is expendable.
 
+## FFN residual memoisation: negative, and the ablations are why
+
+The skipping study closed by showing an FFN cannot simply be removed. This one asked the
+better question -- whether a familiar context can *reuse* a cheap approximation of the FFN
+computation -- and it closes too, for a reason worth keeping.
+
+Cache built on 3,000 documents (1,361,081 tokens) drawn from `capture-data/heldout.jsonl`
+with every evaluation-bundle document excluded by SHA-256: 440,433 distinct token
+trigrams, of which 64,598 recur across two or more documents and are kept as full bf16
+prototypes, 252 MB per layer at layers 8/12/16/20. Evaluated on the untouched 384-document
+screen split. No training anywhere.
+
+### The residuals really are repeatable
+
+Measured over 1,500 documents and 393,881 occurrences of 15,349 cross-document keys:
+
+| layer | within-key unexplained | global-mean unexplained | key explains |
+| ---: | ---: | ---: | ---: |
+| 8 | 0.226 | 0.948 | 76.1% |
+| 12 | 0.278 | 0.960 | 71.1% |
+| 16 | 0.222 | 0.959 | 76.8% |
+| 20 | 0.238 | 0.941 | 74.7% |
+
+A per-trigram mean explains about three quarters of the residual energy where a single
+global mean explains five percent. The premise was sound: local context does determine
+most of what the FFN produces.
+
+### Substituting it does not work
+
+Held out, at layer 12, across 384 documents:
+
+| arm | coverage | content NLL | t | top-1 |
+| --- | ---: | ---: | ---: | ---: |
+| exact prototype | 0.576 | **+0.005848** | +14.5 | 0.9762 |
+| wrong key | 0.576 | -0.025637 | -18.5 | 0.9422 |
+| global mean | 0.576 | -0.027345 | -23.7 | 0.9486 |
+| zero | 0.576 | **-0.042734** | -31.8 | 0.9458 |
+
+The cache is beaten by every ablation, including the one that stores nothing at all. That
+ordering is not a threshold artefact -- it holds at every coverage level, and the gap
+widens as the cache is restricted to its most confident entries:
+
+| threshold | coverage | exact | zero |
+| --- | ---: | ---: | ---: |
+| count >= 2 | 0.614 | +0.006950 | -0.041112 |
+| count >= 4 | 0.576 | +0.005848 | -0.042734 |
+| count >= 16 | 0.484 | +0.003845 | -0.045974 |
+| count >= 4, var <= 0.25 | 0.329 | +0.000131 | -0.051411 |
+
+Confidence filtering makes the cache harmless, not useful: at variance <= 0.25 the exact
+arm finally reaches +0.000131 (t = 0.9, indistinguishable from baseline) -- for 1.4% of
+FFN FLOPs, while zeroing the same positions is better than baseline.
+
+Stacking layers only accumulates the error. Substituting at 8/12/16/20 together reaches
+10.2% of FFN FLOPs at +0.040728 content (t = 26.3), and the best confident setting there
+is 5.6% of FFN FLOPs at +0.002662 (t = 7.6).
+
+### Why explained variance did not transfer
+
+Three quarters of the residual *energy* is not three quarters of the residual's *function*.
+The prototype captures the part of the residual that is common to a context -- the part
+the rest of the network has already come to expect -- and discards the position-specific
+correction, which is the part that was doing work. Injecting a stale mean is then actively
+worse than injecting nothing: zero removes a contribution, while a prototype asserts a
+wrong one, and the residual stream carries that assertion forward through every later
+token.
+
+This is the same shape of error as the native-PLE result one level down. There, learned
+rows stopped mattering once a backbone could exploit the addressing; here, a stored mean
+stops mattering because what makes a residual useful is exactly what a mean averages away.
+
+### An observation that is not a recommendation
+
+Zeroing layer 12's FFN on high-frequency trigram positions *improves* held-out content NLL,
+monotonically in how confident the key is: -0.0411 at 61% coverage, -0.0514 at 33%.
+Reproduced in a separate run. Top-1 agreement falls to 0.94-0.96, so this is a materially
+different model rather than a free lunch, and it is one layer on one corpus. It is recorded
+because it is surprising and reproducible, not because anything should be built on it.
+
+### Decision
+
+Full-vector exact-key prototypes -- the most favourable representation available, with no
+compression or fuzziness to blame -- damage content where no cache at all does not. Per the
+stop rule, the low-rank basis and fuzzy-matching phases did not run: a compressed or
+approximate lookup cannot outperform the oracle that already has the better vector.
+
 ## Reproduction
 
 ```powershell

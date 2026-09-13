@@ -33,8 +33,8 @@ import contextlib
 import torch
 from torch import nn
 
-__all__ = ["skip_ffn", "FFNSkip", "mlp_flops_per_token", "model_flops_per_token",
-           "estimate_savings"]
+__all__ = ["skip_ffn", "FFNSkip", "substitute_ffn", "FFNSubstitute", "capture_ffn",
+           "mlp_flops_per_token", "model_flops_per_token", "estimate_savings"]
 
 
 class FFNSkip:
@@ -150,3 +150,110 @@ def estimate_savings(flops: dict, skipped_calls: int, scored_tokens: int) -> dic
         "total_flops_saved": int(saved),
         "total_flops_fraction": saved / full_total if full_total else 0.0,
     }
+
+
+class FFNSubstitute:
+    """Handle for residual substitution. Set a mask and a replacement per layer.
+
+    Where the mask is true the MLP's output is replaced by the supplied residual; where it
+    is false the real MLP output stands. Zeroing is the special case of substituting a
+    zero residual, which the previous study found too damaging -- the question now is
+    whether a *retrieved* residual does better.
+    """
+
+    def __init__(self, layers: dict[int, nn.Module]):
+        self._layers = layers
+        self.masks: dict[int, torch.Tensor] = {}
+        self.replacements: dict[int, torch.Tensor] = {}
+        self.replaced_calls = 0
+        self.total_calls = 0
+
+    def set(self, layer: int, mask: torch.Tensor, replacement: torch.Tensor) -> None:
+        """``mask`` is [batch, sequence]; ``replacement`` is [batch, sequence, hidden]."""
+        if layer not in self._layers:
+            raise ValueError("layer %d is not intervened on" % layer)
+        self.masks[layer] = mask
+        self.replacements[layer] = replacement
+
+    def clear(self) -> None:
+        self.masks.clear()
+        self.replacements.clear()
+
+    def reset_counts(self) -> None:
+        self.replaced_calls = 0
+        self.total_calls = 0
+
+    def _apply(self, layer: int, output: torch.Tensor) -> torch.Tensor:
+        self.total_calls += int(output.shape[0] * output.shape[1])
+        mask = self.masks.get(layer)
+        if mask is None:
+            return output
+        if mask.shape != output.shape[:2]:
+            raise ValueError("mask %s does not match hidden states %s"
+                             % (tuple(mask.shape), tuple(output.shape[:2])))
+        replacement = self.replacements[layer]
+        if replacement.shape != output.shape:
+            raise ValueError("replacement %s does not match hidden states %s"
+                             % (tuple(replacement.shape), tuple(output.shape)))
+        self.replaced_calls += int(mask.sum())
+        return torch.where(mask.unsqueeze(-1).to(output.device),
+                           replacement.to(output.dtype).to(output.device), output)
+
+
+@contextlib.contextmanager
+def substitute_ffn(model: nn.Module, layers):
+    """Replace the MLP residual in ``layers`` wherever the handle's mask says to.
+
+    Substituting a residual equal to the one the MLP would have produced reproduces the
+    stock model exactly. That equivalence is what makes a cache hit meaningful, so it is
+    pinned by the tests rather than assumed.
+    """
+    inner = getattr(model, "model", model)
+    if not hasattr(inner, "layers"):
+        raise ValueError("expected a decoder model with a `layers` list")
+    chosen = {}
+    for index in layers:
+        if not 0 <= index < len(inner.layers):
+            raise ValueError("layer %d outside the model's %d layers"
+                             % (index, len(inner.layers)))
+        chosen[index] = inner.layers[index]
+
+    handle = FFNSubstitute(chosen)
+    originals = {}
+    for index, layer in chosen.items():
+        originals[index] = layer.mlp.forward
+
+        def wrapped(hidden_states, _index=index, _original=originals[index],
+                    _handle=handle, **kwargs):
+            return _handle._apply(_index, _original(hidden_states, **kwargs))
+
+        layer.mlp.forward = wrapped
+    try:
+        yield handle
+    finally:
+        for index, layer in chosen.items():
+            layer.mlp.forward = originals[index]
+
+
+@contextlib.contextmanager
+def capture_ffn(model: nn.Module, layers):
+    """Record each layer's MLP input and output without changing anything.
+
+    Used to build the cache. The forward is untouched -- the tensors are copied out on the
+    way past -- so a capture run is the stock model by construction.
+    """
+    inner = getattr(model, "model", model)
+    captured: dict[int, list] = {index: [] for index in layers}
+    handles = []
+    for index in layers:
+        layer = inner.layers[index]
+
+        def hook(module, inputs, output, _index=index):
+            captured[_index].append((inputs[0].detach(), output.detach()))
+
+        handles.append(layer.mlp.register_forward_hook(hook))
+    try:
+        yield captured
+    finally:
+        for handle in handles:
+            handle.remove()

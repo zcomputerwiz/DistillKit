@@ -1,0 +1,244 @@
+{
+  "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "cache": "scratch\\ffn_memo\\cache",
+  "cache_manifest": {
+    "model": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+    "source": "D:/DeepThought/Projects/HybridModel/capture-data/heldout.jsonl",
+    "documents": 3000,
+    "tokens": 1361081,
+    "distinct_trigrams": 440433,
+    "cached_keys": 64598,
+    "min_count": 2,
+    "layers": [
+      8,
+      12,
+      16,
+      20
+    ],
+    "hidden": 2048,
+    "elapsed_seconds": 326.42199999999866,
+    "excluded_digests": 768
+  },
+  "documents": 8,
+  "flops_per_token": {
+    "mlp": 1811939328,
+    "other": 934588032,
+    "head": 1017118720,
+    "total": 3763646080,
+    "mlp_per_layer": 75497472,
+    "layers": 24
+  },
+  "results": [
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 2,
+      "max_variance": null,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.006754329434776379,
+          "stderr": 0.0036391339002231405,
+          "t": 1.8560266316010587,
+          "better": 2,
+          "n": 8
+        },
+        "layout": {
+          "mean": -0.008335115039265723,
+          "stderr": 0.004824156608411309,
+          "t": -1.7277869928046643,
+          "better": 6,
+          "n": 8
+        },
+        "punctuation": {
+          "mean": 0.0044420355339385,
+          "stderr": 0.003604126731931655,
+          "t": 1.2324859430117103,
+          "better": 3,
+          "n": 8
+        },
+        "control": {
+          "mean": 0.0006079011215192053,
+          "stderr": 0.00425040373805339,
+          "t": 0.1430219713192736,
+          "better": 4,
+          "n": 8
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.2654574702278936,
+          "baseline_nll": 1.2585266210191648,
+          "tokens": 2421
+        },
+        "control": {
+          "nll": 0.16390622835991167,
+          "baseline_nll": 0.1626676063583456,
+          "tokens": 35
+        },
+        "layout": {
+          "nll": 0.4594047351102465,
+          "baseline_nll": 0.4653840501834943,
+          "tokens": 498
+        },
+        "punctuation": {
+          "nll": 0.4134132136559659,
+          "baseline_nll": 0.40832288377569287,
+          "tokens": 831
+        }
+      },
+      "coverage": 0.5352708058124175,
+      "top1_agreement": 0.9799207397622193,
+      "savings": {
+        "ffn_calls_skipped": 2026,
+        "ffn_calls_possible": 90840,
+        "ffn_flops_saved": 152957878272,
+        "ffn_flops_fraction": 0.02230295024218406,
+        "total_flops_saved": 152957878272,
+        "total_flops_fraction": 0.01073735197604989
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": null,
+      "arm": "exact",
+      "delta": {
+        "content": {
+          "mean": 0.006586328142245187,
+          "stderr": 0.003227892721382443,
+          "t": 2.040442081180564,
+          "better": 2,
+          "n": 8
+        },
+        "layout": {
+          "mean": -0.006856699057050601,
+          "stderr": 0.00442549337867617,
+          "t": -1.5493637590983573,
+          "better": 5,
+          "n": 8
+        },
+        "punctuation": {
+          "mean": 0.0027693964064912577,
+          "stderr": 0.0036038736957442813,
+          "t": 0.7684499070435139,
+          "better": 3,
+          "n": 8
+        },
+        "control": {
+          "mean": -0.0028624790801131893,
+          "stderr": 0.003608997187506113,
+          "t": -0.793150820405936,
+          "better": 5,
+          "n": 8
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.2653888359489889,
+          "baseline_nll": 1.2585266210191648,
+          "tokens": 2421
+        },
+        "control": {
+          "nll": 0.15986196849191206,
+          "baseline_nll": 0.1626676063583456,
+          "tokens": 35
+        },
+        "layout": {
+          "nll": 0.4603921141106906,
+          "baseline_nll": 0.4653840501834943,
+          "tokens": 498
+        },
+        "punctuation": {
+          "nll": 0.4116414892798191,
+          "baseline_nll": 0.40832288377569287,
+          "tokens": 831
+        }
+      },
+      "coverage": 0.49722589167767506,
+      "top1_agreement": 0.9817701453104359,
+      "savings": {
+        "ffn_calls_skipped": 1882,
+        "ffn_calls_possible": 90840,
+        "ffn_flops_saved": 142086242304,
+        "ffn_flops_fraction": 0.020717745486569794,
+        "total_flops_saved": 142086242304,
+        "total_flops_fraction": 0.009974183819805475
+      }
+    },
+    {
+      "layers": [
+        12
+      ],
+      "min_count": 4,
+      "max_variance": null,
+      "arm": "wrong",
+      "delta": {
+        "content": {
+          "mean": -0.01876353738089402,
+          "stderr": 0.009672130399599584,
+          "t": -1.9399590995661942,
+          "better": 6,
+          "n": 8
+        },
+        "layout": {
+          "mean": -0.003914352923881837,
+          "stderr": 0.006557454708016257,
+          "t": -0.5969317514456758,
+          "better": 5,
+          "n": 8
+        },
+        "punctuation": {
+          "mean": -0.01352020820386736,
+          "stderr": 0.008710510245938293,
+          "t": -1.5521717812308211,
+          "better": 5,
+          "n": 8
+        },
+        "control": {
+          "mean": -0.028096250639359433,
+          "stderr": 0.020657027527585175,
+          "t": -1.360130377027382,
+          "better": 5,
+          "n": 8
+        }
+      },
+      "by_class": {
+        "content": {
+          "nll": 1.2434298595708846,
+          "baseline_nll": 1.2585266210191648,
+          "tokens": 2421
+        },
+        "control": {
+          "nll": 0.1358244548336724,
+          "baseline_nll": 0.1626676063583456,
+          "tokens": 35
+        },
+        "layout": {
+          "nll": 0.46208496895972173,
+          "baseline_nll": 0.4653840501834943,
+          "tokens": 498
+        },
+        "punctuation": {
+          "nll": 0.397173974360192,
+          "baseline_nll": 0.40832288377569287,
+          "tokens": 831
+        }
+      },
+      "coverage": 0.49722589167767506,
+      "top1_agreement": 0.9603698811096433,
+      "savings": {
+        "ffn_calls_skipped": 1882,
+        "ffn_calls_possible": 90840,
+        "ffn_flops_saved": 142086242304,
+        "ffn_flops_fraction": 0.020717745486569794,
+        "total_flops_saved": 142086242304,
+        "total_flops_fraction": 0.009974183819805475
+      }
+    }
+  ],
+  "elapsed_seconds": 9.01600000000326
+}
