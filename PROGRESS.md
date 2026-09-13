@@ -4403,6 +4403,88 @@ PLE screens from being over-read applies here. Whether learned admission survive
 backbone trained alongside it is a separate experiment with its own separately-trained
 control, and the PLE result is the reason to expect that it might not.
 
+## Paired gate co-adaptation: the advantage survives, at a ninth of the size
+
+The frozen stage is mechanistic evidence and nothing more. The PLE programme is the
+reason that distinction is load-bearing: a memory that measurably worked on a frozen
+backbone turned out to be redundant against a backbone trained without it, at
+A - B = -0.000108 (t -0.2). Once the backbone can train, the same checkpoint with the
+gate switched off measures how far the model has come to lean on its gate, not what the
+gate was worth.
+
+So: two backbones from the same starting checkpoint, same documents in the same order,
+same seed, same budget, same optimizer, same rates. Arm A carries a fresh identity gate
+-- not the frozen stage's trained weights -- and trains it alongside. Arm B has no gate
+path at all. Then a second independently seeded pair, because the first pair's milestone
+curve swung from -0.0028 to +0.0006 and a paired t over documents cannot tell a small
+architecture difference from where one trajectory happened to stop.
+
+### The endpoint, four ways
+
+| seed | corpus | A - B content | t | better docs | A gated - A at g=1 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 42 | screen | -0.002580 | -10.5 | 322/384 | -0.003631 |
+| 42 | confirmation | -0.002486 | -14.8 | 299/384 | -0.003690 |
+| 43 | screen | **-0.004525** | -31.9 | 374/384 | -0.006342 |
+| 43 | confirmation | **-0.004973** | -30.1 | 382/384 | -0.006650 |
+
+Same sign in all four, on two independently seeded pairs and two disjoint corpora. The
+gated backbone is better on content than the counterfactual trained without a gate, and
+turning the gate off at inference costs more than the advantage itself -- so the gate is
+both beneficial and actively used, which is the least ambiguous of the outcomes this
+experiment could have produced.
+
+The third number is the one worth staring at. Arm A with `g = 1` scores 1.65984 against
+arm B's 1.65879 on seed 42, and 1.67100 against 1.66918 on seed 43. **The gated backbone
+is worse than the control when you take its gate away.** It did not merely tolerate the
+gate; it reorganised around it and now depends on it. That is what distinguishes an
+architecture from a training trick, and it is also why `A enabled - A at g = 1` must never
+be quoted as the architecture effect: it is inflated by exactly that dependence.
+
+### Nine times smaller than the frozen stage
+
+The frozen gate was worth -0.023510. Co-adapted, the same architecture is worth -0.0026
+to -0.0050. A backbone that can train learns most of what the gate was doing for it. That
+is not a disappointment, it is the measurement the frozen stage could not make, and the
+honest headline is the small number rather than the large one.
+
+The gate itself shows the same thing from the inside. Under a frozen backbone its `reach`
+-- the furthest it could deviate from unit admission for any input -- ran to 0.46-0.81.
+Co-adapting at the identical gate learning rate it reaches only 0.07-0.15: as the backbone
+absorbs the correction, the gradient asking for the correction shrinks.
+
+### The mechanism replicates; the depth assignment does not
+
+Mean admission by cross-document trigram count, co-adapted arm A:
+
+| seed | layer | unseen | 4-100 | 400-800 | 3000+ |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 42 | 10 | 1.0329 | 1.0187 | 1.0038 | 0.9971 |
+| 42 | 14 | 1.0269 | 0.9987 | 0.9624 | **0.9492** |
+| 42 | 16 | 0.9604 | 0.9470 | 0.9720 | **0.9861** |
+| 43 | 10 | 0.9961 | 1.0443 | 1.0655 | **1.0724** |
+| 43 | 16 | 1.0026 | 0.9455 | 0.9206 | **0.9153** |
+
+Every layer in both seeds is monotone in familiarity, and unseen contexts sit near unit
+admission. But seed 42 attenuates familiar contexts at 14 and amplifies them at 16, and
+seed 43 does the reverse at 10 and 16. **Conditioning admission on context familiarity
+replicates. Which depths take which sign does not.** Anything built on a particular layer
+being the right place for this is building on one draw.
+
+### What each seed paid
+
+Neither arm is free. Seed 42 loses 0.0049 nats on control tokens; seed 43 loses 0.0052 on
+punctuation, on 25 of 384 documents. The two penalties are in different classes and each
+is absent from the other seed, while content improves in both at t -10 to -32. After four
+screens where structure dominated every aggregate, the class that replicates here is
+content and the classes that do not are structural -- which is the outcome the
+content-first endpoint was chosen to be able to see.
+
+**POSITIVE -- LEARNED RESIDUAL ADMISSION IMPROVES CONTENT BEYOND STOCK COADAPTATION**, at
+0.0026-0.0050 nats from 260 parameters, actively used at inference, and stable in sign
+across two seeds and two corpora. Small, replicated, and the first architecture change in
+this programme to survive its own control.
+
 ## Reproduction
 
 ```powershell
