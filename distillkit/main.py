@@ -561,7 +561,7 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         LOG.info("Done.")
         return
     if config.tensor_parallel:
-        from distillkit.tp_model import shard_model
+        from distillkit.parallel import shard_model
         if torch.cuda.device_count() < 2 or int(os.environ.get("WORLD_SIZE", "1")) != 1:
             raise ValueError("Tensor parallel training requires two visible GPUs in one process")
         shard_model(model, ["cuda:0", "cuda:1"])

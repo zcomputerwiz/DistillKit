@@ -131,7 +131,7 @@ class DistillationTrainer(SFTTrainer):
         if self.config.tensor_parallel:
             if self.accelerator.num_processes != 1 or self.accelerator.distributed_type.name != "NO" or self.accelerator.scaler is not None:
                 raise ValueError("Tensor parallelism requires native single-process bf16/fp32 training")
-            from distillkit.tp_model import sync_replicated_gradients
+            from distillkit.parallel import sync_replicated_gradients
             # Cold FLA autotuners share state across device workers. Prime the first
             # backward serially; later steps retain normal autograd scheduling.
             with torch.autograd.set_multithreading_enabled(getattr(self, "_tp_warmed", False)):
@@ -216,19 +216,19 @@ class DistillationTrainer(SFTTrainer):
     def _clip_grad_norm(self, model):
         if not self.config.tensor_parallel:
             return super()._clip_grad_norm(model)
-        from distillkit.tp_gated_delta_module import clip_grad_norm
+        from distillkit.parallel import clip_grad_norm
         return clip_grad_norm(model, self.args.max_grad_norm)
 
     def _get_grad_norm(self, model, grad_norm=None):
         if self.config.tensor_parallel and grad_norm is None:
-            from distillkit.tp_gated_delta_module import clip_grad_norm
+            from distillkit.parallel import clip_grad_norm
             return clip_grad_norm(model, float("inf"))
         return super()._get_grad_norm(model, grad_norm)
 
     def _save(self, output_dir=None, state_dict=None):
         if not self.config.tensor_parallel:
             return super()._save(output_dir, state_dict)
-        from distillkit.tp_checkpoint import consolidated_state_dict, write_layout
+        from distillkit.parallel import consolidated_state_dict, write_layout
         if state_dict is not None:
             raise ValueError("TP saving must reconstruct weights from the live shards")
         super()._save(output_dir, consolidated_state_dict(self.model))
@@ -236,7 +236,7 @@ class DistillationTrainer(SFTTrainer):
 
     def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
         from pathlib import Path
-        from distillkit.tp_checkpoint import MARKER, load_checkpoint
+        from distillkit.parallel import MARKER, load_checkpoint
         if self.config.tensor_parallel:
             return load_checkpoint(self.model if model is None else model, resume_from_checkpoint)
         if (Path(resume_from_checkpoint) / MARKER).exists():
@@ -246,7 +246,7 @@ class DistillationTrainer(SFTTrainer):
     def _load_best_model(self):
         if not self.config.tensor_parallel:
             return super()._load_best_model()
-        from distillkit.tp_checkpoint import load_checkpoint
+        from distillkit.parallel import load_checkpoint
         load_checkpoint(self.model, self.state.best_model_checkpoint)
 
     def compute_loss(
