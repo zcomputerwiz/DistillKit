@@ -120,6 +120,41 @@ ROLES = ("system", "user", "assistant", "template")
 LAYOUT_TOKEN_IDS = frozenset((198, 248068, 248069))
 
 
+def build_token_classes(tokenizer, vocab_size):
+    """Classify every token id once: content, layout, punctuation or control.
+
+    The frozen stage showed why one aggregate number is not enough -- 5.8% of positions
+    carried 79% of the improvement -- and "content vs layout" is still coarse. A memory
+    that has learned to close a quotation mark is not a memory that has learned a fact,
+    and neither is one that has learned where the chat protocol tokens go.
+
+    Boundaries, in order of precedence:
+
+        layout       newline and the think tags (LAYOUT_TOKEN_IDS), plus any token whose
+                     text is entirely whitespace
+        control      the tokenizer's own special and added tokens -- protocol, not text
+        punctuation  text with no alphanumeric character in it
+        content      everything else, which is what the experiment is about
+    """
+    special = set(getattr(tokenizer, "all_special_ids", []) or [])
+    special.update(int(key) for key in (getattr(tokenizer, "added_tokens_decoder", {}) or {}))
+
+    classes = ["content"] * vocab_size
+    tokens = tokenizer.convert_ids_to_tokens(list(range(vocab_size)))
+    for index, token in enumerate(tokens):
+        if index in LAYOUT_TOKEN_IDS:
+            classes[index] = "layout"
+        elif index in special:
+            classes[index] = "control"
+        else:
+            text = tokenizer.convert_tokens_to_string([token]) if token is not None else ""
+            if text == "" or text.isspace():
+                classes[index] = "layout"
+            elif not any(character.isalnum() for character in text):
+                classes[index] = "punctuation"
+    return classes
+
+
 def role_spans(text, offsets):
     """Token index ranges per role, from character offsets.
 
@@ -332,7 +367,8 @@ def forward_logits(model, batch, mode, positions):
 
 
 @torch.inference_mode()
-def score_sequences(model, features, collator, mode, device, forward_mode=None):
+def score_sequences(model, features, collator, mode, device, forward_mode=None,
+                    token_classes=None):
     batch = {k: v.to(device) for k, v in collator(features).items()}
     positions = sorted({p for f in features for p in range(f.get("start", 1) - 1, len(f["ids"]) - 1)})
     if not positions:
@@ -358,11 +394,14 @@ def score_sequences(model, features, collator, mode, device, forward_mode=None):
         # LAYOUT_TOKEN_IDS as the role-based split below, so the two agree.
         values = per_token.cpu().numpy()
         targets = feature["ids"][start:]
-        layout_at = [i for i, token in enumerate(targets) if token in LAYOUT_TOKEN_IDS]
-        content_at = [i for i, token in enumerate(targets) if token not in LAYOUT_TOKEN_IDS]
+        buckets = {}
+        for offset, token in enumerate(targets):
+            label = (token_classes[token] if token_classes is not None
+                     else ("layout" if token in LAYOUT_TOKEN_IDS else "content"))
+            buckets.setdefault(label, []).append(offset)
         record["by_class"] = {
             label: {"sum_nll": float(values[picked].sum()), "tokens": len(picked)}
-            for label, picked in (("content", content_at), ("layout", layout_at)) if picked}
+            for label, picked in buckets.items()}
         if "content" not in record["by_class"]:
             # Silently reporting one aggregate is how a layout gain gets read as a
             # content gain. If a document has no content targets at all, say so.
@@ -491,6 +530,13 @@ def evaluate(args):
         first = next(iter(tasks.values()))[0]
         feature = first if "ids" in first else first["choices"][0]
         probe = plumbing_probe(model, collator, feature, args.device)
+        # Built from the checkpoint's own tokenizer, so the class boundaries belong to
+        # the model being scored rather than to whatever produced the bundle.
+        from transformers import AutoTokenizer
+
+        token_classes = build_token_classes(
+            AutoTokenizer.from_pretrained(args.checkpoint, local_files_only=True),
+            model.config.vocab_size)
         modes = ["enabled", "bypassed"] + (["full_bypass"] if audit["variant"] == "gated_residual" else [])
         # Each mode names the collator that builds its batch and the forward mode
         # that scores it. Only `shuffled` differs in the batch: same text, same
@@ -519,7 +565,8 @@ def evaluate(args):
                     features = [record] if task == "nll" else record["choices"]
                     mode_collator, forward_mode = wiring[mode]
                     scored = score_sequences(model, features, mode_collator, mode,
-                                             args.device, forward_mode=forward_mode)
+                                             args.device, forward_mode=forward_mode,
+                                             token_classes=token_classes)
                     outputs[mode] = scored[0] if task == "nll" else choice_result(scored, features, record["answer"])
                 result["records"][task].append({"id": record["id"], "modes": outputs})
                 if (index + 1) % 8 == 0:

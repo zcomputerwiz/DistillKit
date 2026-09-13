@@ -3938,6 +3938,89 @@ themselves justify continuing. `independent_eval` now raises rather than omittin
 content/layout split when a feature has no content targets, so the split cannot silently
 disappear the way it did on this bundle before the frozen stage was scored.
 
+## Paired co-adaptation screen: negative on content
+
+Both arms ran from `runs/native-ple-2b-ce-1m/checkpoint-675`, 284 updates at accumulation
+1, CE only, concurrently one per 3090. Arm A trained the backbone and the native memory
+together; arm B trained the backbone alone with the memory bypassed and frozen.
+
+Preconditions held against the running processes rather than the configuration files:
+`training_stream_sha256` over the first 64 batches was
+`7e0f97c744a75e782d1846eab35dd83a16368a42104c381e58788c2e52aa1609` in both arms, the arms
+reported identical `supervised_tokens` at every milestone, and arm B's sidecar carried no
+gradients and did not move.
+
+### Primary metric: content, arm A against the separately trained control
+
+| updates | supervised tokens | A_correct - B_control | 95% CI | better |
+| ---: | ---: | ---: | :--- | ---: |
+| 57 | 50,787 | +0.006292 (t +14.6) | [+0.005445, +0.007139] | 87/384 |
+| 114 | 101,574 | +0.004006 (t +7.0) | [+0.002885, +0.005127] | 162/384 |
+| 171 | 152,361 | -0.000932 (t -1.8) | [-0.001966, +0.000102] | 278/384 |
+| 228 | 203,148 | +0.000134 (t +0.3) | [-0.000777, +0.001045] | 245/384 |
+| 284 | 253,044 | **-0.000108 (t -0.2)** | [-0.001010, +0.000793] | 258/384 |
+
+Arm A starts *behind* the control on content -- the co-adapting backbone spends its first
+100K tokens paying for the memory it is learning to use -- converges to it by 150K, and
+ends indistinguishable from it. The confidence interval at the endpoint spans zero and is
+tight enough to exclude any effect larger than about 0.001 nats/token in either direction.
+
+By Codex's stopping rule this is the failure case: `A_correct - B_control >= 0` with
+sufficient precision, and the experiment stops.
+
+### The memory still works. It is simply redundant.
+
+Within arm A the memory is doing exactly what the frozen stage said it does:
+
+| updates | content A - off | content A - wrong context |
+| ---: | ---: | ---: |
+| 284 | -0.001877 (t -3.8) | -0.002343 (t -5.1) |
+
+Switching the memory off costs arm A content, and misaddressing it costs more. Retrieval
+dependence survived co-adaptation intact. What did not survive is the *architecture*
+claim: a backbone trained on the same documents with no memory at all reaches the same
+content NLL by itself. The memory is a route to that content, not a source of content the
+backbone could not otherwise find.
+
+### Everything that looks like success is layout
+
+| class | A - B at 284 | share of the nats |
+| --- | ---: | ---: |
+| content | -0.000108 (t -0.2) | -0.6% |
+| layout | -0.106991 (t -39.6) | **-90.4%** |
+| punctuation | +0.005502 (t +10.4) | +8.8% |
+| control | -0.002978 (t -1.5) | -0.2% |
+
+The in-loop `eval_loss` had arm A ahead at every milestone, ending -0.0008. That number is
+90% newlines. Reported alone it would have read as a win; it is the same trap as the
+frozen stage, one layer deeper, and this is what the four-class split and the share guard
+exist to catch. Arm A is also *worse* on punctuation at every checkpoint, which no
+aggregate would have shown.
+
+### Learned rows against restored random rows, at the endpoint
+
+| class | learned - random |
+| --- | ---: |
+| content | -0.000316 (t -1.3) |
+| layout | +0.031047 (t +19.3) |
+| punctuation | +0.000288 (t +1.3) |
+| control | -0.010469 (t -11.8) |
+
+At the end of co-adaptation the learned rows no longer beat random ones on content. In the
+frozen stage they did, by -0.001536 at t = -4.7. A trainable backbone has learned to
+extract what it needs from the *addressing* -- which is text-dependent whatever the rows
+contain -- rather than from what the rows store. That is consistent with the wrong-context
+arm still mattering while the random-table arm stopped mattering, and it is the sharpest
+thing this experiment found.
+
+### What this closes
+
+Native memory retrieves, and what it retrieves is mostly layout. Given a trainable
+backbone and the same data, the memory buys no content advantage over not having one. The
+programme should not read the aggregate improvement, the retained ON/OFF gap, or the
+retained wrong-context gap as evidence otherwise: all three are true and none of them is
+the architecture claim.
+
 ## Reproduction
 
 ```powershell

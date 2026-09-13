@@ -130,10 +130,24 @@ def test_arm_b_leaves_the_memory_bitwise_unchanged_after_an_update():
     assert model.model.layers[0].mlp.down_proj.weight.grad.abs().sum() > 0
 
 
+def test_freezing_an_already_frozen_sidecar_is_fine():
+    """The control arm reaches this with the sidecar already frozen.
+
+    `sidecar.enabled: false` runs `disable_sidecar_projection`, which freezes a PLE block
+    whole, long before the optimizer is configured. The contract has to be "the sidecar is
+    frozen", not "this call is what froze it" -- the first launch of arm B died here.
+    """
+    model = build()
+    first = freeze_sidecar_parameters(model)
+    assert len(first) == 8
+    assert freeze_sidecar_parameters(model) == ()
+    assert not any(p.requires_grad for p in sidecar_of(model).parameters())
+
+
 def test_freezing_the_sidecar_refuses_a_model_without_one():
     model = build()
-    freeze_sidecar_parameters(model)
-    with pytest.raises(ValueError, match="no trainable sidecar parameters"):
+    model.config.sidecar_layer_index = len(model.model.layers) - 1
+    with pytest.raises(ValueError, match="no sidecar parameters"):
         freeze_sidecar_parameters(model)
 
 

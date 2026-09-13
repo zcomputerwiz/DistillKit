@@ -359,14 +359,23 @@ def freeze_sidecar_parameters(model: nn.Module) -> tuple[str, ...]:
     if index is None:
         raise ValueError("freeze_sidecar needs a sidecar model")
     prefix = f"model.layers.{index}.sidecar."
+    if not any(name.startswith(prefix) for name, _ in model.named_parameters()):
+        raise ValueError("freeze_sidecar found no sidecar parameters under %s" % prefix)
     frozen = []
     for name, parameter in model.named_parameters():
         if name.startswith(prefix) and parameter.requires_grad:
             parameter.requires_grad_(False)
             parameter.grad = None
             frozen.append(name)
-    if not frozen:
-        raise ValueError("freeze_sidecar matched no trainable sidecar parameters")
+    # The postcondition is that the sidecar is frozen, not that this call is what froze
+    # it. A control arm configured with `sidecar.enabled: false` has already been through
+    # `disable_sidecar_projection`, which freezes a PLE block whole, so finding nothing
+    # left to do is the expected case and not a misconfiguration.
+    still_trainable = [name for name, parameter in model.named_parameters()
+                       if name.startswith(prefix) and parameter.requires_grad]
+    if still_trainable:
+        raise ValueError("sidecar parameters still trainable after freezing: %s"
+                         % ", ".join(still_trainable[:4]))
     return tuple(frozen)
 
 

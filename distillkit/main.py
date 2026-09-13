@@ -703,7 +703,11 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         if config.optimizer.freeze_sidecar:
             from distillkit.optimizers import freeze_sidecar_parameters
             frozen_sidecar = freeze_sidecar_parameters(model)
-            LOG.info("Sidecar frozen: %d parameters held fixed while the backbone trains",
+            # Zero is the ordinary case for a control arm: `sidecar.enabled: false`
+            # already froze the block. Report the invariant, not the work done, or the
+            # line reads as though nothing is held fixed.
+            LOG.info("Sidecar held fixed while the backbone trains (%d frozen here, "
+                     "the rest already frozen by the disabled-sidecar path)",
                      len(frozen_sidecar))
         if config.optimizer.freeze_backbone:
             window = config.optimizer.stage1_trainable_layers
