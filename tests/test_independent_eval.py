@@ -306,3 +306,34 @@ def test_stage1_check_uses_complete_gr_bypass_and_exposes_drift():
     assert stage1_self_check(result, reference)["exact_match"], "GR's False flag retains trained branches"
     result["records"]["nll"][0]["modes"]["full_bypass"]["sum_nll"] = 2.1
     assert not stage1_self_check(result, reference)["exact_match"], "backbone drift must remain visible"
+
+
+def test_the_collator_serves_a_native_checkpoint_without_a_donor_table():
+    """A native checkpoint owns its rows, so there is no GGUF to pass.
+
+    `make_collator` keyed off `table is None` alone, which handed a native model a plain
+    text batch with no row indices -- the same gap that stopped the first training launch
+    one step in, in the tool that is supposed to independently check the result.
+    """
+    import torch
+
+    from distillkit.independent_eval import make_collator
+    from distillkit.native_ple import native_hash_config
+    from distillkit.ngram_hash import NGramHasher
+    from test_sidecar_model import tiny_config
+
+    config = tiny_config(sidecar_variant="ple", sidecar_table_mode="native",
+                         sidecar_ngram_vocab_size_base=97, sidecar_layer_index=1)
+    hasher = NGramHasher(native_hash_config(config))
+    collator = make_collator(0, table=None, hasher=hasher, mode="native")
+    batch = collator([{"ids": [3, 4, 5, 6]}, {"ids": [7, 8]}])
+
+    assert "ngram_ids" in batch, "a native batch reached the model without its rows"
+    assert batch["ngram_ids"].shape[:2] == batch["input_ids"].shape
+    assert batch["ngram_ids"].max() < hasher.padded_vocab_size
+    assert "ngram_raw" not in batch, "native collation must not fabricate donor bytes"
+
+    # With neither a table nor a hasher there is no sidecar, and the plain collator stands.
+    plain = make_collator(0)([{"ids": [3, 4]}])
+    assert set(plain) == {"input_ids", "attention_mask"}
+    assert torch.equal(plain["input_ids"], torch.tensor([[3, 4]]))

@@ -232,9 +232,17 @@ class TextCollator:
         return {"input_ids": ids, "attention_mask": mask}
 
 
-def make_collator(pad_token_id, table=None, hasher=None):
+def make_collator(pad_token_id, table=None, hasher=None, mode="donor"):
+    """Donor collation needs the GGUF table; native collation needs only the hasher.
+
+    A native checkpoint owns its rows as parameters, so there is no donor file to pass
+    and the collator stops at the row indices. Keying off ``table is None`` alone would
+    hand a native model a plain text batch, which it refuses.
+    """
     base = TextCollator(pad_token_id)
-    return base if table is None else SidecarDataCollator(base, table, hasher)
+    if table is None and hasher is None:
+        return base
+    return SidecarDataCollator(base, table, hasher, mode=mode)
 
 
 def validate_loading(info, has_sidecar):
@@ -440,12 +448,26 @@ def evaluate(args):
                 reader.rho.weight.fill_(args.rho)
             audit["rho_override"] = float(args.rho)
         table = None
+        hasher = None
+        mode = "donor"
         if audit["variant"]:
-            from distillkit.ngram_table import GGUFNGramTable
-            if not args.table:
-                raise ValueError("--table is required for a sidecar checkpoint")
-            table = GGUFNGramTable(args.table)
-        collator = make_collator(bundle["pad_token_id"], table)
+            text_config = getattr(model.config, "text_config", model.config)
+            if getattr(text_config, "sidecar_table_mode", "donor") == "native":
+                # The rows are the model's own parameters. The hash geometry has to be
+                # the model's too: a collator addressing a different space than the table
+                # it feeds is an out-of-range lookup at best, wrong rows at worst.
+                from distillkit.native_ple import native_hash_config
+                from distillkit.ngram_hash import NGramHasher
+                if args.table:
+                    raise ValueError("--table is meaningless for a native checkpoint")
+                hasher = NGramHasher(native_hash_config(text_config))
+                mode = "native"
+            else:
+                from distillkit.ngram_table import GGUFNGramTable
+                if not args.table:
+                    raise ValueError("--table is required for a donor sidecar checkpoint")
+                table = GGUFNGramTable(args.table)
+        collator = make_collator(bundle["pad_token_id"], table, hasher, mode)
         first = next(iter(tasks.values()))[0]
         feature = first if "ids" in first else first["choices"][0]
         probe = plumbing_probe(model, collator, feature, args.device)

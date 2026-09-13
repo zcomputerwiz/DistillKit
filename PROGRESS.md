@@ -3709,6 +3709,69 @@ cache supplies the documents. No teacher signal is read: `assistant_cross_entrop
 `requires_teacher_signal() == False` and the trainer now skips the per-microbatch fetch
 entirely.
 
+## First native-table screen: the memory learns
+
+Launched, completed, and evaluated. 250 optimizer updates at accumulation 1, frozen
+backbone with the prefix outside autograd, `assistant_cross_entropy` alone, starting from
+the bootstrapped checkpoint. 547 seconds on one RTX 3090.
+
+Held-out NLL on the 384-document independent-evaluation bundle, sidecar enabled against
+sidecar bypassed on the *same* checkpoint -- a paired within-model control, so the
+backbone cancels exactly (bypassed NLL is 1.371346 for every arm below, as it must be
+when nothing upstream of the injection can move):
+
+| arm | enabled - bypassed, nats/token | t | documents helped |
+| --- | ---: | ---: | ---: |
+| bootstrap: random rows, untrained block | **+0.000674** | +7.14 | 113 / 384 |
+| trained block, rows restored to random | -0.000827 | -6.71 | 223 / 384 |
+| trained block, trained rows | **-0.001347** | -8.62 | 218 / 384 |
+
+The sign flips. Before training the sidecar *hurts* content, which is what an untrained
+random-row memory admitted at rho = 1e-4 should do. After 250 updates it helps, and the
+change is -0.002021 nats/token at t = -14.27.
+
+The third arm is a chimera built by `scratch/native_table/swap_table.py`: every trained
+parameter except the table, whose 2,099,200 rows are restored bit-for-bit from the
+bootstrap checkpoint, verified by comparing every other tensor for exact equality. It
+separates two claims that the aggregate cannot:
+
+- **what the block contributes**: -0.001501 nats/token (t = -13.35) -- the projections,
+  the convolution and rho learning to exploit memory, even random memory.
+- **what the rows contribute**: -0.000520 nats/token (t = -5.60) -- content in the table
+  itself, over and above a block that has learned to read arbitrary rows.
+
+The block dominates at roughly three quarters of the effect, but the rows carry a real and
+separately significant share. That is the first direct evidence in this programme that a
+student-native n-gram table stores anything useful, rather than merely providing a
+trainable surface for the block around it.
+
+Parameters moved as expected: rho 1.001e-4 -> 1.007e-2 (and flat over the last fifty
+updates), value_proj +8.7%, key_proj +5.5%, conv1d +9.5%, and 850,662 of 2,099,200 table
+rows touched -- 40.5% of the table, at a mean row-delta of 3.0e-3. The logged
+`table_weight_norm` never left 325.7 across the entire run, which is a defect in the
+metric rather than in the table: a 1.2% change in a 268.7M-parameter Frobenius norm does
+not survive four significant figures. A touched-row statistic would say more.
+
+### What this screen is not
+
+**It is not a 1M-token screen.** The schedule was built on 4096 tokens per update, which
+is the padded capacity of a sequence, not its content. The documents in this cache are far
+shorter: measured, about 1,080 supervised tokens per update, so 250 updates bought roughly
+270K supervised tokens, not 1,024,000. Step time confirms it independently -- 1.07 s
+against the benchmark's 1.667 s for a full 4096 -- as does VRAM, 6.10 GiB peak against
+12.26. Reaching 1M supervised tokens at this density needs about 925 updates, or packing,
+which would also restore the benchmark's throughput.
+
+**The logged `supervised_tokens` for this run is unusable.** Evaluation runs the same loss
+path, so every eval microbatch accumulated into the training counter: it read 2.8e6 at the
+end where training supplied roughly 2.7e5 of it. Fixed afterwards -- the counter now only
+accumulates in training mode -- but this run predates the fix, and its x-axis has to be
+reconstructed as approximately 1,080 tokens per update.
+
+**The training-loss eval curve is nearly flat**: 0.6384 at update 25 falling to 0.6347 at
+update 250, monotone and decelerating throughout. The independent evaluation is the
+informative measurement here, not the in-loop one.
+
 ## Reproduction
 
 ```powershell
