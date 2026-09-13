@@ -3772,6 +3772,81 @@ reconstructed as approximately 1,080 tokens per update.
 update 250, monotone and decelerating throughout. The independent evaluation is the
 informative measurement here, not the in-loop one.
 
+## To 814K supervised tokens: the memory is real, and it is mostly learning layout
+
+The screen was continued from 250 updates to 925 (`examples/qwen35_2b_native_ple_ce_continue.yml`,
+905 seconds), and every checkpoint was scored on the same 384 held-out documents with the
+same three arms. All figures are paired per-document differences in nats per token, so the
+frozen backbone cancels exactly and the error is over documents.
+
+| updates | supervised tokens | ON - OFF | correct - wrong | content ON-OFF | layout ON-OFF |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0 | +0.000674 (t +7.1) | +0.000708 (t +7.8) | +0.000718 (t +7.3) | -0.000122 (t -0.5) |
+| 250 | 220,000 | -0.001347 (t -8.6) | -0.001260 (t -9.1) | -0.000194 (t -1.4) | -0.018047 (t -18.1) |
+| 385 | 338,800 | -0.006988 (t -15.4) | -0.006995 (t -16.2) | -0.001481 (t -4.0) | -0.086018 (t -18.9) |
+| 520 | 457,600 | -0.011253 (t -15.4) | -0.011239 (t -16.0) | -0.001224 (t -2.0) | -0.156598 (t -20.5) |
+| 655 | 576,400 | -0.013101 (t -16.8) | -0.013309 (t -17.7) | -0.001969 (t -2.9) | -0.174739 (t -21.3) |
+| 790 | 695,200 | -0.013072 (t -17.0) | -0.013218 (t -18.0) | -0.001854 (t -2.8) | -0.176281 (t -21.4) |
+| 925 | 814,000 | -0.013513 (t -17.5) | -0.013639 (t -18.4) | -0.002300 (t -3.4) | -0.176431 (t -21.4) |
+
+### The retrieval is genuine
+
+The wrong-context arm -- identical text, identical rows, identical row norms, n-gram
+addresses rolled seven positions -- sits at zero at every checkpoint: -0.000034, -0.000087,
++0.000007, -0.000015, +0.000208, +0.000146, +0.000126, with t between -0.8 and +1.8. The
+sidecar contributes nothing unless what it retrieves corresponds to *this* text. Whatever
+is being learned is addressed memory, not a learned bias, and that holds at every point on
+the trajectory rather than only at the end.
+
+### The headline number is 79% layout
+
+Splitting the scored targets by `LAYOUT_TOKEN_IDS` -- newline and the two think tags --
+against everything else:
+
+| | tokens | OFF | ON | nats saved |
+| --- | ---: | ---: | ---: | ---: |
+| content | 165,409 (94.2%) | 1.4144 | 1.4116 | -458.9 |
+| layout | 10,117 (5.8%) | 0.6679 | 0.4961 | -1738.0 |
+
+5.8% of the positions carry 79% of the improvement. A quarter of the layout NLL is gone;
+0.2% of the content NLL is. The aggregate -0.0135 is a number about newlines.
+
+This is the same trap the A/B/D branch closed as a negative result, arriving by a different
+road: an architecture given a cheap, highly predictable regularity will take it. What is
+different here is that the content effect does not vanish under scrutiny -- it is small,
+but it is real, it grows monotonically after the first 250 updates, and the ablations say
+where it lives.
+
+### On content, the rows are the thing
+
+At 925 updates, restoring the table to its bootstrap rows while keeping every other trained
+parameter (`scratch/native_table/swap_table.py`, verified tensor by tensor):
+
+| | overall | content | layout |
+| --- | ---: | ---: | ---: |
+| trained rows - random rows | -0.005182 (t -17.7) | -0.001536 (t -4.7) | -0.057864 (t -22.0) |
+| random-table chimera, ON - OFF | -0.008331 (t -15.5) | -0.000763 (t -1.9) | -0.118567 (t -20.8) |
+
+The content gain is almost entirely in the rows: -0.001536 of the -0.002300 total, and what
+the block achieves with random rows (-0.000763) does not reach significance. The layout gain
+splits the other way -- two thirds of it survives randomising the table, because "a newline
+goes here" is a fact about position that a block can learn to emit from almost any
+text-dependent signal.
+
+So the table does store content. It stores much less of it than the aggregate suggests.
+
+### Stopping here
+
+ON - OFF is -0.013101, -0.013072, -0.013513 over the last three checkpoints, and the layout
+term saturated at -0.1747 / -0.1763 / -0.1764. The effect is not still rising sharply, which
+was the condition for continuing past 1M. Content is the only term still moving (-0.00197,
+-0.00185, -0.00230) and it would need roughly an order of magnitude more tokens to say
+whether that trend is real or drift at this noise level.
+
+The measured density is 880 supervised tokens per update -- lower than the 1,080 estimated
+from the contaminated counter before `e4c5379`, so 925 updates is 814K supervised tokens,
+not the 1M the schedule was named for.
+
 ## Reproduction
 
 ```powershell

@@ -232,7 +232,8 @@ class TextCollator:
         return {"input_ids": ids, "attention_mask": mask}
 
 
-def make_collator(pad_token_id, table=None, hasher=None, mode="donor"):
+def make_collator(pad_token_id, table=None, hasher=None, mode="donor",
+                  shuffle_context=0):
     """Donor collation needs the GGUF table; native collation needs only the hasher.
 
     A native checkpoint owns its rows as parameters, so there is no donor file to pass
@@ -242,7 +243,8 @@ def make_collator(pad_token_id, table=None, hasher=None, mode="donor"):
     base = TextCollator(pad_token_id)
     if table is None and hasher is None:
         return base
-    return SidecarDataCollator(base, table, hasher, mode=mode)
+    return SidecarDataCollator(base, table, hasher, mode=mode,
+                               shuffle_context=shuffle_context)
 
 
 def validate_loading(info, has_sidecar):
@@ -330,13 +332,13 @@ def forward_logits(model, batch, mode, positions):
 
 
 @torch.inference_mode()
-def score_sequences(model, features, collator, mode, device):
+def score_sequences(model, features, collator, mode, device, forward_mode=None):
     batch = {k: v.to(device) for k, v in collator(features).items()}
     positions = sorted({p for f in features for p in range(f.get("start", 1) - 1, len(f["ids"]) - 1)})
     if not positions:
         raise ValueError("no causal targets to score")
     positions_tensor = torch.tensor(positions, device=device)
-    logits = forward_logits(model, batch, mode, positions_tensor)
+    logits = forward_logits(model, batch, forward_mode or mode, positions_tensor)
     lookup = {p: i for i, p in enumerate(positions)}
     results = []
     for i, feature in enumerate(features):
@@ -349,11 +351,22 @@ def score_sequences(model, features, collator, mode, device):
         if not np.isfinite(loss):
             raise ValueError("non-finite next-token NLL")
         record = {"sum_nll": loss, "tokens": len(target)}
+        # Content against layout, for every feature, not only chat-formatted ones. A
+        # text-only bundle carries no role spans, and without this a plain-document
+        # screen could only report one aggregate -- which cannot tell a memory that
+        # supplies facts from one that has learned where the newlines go. Same
+        # LAYOUT_TOKEN_IDS as the role-based split below, so the two agree.
+        values = per_token.cpu().numpy()
+        targets = feature["ids"][start:]
+        layout_at = [i for i, token in enumerate(targets) if token in LAYOUT_TOKEN_IDS]
+        content_at = [i for i, token in enumerate(targets) if token not in LAYOUT_TOKEN_IDS]
+        record["by_class"] = {
+            label: {"sum_nll": float(values[picked].sum()), "tokens": len(picked)}
+            for label, picked in (("content", content_at), ("layout", layout_at)) if picked}
         roles = feature.get("roles")
         if roles:
             # A position's loss belongs to the role of the token it predicts, which is
             # `start + offset`, not the position itself.
-            values = per_token.cpu().numpy()
             record["by_role"] = {}
             for role, ranges in roles.items():
                 picked = [index for low, high in ranges
@@ -472,6 +485,18 @@ def evaluate(args):
         feature = first if "ids" in first else first["choices"][0]
         probe = plumbing_probe(model, collator, feature, args.device)
         modes = ["enabled", "bypassed"] + (["full_bypass"] if audit["variant"] == "gated_residual" else [])
+        # Each mode names the collator that builds its batch and the forward mode
+        # that scores it. Only `shuffled` differs in the batch: same text, same
+        # rows, same row norms and value distribution, but the memory is addressed
+        # for the wrong position. Bypassing asks whether the sidecar helps; wrong
+        # context asks whether what it retrieves has to correspond to *this* text,
+        # which is the difference between a memory and a learned bias.
+        wiring = {name: (collator, name) for name in modes}
+        if args.shuffle_context and audit["variant"]:
+            wiring["shuffled"] = (
+                make_collator(bundle["pad_token_id"], table, hasher, mode,
+                              shuffle_context=args.shuffle_context), "enabled")
+            modes = modes + ["shuffled"]
         result = {"checkpoint": str(Path(args.checkpoint).resolve()), "split": args.split,
                   "bundle_sha256": digest(bundle), "tokenizer_sha256": bundle["tokenizer_sha256"],
                   "task_sha256": {k: digest(v) for k, v in tasks.items()}, "audit": audit, "probe": probe,
@@ -485,7 +510,9 @@ def evaluate(args):
                         outputs[mode] = outputs["enabled"]
                         continue
                     features = [record] if task == "nll" else record["choices"]
-                    scored = score_sequences(model, features, collator, mode, args.device)
+                    mode_collator, forward_mode = wiring[mode]
+                    scored = score_sequences(model, features, mode_collator, mode,
+                                             args.device, forward_mode=forward_mode)
                     outputs[mode] = scored[0] if task == "nll" else choice_result(scored, features, record["answer"])
                 result["records"][task].append({"id": record["id"], "modes": outputs})
                 if (index + 1) % 8 == 0:
@@ -647,6 +674,11 @@ def main():
     run.add_argument("--split", choices=["screen", "confirmation"], default="screen")
     run.add_argument("--tasks", nargs="+", choices=["nll", "mmlu", "arc"], default=["nll", "mmlu", "arc"])
     run.add_argument("--limit", type=int, default=0)
+    run.add_argument(
+        "--shuffle-context", type=int, default=0, metavar="N",
+        help="also score a wrong-context arm, where the n-gram rows are addressed "
+             "N positions away from the text they accompany",
+    )
     run.add_argument(
         "--rho", type=float,
         help="override a donor-reader residual scalar for a frozen pre-training sweep",

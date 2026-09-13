@@ -1,0 +1,95 @@
+# Continuation of the first native-table screen, from 250 updates to roughly 1M
+# cumulative supervised tokens.
+#
+# The first screen (examples/qwen35_2b_native_ple_ce.yml) answered the question it was
+# built to answer -- a trained native table improves held-out NLL where an untrained one
+# degrades it, and the entire benefit disappears when the memory is addressed for the
+# wrong position (-0.000087 nats/token at t = -0.84, indistinguishable from off). That is
+# retrieval, not a learned bias, so it is worth paying for more tokens.
+#
+# It was not, however, a 1M-token screen. 4096 is a sequence's padded capacity; these
+# documents carry about 1,080 supervised tokens per update, so 250 updates bought roughly
+# 270K. 925 updates total reaches 1M, which is another 675 from here.
+#
+#   update  675  ~=  1,000,000 cumulative supervised tokens (270K + 729K)
+#
+# Packing would make a sequence carry its full 4096 and cut the wall clock, and is
+# deliberately not used: it changes document-boundary and history-reset semantics exactly
+# where the n-gram hash and the short causal convolution are sensitive. That is a new
+# correctness problem in exchange for several minutes.
+#
+# The learning rate restarts. The first run's cosine decayed to nearly zero by update 250,
+# so continuing on the same schedule would train at no learning rate at all; this is a
+# warm restart at the same peak, over the remaining budget. It is a discontinuity at the
+# join, and any curve read across update 250 has to account for it.
+
+model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce
+output_path: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce-1m
+project_name: hybridmodel-native-ple
+
+sequence_length: 4096
+
+dataset:
+  # The same stream in the same order: this is a continuation, not a second sample.
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+sidecar:
+  enabled: true
+  table_mode: native
+  ngram_vocab_size_base: 131072
+  variant: ple
+  layer_index: 1
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  freeze_backbone: true
+  unfreeze_at_step: null
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  optim: adamw_torch
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  max_steps: 675
+  learning_rate: 1.0e-4
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 25
+  eval_strategy: steps
+  eval_steps: 45
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  # Five intermediate checkpoints plus the final one, each an independent-evaluation
+  # point on the fixed 384-document bundle. 4.3 GiB apiece, so save_total_limit stays
+  # off deliberately -- the whole purpose is to keep them.
+  save_steps: 135
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
