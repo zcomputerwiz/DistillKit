@@ -84,8 +84,8 @@ class AssistantCrossEntropyLoss(LossFunctionBase):
     def __call__(self, student_outputs, signal, mask=None, hidden_state_mapping=None,
                  num_items_in_batch=None, head_context=None, labels=None,
                  assistant_mask=None, attention_mask=None):
-        from distillkit.chunked_ce import chunk_tokens_for
-        from distillkit.chunked_head import chunked_head_loss
+        from distillkit.core.chunked_ce import chunk_tokens_for
+        from distillkit.core.chunked_head import chunked_head_loss
 
         if head_context is None or labels is None or assistant_mask is None:
             raise ValueError("assistant CE needs chunked_head, labels and assistant_mask")

@@ -26,7 +26,7 @@ from distillkit.configuration import (
     TeacherDatasetConfig,
     TeacherModelConfig,
 )
-from distillkit.frozen_prefix import no_grad_prefix
+from distillkit.core.frozen_prefix import no_grad_prefix
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.gqa_dispatch import install_expanded_gqa_attention
 from distillkit.linear_attention_dispatch import install_device_aware_linear_attention

@@ -10,9 +10,9 @@ from transformers import (
 )
 from trl import SFTTrainer
 
-from distillkit.anchor_tap import AnchorTap
-from distillkit.chunked_head import HeadContext
-from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
+from distillkit.core.anchor_tap import AnchorTap
+from distillkit.core.chunked_head import HeadContext
+from distillkit.core.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
 from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
@@ -190,7 +190,7 @@ class DistillationTrainer(SFTTrainer):
     def _get_train_sampler(self, train_dataset=None):
         if not self.sortish_batching:
             return super()._get_train_sampler(train_dataset)
-        from distillkit.sortish_sampler import SortishSampler
+        from distillkit.core.sortish_sampler import SortishSampler
 
         dataset = self.train_dataset if train_dataset is None else train_dataset
         column = self.args.length_column_name or "length"
