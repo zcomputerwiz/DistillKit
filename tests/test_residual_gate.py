@@ -472,3 +472,91 @@ def test_a_warm_started_gate_still_trains_with_the_backbone(tmp_path):
         assert embedding.grad is not None and torch.any(embedding.grad != 0)
     finally:
         remove_residual_gates(model)
+
+
+# --- inference-time strength --------------------------------------------------
+#
+# The forensics scale a trained gate without retraining it: g_lambda = 1 + lambda (g - 1).
+# Two endpoints have to be exact or the curve between them means nothing -- lambda = 0 is
+# the identity the ablation already uses, and lambda = 1 is the gate as trained.
+
+
+def test_strength_zero_is_the_identity(tmp_path):
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+            handle.gate(index).output.bias.data.normal_(0, 0.6)
+        assert not torch.equal(reference, logits_of(model, ids))
+        handle.strength = 0.0
+        assert torch.equal(reference, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_strength_one_is_the_gate_as_trained(tmp_path):
+    model = build()
+    ids = batch(model)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+            handle.gate(index).output.bias.data.normal_(0, 0.6)
+        trained = logits_of(model, ids)
+        handle.strength = 1.0
+        assert torch.equal(trained, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_strength_scales_the_departure_from_unit_admission():
+    """The interpolation is on g - 1, not on g: halving must not halve admission."""
+    gate = ResidualAdmissionGate(4)
+    gate.observe(torch.randn(64, 4))
+    gate.finalize()
+    gate.output.weight.data.normal_(0, 0.6)
+    gate.output.bias.data.fill_(0.3)
+    features = torch.randn(32, 4)
+    full = gate(features)
+    for strength in (0.0, 0.25, 0.5, 1.0, 1.5):
+        scaled = 1.0 + strength * (full - 1.0)
+        assert torch.allclose(scaled - 1.0, strength * (full - 1.0), atol=1e-6)
+    assert torch.allclose(1.0 + 0.0 * (full - 1.0), torch.ones_like(full))
+
+
+def test_forced_identity_wins_over_strength(tmp_path):
+    """Both knobs exist; the ablation must not be silently rescaled by the other."""
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+        handle.strength = 1.5
+        handle.force_identity = True
+        assert torch.equal(reference, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_the_update_norm_is_recorded_beside_the_gate(tmp_path):
+    """g * r is the thing the network consumes; both halves have to be observable."""
+    model = build()
+    ids = batch(model)
+    handle = calibrated(model, ids)
+    try:
+        handle.keep = True
+        handle.keep_update = True
+        handle.reset_stats()
+        logits_of(model, ids)
+        for index in handle.layer_indices:
+            gates = torch.cat([part.reshape(-1) for part in handle.kept[index]])
+            norms = torch.cat([part.reshape(-1) for part in handle.kept_norms[index]])
+            assert gates.shape == norms.shape == (ids.numel(),)
+            assert torch.all(norms >= 0)
+    finally:
+        remove_residual_gates(model)

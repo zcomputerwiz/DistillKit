@@ -4583,6 +4583,149 @@ not fix the seed instability it was proposed to fix, and before routing capacity
 the thing worth fixing is that a 250K-token co-adaptation of this backbone has a 0.0033
 nat noise floor that no single run can see past.
 
+## Checkpoint forensics: co-adaptation destroys the routing policy it starts from
+
+Three screens had produced sixteen trained backbones and their gates, and the question
+they left -- which half of `(B, G)` decides whether a warm-started run wins -- does not
+need another training run to answer. It needs the states we already paid for, taken
+apart and recombined at inference. No optimizer step appears anywhere in this section.
+
+The mechanism it found is not the one any of the hypotheses on the table proposed.
+
+### The frozen-stage gate beats every co-adapted gate, on every backbone
+
+Content NLL on the screen, each backbone carrying its own learned gate and then carrying
+the Stage-1 familiarity gate instead:
+
+| backbone | own gate | + Stage-1 gate | delta |
+| --- | ---: | ---: | ---: |
+| C42 (warm, seed 42) | 1.655552 | 1.640604 | **-0.014948** |
+| C43 (warm, seed 43) | 1.668988 | 1.644146 | **-0.024842** |
+| A42 (fresh, seed 42) | 1.656474 | 1.648271 | -0.008203 |
+| A43 (fresh, seed 43) | 1.664657 | 1.642613 | -0.022044 |
+| B42 (stock, no gate) | 1.658790 | 1.647045 | -0.011745 |
+| B43 (stock, no gate) | 1.669182 | 1.640971 | **-0.028211** |
+
+Every row, both corpora, t between -14 and -32 on paired documents. The confirmation
+corpus reproduces each delta to within 0.001.
+
+Two of those rows are the ones that matter most. **B42 and B43 never saw a gate at all**:
+they are the stock controls, 250K supervised tokens of ordinary fine-tuning. Dropping the
+frozen-stage routing policy onto them afterwards is worth -0.0117 and -0.0282 nats. The
+Stage-1 policy is not stale after backbone adaptation. It is portable to backbones that
+adapted without it.
+
+### And it is too weak, not too strong
+
+Scaling a gate at inference without retraining it -- `g_lambda = 1 + lambda (g - 1)`, so
+`lambda = 0` is the identity and `lambda = 1` is the gate as trained:
+
+| lambda | 0.0 | 0.25 | 0.5 | 0.75 | 1.0 | 1.25 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| C43 own gate | 1.674155 | 1.672963 | 1.671027 | 1.670327 | 1.668988 | **1.668039** |
+
+Monotone *down*. Weakening the learned gate makes C43 worse at every step; the best point
+in its own family is the strongest one tested. The gate-plasticity hypothesis -- that the
+losing run over-corrected and wants a lower learning rate -- is the opposite of what the
+checkpoint says.
+
+The Stage-1 gate on the same backbones goes further in the same direction:
+
+| lambda | 0.5 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| C43 + Stage-1 | 1.661926 | 1.644146 | 1.634699 | 1.624624 | 1.618579 | **1.617801** | 1.665263 |
+| B43 + Stage-1 | 1.657745 | 1.640971 | 1.633199 | 1.625651 | 1.618362 | **1.617300** | -- |
+
+At `lambda = 2` the frozen policy applied twice as hard takes the losing warm-start
+backbone from 1.668988 to **1.617801**, and the stock backbone from 1.669182 to
+**1.617300** -- a recovery of 0.051 nats, the size of the original attenuation effect,
+on a backbone that spent 250K tokens adapting away from it. The optimum was chosen on the
+screen; the confirmation corpus was then scored at that fixed lambda and gives 1.658268
+against C43's own 1.709855, the same -0.0516.
+
+### Gate drift is immediate, not a response to representation drift
+
+Every milestone of both warm-start runs, backbone and gate taken from the same step:
+
+| step | C43 own gate | + Stage-1 | Stage-1 advantage |
+| --- | ---: | ---: | ---: |
+| 57 | 1.674116 | 1.655443 | -0.018672 |
+| 114 | 1.677907 | 1.648500 | -0.029406 |
+| 171 | 1.664238 | 1.643995 | -0.020243 |
+| 228 | 1.669489 | 1.644544 | -0.024945 |
+| 284 | 1.668988 | 1.644146 | -0.024842 |
+
+The frozen policy is already better by the first checkpoint and never stops being better.
+There is no window in which the learned gate is ahead and then falls behind, and no decay
+in the Stage-1 advantage as the representation moves. Seed 42 shows the same shape at
+smaller magnitude. **The gate degrades first and the backbone never invalidates the
+policy** -- which is the opposite temporal ordering to the one that would justify calling
+this representation drift.
+
+### The outcome follows the backbone; the gate is a small correction on top
+
+Cross-seed swaps, each backbone carrying the other seed's gate:
+
+| combination | content | vs its own pairing |
+| --- | ---: | ---: |
+| C42 + C42 | 1.655552 | -- |
+| C42 + C43 | 1.652408 | **-0.003144** |
+| C43 + C43 | 1.668988 | -- |
+| C43 + C42 | 1.670843 | +0.001855 |
+| A42 + A43 | 1.653376 | -0.003097 |
+| A43 + A42 | 1.669057 | +0.004400 |
+
+Seed-42 backbones score 1.652-1.656 whatever gate they carry; seed-43 backbones score
+1.665-1.671. The level follows `B`. There is no matched-pair epistasis at all -- the
+cross-pairs are not worse than the matched pairs, and on the seed-42 backbone the foreign
+gate is *better* than the one that trained with it.
+
+Backbone movement agrees. Relative parameter displacement at the gated MLPs is
+0.0047/0.0045/0.0042/0.0037 for arm A and 0.0049/0.0045/0.0044/0.0037 for arm C -- the
+same to three figures. Mean cosine between arms (0.885-0.901) barely exceeds the cosine
+between two runs of the same arm (0.909-0.939). Carrying a warm-started gate does not send
+the backbone anywhere different.
+
+### Not an identifiability artefact
+
+The network consumes `g * r`, so a gate that looks different could be the same function
+with a compensating FFN. It is not. Across the layer x familiarity grid, comparing seed 42
+with seed 43: the FFN's own proposal `||r||` is identical (Pearson 1.000, relative RMS
+0.006), the gate `g` differs by 4.0%, the product `g * r` by 5.0%, and the size of the
+correction `|g - 1| * ||r||` by **57%**. The FFN did not move to absorb the gate. The
+routing function genuinely differs, and what differs most is how much correction is
+applied.
+
+### What it costs
+
+The Stage-1 rescue is not free on every class. On C43 it improves content by 0.0248 and
+punctuation by 0.0206, leaves control flat, and worsens whitespace from 0.2888 to 0.5377 --
+a small class, 4% of tokens, and the aggregate still improves by 0.0123. On the stock B43
+backbone the same swap moves whitespace by only 0.016, so the whitespace cost belongs to
+the warm-started backbone rather than to the policy.
+
+### Verdict
+
+**GATE COLLAPSE UNDER JOINT TRAINING.** Not gate drift in the sense of over-correction --
+the learned gates are too weak, and every one of them is beaten on its own backbone by a
+policy fitted before that backbone existed. Not backbone drift: the frozen policy gets
+*better* in relative terms as training proceeds and works on backbones that never saw a
+gate. Not epistasis: cross-pairs beat matched pairs. Not identifiability: `g * r` is no
+more stable than `g`.
+
+What happens is that joint cross-entropy training collapses the gate toward the identity.
+The training log already said so and nobody read it that way: gate reach runs 0.46-0.81
+frozen and 0.07-0.15 co-adapted at an identical gate learning rate. As the backbone starts
+absorbing the correction, the gradient asking for the correction shrinks, and the gate
+gives up a policy worth five times what co-adaptation ends up extracting from it.
+
+**DO NOT SPEND GPU TIME ON THE GATE-LR SCREEN.** A learning-rate grid searches for a gate
+that trains better under joint cross-entropy, and the evidence says joint cross-entropy is
+the thing destroying it. The cheap experiments the forensics point at instead are: freeze
+the Stage-1 gate and train only the backbone, which no arm has ever run; and scale the
+frozen policy, since `lambda = 2` on a stock-trained backbone is the best model this
+programme has produced.
+
 ## Reproduction
 
 ```powershell

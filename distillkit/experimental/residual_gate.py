@@ -260,12 +260,27 @@ class ResidualGateHandle:
         # touching a weight, so 'does this model depend on its gate at inference' is a
         # question about one set of parameters rather than two runs.
         self.force_identity = False
+        # How much of the learned departure from unit admission to admit::
+        #
+        #     g_lambda = 1 + strength * (g - 1)
+        #
+        # 1.0 is the gate as trained and 0.0 is the identity, so this is a continuous
+        # version of the same ablation. It exists to ask whether a learned correction is
+        # the right *size* for the backbone it ended up with, which no amount of staring
+        # at the weights can answer.
+        self.strength = 1.0
         self.record = False
         # Per-token gate values, kept only when a scorer asks: the distributions are
         # the mechanistic evidence, and a running mean cannot be split by context
         # afterwards.
         self.keep = False
         self.kept: dict[int, list] = {}
+        # The norm of the FFN's own proposal, beside the gate that scales it. The
+        # network consumes g * r, not g: two runs with different gate policies and
+        # compensating update magnitudes can be the same function, and only this tells
+        # them apart from two runs that genuinely route differently.
+        self.keep_update = False
+        self.kept_norms: dict[int, list] = {}
         self.stats: dict[int, dict] = {}
         self.gated_calls = 0
 
@@ -285,6 +300,7 @@ class ResidualGateHandle:
     def reset_stats(self) -> None:
         self.stats = {}
         self.kept = {}
+        self.kept_norms = {}
         self.gated_calls = 0
 
     def _observe(self, layer: int, values: torch.Tensor) -> None:
@@ -353,10 +369,15 @@ class ResidualGateHandle:
         values = gate(features)
         if self.force_identity:
             values = torch.ones_like(values)
+        elif self.strength != 1.0:
+            values = 1.0 + self.strength * (values - 1.0)
         if self.record:
             self._observe(layer, values)
         if self.keep:
             self.kept.setdefault(layer, []).append(values.detach().float().cpu())
+        if self.keep_update:
+            self.kept_norms.setdefault(layer, []).append(
+                update.detach().float().norm(dim=-1).cpu())
         self.gated_calls += int(values.numel())
         return update * values.unsqueeze(-1).to(update.dtype)
 
