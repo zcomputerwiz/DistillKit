@@ -167,8 +167,11 @@ cython_debug/
 /scratch/eval-suite-temp-*/
 /scratch/eval-datasets-cache/
 /scratch/eval-pytest-cache/
-/scratch/independent-eval/*.partial
-/scratch/independent-eval/*.tmp
+# Crash-safety snapshots the evaluator writes beside each result: the final file is
+# the same content plus elapsed_seconds and complete. Recursive, because the sweep
+# driver writes its per-checkpoint records into a subdirectory.
+/scratch/independent-eval/**/*.partial
+/scratch/independent-eval/**/*.tmp
 
 # Keep the bounded widening probe results, not its multi-GB training checkpoint.
 /scratch/widened-residual/smoke-checkpoint/

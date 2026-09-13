@@ -1,0 +1,6579 @@
+{
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\native-ple-2b-ce",
+  "split": "screen",
+  "bundle_sha256": "d6a011d9710518b4f4812b5bf9d7fa3ea1dafd72fb08577a3cf6708636d1cfb3",
+  "tokenizer_sha256": "cc4ac36668961751f10c10901159d3fb3263507a4c24f4760833f9d21901849f",
+  "task_sha256": {
+    "nll": "3d97e084be400e9b4215d78a7c6daf83f8ed15d4135886f527754697e4e37dde"
+  },
+  "audit": {
+    "variant": "ple",
+    "residual_branches": 1,
+    "adapter_tensor_count": 8,
+    "adapter_exact_match": true,
+    "adapter_norms": {
+      "model.layers.1.sidecar.ple.conv1d.weight": 1.812023639678955,
+      "model.layers.1.sidecar.ple.key_proj.weight": 40.720558166503906,
+      "model.layers.1.sidecar.ple.norm_conv.weight": 0.14064639806747437,
+      "model.layers.1.sidecar.ple.norm_key.weight": 0.07085701078176498,
+      "model.layers.1.sidecar.ple.norm_query.weight": 0.07086747139692307,
+      "model.layers.1.sidecar.ple.value_proj.weight": 40.767730712890625,
+      "model.layers.1.sidecar.rho": 0.01007080078125,
+      "model.layers.1.sidecar.table.weight": 311.74639892578125
+    },
+    "ignored_loss_only_keys": [],
+    "config_sha256": "aaf72553eb0dd996d49942c2cedd655bd96ecb9352b00e5a70a0875da55ae14e"
+  },
+  "probe": {
+    "sidecar_calls": [
+      {
+        "enabled": true,
+        "raw_present": true,
+        "residual_max": 0.0037841796875
+      },
+      {
+        "enabled": false,
+        "raw_present": true,
+        "residual_max": 0.0
+      }
+    ],
+    "branch_calls_per_forward": 1,
+    "enabled_minus_bypassed_logits_max": 0.25
+  },
+  "dtype": "bfloat16",
+  "device": "cuda:0",
+  "complete": true,
+  "records": {
+    "nll": [
+      {
+        "id": "1c88d10fed8e5d7929bd8237e00cc804",
+        "modes": {
+          "enabled": {
+            "sum_nll": 478.9569091796875,
+            "tokens": 437
+          },
+          "bypassed": {
+            "sum_nll": 480.01666259765625,
+            "tokens": 437
+          },
+          "shuffled": {
+            "sum_nll": 480.29498291015625,
+            "tokens": 437
+          }
+        }
+      },
+      {
+        "id": "1fa0c7a3b9b650269df134fc3cc4ab9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 433.91162109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 433.18115234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 433.0289306640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eec6419dba44b0c528531bee3b6ab74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 421.59075927734375,
+            "tokens": 442
+          },
+          "bypassed": {
+            "sum_nll": 422.03460693359375,
+            "tokens": 442
+          },
+          "shuffled": {
+            "sum_nll": 422.01702880859375,
+            "tokens": 442
+          }
+        }
+      },
+      {
+        "id": "1ea40d8a7c4b2636644ff07a61d90ad8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.3243713378906,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 466.9758605957031,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 467.69366455078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "230b9d09eba77d3bba635b3069752c24",
+        "modes": {
+          "enabled": {
+            "sum_nll": 629.3262939453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 628.3858642578125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 629.5186157226562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20dcde0ea7bb1db4c192d5a425eedd14",
+        "modes": {
+          "enabled": {
+            "sum_nll": 410.80072021484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 411.2631530761719,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 411.3333740234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2323fdb3b702137f379546cd2467b2a5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 512.4514770507812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 512.4712524414062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 513.38720703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2239b7474c7e25d5920914e71eb3eb63",
+        "modes": {
+          "enabled": {
+            "sum_nll": 263.69561767578125,
+            "tokens": 351
+          },
+          "bypassed": {
+            "sum_nll": 264.34942626953125,
+            "tokens": 351
+          },
+          "shuffled": {
+            "sum_nll": 264.6752624511719,
+            "tokens": 351
+          }
+        }
+      },
+      {
+        "id": "22fffd62e15ac26b8fb43e429af8bae6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 659.0388793945312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 658.60107421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 659.3108520507812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21bb69e9db5e74b7859fe1c934afe506",
+        "modes": {
+          "enabled": {
+            "sum_nll": 439.7421875,
+            "tokens": 436
+          },
+          "bypassed": {
+            "sum_nll": 440.6724853515625,
+            "tokens": 436
+          },
+          "shuffled": {
+            "sum_nll": 440.133544921875,
+            "tokens": 436
+          }
+        }
+      },
+      {
+        "id": "1f139af8cc5352e4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1061.747802734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1064.331787109375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1064.267333984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ee78ff77a4a39cf9858ee679542b8aa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 542.058349609375,
+            "tokens": 493
+          },
+          "bypassed": {
+            "sum_nll": 540.6614990234375,
+            "tokens": 493
+          },
+          "shuffled": {
+            "sum_nll": 541.0938110351562,
+            "tokens": 493
+          }
+        }
+      },
+      {
+        "id": "238a891afe4d419a1453f9ba3b4e9e8f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 270.0418701171875,
+            "tokens": 257
+          },
+          "bypassed": {
+            "sum_nll": 272.10516357421875,
+            "tokens": 257
+          },
+          "shuffled": {
+            "sum_nll": 270.8638000488281,
+            "tokens": 257
+          }
+        }
+      },
+      {
+        "id": "227db29c45708a61ff0ae57145930e2d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1557.02587890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1559.650634765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1559.0830078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20f7fb187fbc70c991e9e818b7e8ac46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 268.3122253417969,
+            "tokens": 380
+          },
+          "bypassed": {
+            "sum_nll": 269.3787536621094,
+            "tokens": 380
+          },
+          "shuffled": {
+            "sum_nll": 268.52008056640625,
+            "tokens": 380
+          }
+        }
+      },
+      {
+        "id": "1e65013257ed1b65b8eb4343b3034ba2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 324.0010070800781,
+            "tokens": 283
+          },
+          "bypassed": {
+            "sum_nll": 325.7652282714844,
+            "tokens": 283
+          },
+          "shuffled": {
+            "sum_nll": 324.82745361328125,
+            "tokens": 283
+          }
+        }
+      },
+      {
+        "id": "1e616cc9960aeb4d184520a402c52910",
+        "modes": {
+          "enabled": {
+            "sum_nll": 825.317138671875,
+            "tokens": 319
+          },
+          "bypassed": {
+            "sum_nll": 828.0348510742188,
+            "tokens": 319
+          },
+          "shuffled": {
+            "sum_nll": 826.18603515625,
+            "tokens": 319
+          }
+        }
+      },
+      {
+        "id": "2331687318325234e268f9c0ed58528a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 750.1165771484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 749.3700561523438,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 748.6318359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20bc2085b4b48d85bb0d32d711c388e0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 424.63177490234375,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 424.1795959472656,
+            "tokens": 397
+          },
+          "shuffled": {
+            "sum_nll": 424.57562255859375,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "226ade2101a266b45ad2bb05813e3a81",
+        "modes": {
+          "enabled": {
+            "sum_nll": 319.3134765625,
+            "tokens": 399
+          },
+          "bypassed": {
+            "sum_nll": 321.0859069824219,
+            "tokens": 399
+          },
+          "shuffled": {
+            "sum_nll": 321.49017333984375,
+            "tokens": 399
+          }
+        }
+      },
+      {
+        "id": "23e59ec752a889eb3926b87e4dda80bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 491.8659973144531,
+            "tokens": 468
+          },
+          "bypassed": {
+            "sum_nll": 491.12615966796875,
+            "tokens": 468
+          },
+          "shuffled": {
+            "sum_nll": 491.0317687988281,
+            "tokens": 468
+          }
+        }
+      },
+      {
+        "id": "20d01de9de941efe4a10674e64d9ab4a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1645.0780029296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1647.652099609375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1646.751220703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e89220548440e661fd54ac4089afca3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1660.0673828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1663.41748046875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1662.6937255859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2101be5131c1f729ca668e13139f5663",
+        "modes": {
+          "enabled": {
+            "sum_nll": 271.1234130859375,
+            "tokens": 204
+          },
+          "bypassed": {
+            "sum_nll": 272.4176330566406,
+            "tokens": 204
+          },
+          "shuffled": {
+            "sum_nll": 272.77685546875,
+            "tokens": 204
+          }
+        }
+      },
+      {
+        "id": "1e9a2c034427ff183ae1b3ada0a36554",
+        "modes": {
+          "enabled": {
+            "sum_nll": 355.4759216308594,
+            "tokens": 422
+          },
+          "bypassed": {
+            "sum_nll": 357.0639953613281,
+            "tokens": 422
+          },
+          "shuffled": {
+            "sum_nll": 356.708740234375,
+            "tokens": 422
+          }
+        }
+      },
+      {
+        "id": "1fe12ac56ff14110b17384ec679480a6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.1371154785156,
+            "tokens": 421
+          },
+          "bypassed": {
+            "sum_nll": 467.6139831542969,
+            "tokens": 421
+          },
+          "shuffled": {
+            "sum_nll": 467.84375,
+            "tokens": 421
+          }
+        }
+      },
+      {
+        "id": "1ea9088154a7073cc465e6a32fbca08b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 464.7351989746094,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 464.3582458496094,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 464.512939453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1efc1d0319cffef18dc2bbfab7014bd9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 588.908203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 589.6033935546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 589.9251098632812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fd8d92d2f28ee1756bdd18edd9c516a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 534.1188354492188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 534.6170654296875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 534.527587890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "246b597fb52afa334b5cfced1d61f7d3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 340.7071533203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 340.60247802734375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 340.33209228515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e32258f88b7dee3e33ecb1f9e1d7f16",
+        "modes": {
+          "enabled": {
+            "sum_nll": 395.0541687011719,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 394.65533447265625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 393.958984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21beb2868bcd90bf41a0c6ce5f1c1ea3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 556.9859619140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 556.75390625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 557.53271484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2442ffe403f0af3c3eac82a3a98ce6b4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 747.4276123046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 746.1768798828125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 747.1759643554688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "221f1654da2d49045631d00d142819cd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1652.41552734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1655.4822998046875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1655.472412109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1df907895c7436aaf3949a9ad9030576",
+        "modes": {
+          "enabled": {
+            "sum_nll": 736.6256103515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 736.51171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 737.0773315429688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d58201864abe1f494bae9f9b975208d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 518.2401123046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 517.453125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 518.5761108398438,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22a5fdf0b25c6a9337a57931e9a86b9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 452.8533020019531,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 453.06793212890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 451.8206787109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e7ff05249b54afe7f991a8038766cc2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1615.84716796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1619.1121826171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1618.38232421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21e0b5281d603f460a82833103bbfe8a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 623.81689453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 623.1922607421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 624.38818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e2420b3c7c74f348b8bf308d386e6b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1633.1573486328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1635.315185546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1634.015869140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "237b2cb8843ae4c84e952f8bf2903274",
+        "modes": {
+          "enabled": {
+            "sum_nll": 821.5423583984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 822.0989990234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 822.5791625976562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2479ba76935b7f61b80d4edd23e0b2a1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 518.2845458984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 517.4215087890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 517.9976806640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eaef392555b1b829e13d1ea025af29c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 275.9497985839844,
+            "tokens": 276
+          },
+          "bypassed": {
+            "sum_nll": 278.24981689453125,
+            "tokens": 276
+          },
+          "shuffled": {
+            "sum_nll": 277.0943908691406,
+            "tokens": 276
+          }
+        }
+      },
+      {
+        "id": "1f53f73799f6326bb5720607bfae4661",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1624.72119140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1627.490966796875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1625.953857421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "224ee7ca0631aabf697c91c57c5974f6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 371.8162536621094,
+            "tokens": 415
+          },
+          "bypassed": {
+            "sum_nll": 373.64599609375,
+            "tokens": 415
+          },
+          "shuffled": {
+            "sum_nll": 372.6172180175781,
+            "tokens": 415
+          }
+        }
+      },
+      {
+        "id": "1d65e295fb73822ba63a98121da7b22b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 342.1202087402344,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 343.7191467285156,
+            "tokens": 397
+          },
+          "shuffled": {
+            "sum_nll": 343.90771484375,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "202a43d50465021053cf1091ffbaf4d5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 294.6078186035156,
+            "tokens": 361
+          },
+          "bypassed": {
+            "sum_nll": 296.40966796875,
+            "tokens": 361
+          },
+          "shuffled": {
+            "sum_nll": 296.0236511230469,
+            "tokens": 361
+          }
+        }
+      },
+      {
+        "id": "1df55141c3613421",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1097.6737060546875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1098.787841796875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1099.6494140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20813d488b824240",
+        "modes": {
+          "enabled": {
+            "sum_nll": 963.3511962890625,
+            "tokens": 345
+          },
+          "bypassed": {
+            "sum_nll": 966.7871704101562,
+            "tokens": 345
+          },
+          "shuffled": {
+            "sum_nll": 966.245849609375,
+            "tokens": 345
+          }
+        }
+      },
+      {
+        "id": "22e17f0c933997c39509a30430a7013b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 551.7661743164062,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 551.83203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 552.1680908203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "227c3b8ba050164808f79645e442d4c0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 558.4879150390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 557.810546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 559.6937866210938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202f5c43eb8fca58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1559.19482421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1558.303466796875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1557.724609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d21bd9524ad3553b3cded86f8b36a6b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 712.612548828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 712.8399658203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 712.8358154296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2480e8fc87a78fff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 832.3114013671875,
+            "tokens": 312
+          },
+          "bypassed": {
+            "sum_nll": 834.0115966796875,
+            "tokens": 312
+          },
+          "shuffled": {
+            "sum_nll": 833.2056884765625,
+            "tokens": 312
+          }
+        }
+      },
+      {
+        "id": "1cf48eea817e987f997dc25153cdf3ef",
+        "modes": {
+          "enabled": {
+            "sum_nll": 790.0941162109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 790.1986083984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 789.9168090820312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23d81067abfdd7beb0b3a94f0382d905",
+        "modes": {
+          "enabled": {
+            "sum_nll": 634.9779052734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 633.5767211914062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 634.4605712890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24358a1ab96e9e7cf925aa024f6cc4bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 508.25677490234375,
+            "tokens": 409
+          },
+          "bypassed": {
+            "sum_nll": 507.6944885253906,
+            "tokens": 409
+          },
+          "shuffled": {
+            "sum_nll": 507.81536865234375,
+            "tokens": 409
+          }
+        }
+      },
+      {
+        "id": "2004e77b2ee755e82637785fe21bc09e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 491.3782958984375,
+            "tokens": 302
+          },
+          "bypassed": {
+            "sum_nll": 492.56744384765625,
+            "tokens": 302
+          },
+          "shuffled": {
+            "sum_nll": 491.9654846191406,
+            "tokens": 302
+          }
+        }
+      },
+      {
+        "id": "20ed690c6d6c0819f17d0fe2f6dea4a1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.9697265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 479.54144287109375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 480.64599609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2410a390309338e5a243430eba84c796",
+        "modes": {
+          "enabled": {
+            "sum_nll": 710.947998046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 710.6688232421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 710.800537109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fea4bd53359ddf7ad0293f55907e103",
+        "modes": {
+          "enabled": {
+            "sum_nll": 657.302734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 656.678955078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 657.3931884765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21c0a7ae9f0a924f7124013a8c27996f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 462.3282470703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 461.9250793457031,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 462.30413818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dd9639abf88606e9ab6193e240f4d0b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 568.910400390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 568.76708984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 568.9039306640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e62d2458d28718bdcc33829ead6fb58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 690.2282104492188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 689.20458984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 688.1705322265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "201ce4da3feb63e47b572af8b7d0d703",
+        "modes": {
+          "enabled": {
+            "sum_nll": 521.8109130859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 522.2789306640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 521.7109985351562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21c2657194330b79f084926f80bdae0a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 351.339111328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 350.8724365234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 351.24383544921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "244b30439d519a608b64c634f051ef83",
+        "modes": {
+          "enabled": {
+            "sum_nll": 364.80059814453125,
+            "tokens": 439
+          },
+          "bypassed": {
+            "sum_nll": 365.02655029296875,
+            "tokens": 439
+          },
+          "shuffled": {
+            "sum_nll": 364.9805603027344,
+            "tokens": 439
+          }
+        }
+      },
+      {
+        "id": "218426a7e23109467b46845a6bd0615d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 418.2465515136719,
+            "tokens": 446
+          },
+          "bypassed": {
+            "sum_nll": 419.97650146484375,
+            "tokens": 446
+          },
+          "shuffled": {
+            "sum_nll": 418.8605651855469,
+            "tokens": 446
+          }
+        }
+      },
+      {
+        "id": "20b0e209d2d204932ce6370a563db7b7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 503.5504150390625,
+            "tokens": 461
+          },
+          "bypassed": {
+            "sum_nll": 503.35955810546875,
+            "tokens": 461
+          },
+          "shuffled": {
+            "sum_nll": 504.2244567871094,
+            "tokens": 461
+          }
+        }
+      },
+      {
+        "id": "20eb2de293c38d271e7c54cbb0562b1e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 278.1614990234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 277.73065185546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 277.3504333496094,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f0fc5f23c1d0b08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1551.00439453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1551.884033203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1551.396484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20103b63b2aeb104953d02370e1ba4d1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 560.84423828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 561.4749145507812,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 560.9805908203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "249a768d16086fe47b3176867db7e0aa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 462.2392578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 461.167236328125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 461.74114990234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e54d1eb4badd0fbfb29515b94bb23ce",
+        "modes": {
+          "enabled": {
+            "sum_nll": 582.531005859375,
+            "tokens": 443
+          },
+          "bypassed": {
+            "sum_nll": 583.267333984375,
+            "tokens": 443
+          },
+          "shuffled": {
+            "sum_nll": 583.0904541015625,
+            "tokens": 443
+          }
+        }
+      },
+      {
+        "id": "2451081f8efca870df44d2d1be6f4bdf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 564.6729736328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 564.9403076171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 564.1976318359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fea5c6847df3e1041a7e26846d949ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 506.8480224609375,
+            "tokens": 434
+          },
+          "bypassed": {
+            "sum_nll": 508.7796325683594,
+            "tokens": 434
+          },
+          "shuffled": {
+            "sum_nll": 508.74627685546875,
+            "tokens": 434
+          }
+        }
+      },
+      {
+        "id": "21a3ba0e41cf4bd3e94b4bd4ea761f73",
+        "modes": {
+          "enabled": {
+            "sum_nll": 447.8277893066406,
+            "tokens": 433
+          },
+          "bypassed": {
+            "sum_nll": 448.0571594238281,
+            "tokens": 433
+          },
+          "shuffled": {
+            "sum_nll": 448.621337890625,
+            "tokens": 433
+          }
+        }
+      },
+      {
+        "id": "23a85583418859efa314110c5877ad6d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 457.2591552734375,
+            "tokens": 373
+          },
+          "bypassed": {
+            "sum_nll": 458.7345886230469,
+            "tokens": 373
+          },
+          "shuffled": {
+            "sum_nll": 457.7715148925781,
+            "tokens": 373
+          }
+        }
+      },
+      {
+        "id": "22352b99e8d313a6a0452efcfcb2c8cc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 412.4585266113281,
+            "tokens": 401
+          },
+          "bypassed": {
+            "sum_nll": 412.998046875,
+            "tokens": 401
+          },
+          "shuffled": {
+            "sum_nll": 413.5361328125,
+            "tokens": 401
+          }
+        }
+      },
+      {
+        "id": "1d887c508d762fdd978b5fb11d2ee623",
+        "modes": {
+          "enabled": {
+            "sum_nll": 466.990234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 467.7330322265625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 466.0478210449219,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f467c0fc88dd896a6817dd89cebe7a0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 478.43060302734375,
+            "tokens": 384
+          },
+          "bypassed": {
+            "sum_nll": 478.0308532714844,
+            "tokens": 384
+          },
+          "shuffled": {
+            "sum_nll": 478.96197509765625,
+            "tokens": 384
+          }
+        }
+      },
+      {
+        "id": "20047f7517aed56ddf465b15898f8aa1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1619.198486328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1623.079345703125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1624.6103515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "218e99ea452b24c030ddbf49d9d14ba7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 840.03857421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 839.7530517578125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 840.7940673828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dbb52227bf958dc3dfa25b083f1db84",
+        "modes": {
+          "enabled": {
+            "sum_nll": 640.1278686523438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 639.8421630859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 639.3447265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "239df3929808d6b273d0bf2f9a38cede",
+        "modes": {
+          "enabled": {
+            "sum_nll": 461.38311767578125,
+            "tokens": 451
+          },
+          "bypassed": {
+            "sum_nll": 463.03619384765625,
+            "tokens": 451
+          },
+          "shuffled": {
+            "sum_nll": 463.931640625,
+            "tokens": 451
+          }
+        }
+      },
+      {
+        "id": "1cf875f6755bfae7bc91f3049fc8f0e5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 632.1505126953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 631.9134521484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 631.6015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d63f1afff1d3214292ba3c66c4a77e8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 468.745849609375,
+            "tokens": 468
+          },
+          "bypassed": {
+            "sum_nll": 468.9288635253906,
+            "tokens": 468
+          },
+          "shuffled": {
+            "sum_nll": 468.82781982421875,
+            "tokens": 468
+          }
+        }
+      },
+      {
+        "id": "1d3666346f7a1fd68b82d5cfac6d1d67",
+        "modes": {
+          "enabled": {
+            "sum_nll": 523.4049682617188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 521.786865234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 522.8948364257812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2215c3111220e8a560a06a70515e234d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 575.213623046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 576.2167358398438,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 575.29931640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "225a90f28a008446504feb3ba3a93eb0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 320.98333740234375,
+            "tokens": 330
+          },
+          "bypassed": {
+            "sum_nll": 322.2022705078125,
+            "tokens": 330
+          },
+          "shuffled": {
+            "sum_nll": 321.705810546875,
+            "tokens": 330
+          }
+        }
+      },
+      {
+        "id": "210883a1467f2e377315c778f364d70e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 569.4232177734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 569.308349609375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 569.4542846679688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20acef17864f7bad7aa20c9f73f294d4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 353.4129638671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 352.82421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 353.28765869140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e438fa2b128a682ce66f804c5de70dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 576.1853637695312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 577.058837890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 577.5988159179688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e1dfc123eaa3f74e74eb03988c1d595",
+        "modes": {
+          "enabled": {
+            "sum_nll": 687.25341796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 685.8090209960938,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 685.7670288085938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2485cc55e46c8434b05344d250f2223f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 336.99090576171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 337.1293640136719,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 336.0852355957031,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1df9ed4ac7c7f015a5570d1c8e60ff7b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 632.5692138671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 631.21728515625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 632.584716796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "232b893681652a364b7be049556d8a9a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 552.0514526367188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 551.4600830078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 551.1697387695312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20ef44aec1ee79c10281a0369c317afb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 529.9180297851562,
+            "tokens": 447
+          },
+          "bypassed": {
+            "sum_nll": 529.9249267578125,
+            "tokens": 447
+          },
+          "shuffled": {
+            "sum_nll": 529.5025634765625,
+            "tokens": 447
+          }
+        }
+      },
+      {
+        "id": "2340b2ca9d4723c368b45cec046e5027",
+        "modes": {
+          "enabled": {
+            "sum_nll": 600.93701171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 600.4166259765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 600.81103515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c90563e3ce70ac34e5aee57ef2b608b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 390.19195556640625,
+            "tokens": 455
+          },
+          "bypassed": {
+            "sum_nll": 391.0257263183594,
+            "tokens": 455
+          },
+          "shuffled": {
+            "sum_nll": 391.3427734375,
+            "tokens": 455
+          }
+        }
+      },
+      {
+        "id": "1e6f7adc7ef5d8d3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1413.5374755859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1416.45458984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1415.756103515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2350b6efe27bc0102ccd750e7bbaa3d7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1655.5745849609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1658.805908203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1659.885009765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2255947d35c8ac1ef5bfa40faa8ab128",
+        "modes": {
+          "enabled": {
+            "sum_nll": 376.1188049316406,
+            "tokens": 369
+          },
+          "bypassed": {
+            "sum_nll": 377.7858581542969,
+            "tokens": 369
+          },
+          "shuffled": {
+            "sum_nll": 377.2215881347656,
+            "tokens": 369
+          }
+        }
+      },
+      {
+        "id": "1ff85e6fed45b0955290c5b98046b845",
+        "modes": {
+          "enabled": {
+            "sum_nll": 495.7057189941406,
+            "tokens": 389
+          },
+          "bypassed": {
+            "sum_nll": 495.10223388671875,
+            "tokens": 389
+          },
+          "shuffled": {
+            "sum_nll": 495.54656982421875,
+            "tokens": 389
+          }
+        }
+      },
+      {
+        "id": "1e35ce364fe82b35c735f46f3b32b36c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1584.4775390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1587.8095703125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1586.7498779296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "213e5aa892bcc593de5d8b799f6c1ab3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 397.6574401855469,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 397.62188720703125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 397.0994873046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20d539ba1a2d8b21d9be950a0fec84a7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 572.2073364257812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 572.6732177734375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 572.5352783203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d8b7121795ed1eaaa9f86922ce09cb7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1626.031494140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1628.38232421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1628.02294921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226e6d27a8a3de90adbf46a7dd2cb667",
+        "modes": {
+          "enabled": {
+            "sum_nll": 763.0668334960938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 761.3229370117188,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 762.91455078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ff920b41e84e48f92ee1e7cf728c354",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1643.036865234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1645.61181640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1645.595703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d75d16bc696f120bccad0e7162d6d72",
+        "modes": {
+          "enabled": {
+            "sum_nll": 420.43670654296875,
+            "tokens": 231
+          },
+          "bypassed": {
+            "sum_nll": 421.0082092285156,
+            "tokens": 231
+          },
+          "shuffled": {
+            "sum_nll": 422.22998046875,
+            "tokens": 231
+          }
+        }
+      },
+      {
+        "id": "1f09f9c2aae097b7e1f53bfdeef668ca",
+        "modes": {
+          "enabled": {
+            "sum_nll": 637.705078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 638.6787109375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 638.3924560546875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d8070e3148041f57867b469cb8e9da5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 585.0479736328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 584.5623168945312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 584.68701171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23cd7da17fb5cf9e81d6f1a3c4d0a381",
+        "modes": {
+          "enabled": {
+            "sum_nll": 530.9864501953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 530.9556884765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 531.1199340820312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21472891631a794710b6214ea5f56aff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 404.6097106933594,
+            "tokens": 409
+          },
+          "bypassed": {
+            "sum_nll": 405.23382568359375,
+            "tokens": 409
+          },
+          "shuffled": {
+            "sum_nll": 404.66058349609375,
+            "tokens": 409
+          }
+        }
+      },
+      {
+        "id": "209c7efbe7d0aa1f2aaff13d6e37ad46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 529.25439453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 528.634033203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 529.8492431640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e35d0f21cf0b80777d13a21bffa515a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1663.7208251953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1668.1602783203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1666.1552734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fe827b48ae3e795c2f928517da5ac3d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 652.4798583984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 653.4759521484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 652.5152587890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eec85d22a1ec7fd887560679064f074",
+        "modes": {
+          "enabled": {
+            "sum_nll": 757.9542846679688,
+            "tokens": 375
+          },
+          "bypassed": {
+            "sum_nll": 758.8473510742188,
+            "tokens": 375
+          },
+          "shuffled": {
+            "sum_nll": 756.77490234375,
+            "tokens": 375
+          }
+        }
+      },
+      {
+        "id": "24acae33c393b10427d51e807c8997dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 761.5352783203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 760.9978637695312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 761.3435668945312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f1cd4d93186397bdc0a5ad0485b8c6e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 263.8941955566406,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 262.71368408203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 263.361572265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21e404bc25dcb87b3124feadc9627245",
+        "modes": {
+          "enabled": {
+            "sum_nll": 547.1468505859375,
+            "tokens": 483
+          },
+          "bypassed": {
+            "sum_nll": 546.4580078125,
+            "tokens": 483
+          },
+          "shuffled": {
+            "sum_nll": 546.36865234375,
+            "tokens": 483
+          }
+        }
+      },
+      {
+        "id": "1ed3ec24d8f160e6bd3c908603ba138c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 452.7082214355469,
+            "tokens": 478
+          },
+          "bypassed": {
+            "sum_nll": 453.4576416015625,
+            "tokens": 478
+          },
+          "shuffled": {
+            "sum_nll": 452.6156005859375,
+            "tokens": 478
+          }
+        }
+      },
+      {
+        "id": "24502ef8a9ac1cb3ead1894291113318",
+        "modes": {
+          "enabled": {
+            "sum_nll": 618.463134765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 617.9046630859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 619.660888671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e1870d1ca47bbf09a34536b67ed7fbb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 383.1060791015625,
+            "tokens": 376
+          },
+          "bypassed": {
+            "sum_nll": 383.71551513671875,
+            "tokens": 376
+          },
+          "shuffled": {
+            "sum_nll": 382.5111083984375,
+            "tokens": 376
+          }
+        }
+      },
+      {
+        "id": "207a7975668ad089e653cc98938e1917",
+        "modes": {
+          "enabled": {
+            "sum_nll": 574.8533935546875,
+            "tokens": 379
+          },
+          "bypassed": {
+            "sum_nll": 576.3131103515625,
+            "tokens": 379
+          },
+          "shuffled": {
+            "sum_nll": 575.423095703125,
+            "tokens": 379
+          }
+        }
+      },
+      {
+        "id": "2287ae9995041b9a5789560bbf31123c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 323.1240234375,
+            "tokens": 423
+          },
+          "bypassed": {
+            "sum_nll": 324.9487609863281,
+            "tokens": 423
+          },
+          "shuffled": {
+            "sum_nll": 323.9342041015625,
+            "tokens": 423
+          }
+        }
+      },
+      {
+        "id": "1e5fbc90bea6180c6d259c6c42c111e0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 370.2595520019531,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 370.09771728515625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 370.0043029785156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21af5be646a470f3771d8808fc19ef74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 254.06854248046875,
+            "tokens": 267
+          },
+          "bypassed": {
+            "sum_nll": 255.87924194335938,
+            "tokens": 267
+          },
+          "shuffled": {
+            "sum_nll": 255.3436737060547,
+            "tokens": 267
+          }
+        }
+      },
+      {
+        "id": "20c43410dfa3bf4290ae0f2284abb887",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1624.6591796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1626.73193359375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1626.143798828125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f5408f042cf1ac9be59fec7610d0e1b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 515.184814453125,
+            "tokens": 506
+          },
+          "bypassed": {
+            "sum_nll": 516.6836547851562,
+            "tokens": 506
+          },
+          "shuffled": {
+            "sum_nll": 516.3563232421875,
+            "tokens": 506
+          }
+        }
+      },
+      {
+        "id": "1dd326720e9e015729edb9fd29e76c5c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 370.71142578125,
+            "tokens": 431
+          },
+          "bypassed": {
+            "sum_nll": 372.8964538574219,
+            "tokens": 431
+          },
+          "shuffled": {
+            "sum_nll": 372.9990234375,
+            "tokens": 431
+          }
+        }
+      },
+      {
+        "id": "1cc47451e70b7f7b97b0d60e2462c3a8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1608.474853515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1612.69482421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1609.5233154296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "242490b9d6a1bc5cbc5dd85e5944965b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 367.31878662109375,
+            "tokens": 329
+          },
+          "bypassed": {
+            "sum_nll": 368.57244873046875,
+            "tokens": 329
+          },
+          "shuffled": {
+            "sum_nll": 368.1269836425781,
+            "tokens": 329
+          }
+        }
+      },
+      {
+        "id": "22c5ecad1e2e0f1dcf19519037ec4f01",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.8577880859375,
+            "tokens": 328
+          },
+          "bypassed": {
+            "sum_nll": 480.051513671875,
+            "tokens": 328
+          },
+          "shuffled": {
+            "sum_nll": 479.4613037109375,
+            "tokens": 328
+          }
+        }
+      },
+      {
+        "id": "1d215183adef2405ecb4f21b677086c5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 424.1405334472656,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 423.4134521484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 423.8062744140625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "212fde8e46a18d0d29a04475e3939cff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 390.02386474609375,
+            "tokens": 166
+          },
+          "bypassed": {
+            "sum_nll": 389.55413818359375,
+            "tokens": 166
+          },
+          "shuffled": {
+            "sum_nll": 389.6844482421875,
+            "tokens": 166
+          }
+        }
+      },
+      {
+        "id": "1c9a11972e39a1d2972e7470df96d088",
+        "modes": {
+          "enabled": {
+            "sum_nll": 694.3341064453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 694.3143310546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 693.67529296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e146d23ad89441e9b88dbba3ac22864",
+        "modes": {
+          "enabled": {
+            "sum_nll": 252.36709594726562,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 253.59100341796875,
+            "tokens": 340
+          },
+          "shuffled": {
+            "sum_nll": 252.52047729492188,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "23cc8c9b8f4589d51f229f7b88876a2a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 450.922607421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 450.7705993652344,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 451.07257080078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dfc9958d09a04649668505f3cf4a542",
+        "modes": {
+          "enabled": {
+            "sum_nll": 320.95635986328125,
+            "tokens": 305
+          },
+          "bypassed": {
+            "sum_nll": 323.7669372558594,
+            "tokens": 305
+          },
+          "shuffled": {
+            "sum_nll": 322.7852783203125,
+            "tokens": 305
+          }
+        }
+      },
+      {
+        "id": "2226f000bb734662337ea3ba2a15d310",
+        "modes": {
+          "enabled": {
+            "sum_nll": 615.50341796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 614.6763305664062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 614.8291625976562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205538dc55a0e8353cdcce3d3bd0a193",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1673.785400390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1677.4266357421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1677.51611328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec5bc3c6f09df8c0a58b1fbaa42f1b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 324.99334716796875,
+            "tokens": 324
+          },
+          "bypassed": {
+            "sum_nll": 326.1830139160156,
+            "tokens": 324
+          },
+          "shuffled": {
+            "sum_nll": 325.508544921875,
+            "tokens": 324
+          }
+        }
+      },
+      {
+        "id": "21fe50431b232c44e0be7b96efa8bb17",
+        "modes": {
+          "enabled": {
+            "sum_nll": 603.9578247070312,
+            "tokens": 411
+          },
+          "bypassed": {
+            "sum_nll": 604.546630859375,
+            "tokens": 411
+          },
+          "shuffled": {
+            "sum_nll": 605.2936401367188,
+            "tokens": 411
+          }
+        }
+      },
+      {
+        "id": "1ec28691b608729e15ac4f2547010821",
+        "modes": {
+          "enabled": {
+            "sum_nll": 356.6805419921875,
+            "tokens": 477
+          },
+          "bypassed": {
+            "sum_nll": 356.99530029296875,
+            "tokens": 477
+          },
+          "shuffled": {
+            "sum_nll": 357.2796630859375,
+            "tokens": 477
+          }
+        }
+      },
+      {
+        "id": "1f9c925ffcb5d50031a726fd951fbe8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 700.5074462890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 700.6197509765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 700.26416015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e4e90bdf5751b9ef293149dd41f8c74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 929.2032470703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 927.458984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 927.1742553710938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec171bb5838bada69d6dfcc18f871f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 344.260986328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 343.5931701660156,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 343.7330322265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ef661e686f44e1f36de7f213867390a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 348.8624267578125,
+            "tokens": 370
+          },
+          "bypassed": {
+            "sum_nll": 350.3587646484375,
+            "tokens": 370
+          },
+          "shuffled": {
+            "sum_nll": 349.2677001953125,
+            "tokens": 370
+          }
+        }
+      },
+      {
+        "id": "1d442aed5474268a6aa5312f8e1113ee",
+        "modes": {
+          "enabled": {
+            "sum_nll": 462.27081298828125,
+            "tokens": 462
+          },
+          "bypassed": {
+            "sum_nll": 462.2271728515625,
+            "tokens": 462
+          },
+          "shuffled": {
+            "sum_nll": 462.1790771484375,
+            "tokens": 462
+          }
+        }
+      },
+      {
+        "id": "2440bd28d7f314cfd58cd336d89eef23",
+        "modes": {
+          "enabled": {
+            "sum_nll": 450.7503662109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 450.67706298828125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 451.2433166503906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e3a3ec500ae9bf3a648becf86ef8341",
+        "modes": {
+          "enabled": {
+            "sum_nll": 562.1550903320312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 561.145263671875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 561.1917724609375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e732e6f45b4d58030cd8e865339b15b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 317.84124755859375,
+            "tokens": 301
+          },
+          "bypassed": {
+            "sum_nll": 319.444580078125,
+            "tokens": 301
+          },
+          "shuffled": {
+            "sum_nll": 318.7553405761719,
+            "tokens": 301
+          }
+        }
+      },
+      {
+        "id": "241e8ad0446d14a8f056aa284ea690c4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 524.80615234375,
+            "tokens": 348
+          },
+          "bypassed": {
+            "sum_nll": 524.8505249023438,
+            "tokens": 348
+          },
+          "shuffled": {
+            "sum_nll": 524.4019775390625,
+            "tokens": 348
+          }
+        }
+      },
+      {
+        "id": "23a582545146324ca3c429417362dd09",
+        "modes": {
+          "enabled": {
+            "sum_nll": 478.26177978515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 476.80072021484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 476.04315185546875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22ceb069d0cfbfa464e531c6c635fc8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1655.5892333984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1658.56640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1657.8031005859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222dee05039928f77e0a5c89ccfe8434",
+        "modes": {
+          "enabled": {
+            "sum_nll": 471.8336486816406,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 471.37811279296875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 471.0150146484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22d23f2b9994f5e06cd7fb7f35c3a06a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 308.9101867675781,
+            "tokens": 346
+          },
+          "bypassed": {
+            "sum_nll": 309.0626220703125,
+            "tokens": 346
+          },
+          "shuffled": {
+            "sum_nll": 310.473388671875,
+            "tokens": 346
+          }
+        }
+      },
+      {
+        "id": "1ee7e1ba708c7b96fcf14b519c6b960d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 625.0653076171875,
+            "tokens": 382
+          },
+          "bypassed": {
+            "sum_nll": 624.9705810546875,
+            "tokens": 382
+          },
+          "shuffled": {
+            "sum_nll": 624.7711181640625,
+            "tokens": 382
+          }
+        }
+      },
+      {
+        "id": "1fee52fe0d67a7036ea6122b7cbcea32",
+        "modes": {
+          "enabled": {
+            "sum_nll": 580.1163330078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 580.0123291015625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 579.4847412109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "223c1db80d10e72a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1147.057373046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1148.074462890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1147.775390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23ef0b5c7539b833a33eaab56311d5e6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 316.9624938964844,
+            "tokens": 328
+          },
+          "bypassed": {
+            "sum_nll": 318.1578369140625,
+            "tokens": 328
+          },
+          "shuffled": {
+            "sum_nll": 317.4723205566406,
+            "tokens": 328
+          }
+        }
+      },
+      {
+        "id": "229477e88bff9c7e14eb76be074a667a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 438.6337585449219,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 438.5492248535156,
+            "tokens": 340
+          },
+          "shuffled": {
+            "sum_nll": 438.74365234375,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "1fef9f5b65ab2e85b0be12a4653aaa4b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 493.28179931640625,
+            "tokens": 456
+          },
+          "bypassed": {
+            "sum_nll": 492.6588134765625,
+            "tokens": 456
+          },
+          "shuffled": {
+            "sum_nll": 490.518798828125,
+            "tokens": 456
+          }
+        }
+      },
+      {
+        "id": "1e376b35a90500987374efb9c837c12b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 312.8038330078125,
+            "tokens": 421
+          },
+          "bypassed": {
+            "sum_nll": 314.13470458984375,
+            "tokens": 421
+          },
+          "shuffled": {
+            "sum_nll": 314.2966613769531,
+            "tokens": 421
+          }
+        }
+      },
+      {
+        "id": "22629b0a70506f7a851797f6814ec69b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 367.0444030761719,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 367.6317138671875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 367.3633117675781,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e167bedfaedf234043fedbd96935b44",
+        "modes": {
+          "enabled": {
+            "sum_nll": 571.1749267578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 570.206298828125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 570.2102661132812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f253fac6f5297aa5c03166fb98a885a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 285.995361328125,
+            "tokens": 311
+          },
+          "bypassed": {
+            "sum_nll": 288.4303894042969,
+            "tokens": 311
+          },
+          "shuffled": {
+            "sum_nll": 287.1429138183594,
+            "tokens": 311
+          }
+        }
+      },
+      {
+        "id": "2419233497332344244229fcf2d0aad2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 371.36090087890625,
+            "tokens": 384
+          },
+          "bypassed": {
+            "sum_nll": 372.04681396484375,
+            "tokens": 384
+          },
+          "shuffled": {
+            "sum_nll": 372.29217529296875,
+            "tokens": 384
+          }
+        }
+      },
+      {
+        "id": "248a91e978f91c13da2619d73f70e523",
+        "modes": {
+          "enabled": {
+            "sum_nll": 520.647705078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 519.5581665039062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 520.04296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222b5a14400802c3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 880.8916015625,
+            "tokens": 378
+          },
+          "bypassed": {
+            "sum_nll": 880.908935546875,
+            "tokens": 378
+          },
+          "shuffled": {
+            "sum_nll": 883.0039672851562,
+            "tokens": 378
+          }
+        }
+      },
+      {
+        "id": "239a6986fb1c1cc3a2606e88667c3965",
+        "modes": {
+          "enabled": {
+            "sum_nll": 454.79901123046875,
+            "tokens": 507
+          },
+          "bypassed": {
+            "sum_nll": 454.92572021484375,
+            "tokens": 507
+          },
+          "shuffled": {
+            "sum_nll": 455.3333740234375,
+            "tokens": 507
+          }
+        }
+      },
+      {
+        "id": "1fd7e64e0e3ee15b33f7418e78f728e4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 409.6372375488281,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 408.1015625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 408.5535888671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "249ad9685b945bbbc8eb6c32f3dd9679",
+        "modes": {
+          "enabled": {
+            "sum_nll": 327.71051025390625,
+            "tokens": 450
+          },
+          "bypassed": {
+            "sum_nll": 329.36639404296875,
+            "tokens": 450
+          },
+          "shuffled": {
+            "sum_nll": 329.0343322753906,
+            "tokens": 450
+          }
+        }
+      },
+      {
+        "id": "1d3c49b5419033863c0678ea3817ca5f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 627.1751098632812,
+            "tokens": 487
+          },
+          "bypassed": {
+            "sum_nll": 629.0853271484375,
+            "tokens": 487
+          },
+          "shuffled": {
+            "sum_nll": 629.4798583984375,
+            "tokens": 487
+          }
+        }
+      },
+      {
+        "id": "240c1c91bc24ca67a8d5f08a5563552c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 650.63037109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 651.1785278320312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 649.5387573242188,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f9e3de60c14c81e34ed493d3c473d74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 267.5137939453125,
+            "tokens": 416
+          },
+          "bypassed": {
+            "sum_nll": 269.7939147949219,
+            "tokens": 416
+          },
+          "shuffled": {
+            "sum_nll": 269.8754577636719,
+            "tokens": 416
+          }
+        }
+      },
+      {
+        "id": "2158e241c7373d9a5c4b61adfc6a6ca7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 562.06640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 561.9017333984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 561.9444580078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dba845188c9b8f16e79114d616ecd4d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 291.33184814453125,
+            "tokens": 293
+          },
+          "bypassed": {
+            "sum_nll": 292.92840576171875,
+            "tokens": 293
+          },
+          "shuffled": {
+            "sum_nll": 292.5422058105469,
+            "tokens": 293
+          }
+        }
+      },
+      {
+        "id": "1e876e041890cd983ce67721146cd3f4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 270.44708251953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 270.126708984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 270.77239990234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d3f16d38524f22069e92e5bf5868656",
+        "modes": {
+          "enabled": {
+            "sum_nll": 638.827392578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 638.5684814453125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 638.2708740234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20675087b927722accf560153d533269",
+        "modes": {
+          "enabled": {
+            "sum_nll": 622.4383544921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 622.239501953125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 621.854736328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2227aceb0192a6e72a84550fca8b1931",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1612.557373046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1615.912353515625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1614.909912109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1faa817f028c419847219d215be74fd4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1655.7305908203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1658.35546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1657.8603515625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f6934513a39d4c6091bcf6d95bcc235",
+        "modes": {
+          "enabled": {
+            "sum_nll": 425.8458251953125,
+            "tokens": 420
+          },
+          "bypassed": {
+            "sum_nll": 426.4035949707031,
+            "tokens": 420
+          },
+          "shuffled": {
+            "sum_nll": 426.25927734375,
+            "tokens": 420
+          }
+        }
+      },
+      {
+        "id": "2384f0b128dfade744500a2ab61d8317",
+        "modes": {
+          "enabled": {
+            "sum_nll": 497.11688232421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 497.3697814941406,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 497.6810607910156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1efd1a3c5bee2e941cbc69188afc8539",
+        "modes": {
+          "enabled": {
+            "sum_nll": 545.317138671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 545.1702880859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 545.0286865234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f889af258ccda90997a145c7d525b1f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 511.49542236328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 510.51715087890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 510.8887939453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2294a1087479db08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 652.7052001953125,
+            "tokens": 232
+          },
+          "bypassed": {
+            "sum_nll": 653.5257568359375,
+            "tokens": 232
+          },
+          "shuffled": {
+            "sum_nll": 654.33740234375,
+            "tokens": 232
+          }
+        }
+      },
+      {
+        "id": "215fb7fab6bf3103baab4e7597661020",
+        "modes": {
+          "enabled": {
+            "sum_nll": 659.7001953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 659.463134765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 659.3438720703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2332e284348cf45e460bc1a614530ade",
+        "modes": {
+          "enabled": {
+            "sum_nll": 348.0743713378906,
+            "tokens": 340
+          },
+          "bypassed": {
+            "sum_nll": 349.38714599609375,
+            "tokens": 340
+          },
+          "shuffled": {
+            "sum_nll": 349.00286865234375,
+            "tokens": 340
+          }
+        }
+      },
+      {
+        "id": "20720ac4716b7356cfbe9d7ff9763b4d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 351.245849609375,
+            "tokens": 310
+          },
+          "bypassed": {
+            "sum_nll": 352.595458984375,
+            "tokens": 310
+          },
+          "shuffled": {
+            "sum_nll": 352.39776611328125,
+            "tokens": 310
+          }
+        }
+      },
+      {
+        "id": "1cbcc2a099f8202ec29c455036793757",
+        "modes": {
+          "enabled": {
+            "sum_nll": 532.6470336914062,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 532.27734375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 533.3269653320312,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d0aa7203d55ab65a2ccadf59926950d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 663.7965087890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 661.6741333007812,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 663.7373657226562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eb70769b979cf503c82c00c0b2d74bb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1593.465576171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1597.0806884765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1596.1805419921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22adf712014f2c8044b2e0b74db6fb51",
+        "modes": {
+          "enabled": {
+            "sum_nll": 477.6785888671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 477.8378601074219,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 478.2196350097656,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "210f25598901481e022dcc99be11e677",
+        "modes": {
+          "enabled": {
+            "sum_nll": 347.56939697265625,
+            "tokens": 164
+          },
+          "bypassed": {
+            "sum_nll": 346.99371337890625,
+            "tokens": 164
+          },
+          "shuffled": {
+            "sum_nll": 346.819091796875,
+            "tokens": 164
+          }
+        }
+      },
+      {
+        "id": "1f902a17386b7ce100a3cfee4731ea17",
+        "modes": {
+          "enabled": {
+            "sum_nll": 583.66015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 582.9594116210938,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 583.2022094726562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23a050b06420d12b1ef9212e8fcfad76",
+        "modes": {
+          "enabled": {
+            "sum_nll": 337.2325744628906,
+            "tokens": 484
+          },
+          "bypassed": {
+            "sum_nll": 337.7965393066406,
+            "tokens": 484
+          },
+          "shuffled": {
+            "sum_nll": 338.22589111328125,
+            "tokens": 484
+          }
+        }
+      },
+      {
+        "id": "21bfdbf7479c4fc601af3c1db6e996a6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 664.285888671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 664.1697387695312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 663.845947265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d6895d2dbd0dc43b268b244128cad4c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 407.983642578125,
+            "tokens": 412
+          },
+          "bypassed": {
+            "sum_nll": 408.425048828125,
+            "tokens": 412
+          },
+          "shuffled": {
+            "sum_nll": 408.4033508300781,
+            "tokens": 412
+          }
+        }
+      },
+      {
+        "id": "1e39d964b68f63d00314f9d1c0e8fdaa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 518.0294799804688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 517.3797607421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 515.705810546875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cc9ef6a4f502ef39d997682c082c666",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1666.5960693359375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1669.007080078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1668.10693359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22bf78d9f7baef06c1d6b5be0b1d42d2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 682.3471069335938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 683.303466796875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 683.2296752929688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e0dd34ec86112e72dc87a4ed81057bf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 423.29010009765625,
+            "tokens": 414
+          },
+          "bypassed": {
+            "sum_nll": 423.9615478515625,
+            "tokens": 414
+          },
+          "shuffled": {
+            "sum_nll": 423.6423034667969,
+            "tokens": 414
+          }
+        }
+      },
+      {
+        "id": "22c97933739aa4d5a3585301170720fc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 698.4041748046875,
+            "tokens": 419
+          },
+          "bypassed": {
+            "sum_nll": 698.8924560546875,
+            "tokens": 419
+          },
+          "shuffled": {
+            "sum_nll": 697.7245483398438,
+            "tokens": 419
+          }
+        }
+      },
+      {
+        "id": "2134fffe5a30f375b6bf0e0e4d13a0d6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1596.19189453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1598.7939453125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1597.5291748046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "222b8eb35d43aefe7f04c307d8f1afc5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 320.20648193359375,
+            "tokens": 422
+          },
+          "bypassed": {
+            "sum_nll": 321.326904296875,
+            "tokens": 422
+          },
+          "shuffled": {
+            "sum_nll": 321.0210266113281,
+            "tokens": 422
+          }
+        }
+      },
+      {
+        "id": "1f184639e050e2855f2ac1eff8a2305c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 379.90545654296875,
+            "tokens": 302
+          },
+          "bypassed": {
+            "sum_nll": 380.77288818359375,
+            "tokens": 302
+          },
+          "shuffled": {
+            "sum_nll": 380.91680908203125,
+            "tokens": 302
+          }
+        }
+      },
+      {
+        "id": "1d086de23ccdb8ef0e703fbbcd6fa54c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 314.35626220703125,
+            "tokens": 281
+          },
+          "bypassed": {
+            "sum_nll": 316.163330078125,
+            "tokens": 281
+          },
+          "shuffled": {
+            "sum_nll": 316.18780517578125,
+            "tokens": 281
+          }
+        }
+      },
+      {
+        "id": "241774dae550299034f434a1df9a7fbc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 469.56268310546875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 469.20916748046875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 468.9601135253906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21b7ff9a124a3cffeaff37d5f928b91d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 554.7421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 555.6871337890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 556.4564208984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2225ea933ee1c3fa8a70b47e17269df2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 281.56988525390625,
+            "tokens": 317
+          },
+          "bypassed": {
+            "sum_nll": 283.5249328613281,
+            "tokens": 317
+          },
+          "shuffled": {
+            "sum_nll": 283.1437072753906,
+            "tokens": 317
+          }
+        }
+      },
+      {
+        "id": "1ed06514e7d5b48010586393771efa51",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1075.0091552734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1074.9775390625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1073.293212890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21d1742e2bdc5e5239303b5841ef3442",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1657.5848388671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1660.8309326171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1661.5811767578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2095b7204c828900932e98bcc064fd40",
+        "modes": {
+          "enabled": {
+            "sum_nll": 364.86871337890625,
+            "tokens": 316
+          },
+          "bypassed": {
+            "sum_nll": 366.85845947265625,
+            "tokens": 316
+          },
+          "shuffled": {
+            "sum_nll": 366.95074462890625,
+            "tokens": 316
+          }
+        }
+      },
+      {
+        "id": "1ca5f2e6a365aa1f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1166.663818359375,
+            "tokens": 454
+          },
+          "bypassed": {
+            "sum_nll": 1170.0927734375,
+            "tokens": 454
+          },
+          "shuffled": {
+            "sum_nll": 1169.25732421875,
+            "tokens": 454
+          }
+        }
+      },
+      {
+        "id": "215b6460fdd0561590f08de1996f45be",
+        "modes": {
+          "enabled": {
+            "sum_nll": 325.5639953613281,
+            "tokens": 322
+          },
+          "bypassed": {
+            "sum_nll": 326.0802001953125,
+            "tokens": 322
+          },
+          "shuffled": {
+            "sum_nll": 326.2930603027344,
+            "tokens": 322
+          }
+        }
+      },
+      {
+        "id": "23ea1264a96c5d2a0db2d842c3e86f36",
+        "modes": {
+          "enabled": {
+            "sum_nll": 309.6607666015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 309.7515869140625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 310.79766845703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2076ade6ecd713fc6dc17ce531c8dc0b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 411.3686218261719,
+            "tokens": 397
+          },
+          "bypassed": {
+            "sum_nll": 411.6824951171875,
+            "tokens": 397
+          },
+          "shuffled": {
+            "sum_nll": 411.62225341796875,
+            "tokens": 397
+          }
+        }
+      },
+      {
+        "id": "2149bb2ba8da4f5cb7f0341cdd17e7d0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 474.24945068359375,
+            "tokens": 510
+          },
+          "bypassed": {
+            "sum_nll": 474.0959777832031,
+            "tokens": 510
+          },
+          "shuffled": {
+            "sum_nll": 474.0671691894531,
+            "tokens": 510
+          }
+        }
+      },
+      {
+        "id": "203dc3caf4de448dd4f2aab544ebc311",
+        "modes": {
+          "enabled": {
+            "sum_nll": 605.4761962890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 605.3983764648438,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 605.1729736328125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24b6d911db02c282504e5e9e2b66bfde",
+        "modes": {
+          "enabled": {
+            "sum_nll": 685.33984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 683.848876953125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 684.4629516601562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23ac1e947e4299c0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1119.73486328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1119.30078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1118.678466796875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "214eff0ca2f31d591e80d71684d759ee",
+        "modes": {
+          "enabled": {
+            "sum_nll": 454.3583984375,
+            "tokens": 462
+          },
+          "bypassed": {
+            "sum_nll": 454.14324951171875,
+            "tokens": 462
+          },
+          "shuffled": {
+            "sum_nll": 454.50640869140625,
+            "tokens": 462
+          }
+        }
+      },
+      {
+        "id": "1d8bc9897e83a305fb4cc84dc598a39f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 292.45928955078125,
+            "tokens": 364
+          },
+          "bypassed": {
+            "sum_nll": 294.25054931640625,
+            "tokens": 364
+          },
+          "shuffled": {
+            "sum_nll": 293.3715515136719,
+            "tokens": 364
+          }
+        }
+      },
+      {
+        "id": "1fd81f0f7e5ed53ce0d76d218a5e436c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 254.33592224121094,
+            "tokens": 381
+          },
+          "bypassed": {
+            "sum_nll": 255.5260009765625,
+            "tokens": 381
+          },
+          "shuffled": {
+            "sum_nll": 254.58468627929688,
+            "tokens": 381
+          }
+        }
+      },
+      {
+        "id": "1cc9ee24ed3241bc37cad0ad23cb7f46",
+        "modes": {
+          "enabled": {
+            "sum_nll": 419.28125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 419.6001892089844,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 419.7935791015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d7f1cd0e1210acbd21cbdb4eaaaa6c4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 369.9082946777344,
+            "tokens": 482
+          },
+          "bypassed": {
+            "sum_nll": 371.0616455078125,
+            "tokens": 482
+          },
+          "shuffled": {
+            "sum_nll": 371.0370178222656,
+            "tokens": 482
+          }
+        }
+      },
+      {
+        "id": "1edae4861649eddf07a4536ed86dc0e1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 515.9179077148438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 515.80810546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 515.9033203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2034b26e2bac9b13cc44cd64d9237fc0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 576.3583984375,
+            "tokens": 372
+          },
+          "bypassed": {
+            "sum_nll": 577.3585815429688,
+            "tokens": 372
+          },
+          "shuffled": {
+            "sum_nll": 576.6683959960938,
+            "tokens": 372
+          }
+        }
+      },
+      {
+        "id": "1cf2b57c30b1547dc9fbd6ebca7299ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 797.3621826171875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 795.5350952148438,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 796.3287963867188,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20474b4570ef05c34d47302822e99fa0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 504.87109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 505.0499572753906,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 505.81634521484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226758678f9f0d95419f9fb5d7367ce1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 497.58795166015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 496.4219055175781,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 497.5271911621094,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e70eb00e6030f8ee02e765ef5cfa130",
+        "modes": {
+          "enabled": {
+            "sum_nll": 296.0844421386719,
+            "tokens": 369
+          },
+          "bypassed": {
+            "sum_nll": 297.262939453125,
+            "tokens": 369
+          },
+          "shuffled": {
+            "sum_nll": 296.73394775390625,
+            "tokens": 369
+          }
+        }
+      },
+      {
+        "id": "1e4ae0018dadec79ff9d96123df0a510",
+        "modes": {
+          "enabled": {
+            "sum_nll": 483.373046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 483.5421142578125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 482.63958740234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d86bda1c8fea99b35c727d0d642c021",
+        "modes": {
+          "enabled": {
+            "sum_nll": 285.331787109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 286.2796630859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 286.9076232910156,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f07776d4268eec53d326a44845aeeb1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 560.098876953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 560.252197265625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 560.9031982421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e5f46a212ba6477ccc099e356cd4a5f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 323.97650146484375,
+            "tokens": 297
+          },
+          "bypassed": {
+            "sum_nll": 324.2469177246094,
+            "tokens": 297
+          },
+          "shuffled": {
+            "sum_nll": 323.60272216796875,
+            "tokens": 297
+          }
+        }
+      },
+      {
+        "id": "1d8ab34c97f73a2104c4d9418caf4da5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 735.369140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 733.3445434570312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 734.1446533203125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f055095bb70286b6886e93148fb6768",
+        "modes": {
+          "enabled": {
+            "sum_nll": 420.2647705078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 420.9639892578125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 421.31402587890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21fc5702a7b47ba3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 801.9989624023438,
+            "tokens": 260
+          },
+          "bypassed": {
+            "sum_nll": 803.2063598632812,
+            "tokens": 260
+          },
+          "shuffled": {
+            "sum_nll": 803.85546875,
+            "tokens": 260
+          }
+        }
+      },
+      {
+        "id": "1d968b6ae6fcf6785e2df33f7e6b3e25",
+        "modes": {
+          "enabled": {
+            "sum_nll": 398.3087158203125,
+            "tokens": 413
+          },
+          "bypassed": {
+            "sum_nll": 399.78546142578125,
+            "tokens": 413
+          },
+          "shuffled": {
+            "sum_nll": 399.7283935546875,
+            "tokens": 413
+          }
+        }
+      },
+      {
+        "id": "241292ff9503f3e7c821f33f676ef3f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 449.3190002441406,
+            "tokens": 199
+          },
+          "bypassed": {
+            "sum_nll": 450.3502197265625,
+            "tokens": 199
+          },
+          "shuffled": {
+            "sum_nll": 449.4244079589844,
+            "tokens": 199
+          }
+        }
+      },
+      {
+        "id": "1e080d2ce68dc3a7c445d05d05ba715a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 459.3523254394531,
+            "tokens": 484
+          },
+          "bypassed": {
+            "sum_nll": 459.470703125,
+            "tokens": 484
+          },
+          "shuffled": {
+            "sum_nll": 458.9887390136719,
+            "tokens": 484
+          }
+        }
+      },
+      {
+        "id": "1d6520ed13743a4b323c01ec377be3d9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 549.1982421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 548.052001953125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 547.3739624023438,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "221c5a5314c086bd885da643bfd70be4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 468.5067138671875,
+            "tokens": 497
+          },
+          "bypassed": {
+            "sum_nll": 467.80303955078125,
+            "tokens": 497
+          },
+          "shuffled": {
+            "sum_nll": 468.49676513671875,
+            "tokens": 497
+          }
+        }
+      },
+      {
+        "id": "230002310904024d53b2e795623c91ae",
+        "modes": {
+          "enabled": {
+            "sum_nll": 340.98614501953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 339.49603271484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 340.896484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226c9f80c729e97282b6f6be745ee1cf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1565.45751953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1568.3282470703125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1568.3570556640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20e5e236711d4a43743f438f7f5402f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 801.0095825195312,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 800.06982421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 800.3345947265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21ad2510933d9ed46fc98542cefd5e18",
+        "modes": {
+          "enabled": {
+            "sum_nll": 334.2581481933594,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 333.56243896484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 334.09295654296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22934aa4972ce715d6af8e3eaea4487b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 531.1077880859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 530.2498168945312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 530.7969970703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e945a9c33c362e16bb3712c6f718f8e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1032.1292724609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1031.281982421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1030.8114013671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e17cb6a58c2f22c116a7ad2c25c3c61",
+        "modes": {
+          "enabled": {
+            "sum_nll": 475.1787109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 475.4561462402344,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 474.972900390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d28678ad54f537dbe22e3b3994197c6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 490.8261413574219,
+            "tokens": 274
+          },
+          "bypassed": {
+            "sum_nll": 491.6666259765625,
+            "tokens": 274
+          },
+          "shuffled": {
+            "sum_nll": 490.4466857910156,
+            "tokens": 274
+          }
+        }
+      },
+      {
+        "id": "2226c706ca8706ec4fb5b340e4528788",
+        "modes": {
+          "enabled": {
+            "sum_nll": 644.4348754882812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 644.3470458984375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 644.6035766601562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2044c14330ece86fef392535f302820d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 643.562255859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 643.4306640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 644.2814331054688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f2cca660ceed697cd830202a5aa5f33",
+        "modes": {
+          "enabled": {
+            "sum_nll": 284.57232666015625,
+            "tokens": 390
+          },
+          "bypassed": {
+            "sum_nll": 285.84356689453125,
+            "tokens": 390
+          },
+          "shuffled": {
+            "sum_nll": 286.7742919921875,
+            "tokens": 390
+          }
+        }
+      },
+      {
+        "id": "1d22a3e355ea443771cf5480457bd2b2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 576.1478271484375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 576.2540893554688,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 576.0872802734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2058ee021b0de9b003b5731e59f86641",
+        "modes": {
+          "enabled": {
+            "sum_nll": 304.08233642578125,
+            "tokens": 317
+          },
+          "bypassed": {
+            "sum_nll": 305.6499938964844,
+            "tokens": 317
+          },
+          "shuffled": {
+            "sum_nll": 304.9467468261719,
+            "tokens": 317
+          }
+        }
+      },
+      {
+        "id": "249b6f1ada3506bbc77106dc50c16b1a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 280.6466369628906,
+            "tokens": 253
+          },
+          "bypassed": {
+            "sum_nll": 282.0458984375,
+            "tokens": 253
+          },
+          "shuffled": {
+            "sum_nll": 282.75018310546875,
+            "tokens": 253
+          }
+        }
+      },
+      {
+        "id": "1f17755f24ad4a7a6544e8a2a7308a22",
+        "modes": {
+          "enabled": {
+            "sum_nll": 588.045654296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 587.84375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 588.4708251953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f714536a658630d4d36e33c9fad2702",
+        "modes": {
+          "enabled": {
+            "sum_nll": 369.3612060546875,
+            "tokens": 449
+          },
+          "bypassed": {
+            "sum_nll": 370.39410400390625,
+            "tokens": 449
+          },
+          "shuffled": {
+            "sum_nll": 369.9882507324219,
+            "tokens": 449
+          }
+        }
+      },
+      {
+        "id": "20b010235010e7f8e7dc02d2c23bb445",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1653.8350830078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1656.995849609375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1655.7701416015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c6ff2ee67553b274b76484d2320f1f3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 772.6176147460938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 773.1510620117188,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 772.5498046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23fb65e2880f7ade8759791d1d35eec2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 378.49066162109375,
+            "tokens": 423
+          },
+          "bypassed": {
+            "sum_nll": 379.05633544921875,
+            "tokens": 423
+          },
+          "shuffled": {
+            "sum_nll": 379.6680908203125,
+            "tokens": 423
+          }
+        }
+      },
+      {
+        "id": "22690048f3562e044f74eab294750725",
+        "modes": {
+          "enabled": {
+            "sum_nll": 501.1900634765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 500.9554748535156,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 501.3162536621094,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2098557250daa64ca7eba9b9921dcac6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 496.63336181640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 496.0877685546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 495.30706787109375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "227fd55bc691de5ee9a96c2b5ddd5f12",
+        "modes": {
+          "enabled": {
+            "sum_nll": 430.92352294921875,
+            "tokens": 305
+          },
+          "bypassed": {
+            "sum_nll": 433.0599060058594,
+            "tokens": 305
+          },
+          "shuffled": {
+            "sum_nll": 431.1983947753906,
+            "tokens": 305
+          }
+        }
+      },
+      {
+        "id": "21f3810578c45ae6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1102.258056640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1101.8394775390625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1101.5087890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22eac71833d40e69f1c9e04716bb5085",
+        "modes": {
+          "enabled": {
+            "sum_nll": 874.2216186523438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 873.4052734375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 874.74072265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fac2c762ebe6233cd87b80852fc66df",
+        "modes": {
+          "enabled": {
+            "sum_nll": 459.8055725097656,
+            "tokens": 434
+          },
+          "bypassed": {
+            "sum_nll": 460.40673828125,
+            "tokens": 434
+          },
+          "shuffled": {
+            "sum_nll": 460.11773681640625,
+            "tokens": 434
+          }
+        }
+      },
+      {
+        "id": "1f7ddb90064f90b9e8e4983e4cda693d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 834.3473510742188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 833.5848388671875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 833.9024047851562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22fe1c4f77f4da35beda3301cff50965",
+        "modes": {
+          "enabled": {
+            "sum_nll": 497.94775390625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 498.6618957519531,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 497.8701171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "201b3fc33ffbb4f7d46e0bbebd504fa9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 451.5689392089844,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 451.022705078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 450.65545654296875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24a02ec5ee791e16857c35bae3d38ac1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 329.72955322265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 329.362548828125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 328.74163818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f33274af37de0e2074e480809bbf4e9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 637.8365478515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 637.3206176757812,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 638.83544921875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "211d3f5db20cf9aa20c5518e39edf5bc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 428.52410888671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 428.21435546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 427.62445068359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fc2937a7bcc02ef6698d879423c8bea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 492.927734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 492.1792297363281,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 492.645263671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2091995cc1cd14250beeac4c3ec12670",
+        "modes": {
+          "enabled": {
+            "sum_nll": 577.0326538085938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 576.7716064453125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 577.9102172851562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "238856ad9478242404dfb171ae9e64a2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 562.604736328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 563.4234008789062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 561.9195556640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22831a4bb2b6819b9f6711a3b1c828ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 311.076171875,
+            "tokens": 356
+          },
+          "bypassed": {
+            "sum_nll": 312.4413146972656,
+            "tokens": 356
+          },
+          "shuffled": {
+            "sum_nll": 313.37127685546875,
+            "tokens": 356
+          }
+        }
+      },
+      {
+        "id": "1e36aa074bf482f6094db760cde12be0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 417.0584716796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 416.0045166015625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 417.13818359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2310d1d2fbce244ec4d1f584cd88dc94",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1043.60546875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1041.8184814453125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1042.5556640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2496a5285de906c4f389ee1edd3d6612",
+        "modes": {
+          "enabled": {
+            "sum_nll": 493.1496276855469,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 492.633056640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 493.7366638183594,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f2555cb63858cae95035f812f4536ab",
+        "modes": {
+          "enabled": {
+            "sum_nll": 286.8329162597656,
+            "tokens": 252
+          },
+          "bypassed": {
+            "sum_nll": 288.3831481933594,
+            "tokens": 252
+          },
+          "shuffled": {
+            "sum_nll": 288.0300598144531,
+            "tokens": 252
+          }
+        }
+      },
+      {
+        "id": "246d5df62870bf685e43bf039fe50cae",
+        "modes": {
+          "enabled": {
+            "sum_nll": 515.5940551757812,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 514.5642700195312,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 515.79052734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e760ba0e1b34ffd01396ecfb24f3bcd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 439.83941650390625,
+            "tokens": 374
+          },
+          "bypassed": {
+            "sum_nll": 439.72698974609375,
+            "tokens": 374
+          },
+          "shuffled": {
+            "sum_nll": 438.72509765625,
+            "tokens": 374
+          }
+        }
+      },
+      {
+        "id": "21a73346c5a820babed4220eba8f7825",
+        "modes": {
+          "enabled": {
+            "sum_nll": 589.7637329101562,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 590.16943359375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 590.2374267578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "233821c82086f3373a9624da8190b84b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 305.469970703125,
+            "tokens": 267
+          },
+          "bypassed": {
+            "sum_nll": 307.96075439453125,
+            "tokens": 267
+          },
+          "shuffled": {
+            "sum_nll": 307.1776123046875,
+            "tokens": 267
+          }
+        }
+      },
+      {
+        "id": "1ec95a046900498a895a039285dec182",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1702.92578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1706.221435546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1705.6732177734375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "24b33aea032700301922ff409c30a1a8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 602.9991455078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 602.730712890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 602.3145141601562,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23bba151da1e30fdc9872bc7d4465899",
+        "modes": {
+          "enabled": {
+            "sum_nll": 454.1085205078125,
+            "tokens": 280
+          },
+          "bypassed": {
+            "sum_nll": 455.2347717285156,
+            "tokens": 280
+          },
+          "shuffled": {
+            "sum_nll": 454.2541198730469,
+            "tokens": 280
+          }
+        }
+      },
+      {
+        "id": "1e63b204732a6988ba20fdaee785abea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 524.8240966796875,
+            "tokens": 435
+          },
+          "bypassed": {
+            "sum_nll": 525.599609375,
+            "tokens": 435
+          },
+          "shuffled": {
+            "sum_nll": 524.7706298828125,
+            "tokens": 435
+          }
+        }
+      },
+      {
+        "id": "209b2e77fa8e9a73c01c4f277614c8df",
+        "modes": {
+          "enabled": {
+            "sum_nll": 516.742431640625,
+            "tokens": 405
+          },
+          "bypassed": {
+            "sum_nll": 517.646240234375,
+            "tokens": 405
+          },
+          "shuffled": {
+            "sum_nll": 518.0510864257812,
+            "tokens": 405
+          }
+        }
+      },
+      {
+        "id": "20494e20b5e8001eb13694e2882286dd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 323.8367919921875,
+            "tokens": 296
+          },
+          "bypassed": {
+            "sum_nll": 325.1076354980469,
+            "tokens": 296
+          },
+          "shuffled": {
+            "sum_nll": 324.5117492675781,
+            "tokens": 296
+          }
+        }
+      },
+      {
+        "id": "2320149d33ad09f15c0c03ae0dc10098",
+        "modes": {
+          "enabled": {
+            "sum_nll": 348.65631103515625,
+            "tokens": 508
+          },
+          "bypassed": {
+            "sum_nll": 349.39495849609375,
+            "tokens": 508
+          },
+          "shuffled": {
+            "sum_nll": 348.90802001953125,
+            "tokens": 508
+          }
+        }
+      },
+      {
+        "id": "21d2b3d18b7df993",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1146.1064453125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1145.021728515625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1151.73583984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22b05dce47e5e65e442d68ea2ecef988",
+        "modes": {
+          "enabled": {
+            "sum_nll": 305.2801208496094,
+            "tokens": 455
+          },
+          "bypassed": {
+            "sum_nll": 305.87408447265625,
+            "tokens": 455
+          },
+          "shuffled": {
+            "sum_nll": 306.85736083984375,
+            "tokens": 455
+          }
+        }
+      },
+      {
+        "id": "22094ce6939f0ff93b974498d3bd4e2c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 642.7614135742188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 642.7420654296875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 642.2550659179688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20fe5d2e341422f9309f5ec5c2c2d312",
+        "modes": {
+          "enabled": {
+            "sum_nll": 412.6470031738281,
+            "tokens": 509
+          },
+          "bypassed": {
+            "sum_nll": 413.5575256347656,
+            "tokens": 509
+          },
+          "shuffled": {
+            "sum_nll": 414.150390625,
+            "tokens": 509
+          }
+        }
+      },
+      {
+        "id": "1e8d24aa792362ea0b57dad9fc77a291",
+        "modes": {
+          "enabled": {
+            "sum_nll": 716.06298828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 716.0471801757812,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 715.6229248046875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21661e3f6f2dde21d40e8c00fbbf6207",
+        "modes": {
+          "enabled": {
+            "sum_nll": 343.83306884765625,
+            "tokens": 357
+          },
+          "bypassed": {
+            "sum_nll": 344.9892272949219,
+            "tokens": 357
+          },
+          "shuffled": {
+            "sum_nll": 343.926025390625,
+            "tokens": 357
+          }
+        }
+      },
+      {
+        "id": "221d83e553e52685c83c04332b99af49",
+        "modes": {
+          "enabled": {
+            "sum_nll": 523.6573486328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 523.09521484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 522.54443359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22a7d62830e719e2a39a7f0e57512a53",
+        "modes": {
+          "enabled": {
+            "sum_nll": 417.11871337890625,
+            "tokens": 377
+          },
+          "bypassed": {
+            "sum_nll": 417.96783447265625,
+            "tokens": 377
+          },
+          "shuffled": {
+            "sum_nll": 417.5681457519531,
+            "tokens": 377
+          }
+        }
+      },
+      {
+        "id": "1fe44f6ebcedc98f9dadd0af5b614c7c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 441.3378601074219,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 440.7929992675781,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 440.763916015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e7feb4a10e7791dd719f0383ddad5fa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1604.9700927734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1607.80810546875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1608.348876953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "218b56a93ed46c06709cb0a8bf208dde",
+        "modes": {
+          "enabled": {
+            "sum_nll": 350.8291015625,
+            "tokens": 405
+          },
+          "bypassed": {
+            "sum_nll": 352.0675048828125,
+            "tokens": 405
+          },
+          "shuffled": {
+            "sum_nll": 352.4039001464844,
+            "tokens": 405
+          }
+        }
+      },
+      {
+        "id": "2030cc38ecf599d565c08a8c45d7da85",
+        "modes": {
+          "enabled": {
+            "sum_nll": 629.17724609375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 628.9444580078125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 630.48876953125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205b5273d15a8e0b589b55a91e56ac0a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 509.65533447265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 509.9791259765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 510.5970458984375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23a519caf4dc849246b1c2044dd81e53",
+        "modes": {
+          "enabled": {
+            "sum_nll": 291.5614013671875,
+            "tokens": 323
+          },
+          "bypassed": {
+            "sum_nll": 293.052001953125,
+            "tokens": 323
+          },
+          "shuffled": {
+            "sum_nll": 292.29290771484375,
+            "tokens": 323
+          }
+        }
+      },
+      {
+        "id": "1f3ea1ddb080143c64633c263ab6cd96",
+        "modes": {
+          "enabled": {
+            "sum_nll": 274.7061767578125,
+            "tokens": 306
+          },
+          "bypassed": {
+            "sum_nll": 276.572265625,
+            "tokens": 306
+          },
+          "shuffled": {
+            "sum_nll": 276.7444763183594,
+            "tokens": 306
+          }
+        }
+      },
+      {
+        "id": "1d7f31f6599cfc45c3da79bfada9874f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 593.1312255859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 592.7890625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 592.705322265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e36f37e7f145d7387f41abcc18b4401",
+        "modes": {
+          "enabled": {
+            "sum_nll": 343.8720703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 343.9876403808594,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 343.6480712890625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cb1cfe52d60306dd94d7a3030ea55b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1546.75341796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1549.1038818359375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1547.1302490234375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1c84a29aee3f4d25a4817c8aa864b8d8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 617.3200073242188,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 617.906005859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 617.7222290039062,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d950e8720dd5e52a2b4480380734a08",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1610.4716796875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1613.3658447265625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1613.1475830078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2048fd8795f320820b058f4122448fe2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 304.0260009765625,
+            "tokens": 300
+          },
+          "bypassed": {
+            "sum_nll": 305.44000244140625,
+            "tokens": 300
+          },
+          "shuffled": {
+            "sum_nll": 304.89202880859375,
+            "tokens": 300
+          }
+        }
+      },
+      {
+        "id": "1e870cfd0a8447cfceeeca77fa278d1a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 488.14764404296875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 488.41644287109375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 486.9283142089844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1da7c2be41c33dd04c0715ca4086ac7b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 669.6646118164062,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 669.696533203125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 669.6624755859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "219031736e462d937aff7a7a226f6879",
+        "modes": {
+          "enabled": {
+            "sum_nll": 374.135009765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 373.5377197265625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 374.3553771972656,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d4d81a686f229436e843b41c781d6e2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 298.6387023925781,
+            "tokens": 331
+          },
+          "bypassed": {
+            "sum_nll": 299.93304443359375,
+            "tokens": 331
+          },
+          "shuffled": {
+            "sum_nll": 299.9317932128906,
+            "tokens": 331
+          }
+        }
+      },
+      {
+        "id": "1f27cab3dbac88188c24fe77d138b0fa",
+        "modes": {
+          "enabled": {
+            "sum_nll": 585.9588623046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 585.4804077148438,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 586.554931640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "205bba57672d8eadc8d6ac05e17e55b0",
+        "modes": {
+          "enabled": {
+            "sum_nll": 624.8468017578125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 623.697021484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 624.6213989257812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202ce9aa1774c4089db86b0e3bc77cc9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 292.86627197265625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 292.7286682128906,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 292.7784729003906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d89aa35f930d816b0d6437b694e65e8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 513.3023681640625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 513.356201171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 513.7675170898438,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2263b11e610ad217aa9e74a383663029",
+        "modes": {
+          "enabled": {
+            "sum_nll": 324.96026611328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 324.54351806640625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 324.9500732421875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2238c4bfbc4e3435f34312e33f534468",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1675.083251953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1676.617919921875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1676.86572265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "202defc6a933f683a62a2aa59edefaf3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 477.1579284667969,
+            "tokens": 403
+          },
+          "bypassed": {
+            "sum_nll": 476.3665771484375,
+            "tokens": 403
+          },
+          "shuffled": {
+            "sum_nll": 477.84698486328125,
+            "tokens": 403
+          }
+        }
+      },
+      {
+        "id": "20a3d540801f2a02d56df864a9d18748",
+        "modes": {
+          "enabled": {
+            "sum_nll": 562.4299926757812,
+            "tokens": 479
+          },
+          "bypassed": {
+            "sum_nll": 561.442626953125,
+            "tokens": 479
+          },
+          "shuffled": {
+            "sum_nll": 562.105224609375,
+            "tokens": 479
+          }
+        }
+      },
+      {
+        "id": "1e4c076b76b30620",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1062.525146484375,
+            "tokens": 367
+          },
+          "bypassed": {
+            "sum_nll": 1066.2625732421875,
+            "tokens": 367
+          },
+          "shuffled": {
+            "sum_nll": 1066.71923828125,
+            "tokens": 367
+          }
+        }
+      },
+      {
+        "id": "238b92d12182226f6b055d08a8ed48cb",
+        "modes": {
+          "enabled": {
+            "sum_nll": 631.01513671875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 630.4663696289062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 629.8778076171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d3d8c56f0cc09821c2b29a43029f230",
+        "modes": {
+          "enabled": {
+            "sum_nll": 499.7100830078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 498.32659912109375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 500.16943359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "246cda4d5ed5d7688a15e1449b2a9246",
+        "modes": {
+          "enabled": {
+            "sum_nll": 272.00189208984375,
+            "tokens": 315
+          },
+          "bypassed": {
+            "sum_nll": 273.88641357421875,
+            "tokens": 315
+          },
+          "shuffled": {
+            "sum_nll": 273.1668701171875,
+            "tokens": 315
+          }
+        }
+      },
+      {
+        "id": "224e3380200a0da59d8bd2cd81ba3946",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1537.08984375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1540.10986328125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1539.660888671875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cebb47566e5ff5c6799e2cf549d2c8c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 439.95050048828125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 439.2196350097656,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 439.98663330078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "20b328e1238ca93c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1010.8533325195312,
+            "tokens": 327
+          },
+          "bypassed": {
+            "sum_nll": 1012.8609619140625,
+            "tokens": 327
+          },
+          "shuffled": {
+            "sum_nll": 1012.6773681640625,
+            "tokens": 327
+          }
+        }
+      },
+      {
+        "id": "1f75a2ff0352b92a66d0d079226b2655",
+        "modes": {
+          "enabled": {
+            "sum_nll": 490.72125244140625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 489.8232421875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 491.1800231933594,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2147ab1dd52d55d8eb1e01e4aeab66c1",
+        "modes": {
+          "enabled": {
+            "sum_nll": 381.99383544921875,
+            "tokens": 355
+          },
+          "bypassed": {
+            "sum_nll": 381.77020263671875,
+            "tokens": 355
+          },
+          "shuffled": {
+            "sum_nll": 381.6121520996094,
+            "tokens": 355
+          }
+        }
+      },
+      {
+        "id": "2023f9ab2e47c2b86c9054832bf74700",
+        "modes": {
+          "enabled": {
+            "sum_nll": 364.0976257324219,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 363.32275390625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 363.8518981933594,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dafd9aa5e6c2ada45beac5ce1b3e12e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 537.943115234375,
+            "tokens": 476
+          },
+          "bypassed": {
+            "sum_nll": 538.2720947265625,
+            "tokens": 476
+          },
+          "shuffled": {
+            "sum_nll": 538.9081420898438,
+            "tokens": 476
+          }
+        }
+      },
+      {
+        "id": "22cea368bcdd70aa4f5b0cc5ca3ce007",
+        "modes": {
+          "enabled": {
+            "sum_nll": 672.2899169921875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 672.14990234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 672.529541015625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1fbd0b10902d6dabd036e7372bfd51a5",
+        "modes": {
+          "enabled": {
+            "sum_nll": 592.505126953125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 592.7076416015625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 592.275390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ccd9b02ff1b28a427854df4c4ba741b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 717.4884643554688,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 716.3692626953125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 716.68505859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22656c44b2e2ae3f61428c44f52663b9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 249.35736083984375,
+            "tokens": 212
+          },
+          "bypassed": {
+            "sum_nll": 250.59059143066406,
+            "tokens": 212
+          },
+          "shuffled": {
+            "sum_nll": 250.9069366455078,
+            "tokens": 212
+          }
+        }
+      },
+      {
+        "id": "1f6be185ae8c1fff7c02ce03415feb00",
+        "modes": {
+          "enabled": {
+            "sum_nll": 557.7269897460938,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 556.9895629882812,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 558.1641845703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1dc945bc322bc767eb8cdcafe0104287",
+        "modes": {
+          "enabled": {
+            "sum_nll": 520.1152954101562,
+            "tokens": 492
+          },
+          "bypassed": {
+            "sum_nll": 518.9065551757812,
+            "tokens": 492
+          },
+          "shuffled": {
+            "sum_nll": 520.1131591796875,
+            "tokens": 492
+          }
+        }
+      },
+      {
+        "id": "2327224142209c1350be04c915a88b50",
+        "modes": {
+          "enabled": {
+            "sum_nll": 408.04541015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 407.1993103027344,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 408.2491455078125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "228f5cae466188d52debb9f35218118a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 615.4493408203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 615.673095703125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 616.423095703125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ddf029945062a32",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1285.0360107421875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1284.243896484375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1284.8233642578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1cb902d4b70a6062504eb78840b382dc",
+        "modes": {
+          "enabled": {
+            "sum_nll": 446.34637451171875,
+            "tokens": 457
+          },
+          "bypassed": {
+            "sum_nll": 446.1827392578125,
+            "tokens": 457
+          },
+          "shuffled": {
+            "sum_nll": 446.4033203125,
+            "tokens": 457
+          }
+        }
+      },
+      {
+        "id": "1dc815bb10b6dae0e5a902696bc64c0f",
+        "modes": {
+          "enabled": {
+            "sum_nll": 504.7142639160156,
+            "tokens": 419
+          },
+          "bypassed": {
+            "sum_nll": 504.336669921875,
+            "tokens": 419
+          },
+          "shuffled": {
+            "sum_nll": 505.9480285644531,
+            "tokens": 419
+          }
+        }
+      },
+      {
+        "id": "1d8dbbbbaabada8b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 686.1412353515625,
+            "tokens": 367
+          },
+          "bypassed": {
+            "sum_nll": 685.7214965820312,
+            "tokens": 367
+          },
+          "shuffled": {
+            "sum_nll": 687.730224609375,
+            "tokens": 367
+          }
+        }
+      },
+      {
+        "id": "1f2bb91ac6c931fa6e14c0d89b46c8ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 479.78021240234375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 479.4137268066406,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 480.0303039550781,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "211f12f6a2a9862a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1443.9345703125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1446.906494140625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1447.4869384765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1db4e76f7b71c7499e46f201bfc5935b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1633.7725830078125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1638.281005859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1636.179443359375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "2215c69ad3ee46fd292c8b35f4957ca3",
+        "modes": {
+          "enabled": {
+            "sum_nll": 523.9767456054688,
+            "tokens": 489
+          },
+          "bypassed": {
+            "sum_nll": 522.8214111328125,
+            "tokens": 489
+          },
+          "shuffled": {
+            "sum_nll": 523.9032592773438,
+            "tokens": 489
+          }
+        }
+      },
+      {
+        "id": "248c858a343ca224e0c1587b9c39ea67",
+        "modes": {
+          "enabled": {
+            "sum_nll": 316.5655517578125,
+            "tokens": 509
+          },
+          "bypassed": {
+            "sum_nll": 317.3092041015625,
+            "tokens": 509
+          },
+          "shuffled": {
+            "sum_nll": 317.2327880859375,
+            "tokens": 509
+          }
+        }
+      },
+      {
+        "id": "249d89c1549bd10abd95916cf9f3b9ea",
+        "modes": {
+          "enabled": {
+            "sum_nll": 305.1109619140625,
+            "tokens": 319
+          },
+          "bypassed": {
+            "sum_nll": 307.3799133300781,
+            "tokens": 319
+          },
+          "shuffled": {
+            "sum_nll": 306.792724609375,
+            "tokens": 319
+          }
+        }
+      },
+      {
+        "id": "21d0113ad4f7a04764fb6eee1fbe5daf",
+        "modes": {
+          "enabled": {
+            "sum_nll": 419.82452392578125,
+            "tokens": 330
+          },
+          "bypassed": {
+            "sum_nll": 419.1266174316406,
+            "tokens": 330
+          },
+          "shuffled": {
+            "sum_nll": 419.50189208984375,
+            "tokens": 330
+          }
+        }
+      },
+      {
+        "id": "1c8318d12dcdb76a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1140.3486328125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1140.501953125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1142.5028076171875,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "23c7055ad620501d5173e7ae3fb5a928",
+        "modes": {
+          "enabled": {
+            "sum_nll": 314.8197937011719,
+            "tokens": 435
+          },
+          "bypassed": {
+            "sum_nll": 316.02484130859375,
+            "tokens": 435
+          },
+          "shuffled": {
+            "sum_nll": 316.4903259277344,
+            "tokens": 435
+          }
+        }
+      },
+      {
+        "id": "1fec7fb08c1965f6c653aa36e0022316",
+        "modes": {
+          "enabled": {
+            "sum_nll": 640.12890625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 639.6119384765625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 639.7885131835938,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ccd9105753774d5b95420ad77acd1b6",
+        "modes": {
+          "enabled": {
+            "sum_nll": 534.2334594726562,
+            "tokens": 473
+          },
+          "bypassed": {
+            "sum_nll": 534.7017822265625,
+            "tokens": 473
+          },
+          "shuffled": {
+            "sum_nll": 534.15234375,
+            "tokens": 473
+          }
+        }
+      },
+      {
+        "id": "1cde519b10ccdc1d913bc13204b8036e",
+        "modes": {
+          "enabled": {
+            "sum_nll": 312.28125,
+            "tokens": 294
+          },
+          "bypassed": {
+            "sum_nll": 314.6731872558594,
+            "tokens": 294
+          },
+          "shuffled": {
+            "sum_nll": 313.3465881347656,
+            "tokens": 294
+          }
+        }
+      },
+      {
+        "id": "24767f82f0ec67a0ef827b58cec06cff",
+        "modes": {
+          "enabled": {
+            "sum_nll": 295.9642639160156,
+            "tokens": 258
+          },
+          "bypassed": {
+            "sum_nll": 298.57806396484375,
+            "tokens": 258
+          },
+          "shuffled": {
+            "sum_nll": 297.57012939453125,
+            "tokens": 258
+          }
+        }
+      },
+      {
+        "id": "1c973a80c6e8c977fb6a3353be266dc9",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.1371154785156,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 466.8172912597656,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 466.2792053222656,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e92d431645ea039b7cdecd2c37220ba",
+        "modes": {
+          "enabled": {
+            "sum_nll": 476.8251037597656,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 476.3309326171875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 476.2608642578125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21f6dbeb8c8b09cbe32a634be5d377f2",
+        "modes": {
+          "enabled": {
+            "sum_nll": 326.115478515625,
+            "tokens": 336
+          },
+          "bypassed": {
+            "sum_nll": 327.283447265625,
+            "tokens": 336
+          },
+          "shuffled": {
+            "sum_nll": 327.05633544921875,
+            "tokens": 336
+          }
+        }
+      },
+      {
+        "id": "1db880487d919c75dd287321efadfbd4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 461.287353515625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 460.8873291015625,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 461.8863220214844,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "226ed70f6dea7cce05b8e278eea38f6d",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1610.62158203125,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1613.4052734375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1612.9908447265625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "203ead4da8189ecd0658afacb3497584",
+        "modes": {
+          "enabled": {
+            "sum_nll": 567.5374755859375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 566.8740844726562,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 567.3452758789062,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f4ede0d4b0d46dba8a59fba077495fd",
+        "modes": {
+          "enabled": {
+            "sum_nll": 722.2261352539062,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 721.8442993164062,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 724.0530395507812,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1f5ea75e8c8456e902d376c16d1bb3b8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 298.8587646484375,
+            "tokens": 168
+          },
+          "bypassed": {
+            "sum_nll": 298.054443359375,
+            "tokens": 168
+          },
+          "shuffled": {
+            "sum_nll": 298.7370300292969,
+            "tokens": 168
+          }
+        }
+      },
+      {
+        "id": "2499b481fced21feb6f23449cf360a4b",
+        "modes": {
+          "enabled": {
+            "sum_nll": 663.9823608398438,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 664.8155517578125,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 663.8546752929688,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1de66572aa8d20fbf67acc2f81c00e19",
+        "modes": {
+          "enabled": {
+            "sum_nll": 507.338623046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 506.1961975097656,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 506.9386291503906,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1ec9d826b51c2cc4ab61eace53fd39f4",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1609.82373046875,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1613.757568359375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1611.8160400390625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "217d7a8429b308bccda46746be59a03c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 659.0975341796875,
+            "tokens": 505
+          },
+          "bypassed": {
+            "sum_nll": 657.7335205078125,
+            "tokens": 505
+          },
+          "shuffled": {
+            "sum_nll": 658.3907470703125,
+            "tokens": 505
+          }
+        }
+      },
+      {
+        "id": "2444ff6adb0b2a068c903df19288024a",
+        "modes": {
+          "enabled": {
+            "sum_nll": 755.869384765625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 755.7508544921875,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 756.16064453125,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "21cec0fed9cd2ccb60cc63c7bddc00d7",
+        "modes": {
+          "enabled": {
+            "sum_nll": 1630.4052734375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 1633.0257568359375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 1632.97509765625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1e38e820cb48d2dc8d80af6e2cb34a58",
+        "modes": {
+          "enabled": {
+            "sum_nll": 427.59967041015625,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 427.0486755371094,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 427.11712646484375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1d881bffeb5b1f76971690e53ab0fe19",
+        "modes": {
+          "enabled": {
+            "sum_nll": 530.050537109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 530.1234130859375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 529.890380859375,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "22db40c6f3068abd20b87565350ce9ad",
+        "modes": {
+          "enabled": {
+            "sum_nll": 449.2455749511719,
+            "tokens": 489
+          },
+          "bypassed": {
+            "sum_nll": 449.6554870605469,
+            "tokens": 489
+          },
+          "shuffled": {
+            "sum_nll": 449.46771240234375,
+            "tokens": 489
+          }
+        }
+      }
+    ]
+  },
+  "elapsed_seconds": 92.73500000000001
+}

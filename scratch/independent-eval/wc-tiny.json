@@ -1,0 +1,119 @@
+{
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\native-ple-2b-ce",
+  "split": "screen",
+  "bundle_sha256": "d6a011d9710518b4f4812b5bf9d7fa3ea1dafd72fb08577a3cf6708636d1cfb3",
+  "tokenizer_sha256": "cc4ac36668961751f10c10901159d3fb3263507a4c24f4760833f9d21901849f",
+  "task_sha256": {
+    "nll": "a0ad6379599068de618b7f08ace80df86a9a3fa060043df1713e46bd4930613b"
+  },
+  "audit": {
+    "variant": "ple",
+    "residual_branches": 1,
+    "adapter_tensor_count": 8,
+    "adapter_exact_match": true,
+    "adapter_norms": {
+      "model.layers.1.sidecar.ple.conv1d.weight": 1.812023639678955,
+      "model.layers.1.sidecar.ple.key_proj.weight": 40.720558166503906,
+      "model.layers.1.sidecar.ple.norm_conv.weight": 0.14064639806747437,
+      "model.layers.1.sidecar.ple.norm_key.weight": 0.07085701078176498,
+      "model.layers.1.sidecar.ple.norm_query.weight": 0.07086747139692307,
+      "model.layers.1.sidecar.ple.value_proj.weight": 40.767730712890625,
+      "model.layers.1.sidecar.rho": 0.01007080078125,
+      "model.layers.1.sidecar.table.weight": 311.74639892578125
+    },
+    "ignored_loss_only_keys": [],
+    "config_sha256": "aaf72553eb0dd996d49942c2cedd655bd96ecb9352b00e5a70a0875da55ae14e"
+  },
+  "probe": {
+    "sidecar_calls": [
+      {
+        "enabled": true,
+        "raw_present": true,
+        "residual_max": 0.0037841796875
+      },
+      {
+        "enabled": false,
+        "raw_present": true,
+        "residual_max": 0.0
+      }
+    ],
+    "branch_calls_per_forward": 1,
+    "enabled_minus_bypassed_logits_max": 0.25
+  },
+  "dtype": "bfloat16",
+  "device": "cuda:0",
+  "complete": true,
+  "records": {
+    "nll": [
+      {
+        "id": "1c88d10fed8e5d7929bd8237e00cc804",
+        "modes": {
+          "enabled": {
+            "sum_nll": 478.9569091796875,
+            "tokens": 437
+          },
+          "bypassed": {
+            "sum_nll": 480.01666259765625,
+            "tokens": 437
+          },
+          "shuffled": {
+            "sum_nll": 480.29498291015625,
+            "tokens": 437
+          }
+        }
+      },
+      {
+        "id": "1fa0c7a3b9b650269df134fc3cc4ab9c",
+        "modes": {
+          "enabled": {
+            "sum_nll": 433.91162109375,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 433.18115234375,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 433.0289306640625,
+            "tokens": 511
+          }
+        }
+      },
+      {
+        "id": "1eec6419dba44b0c528531bee3b6ab74",
+        "modes": {
+          "enabled": {
+            "sum_nll": 421.59075927734375,
+            "tokens": 442
+          },
+          "bypassed": {
+            "sum_nll": 422.03460693359375,
+            "tokens": 442
+          },
+          "shuffled": {
+            "sum_nll": 422.01702880859375,
+            "tokens": 442
+          }
+        }
+      },
+      {
+        "id": "1ea40d8a7c4b2636644ff07a61d90ad8",
+        "modes": {
+          "enabled": {
+            "sum_nll": 467.3243713378906,
+            "tokens": 511
+          },
+          "bypassed": {
+            "sum_nll": 466.9758605957031,
+            "tokens": 511
+          },
+          "shuffled": {
+            "sum_nll": 467.69366455078125,
+            "tokens": 511
+          }
+        }
+      }
+    ]
+  },
+  "elapsed_seconds": 27.531000000000006
+}
