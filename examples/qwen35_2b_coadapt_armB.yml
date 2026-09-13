@@ -1,0 +1,108 @@
+# Arm B of the paired co-adaptation screen: the counterfactual backbone, trained
+# without the memory.
+#
+# The frozen stage established three things, and this experiment takes exactly one step
+# past them:
+#
+#   1. Correct addressing is required. The wrong-context arm -- same text, same rows,
+#      addresses rolled seven positions -- is indistinguishable from OFF at every
+#      checkpoint (t between -0.8 and +1.8).
+#   2. The learned rows carry content: -0.001536 nats/token at t = -4.7 over a random
+#      table, on content tokens alone.
+#   3. The aggregate gain is 79% layout. 5.8% of positions carried 1738 of the 2197 nats
+#      saved. Aggregate NLL is therefore a diagnostic here, never a success criterion.
+#
+# This arm is why the experiment can answer anything. Arm A's backbone adapts under
+# memory-conditioned gradients, so comparing arm A with and without its sidecar measures
+# how much that model has come to lean on the memory, not what the memory was worth. Only
+# a backbone trained from the same checkpoint, on the same documents in the same order,
+# without the memory, is the counterfactual.
+#
+# Identical to examples/qwen35_2b_coadapt_armA.yml except for output_path,
+# sidecar.enabled, optimizer.freeze_sidecar and the absence of sidecar_lr. The sidecar
+# section itself stays: its presence forces packing and padding_free off, so removing it
+# would change the batching and the arms would no longer see the same stream.
+
+model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce-1m/checkpoint-675
+output_path: D:/DeepThought/Projects/HybridModel/runs/coadapt-armB
+project_name: hybridmodel-coadapt
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+sidecar:
+  # Bypassed in the forward. The section itself stays, so batching matches arm A.
+  enabled: false
+  table_mode: native
+  ngram_vocab_size_base: 131072
+  variant: ple
+  layer_index: 1
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # The backbone trains; the memory does not. Bypassing the forward alone would leave
+  # the table nominally trainable and reachable by weight decay, so it is frozen too,
+  # and the smoke asserts it is bitwise unchanged after an optimizer step.
+  freeze_backbone: false
+  freeze_sidecar: true
+  unfreeze_at_step: null
+  # No sidecar_lr: nothing in the sidecar trains, so there is no second group. The
+  # backbone rate below is identical to arm A's, which is the rate the comparison
+  # depends on.
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# Measured: 15.48 GiB allocated, 17.40 GiB reserved through a real 8-bit AdamW step
+# (scratch/coadapt/smoke-B.json). The cap is enforced by the allocator, so an overrun
+# raises instead of paging into shared system memory.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # 8-bit AdamW state: two moments at one byte each over 2.16B parameters is 4.3 GiB,
+  # against 17.3 GiB for fp32 moments. This is what makes a fully trainable backbone fit
+  # beside a 268.7M-row table on one 24 GiB card.
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update. Not 4096 x updates: that is
+  # padded capacity, and assuming it is what named the last screen 1M when it was 814K.
+  max_steps: 284
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 57
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

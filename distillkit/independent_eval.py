@@ -363,6 +363,13 @@ def score_sequences(model, features, collator, mode, device, forward_mode=None):
         record["by_class"] = {
             label: {"sum_nll": float(values[picked].sum()), "tokens": len(picked)}
             for label, picked in (("content", content_at), ("layout", layout_at)) if picked}
+        if "content" not in record["by_class"]:
+            # Silently reporting one aggregate is how a layout gain gets read as a
+            # content gain. If a document has no content targets at all, say so.
+            raise ValueError(
+                "no content targets in feature %s: the content/layout split cannot be "
+                "reported, and an aggregate alone is not a valid architecture metric"
+                % feature.get("id", "?"))
         roles = feature.get("roles")
         if roles:
             # A position's loss belongs to the role of the token it predicts, which is

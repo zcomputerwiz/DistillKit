@@ -700,6 +700,11 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
             # earlier instance raises on attribute access. Same number, stable source.
             world_size=training_arguments.world_size,
         )
+        if config.optimizer.freeze_sidecar:
+            from distillkit.optimizers import freeze_sidecar_parameters
+            frozen_sidecar = freeze_sidecar_parameters(model)
+            LOG.info("Sidecar frozen: %d parameters held fixed while the backbone trains",
+                     len(frozen_sidecar))
         if config.optimizer.freeze_backbone:
             window = config.optimizer.stage1_trainable_layers
             if window is not None:

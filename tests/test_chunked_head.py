@@ -493,6 +493,7 @@ def test_a_ce_only_run_never_reads_the_teacher_cache():
         signal_source=SimpleNamespace(
             get_signal=lambda *a, **kw: fetches.append(1)),
         _loss_log_local=threading.local(), log=lambda *a: None,
+        _digest_stream=lambda ids: None,
         config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),
                                sidecar=SimpleNamespace(enabled=False),
                                loss_functions=cfgs),
@@ -556,6 +557,7 @@ def test_supervised_tokens_counts_what_actually_carried_gradient():
         accelerator=SimpleNamespace(unwrap_model=lambda x: x),
         signal_source=SimpleNamespace(get_signal=lambda *a, **kw: None),
         _loss_log_local=threading.local(), log=lambda *a: None,
+        _digest_stream=lambda ids: None,
         config=SimpleNamespace(dataset=SimpleNamespace(eos_label_token_ids=[]),
                                sidecar=SimpleNamespace(enabled=False),
                                loss_functions=cfgs),

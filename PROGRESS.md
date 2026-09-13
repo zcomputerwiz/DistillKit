@@ -3847,6 +3847,97 @@ The measured density is 880 supervised tokens per update -- lower than the 1,080
 from the contaminated counter before `e4c5379`, so 925 updates is 814K supervised tokens,
 not the 1M the schedule was named for.
 
+## Paired co-adaptation screen, content-first: prepared, not launched
+
+The frozen stage is finished and it says three things, the third of which changes how the
+next experiment has to be judged: correct addressing is required, the learned rows carry
+content, and the aggregate gain is 79% layout. Aggregate NLL is therefore a diagnostic
+from here on and never a success criterion.
+
+The question now is whether a *trainable* backbone can exploit the content signal more
+than an otherwise identical backbone trained without the memory. That makes the control a
+separately trained run, not this checkpoint with the sidecar switched off: once a backbone
+adapts under memory-conditioned gradients, ON/OFF within one checkpoint measures how much
+that model has come to lean on the memory, not what the memory was worth.
+
+### The common starting point
+
+```
+checkpoint          runs/native-ple-2b-ce-1m/checkpoint-675
+global step         675 (925 cumulative updates, ~814K supervised tokens)
+rho                 0.030517578125
+table sha256        a334792cbb6c88954f6ec5f33ebb982d1bc25dc01a291478863ad93f33606d38
+table shape         2,099,200 x 128
+geometry            2048 hidden, 24 layers, sidecar at layer 1, ple/native, base 131072
+```
+
+Both arms load this file. Neither is reconstructed from the pretrained Qwen checkpoint.
+
+### The arms
+
+`examples/qwen35_2b_coadapt_armA.yml` and `examples/qwen35_2b_coadapt_armB.yml` are the
+same file except for four keys, which is the whole design:
+
+| key | A | B |
+| --- | --- | --- |
+| `sidecar.enabled` | true | false |
+| `optimizer.freeze_sidecar` | false | true |
+| `optimizer.sidecar_lr` | 1.0e-4 | absent |
+| `output_path` | coadapt-armA | coadapt-armB |
+
+Arm B keeps the `sidecar:` section rather than deleting it, because its *presence* is what
+forces `packing` and `padding_free` off in `main.py`. Dropping it would change the batching
+and the two arms would no longer see the same stream.
+
+`optimizer.freeze_sidecar` is new. Bypassing the forward alone would leave the table
+nominally trainable and reachable by weight decay, and a control whose memory drifts is not
+a control; `tests/test_coadapt_arms.py` pins that an optimizer step with `weight_decay=0.1`
+leaves every sidecar tensor bitwise unchanged.
+
+### Measured, both arms, real 8-bit AdamW step
+
+| | trainable | tok/s | step | allocated | reserved |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| A (backbone + memory) | 2,158,925,633 | 1900 | 2.156 s | 16.52 GiB | 18.46 GiB |
+| B (backbone only) | 1,881,825,088 | 1934 | 2.118 s | 15.48 GiB | 17.40 GiB |
+
+Both under the 21-22 GiB ceiling, so the arms run concurrently, one per card, as two
+independent single-GPU processes under `CUDA_VISIBLE_DEVICES`. No DDP, no FSDP, no tensor
+parallel. 8-bit AdamW is what makes this fit: two moments at one byte each over 2.16B
+parameters is 4.3 GiB against 17.3 GiB for fp32 moments.
+
+Gradient contracts, from the same smoke:
+
+```
+A   layer0 2.12   layer12 5.70   layer23 12.63   rho 0.0233   table 0.0160
+    key_proj 0.00378   value_proj 0.0153   conv1d 0.0119        all finite, all nonzero
+B   layer0 2.07   layer12 5.62   layer23 12.55   sidecar gradients all None
+    sidecar bitwise unchanged after 11 updates
+```
+
+### Data parity
+
+Configuration equality is not proof that two runs saw the same documents, so each run now
+digests the tokens of its own first 64 training batches and logs
+`training_stream_sha256`. The hashes are compared after launch; a mismatch invalidates the
+comparison regardless of what the curves do.
+
+### Budget and cadence
+
+284 updates at the measured 880 supervised tokens per update is roughly 250K supervised
+tokens, evaluated every 57 updates (~50K). The x-axis is the corrected training-only
+counter, never `4096 x updates` -- that assumption is what named an 814K screen "1M".
+
+### The decision rule
+
+Primary: content NLL, `A_correct - B_control`, on the fixed 384-document bundle. Secondary:
+`A_correct - A_off` and `A_correct - A_wrong` on content, plus the random-table chimera at
+the endpoint. Layout, punctuation and aggregate are reported at every checkpoint as
+diagnostics, along with the fraction of nats saved attributable to each, and cannot by
+themselves justify continuing. `independent_eval` now raises rather than omitting the
+content/layout split when a feature has no content targets, so the split cannot silently
+disappear the way it did on this bundle before the frozen stage was scored.
+
 ## Reproduction
 
 ```powershell

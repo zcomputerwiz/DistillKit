@@ -1,0 +1,109 @@
+# Arm A of the paired co-adaptation screen: backbone and native memory learn together.
+#
+# The frozen stage established three things, and this experiment takes exactly one step
+# past them:
+#
+#   1. Correct addressing is required. The wrong-context arm -- same text, same rows,
+#      addresses rolled seven positions -- is indistinguishable from OFF at every
+#      checkpoint (t between -0.8 and +1.8).
+#   2. The learned rows carry content: -0.001536 nats/token at t = -4.7 over a random
+#      table, on content tokens alone.
+#   3. The aggregate gain is 79% layout. 5.8% of positions carried 1738 of the 2197 nats
+#      saved. Aggregate NLL is therefore a diagnostic here, never a success criterion.
+#
+# The question is whether a *trainable* backbone can exploit that content signal more
+# than an otherwise identical backbone trained without the memory. That makes the control
+# a separately trained run (arm B), not this checkpoint with the sidecar switched off:
+# once the backbone adapts under memory-conditioned gradients, ON/OFF within one
+# checkpoint measures how much this model has come to lean on the memory, not what the
+# memory was worth.
+#
+# The primary metric is content NLL, arm A against arm B. Nothing else decides the
+# outcome. See examples/qwen35_2b_coadapt_armB.yml, which must stay identical to this
+# file except for the three lines that define the counterfactual.
+
+model: D:/DeepThought/Projects/HybridModel/runs/native-ple-2b-ce-1m/checkpoint-675
+output_path: D:/DeepThought/Projects/HybridModel/runs/coadapt-armA
+project_name: hybridmodel-coadapt
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+sidecar:
+  # ON, with correct addressing. Arm B keeps this section with `enabled: false`: its
+  # presence is what forces packing and padding_free off, so dropping it would change
+  # the batching and break the data parity the comparison depends on.
+  enabled: true
+  table_mode: native
+  ngram_vocab_size_base: 131072
+  variant: ple
+  layer_index: 1
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # Everything trains: backbone, table, PLE projections, conv, rho.
+  freeze_backbone: false
+  freeze_sidecar: false
+  unfreeze_at_step: null
+  # The backbone is pretrained and the table is not, so they do not want the same rate.
+  # 1e-4 on a 1.88B pretrained backbone is a way to destroy it; 1e-5 on a table that
+  # learned at 1e-4 for 925 updates is a way to stop it. Applied by _apply_sidecar_lr,
+  # which splits the parameter groups after the optimizer is built -- no new machinery.
+  sidecar_lr: 1.0e-4
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# Measured: 16.52 GiB allocated, 18.46 GiB reserved for this arm through a real 8-bit
+# AdamW step (scratch/coadapt/smoke-A.json). The cap is enforced by the allocator, so an
+# overrun raises instead of paging into shared system memory.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # 8-bit AdamW state: two moments at one byte each over 2.16B parameters is 4.3 GiB,
+  # against 17.3 GiB for fp32 moments. This is what makes a fully trainable backbone fit
+  # beside a 268.7M-row table on one 24 GiB card.
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update. Not 4096 x updates: that is
+  # padded capacity, and assuming it is what named the last screen 1M when it was 814K.
+  max_steps: 284
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 57
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

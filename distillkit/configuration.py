@@ -352,6 +352,18 @@ class OptimizerConfig(BaseModel):
         ),
     )
     freeze_backbone: bool = True
+    freeze_sidecar: bool = Field(
+        default=False,
+        description=(
+            "Train the backbone with the sidecar held fixed -- the counterfactual arm "
+            "for a co-adaptation experiment. Once the backbone is trainable, comparing "
+            "the sidecar on against off within one checkpoint no longer isolates the "
+            "architecture: that backbone has itself adapted under sidecar-conditioned "
+            "gradients. The control has to be a backbone trained from the same starting "
+            "point without one. Bypassing the forward alone would leave the table "
+            "nominally trainable and reachable by weight decay, so this freezes it."
+        ),
+    )
     stage1_trainable_layers: tuple[int, int] | None = Field(
         default=None,
         description=(
@@ -365,6 +377,13 @@ class OptimizerConfig(BaseModel):
     )
     unfreeze_at_step: int | None = Field(default=None, ge=1)
     log_every_n_steps: int = Field(default=100, ge=1)
+
+    @model_validator(mode="after")
+    def _something_has_to_train(self):
+        if self.freeze_backbone and self.freeze_sidecar:
+            raise ValueError(
+                "freeze_backbone and freeze_sidecar together leave nothing trainable")
+        return self
 
 
     # sidecar_lr used to require strategy=adamw, because it was applied by adding a

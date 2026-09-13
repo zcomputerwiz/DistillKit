@@ -1,5 +1,7 @@
 # Copyright 2024 Charles O. Goddard
 
+import hashlib
+import logging
 import threading
 
 import torch
@@ -17,6 +19,8 @@ from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
 from distillkit.lossfuncs.hidden_state import last_anchor_report
 from distillkit.signals import OnlineSignalSource, SignalSource, TeacherSignal
 
+LOG = logging.getLogger(__name__)
+
 
 def create_loss_func(cfg: LossFunctionConfig) -> LossFunctionBase:
     for cls in ALL_LOSS_CLASSES:
@@ -25,6 +29,11 @@ def create_loss_func(cfg: LossFunctionConfig) -> LossFunctionBase:
                 **cfg.model_dump(exclude=["function", "weight"], exclude_none=True)
             )
     raise RuntimeError(f"Unknown loss function '{cfg.function}'")
+
+
+# Enough batches that an ordering difference cannot hide, few enough that the
+# hashing is over before the first optimizer log line.
+STREAM_PARITY_BATCHES = 64
 
 
 def model_is_training(model) -> bool:
@@ -51,6 +60,13 @@ class DistillationTrainer(SFTTrainer):
         # measured in the tokens that carried gradient. Accumulated on device and read
         # only at log time, because a per-microbatch .item() is a synchronisation.
         self._supervised_tokens = None
+        # A paired experiment is only a comparison if both arms see the same documents in
+        # the same order. Asserting that from the configuration is not proof -- the arms
+        # differ in ways that touch collation -- so each run digests the tokens of its own
+        # first batches and says so, and the two hashes are compared afterwards.
+        self._stream_digest = hashlib.sha256()
+        self._stream_batches = 0
+        self._stream_sha256 = None
 
         self.loss_functions = [create_loss_func(lfc) for lfc in config.loss_functions]
         self.need_hidden_states = any(
@@ -314,6 +330,18 @@ class DistillationTrainer(SFTTrainer):
         )
         return (total_loss, student_outputs) if return_outputs else total_loss
 
+    def _digest_stream(self, input_ids) -> None:
+        """Hash the first STREAM_PARITY_BATCHES training batches, then stop."""
+        if self._stream_batches >= STREAM_PARITY_BATCHES:
+            return
+        self._stream_digest.update(
+            input_ids.detach().to("cpu", torch.int32).numpy().tobytes())
+        self._stream_batches += 1
+        if self._stream_batches == STREAM_PARITY_BATCHES:
+            self._stream_sha256 = self._stream_digest.hexdigest()
+            LOG.info("training_stream_sha256 over %d batches: %s",
+                     STREAM_PARITY_BATCHES, self._stream_sha256)
+
     def total_distillation_loss(
         self, student_outputs, inputs, num_items_in_batch: int | None = None
     ):
@@ -326,6 +354,7 @@ class DistillationTrainer(SFTTrainer):
         # tokens: counting them would inflate the x-axis of the very curve the evaluation
         # is producing a point on.
         if model_is_training(self.model):
+            self._digest_stream(inputs["input_ids"])
             counted = valid_mask.any(-1).sum()
             running = getattr(self, "_supervised_tokens", None)
             self._supervised_tokens = counted if running is None else running + counted

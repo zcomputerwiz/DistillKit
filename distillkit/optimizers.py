@@ -347,6 +347,29 @@ def _refuse_trainable_muon_shards(model: nn.Module, groups) -> None:
         )
 
 
+def freeze_sidecar_parameters(model: nn.Module) -> tuple[str, ...]:
+    """Freeze the sidecar module, leaving everything else as it is.
+
+    The mirror of `freeze_backbone_for_stage1`, for the arm that trains a backbone
+    against a fixed memory. Only the sidecar module itself: the distillation projections
+    are not part of the architecture under test, and a run that does not use them has
+    none.
+    """
+    index = getattr(model.config, "sidecar_layer_index", None)
+    if index is None:
+        raise ValueError("freeze_sidecar needs a sidecar model")
+    prefix = f"model.layers.{index}.sidecar."
+    frozen = []
+    for name, parameter in model.named_parameters():
+        if name.startswith(prefix) and parameter.requires_grad:
+            parameter.requires_grad_(False)
+            parameter.grad = None
+            frozen.append(name)
+    if not frozen:
+        raise ValueError("freeze_sidecar matched no trainable sidecar parameters")
+    return tuple(frozen)
+
+
 def freeze_backbone_for_stage1(model: nn.Module) -> tuple[str, ...]:
     """Freeze currently trainable backbone weights, retaining auxiliary training.
 
