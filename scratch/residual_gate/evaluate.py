@@ -41,9 +41,9 @@ import torch.nn.functional as F
 
 from attenuate import Familiarity, load_records
 from distillkit.ffn_skip import attenuate_ffn
-from distillkit.residual_gate import (TrigramFamiliarity, family_features,
-                                      install_residual_gates,
-                                      remove_residual_gates)
+from distillkit.experimental.residual_gate import (
+    TrigramFamiliarity, family_features, install_residual_gates,
+    remove_residual_gates)
 from repeatability import DEFAULT_BUNDLE, DEFAULT_MODEL, trigram_keys
 
 DEFAULT_CACHE = Path("scratch/ffn_memo/cache/layer-12.npz")

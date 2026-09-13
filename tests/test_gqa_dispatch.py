@@ -21,7 +21,9 @@ def test_patch_is_conditional_on_the_build():
     original = sdpa_attention.use_gqa_in_sdpa
     try:
         sdpa_attention.use_gqa_in_sdpa = lambda mask, key, value: True
-        import distillkit.gqa_dispatch as module
+        # The owning module, not the compatibility shim: a re-export carries
+        # functions, and `_installed` is state the shim cannot stand in for.
+        import distillkit.models.qwen35.gqa_dispatch as module
 
         module._installed = False
         assert module.install_expanded_gqa_attention(force=False) is False
@@ -32,7 +34,7 @@ def test_patch_is_conditional_on_the_build():
         assert sdpa_attention.use_gqa_in_sdpa(None, None, None) is False
     finally:
         sdpa_attention.use_gqa_in_sdpa = original
-        import distillkit.gqa_dispatch as module
+        import distillkit.models.qwen35.gqa_dispatch as module
 
         module._installed = False
 

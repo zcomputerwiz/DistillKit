@@ -16,8 +16,10 @@ import click
 import numpy as np
 import torch
 
-from distillkit.gqa_dispatch import install_expanded_gqa_attention
-from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
+from distillkit.models.qwen35 import (
+    install_device_aware_linear_attention,
+    install_expanded_gqa_attention,
+)
 from distillkit.offline_cache import (
     OfflineCacheWriter,
     file_sha256,

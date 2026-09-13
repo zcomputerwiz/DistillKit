@@ -45,8 +45,9 @@ import torch
 import torch.nn.functional as F
 
 from attenuate import load_records
-from distillkit.residual_gate import (TrigramFamiliarity, family_features,
-                                      install_residual_gates, remove_residual_gates)
+from distillkit.experimental.residual_gate import (
+    TrigramFamiliarity, family_features, install_residual_gates,
+    remove_residual_gates)
 from evaluate import DEFAULT_CACHE, split_layout
 from repeatability import DEFAULT_BUNDLE
 

@@ -1,0 +1,282 @@
+"""PLE with per-stream direction gates, sized for a widened residual rather than for
+upstream's four hyper-connection streams.
+
+This is what the measurements in ``PROGRESS.md`` (2026-09-10) leave standing of
+``ple_sidecar.PLESidecar``, which is a faithful transcription of upstream's layer. Three
+results shaped it, and each removes something:
+
+**``key_proj`` does not earn its 26.2M multiplies.** It is 80% of the layer's arithmetic
+and produces one scalar per stream. On upstream's own trained weights the keys come out
+of ``norm_key(key_proj(features))`` nearly collinear -- mean pairwise cosine 0.81 to 0.96
+-- so there is nothing for a query to match against, and substituting the *mean* key for
+every position reproduces 65-93% of the gate. The gate is admission control read off the
+residual stream, not a relevance match. So the key path is replaced by a learned
+direction per stream: ``gate_s = f(query_s . g_s)``, which is what the trained module
+computes anyway, at 2,560x fewer multiplies and without a 26.2M-parameter tensor.
+
+**One direction per stream is enough.** A controlled ablation at matched gate scale
+(``scratch/table_capacity_probe.py``) put one direction at -0.003626 [-0.004397,
+-0.002896] against an ungated linear read and four directions at -0.003614 [-0.004370,
+-0.002895] -- indistinguishable, with value norms matching to 0.1%. The apparent
+advantage of four in the first run was scale: summing k gates starts the value path at an
+effective multiplier of k/2, and ``(sum_i g_i) W f = (mean_i g_i)(k W) f`` when ``W`` is
+free. ``gate_directions`` therefore defaults to 2 rather than 1 only because that
+ablation could not test what *this* module is for: with one residual stream every gate
+reads the same vector, so it could not distinguish directions from streams. Here the
+streams differ, and each carries its own directions.
+
+**The gate must be learned.** Four *frozen* random directions bought -0.000061
+[-0.000163, +0.000035] -- an interval spanning zero. Whatever the gate contributes, it is
+a criterion the run discovers, not any non-linear function of the stream.
+
+**The convolution branch never sees the gate.** ``norm_conv`` RMS-normalises
+``gate * value`` and RMS normalisation cancels a positive scalar, so its input is
+``norm_conv(value)`` however the gate moves -- exact as ``eps -> 0``, and departing as
+``eps / (gate^2 * mean(value^2))`` (checked in ``scratch/ple_restructure_check.py``). The
+per-stream norm weight then folds into the depthwise filters, since scaling channel c of
+a depthwise convolution's input is the same as scaling that channel's filter. Both are
+applied here: one reduction over the shared value feeds every stream's convolution, and
+``norm_conv`` does not exist as a parameter.
+
+``norm_query``'s weight is gone for the same kind of reason. Upstream scales the
+normalised query elementwise by ``(1 + w_s)`` and then dots it with the key; since
+``(q * (1 + w_s)) . g = q . ((1 + w_s) * g)``, a per-stream norm weight is exactly
+absorbable into that stream's direction, and keeping both would be two parameterisations
+of one function.
+
+**The direction is normalised, and that is not cosmetic.** The gate divides by
+``sqrt(hidden_size)``, which is the attention convention and assumes *both* sides of the
+dot product have norm ``sqrt(d)``. Upstream gets that for free because it RMS-normalises
+its key. A raw learned vector does not: at ``std = 0.02`` its norm is about 1.0 rather
+than 50.6, the pre-activation is 50x too small, and the gate is pinned near 0.5 no matter
+what it learns. The first run of this module measured ``gate_std`` 0.0348 against a
+predicted 0.0313 for that initialisation, while upstream's four streams sit at 0.080 to
+0.228 -- so the gate was not failing to learn, it was structurally unable to select.
+
+Nor could a learning-rate sweep have rescued it. AdamW's step is about ``lr`` per element
+regardless of gradient size, so 72 steps at 1e-4 move each element by at most 0.0072
+while the gap to a selective scale is about 1.0 per element -- 140x the entire step
+budget, needing ``lr`` near 0.014 to close, which would wreck everything else sharing the
+optimizer. So the scale is fixed by construction here: the direction is RMS-normalised to
+``sqrt(d)`` and a learned per-direction ``sharpness_delta`` (initialised at 0, applied as
+``1 + delta``) carries the magnitude. Only the direction's *direction* is learned as a
+direction, which is what it was ever supposed to mean, and no choice of
+``gate_init_std`` can silently flatten it.
+
+**The gate parameters are stored in fp32 and that is also not cosmetic** -- see
+``_apply``. Both of the above facts are about the same thing from opposite ends: the
+scale has to be right in the forward *and* representable in storage, and getting one
+without the other still gives a gate that cannot move.
+
+**Identity at load** is preserved the way ``PLESidecar`` establishes it: ``value_proj``
+and ``conv1d`` are both zero, so the gated value and the convolution branch are both
+exactly zero and the module returns its input unchanged. The gate directions are
+*not* zero, and must not be -- the signed square root has ``sign(0) = 0`` and its
+``clamp_min`` flattens ``abs`` at the origin, so a zero direction receives exactly zero
+gradient and stays at 0.5 for the entire run. Measured: ``|grad|`` 0.0 at ``g = 0``
+against 4.85 at ``g ~ N(0, 0.02)``. Because the value starts at zero the gate cannot
+break the identity regardless of where its directions point.
+"""
+
+from __future__ import annotations
+
+import math
+
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+__all__ = ["DirectionGatedPLESidecar"]
+
+
+class DirectionGatedPLESidecar(nn.Module):
+    """``stream[..., hc, d] -> stream + gate_s * value + silu(conv_s(rms(value)))``.
+
+    ``features`` are the dequantized n-gram rows, ``[batch, seq, ngram_heads * head_dim]``.
+    The value is shared across streams, as upstream's is; only admission differs.
+    """
+
+    def __init__(
+        self,
+        hidden_size: int,
+        feature_dim: int,
+        *,
+        hc_count: int = 2,
+        gate_directions: int = 2,
+        conv_kernel_size: int = 4,
+        ngram_size: int = 3,
+        rms_norm_eps: float = 1e-6,
+        gate_init_std: float = 0.02,
+    ):
+        super().__init__()
+        if hidden_size <= 0 or feature_dim <= 0:
+            raise ValueError("hidden_size and feature_dim must be positive")
+        if conv_kernel_size < 1 or ngram_size < 1:
+            raise ValueError("conv_kernel_size and ngram_size must be positive")
+        if hc_count < 1 or gate_directions < 1:
+            raise ValueError("hc_count and gate_directions must be positive")
+        if gate_init_std <= 0:
+            raise ValueError("gate_init_std must be positive; a zero direction cannot train")
+        self.hidden_size = hidden_size
+        self.feature_dim = feature_dim
+        self.hc_count = hc_count
+        self.gate_directions = gate_directions
+        self.eps = rms_norm_eps
+        self._last_gate_stats: torch.Tensor | None = None
+        # Upstream dilates the short convolution by ngram_size so a position sees the
+        # same phase of adjacent n-grams; the state it needs is (K-1)*dilation wide.
+        self.conv_dilation = ngram_size
+        self.short_conv_state_len = (conv_kernel_size - 1) * ngram_size
+
+        self.value_proj = nn.Linear(feature_dim, hidden_size, bias=False)
+        # fp32 whatever dtype the rest of the model loads in; see `_apply` below.
+        self.gate = nn.Parameter(
+            torch.empty(hc_count, gate_directions, hidden_size, dtype=torch.float32))
+        # The *deviation* from unit sharpness, not the sharpness itself, for the reason
+        # `_PLERMSNorm` stores a deviation: bfloat16 spacing near 1.0 is 0.0078, and this
+        # parameter's AdamW update at lr 1e-4 is about 7.4e-5, so a scale stored directly
+        # at 1.0 rounds back to 1.0 on every step and can never move. Measured over a
+        # 72-step run: sharpness exactly 1.0, 1.0, 1.0, 1.0 while the same gradient in
+        # fp32 would have moved each element 7.44e-5 per step. Near zero the spacing is
+        # ~1e-41 and the identical update survives. Keeping the deviation is still worth
+        # it with the fp32 pin below -- it is what makes the parameter survive a
+        # checkpoint someone saves in bfloat16 -- but the pin is the load-bearing fix.
+        self.sharpness_delta = nn.Parameter(
+            torch.zeros(hc_count, gate_directions, dtype=torch.float32))
+        self.conv1d = nn.Conv1d(
+            hc_count * hidden_size, hc_count * hidden_size, kernel_size=conv_kernel_size,
+            groups=hc_count * hidden_size, dilation=self.conv_dilation, bias=False,
+        )
+        # Held on the module, not the parameter: `from_pretrained` re-initialises
+        # missing tensors after materialising them and its hook is called per module, so
+        # a mark on a bare Parameter is never seen and the directions would come back as
+        # whatever HF's default is -- including, for a checkpoint saved before this field
+        # existed, zero. A zero direction never trains.
+        self.gate_init_std = gate_init_std
+        nn.init.normal_(self.gate, std=gate_init_std)
+        for zeroed in (self.value_proj, self.conv1d):
+            nn.init.zeros_(zeroed.weight)
+            zeroed._sidecar_weight_init = "zero"
+
+    #: Storage precision is part of this module's contract, not a loading detail.
+    FP32_PARAMETERS = ("gate", "sharpness_delta")
+
+    def _apply(self, fn, *args, **kwargs):
+        """Keep the admission parameters in fp32 through every dtype conversion.
+
+        These two are the entire learned criterion and their AdamW update is about
+        `lr` per element -- 1e-4 here. bfloat16 has eight mantissa bits: at a direction
+        coordinate near 0.02 the spacing is 1.22e-4, so roughly half of those updates
+        round away, and at a scale near 1.0 it is 0.0078, so all of them do.
+        `torch.optim.AdamW` updates the parameter in place and keeps no fp32 master
+        copy, and neither does this project's wrapper, so the precision has to live on
+        the parameter itself. `.float()` in the forward is not enough; by then the
+        update has already been lost on assignment.
+
+        Measured over a 72-step production run (`scratch/gate-update-diagnosis/`):
+        `sharpness` finished bit-identical to its initialisation on all four elements,
+        with nonzero AdamW moments throughout, while the same post-clipping gradients
+        applied to fp32 copies moved it 7.44e-5 and 8.50e-5 on the steps that had one.
+        The direction did move -- 8,723 of 10,240 coordinates -- but only where its
+        update happened to exceed the local spacing.
+
+        10,244 numbers, so the parameters and their two moments cost about 60 KiB more
+        than bfloat16. This is the master-weight argument from Micikevicius et al.,
+        *Mixed Precision Training* (arXiv:1710.03740), applied to the two tensors that
+        need it rather than to the whole model.
+        """
+        module = super()._apply(fn, *args, **kwargs)
+        module.pin_fp32()
+        return module
+
+    def pin_fp32(self) -> None:
+        """Restore fp32 storage on the admission parameters. See ``_apply``."""
+        for name in self.FP32_PARAMETERS:
+            param = getattr(self, name, None)
+            if param is None or param.dtype == torch.float32:
+                continue
+            param.data = param.data.float()
+            if param.grad is not None:
+                param.grad = param.grad.float()
+
+    def _admission(self, stream: torch.Tensor) -> torch.Tensor:
+        """``2 * mean_k sigmoid(signed_sqrt(rms(stream_s) . g_sk / sqrt(d)))``.
+
+        The mean rather than the sum, so that a change in ``gate_directions`` does not
+        silently rescale the value path: every width starts at 1.0 and spans (0, 2).
+        """
+        query = stream.float()
+        query = query * torch.rsqrt(query.pow(2).mean(-1, keepdim=True) + self.eps)
+        # Both sides at RMS 1, exactly as upstream's normalised key gives it, so the
+        # /sqrt(d) below divides by the scale the operands actually have.
+        direction = self.gate.float()
+        direction = direction * torch.rsqrt(direction.pow(2).mean(-1, keepdim=True) + self.eps)
+        direction = direction * (1.0 + self.sharpness_delta.float()).unsqueeze(-1)
+        raw = torch.einsum("...hd,hkd->...hk", query, direction)
+        raw = raw / math.sqrt(self.hidden_size)
+        # Signed square root: compresses the dot product's range without losing its sign,
+        # so a strongly disagreeing stream suppresses the value rather than merely not
+        # amplifying it. clamp_min keeps the derivative finite at the origin.
+        gate = torch.sigmoid(raw.abs().clamp_min(1e-6).sqrt() * raw.sign())
+        if self.training:
+            with torch.no_grad():
+                flat = gate.detach().float()
+                self._last_gate_stats = torch.stack([
+                    flat.mean(), flat.std(),
+                    (flat > 0.6).float().mean(), (flat < 0.4).float().mean(),
+                ])
+        return 2.0 * gate.mean(-1, keepdim=True)
+
+    def _short_conv(self, value: torch.Tensor) -> torch.Tensor:
+        """Every stream's causal dilated convolution over one shared normalised value.
+
+        The gate is absent on purpose: it cancels inside the normalisation it would have
+        passed through, so this branch depends only on the value. One reduction serves
+        every stream, and the per-stream norm weight lives in the filters.
+        """
+        normed = value.float()
+        normed = normed * torch.rsqrt(normed.pow(2).mean(-1, keepdim=True) + self.eps)
+        wide = normed.to(value.dtype).repeat(1, 1, self.hc_count).transpose(1, 2)
+        wide = F.pad(wide, (self.short_conv_state_len, 0))
+        wide = F.silu(self.conv1d(wide)).transpose(1, 2)
+        return wide.unflatten(-1, (self.hc_count, self.hidden_size))
+
+    def forward(self, stream: torch.Tensor, features: torch.Tensor) -> torch.Tensor:
+        if stream.shape[-2:] != (self.hc_count, self.hidden_size):
+            raise ValueError(
+                f"expected a stream ending in ({self.hc_count}, {self.hidden_size}), "
+                f"got {tuple(stream.shape)}"
+            )
+        features = features.to(dtype=stream.dtype)
+        value = self.value_proj(features)
+        gate = self._admission(stream).to(value.dtype)
+        return stream + gate * value.unsqueeze(-2) + self._short_conv(value)
+
+    @torch.no_grad()
+    def gate_report(self, prefix: str = "ple") -> dict:
+        """Is this thing learning, and is its gate selecting rather than scaling?
+
+        ``value_norm`` and ``conv_norm`` start at exactly zero, so any nonzero value is
+        movement. ``gate_std`` is the one to watch: a computed gate cannot sit at its
+        initialisation the way a learned scalar can, but it can still return nearly the
+        same number for every token, which is a constant scale wearing a gate's clothes.
+        """
+        report = {
+            f"{prefix}/value_norm": self.value_proj.weight.float().norm().item(),
+            f"{prefix}/conv_norm": self.conv1d.weight.float().norm().item(),
+            f"{prefix}/gate_direction_norm": self.gate.float().norm().item(),
+            f"{prefix}/gate_sharpness_mean": (1 + self.sharpness_delta.float()).mean().item(),
+            f"{prefix}/gate_sharpness_min": (1 + self.sharpness_delta.float()).min().item(),
+            f"{prefix}/gate_sharpness_max": (1 + self.sharpness_delta.float()).max().item(),
+            f"{prefix}/gate_sharpness_deviation": self.sharpness_delta.float().abs().max().item(),
+        }
+        for stream in range(self.hc_count):
+            report[f"{prefix}/gate_direction_norm_{stream}"] = (
+                self.gate[stream].float().norm().item())
+        if self._last_gate_stats is not None:
+            mean, std, open_, shut = self._last_gate_stats.tolist()
+            report[f"{prefix}/gate_mean"] = mean
+            report[f"{prefix}/gate_std"] = std
+            report[f"{prefix}/gate_frac_open"] = open_
+            report[f"{prefix}/gate_frac_shut"] = shut
+        return report

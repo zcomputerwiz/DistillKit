@@ -342,7 +342,7 @@ class ResidualGateConfig(BaseModel):
     on familiar contexts at some depths and the right one at others. This section asks
     the model to choose, and stays deliberately minimal: one scalar per token per gated
     layer, a handful of compact features, no per-channel or multi-branch anything. See
-    distillkit/residual_gate.py.
+    distillkit/experimental/residual_gate.py.
     """
     layers: list[int] = Field(
         default_factory=list, min_length=1,

@@ -26,10 +26,13 @@ from distillkit.configuration import (
     TeacherDatasetConfig,
     TeacherModelConfig,
 )
-from distillkit.frozen_prefix import no_grad_prefix
+from distillkit.core.frozen_prefix import no_grad_prefix
+from distillkit.experimental.residual_gate import attach_residual_gates
 from distillkit.hsd_mapping import HiddenStateMapping
-from distillkit.gqa_dispatch import install_expanded_gqa_attention
-from distillkit.linear_attention_dispatch import install_device_aware_linear_attention
+from distillkit.models.qwen35 import (
+    install_device_aware_linear_attention,
+    install_expanded_gqa_attention,
+)
 from distillkit.monkey_patch_packing import monkey_patch_packing_for_model
 from distillkit.sharding import (
     as_device,
@@ -206,254 +209,8 @@ def load_data(
     return ds_train, ds_eval
 
 
-def load_student_model(
-    config: DistillationRunConfig,
-    tokenizer_vocab_size: int,
-    signal_vocab_size: int | None = None,
-) -> transformers.PreTrainedModel:
-    residual_stream = getattr(config, "residual_stream", None)
-    if config.functionary_packing:
-        monkey_patch_packing_for_model(config.train_model)
-    if residual_stream is not None:
-        from distillkit.models.qwen35_widened import Qwen35WidenedForCausalLM
-        auto_cls = Qwen35WidenedForCausalLM
-    elif config.sidecar is not None:
-        from distillkit.models.qwen35_sidecar import Qwen35SidecarForCausalLM
-        auto_cls = Qwen35SidecarForCausalLM
-    else:
-        auto_cls = getattr(transformers, config.model_auto_class, None)
-    if auto_cls is None:
-        raise ValueError(
-            f"Model class {config.model_auto_class} not found in transformers."
-        )
-    LOG.info(f"Loading model {config.train_model} with class {auto_cls}")
-    extra_kwargs = {"trust_remote_code": config.trust_remote_code}
-    if config.use_flash_attention:
-        if importlib.util.find_spec("flash_attn") is None:
-            # from_pretrained's own failure here names the package but not the two
-            # consequences of turning the flag off, and it surfaces only after the
-            # dataset and teacher cache have already been built.
-            raise RuntimeError(
-                "use_flash_attention is true but flash_attn is not installed "
-                "(it has no Windows wheels). Install it, or set "
-                "use_flash_attention: false and set training_args.bf16 so the "
-                "student still loads in bfloat16."
-            )
-        extra_kwargs["attn_implementation"] = "flash_attention_2"
-        extra_kwargs["torch_dtype"] = torch.bfloat16
-    extra_kwargs.update(config.model_kwargs)
-    if "torch_dtype" not in extra_kwargs:
-        # Only the flash-attention branch ever set a dtype, so with
-        # `use_flash_attention: false` the dtype came entirely from the checkpoint's
-        # own config -- fine for `student-hf`, which records bfloat16, and silently
-        # fp32 for any checkpoint that does not. autocast does not shrink the weights,
-        # so honour the trainer's own mixed-precision flags when nothing else has
-        # chosen.
-        if config.training_args.get("bf16"):
-            extra_kwargs["torch_dtype"] = torch.bfloat16
-        elif config.training_args.get("fp16"):
-            extra_kwargs["torch_dtype"] = torch.float16
-    # Inspect saved architecture before choosing overrides: loading widened weights
-    # with the stock class would silently discard trained routing parameters.
-    config_kwargs = {key: extra_kwargs[key] for key in (
-        "revision", "cache_dir", "local_files_only", "token", "subfolder",
-        "trust_remote_code") if key in extra_kwargs}
-    stock_config = transformers.AutoConfig.from_pretrained(config.train_model, **config_kwargs)
-    text_config = getattr(stock_config, "text_config", stock_config)
-    saved_sidecar_variant = getattr(text_config, "sidecar_variant", None)
-    if getattr(text_config, "residual_stream_enabled", False):
-        if residual_stream is None:
-            raise ValueError("Widened checkpoint requires its matching residual_stream run configuration")
-        expected = (text_config.residual_stream_num_branches, text_config.residual_stream_lowrank,
-                    getattr(text_config, "residual_stream_sidecar", False),
-                    getattr(text_config, "residual_stream_routing", "widened"))
-        requested = (residual_stream.num_branches, residual_stream.lowrank, config.sidecar is not None,
-                     residual_stream.routing)
-        if expected != requested:
-            raise ValueError(f"Widened checkpoint architecture {expected} differs from requested {requested}")
-        if config.sidecar is not None and (
-            text_config.sidecar_layer_index != config.sidecar.layer_index
-            or text_config.sidecar_num_branches != config.sidecar.num_branches
-            or text_config.sidecar_variant != config.sidecar.variant
-            # A native table and a donor table are different architectures with
-            # differently shaped state dicts; reloading one as the other is a silent
-            # correctness bug rather than a resize.
-            or getattr(text_config, "sidecar_table_mode", "donor") != config.sidecar.table_mode
-            # Only ple_gated has directions. Comparing them unconditionally would
-            # reject every checkpoint saved before the field existed, whose config
-            # carries no such key and whose variant does not use one.
-            or (config.sidecar.variant == "ple_gated"
-                and getattr(text_config, "sidecar_gate_directions", None)
-                != config.sidecar.gate_directions)
-        ):
-            raise ValueError("Widened checkpoint sidecar architecture differs from requested sidecar")
-    if config.sidecar is not None or residual_stream is not None:
-        if config.sidecar is not None:
-            if saved_sidecar_variant == "donor_reader":
-                expected = (
-                    text_config.sidecar_value_source,
-                    text_config.sidecar_conv_source,
-                    text_config.sidecar_reader_collapse,
-                    text_config.sidecar_reader_single_stream,
-                    getattr(text_config, "sidecar_reader_collapse_weights", None),
-                )
-                requested = (
-                    config.sidecar.reader_value_source,
-                    config.sidecar.reader_conv_source,
-                    config.sidecar.reader_collapse,
-                    config.sidecar.reader_single_stream,
-                    config.sidecar.reader_collapse_weights,
-                )
-                if expected != requested:
-                    raise ValueError(
-                        f"Saved donor-reader arm {expected} differs from requested {requested}")
-            text_config.sidecar_layer_index = config.sidecar.layer_index
-            text_config.sidecar_num_branches = config.sidecar.num_branches
-            text_config.sidecar_variant = config.sidecar.variant
-            text_config.sidecar_gate_directions = config.sidecar.gate_directions
-            text_config.sidecar_value_source = config.sidecar.reader_value_source
-            text_config.sidecar_conv_source = config.sidecar.reader_conv_source
-            text_config.sidecar_reader_collapse = config.sidecar.reader_collapse
-            text_config.sidecar_reader_single_stream = config.sidecar.reader_single_stream
-            text_config.sidecar_reader_collapse_weights = config.sidecar.reader_collapse_weights
-            text_config.sidecar_reader_rho = config.sidecar.reader_rho
-            text_config.sidecar_table_mode = config.sidecar.table_mode
-            text_config.sidecar_ngram_vocab_size_base = config.sidecar.ngram_vocab_size_base
-            text_config.sidecar_ple_embed_dim = config.sidecar.ple_embed_dim
-        if residual_stream is not None:
-            text_config.residual_stream_enabled = True
-            text_config.residual_stream_num_branches = residual_stream.num_branches
-            text_config.residual_stream_lowrank = residual_stream.lowrank
-            text_config.residual_stream_sidecar = config.sidecar is not None
-            text_config.residual_stream_routing = residual_stream.routing
-            text_config.residual_stream_blend = residual_stream.blend
-            text_config.residual_stream_learnable_blend = residual_stream.learnable_blend
-        extra_kwargs["config"] = text_config
-    model = auto_cls.from_pretrained(
-        config.train_model,
-        **extra_kwargs,
-    )
-    LOG.info("Loaded model.")
+from distillkit.models import load_student_model
 
-    if config.sidecar is not None and config.sidecar.variant == "donor_reader" \
-            and saved_sidecar_variant != "donor_reader":
-        # Populate after from_pretrained has materialised missing sidecar tensors, but
-        # before sharding/optimizer construction. Saved transplant checkpoints already
-        # carry these frozen tensors and must replay them rather than consulting a
-        # machine-local source path again.
-        from distillkit.donor_reader import initialise_transplant_reader
-
-        LOG.info("Initialized donor-reader arm: %s", initialise_transplant_reader(
-            model,
-            c1_reference=config.sidecar.reader_c1_reference,
-            donor_reference=config.sidecar.reader_donor_reference,
-        ))
-
-    if config.sidecar is not None and config.sidecar.variant == "donor_reader":
-        # Transformers can materialize parameters missing from a stock checkpoint
-        # with requires_grad=True even when their module constructors froze them.
-        # Reassert the transplant contract before sharding and optimizer creation,
-        # including when resuming a saved donor-reader checkpoint.
-        reader = model.model.layers[config.sidecar.layer_index].sidecar.reader
-        reader.enforce_trainability()
-        reader_trainable = {
-            name: parameter.numel()
-            for name, parameter in reader.named_parameters()
-            if parameter.requires_grad
-        }
-        expected_reader_trainable = (
-            {"mixer.weight": 4 * reader.hidden_size, "rho.weight": 1}
-            if reader.collapse == "mixer"
-            else {"rho.weight": 1}
-        )
-        if reader_trainable != expected_reader_trainable:
-            raise RuntimeError(
-                "Donor-reader freeze contract violated: "
-                f"expected {expected_reader_trainable}, got {reader_trainable}"
-            )
-        LOG.info("Donor-reader trainable parameters: %s", reader_trainable)
-
-    if residual_stream is not None and residual_stream.init_from:
-        # Before sharding and before the optimizer: this writes parameters in place,
-        # and a copy after either would be copying into the wrong object.
-        from distillkit.borrowed_routing import initialise_widened_residual
-
-        LOG.info("Borrowed routing: %s", initialise_widened_residual(
-            model, residual_stream.init_from, residual_stream.init_layer_map))
-
-    model_vocab_size = model.get_input_embeddings().weight.shape[0]
-    required_vocab_size = max(tokenizer_vocab_size, signal_vocab_size or 0)
-    if config.sidecar is not None or residual_stream is not None:
-        if model_vocab_size < required_vocab_size:
-            raise ValueError(
-                "Student head does not cover the tokenizer/signal vocabulary"
-            )
-    else:
-        # Only a cached signal normalized over a padded (larger-than-tokenizer)
-        # head forbids growth. An online teacher's signal_vocab_size equals the
-        # tokenizer size and must still reach the resize path below.
-        if (
-            signal_vocab_size is not None
-            and signal_vocab_size > tokenizer_vocab_size
-            and model_vocab_size < signal_vocab_size
-        ):
-            # Growing would fabricate rows for IDs the cached signals already
-            # normalize over, changing the captured distribution.
-            raise ValueError(
-                f"Student head ({model_vocab_size}) is smaller than the cached "
-                f"signal vocabulary ({signal_vocab_size}); re-capture or use a "
-                f"student whose head covers the cache vocabulary"
-            )
-        # A cached signal normalized over a padded teacher head must not be
-        # shrunk to the tokenizer size; only resize when that cannot break
-        # signal coverage.
-        preserves_padded_head = (
-            signal_vocab_size is not None
-            and signal_vocab_size > tokenizer_vocab_size
-            and model_vocab_size >= signal_vocab_size
-        )
-        if preserves_padded_head:
-            LOG.info(
-                f"Preserving padded student head of {model_vocab_size} entries "
-                f"(tokenizer vocab {tokenizer_vocab_size}) to cover the cached "
-                f"signal vocabulary"
-            )
-        elif (
-            model_vocab_size != tokenizer_vocab_size
-            or config.resize_embeddings_to_multiple_of
-        ):
-            model.resize_token_embeddings(
-                tokenizer_vocab_size,
-                pad_to_multiple_of=config.resize_embeddings_to_multiple_of,
-            )
-            new_model_vocab_size = model.get_input_embeddings().weight.shape[0]
-            if new_model_vocab_size != model_vocab_size:
-                LOG.info(
-                    f"Resized model vocab size from {model_vocab_size} to {new_model_vocab_size}"
-                )
-
-    model: transformers.PreTrainedModel
-    if config.frozen_modules:
-        module_set = set(config.frozen_modules)
-        seen = set()
-        for name, module in model.named_modules():
-            if name in module_set:
-                module.requires_grad_(False)
-                seen.add(name)
-        unseen = module_set - seen
-        LOG.info(f"Froze {len(seen)} modules")
-        if unseen:
-            raise ValueError(f"Frozen modules not found in model: {', '.join(unseen)}")
-    if config.frozen_res:
-        num_frozen = 0
-        frozen_res = [re.compile(s) for s in config.frozen_res]
-        for name, param in model.named_parameters():
-            if any(fre.search(name) for fre in frozen_res):
-                param.requires_grad = False
-                num_frozen += 1
-        if num_frozen:
-            print(f"Froze {num_frozen} tensors by regular expression")
-    return model
 
 
 def create_signal_source(
@@ -485,13 +242,8 @@ def create_signal_source(
         raise RuntimeError("Teacher configuration invalid")
 
 
-def collate_packed_batch(examples):
-    # all sequences in the batch already have the same length
-    # so we can directly stack them
-    return {
-        key: torch.tensor([example[key] for example in examples])
-        for key in examples[0].keys()
-    }
+from distillkit.data import collate_packed_batch, create_data_collator
+
 
 
 def load_tokenizer(config: DistillationRunConfig) -> transformers.PreTrainedTokenizer:
@@ -561,7 +313,7 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         LOG.info("Done.")
         return
     if config.tensor_parallel:
-        from distillkit.tp_model import shard_model
+        from distillkit.parallel import shard_model
         if torch.cuda.device_count() < 2 or int(os.environ.get("WORLD_SIZE", "1")) != 1:
             raise ValueError("Tensor parallel training requires two visible GPUs in one process")
         shard_model(model, ["cuda:0", "cuda:1"])
@@ -628,83 +380,16 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         )
     else:
         hsm = None
-    from distillkit.data import CachedBatchCollator
-    if isinstance(signal_source, OfflineHiddenStateSignalSource):
-        collator = CachedBatchCollator(tokenizer.pad_token_id or tokenizer.eos_token_id)
-    elif config.dataset.prepacked:
-        collator = collate_packed_batch
-    else:
-        # Leave ordinary collation to SFTTrainer so packing/padding_free/
-        # completion_only_loss are honored. TRL rejects a custom collator when
-        # BFD packing enables padding-free mode, so an unconditional collator
-        # here breaks packing=True configurations (e.g. examples/afm_test.yml).
-        collator = None
-    if config.sidecar and config.sidecar.enabled:
-        from trl.trainer.sft_trainer import DataCollatorForLanguageModeling
-        from distillkit.ngram_table import GGUFNGramTable
-        from distillkit.sidecar_collator import SidecarDataCollator
-        # The sidecar wraps a concrete base collator. Packing is forced off for
-        # sidecar runs above, so a plain LM collator is valid when none was set.
-        base_collator = (
-            collator if collator is not None else DataCollatorForLanguageModeling(
-                pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id)
-        )
-        table = None
-        hasher = None
-        if config.sidecar.table_mode == "native":
-            # No GGUF at all: the rows are model parameters, so collation stops at the
-            # indices. The hash geometry has to be the model's own -- a collator hashing
-            # into a different address space than the table it feeds is an out-of-range
-            # lookup at best and silently wrong rows at worst.
-            from distillkit.native_ple import native_hash_config
-            from distillkit.ngram_hash import NGramHasher
-            text_config = getattr(model.config, "text_config", model.config)
-            hasher = NGramHasher(native_hash_config(text_config))
-        else:
-            table = GGUFNGramTable(config.sidecar.table_path)
-            if config.sidecar.resident:
-                # training_arguments, not the Accelerator created before SFTConfig:
-                # building SFTConfig resets AcceleratorState, after which that instance
-                # raises.
-                if training_arguments.world_size > 1:
-                    raise ValueError("Resident table duplication across distributed ranks is unsupported; use memmap")
-                table.load_resident()
-            elif config.sidecar.prefault:
-                table.prefault()
-        collator = SidecarDataCollator(base_collator, table, hasher=hasher,
-                                       shuffle_context=config.sidecar.shuffle_context,
-                                       mode=config.sidecar.table_mode)
-    gate_handle = None
-    if config.residual_gate:
-        from distillkit.residual_gate import (TrigramFamiliarity, calibrate_gates,
-                                              gate_parameter_count,
-                                              install_residual_gates)
-        text_config = getattr(model.config, "text_config", model.config)
-        statistics = None
-        if config.residual_gate.familiarity_cache:
-            statistics = TrigramFamiliarity(config.residual_gate.familiarity_cache,
-                                            text_config.vocab_size)
-        gate_handle = install_residual_gates(
-            model, config.residual_gate.layers, family=config.residual_gate.family,
-            hidden=config.residual_gate.hidden, span=config.residual_gate.span,
-            familiarity=statistics)
-        # Before the optimizer exists, and before anything can have moved: the feature
-        # normalizer is estimated with the gate inert, so the model is the stock model
-        # for the whole pass. A batch here is one document -- the statistics being
-        # collected are per token, so padding would only dilute them.
-        device = next(model.parameters()).device
-        batches = []
-        for index in range(min(config.residual_gate.calibration_batches, len(ds_train))):
-            ids = torch.tensor([ds_train[index]["input_ids"]], device=device)
-            batches.append({"input_ids": ids,
-                            "attention_mask": torch.ones_like(ids)})
-        calibration = calibrate_gates(model, gate_handle, batches)
-        LOG.info("Residual gates on layers %s, family %s, %d parameters; feature "
-                 "normalizer frozen from %d documents",
-                 list(gate_handle.layer_indices), config.residual_gate.family,
-                 gate_parameter_count(model), len(batches))
-        LOG.debug("Gate feature normalizer: %s", calibration)
-
+    collator = create_data_collator(
+        config,
+        tokenizer,
+        signal_source=signal_source,
+        model=model,
+        world_size=training_arguments.world_size,
+    )
+    # Installed and calibrated before the optimizer exists, so the calibration pass runs
+    # against a model nothing has moved yet. Returns None when the run has no gate.
+    gate_handle = attach_residual_gates(config, model, ds_train)
     from distillkit.optimizers import ReleaseEvalCacheCallback
 
     # Evaluation carves the allocator's pool into its own shapes, and Windows cannot
@@ -787,7 +472,8 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
                 callbacks.append(UnfreezeBackboneCallback(config.optimizer.unfreeze_at_step, frozen_names))
         callbacks.append(ArchitectureMetricsCallback(config.optimizer.log_every_n_steps))
     if gate_handle is not None:
-        from distillkit.residual_gate import ResidualGateCheckpointCallback
+        from distillkit.experimental.residual_gate import (
+            ResidualGateCheckpointCallback)
         # The backbone is frozen in stage 1, so a full checkpoint every eval would write
         # the same 2B model five times. Only the gate changes; only the gate is saved.
         callbacks.append(ResidualGateCheckpointCallback(config.output_path))

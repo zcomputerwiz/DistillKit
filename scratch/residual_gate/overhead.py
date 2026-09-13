@@ -27,8 +27,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "ffn_attenuation"))
 import torch
 
 from attenuate import load_records
-from distillkit.residual_gate import (TrigramFamiliarity, family_features,
-                                      install_residual_gates, remove_residual_gates)
+from distillkit.experimental.residual_gate import (
+    TrigramFamiliarity, family_features, install_residual_gates,
+    remove_residual_gates)
 from repeatability import DEFAULT_BUNDLE, DEFAULT_MODEL
 
 CACHE = Path("scratch/ffn_memo/cache/layer-12.npz")

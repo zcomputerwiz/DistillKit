@@ -23,6 +23,13 @@ ALL_LOSS_CLASSES = [
     AssistantCrossEntropyLoss,
 ]
 
+from distillkit.lossfuncs.registry import (
+    register_loss_function,
+    get_loss_function_class,
+    create_loss_function,
+    list_registered_loss_functions,
+)
+
 __all__ = [
     "sparse_kl_div",
     "sparse_js_div",
@@ -41,4 +48,8 @@ __all__ = [
     "AssistantCrossEntropyLoss",
     "LossFunctionBase",
     "ALL_LOSS_CLASSES",
+    "register_loss_function",
+    "get_loss_function_class",
+    "create_loss_function",
+    "list_registered_loss_functions",
 ]

@@ -10,12 +10,16 @@ from transformers import (
 )
 from trl import SFTTrainer
 
-from distillkit.anchor_tap import AnchorTap
-from distillkit.chunked_head import HeadContext
-from distillkit.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
+from distillkit.core.anchor_tap import AnchorTap
+from distillkit.core.chunked_head import HeadContext
+from distillkit.core.chunked_ce import keep_bf16_forward_outputs, maybe_install_chunked_loss
 from distillkit.configuration import DistillationRunConfig, LossFunctionConfig
 from distillkit.hsd_mapping import HiddenStateMapping
-from distillkit.lossfuncs import ALL_LOSS_CLASSES, LossFunctionBase
+from distillkit.lossfuncs import (
+    ALL_LOSS_CLASSES,
+    LossFunctionBase,
+    create_loss_function,
+)
 from distillkit.lossfuncs.hidden_state import last_anchor_report
 from distillkit.signals import OnlineSignalSource, SignalSource, TeacherSignal
 
@@ -23,12 +27,7 @@ LOG = logging.getLogger(__name__)
 
 
 def create_loss_func(cfg: LossFunctionConfig) -> LossFunctionBase:
-    for cls in ALL_LOSS_CLASSES:
-        if cfg.function.value == cls.name():
-            return cls(
-                **cfg.model_dump(exclude=["function", "weight"], exclude_none=True)
-            )
-    raise RuntimeError(f"Unknown loss function '{cfg.function}'")
+    return create_loss_function(cfg)
 
 
 # Enough batches that an ordering difference cannot hide, few enough that the
@@ -131,7 +130,7 @@ class DistillationTrainer(SFTTrainer):
         if self.config.tensor_parallel:
             if self.accelerator.num_processes != 1 or self.accelerator.distributed_type.name != "NO" or self.accelerator.scaler is not None:
                 raise ValueError("Tensor parallelism requires native single-process bf16/fp32 training")
-            from distillkit.tp_model import sync_replicated_gradients
+            from distillkit.parallel import sync_replicated_gradients
             # Cold FLA autotuners share state across device workers. Prime the first
             # backward serially; later steps retain normal autograd scheduling.
             with torch.autograd.set_multithreading_enabled(getattr(self, "_tp_warmed", False)):
@@ -190,7 +189,7 @@ class DistillationTrainer(SFTTrainer):
     def _get_train_sampler(self, train_dataset=None):
         if not self.sortish_batching:
             return super()._get_train_sampler(train_dataset)
-        from distillkit.sortish_sampler import SortishSampler
+        from distillkit.core.sortish_sampler import SortishSampler
 
         dataset = self.train_dataset if train_dataset is None else train_dataset
         column = self.args.length_column_name or "length"
@@ -216,19 +215,19 @@ class DistillationTrainer(SFTTrainer):
     def _clip_grad_norm(self, model):
         if not self.config.tensor_parallel:
             return super()._clip_grad_norm(model)
-        from distillkit.tp_gated_delta_module import clip_grad_norm
+        from distillkit.parallel import clip_grad_norm
         return clip_grad_norm(model, self.args.max_grad_norm)
 
     def _get_grad_norm(self, model, grad_norm=None):
         if self.config.tensor_parallel and grad_norm is None:
-            from distillkit.tp_gated_delta_module import clip_grad_norm
+            from distillkit.parallel import clip_grad_norm
             return clip_grad_norm(model, float("inf"))
         return super()._get_grad_norm(model, grad_norm)
 
     def _save(self, output_dir=None, state_dict=None):
         if not self.config.tensor_parallel:
             return super()._save(output_dir, state_dict)
-        from distillkit.tp_checkpoint import consolidated_state_dict, write_layout
+        from distillkit.parallel import consolidated_state_dict, write_layout
         if state_dict is not None:
             raise ValueError("TP saving must reconstruct weights from the live shards")
         super()._save(output_dir, consolidated_state_dict(self.model))
@@ -236,7 +235,7 @@ class DistillationTrainer(SFTTrainer):
 
     def _load_from_checkpoint(self, resume_from_checkpoint, model=None):
         from pathlib import Path
-        from distillkit.tp_checkpoint import MARKER, load_checkpoint
+        from distillkit.parallel import MARKER, load_checkpoint
         if self.config.tensor_parallel:
             return load_checkpoint(self.model if model is None else model, resume_from_checkpoint)
         if (Path(resume_from_checkpoint) / MARKER).exists():
@@ -246,7 +245,7 @@ class DistillationTrainer(SFTTrainer):
     def _load_best_model(self):
         if not self.config.tensor_parallel:
             return super()._load_best_model()
-        from distillkit.tp_checkpoint import load_checkpoint
+        from distillkit.parallel import load_checkpoint
         load_checkpoint(self.model, self.state.best_model_checkpoint)
 
     def compute_loss(
@@ -487,79 +486,16 @@ class HybridDistillationTrainer(DistillationTrainer):
             self.optimizer = super().create_optimizer()
         unwrapped = self.accelerator.unwrap_model(self.model)
         # None under the hybrid strategy, which already took it at construction.
-        _apply_sidecar_lr(self.optimizer, unwrapped, sidecar_lr)
+        apply_sidecar_lr(self.optimizer, unwrapped, sidecar_lr)
         # Only for the plain-AdamW path; the hybrid optimizer took it at construction.
         # After the sidecar split, so the blend leaves whichever group that put it in.
-        _apply_blend_lr(self.optimizer, unwrapped, blend_lr)
+        apply_blend_lr(self.optimizer, unwrapped, blend_lr)
         return self.optimizer
 
 
-def _apply_sidecar_lr(optimizer, model, sidecar_lr):
-    """Give the sidecar its own learning rate, leaving the backbone on the run's.
+from distillkit.optimizers import apply_sidecar_lr, apply_blend_lr
 
-    Stage 2 runs the backbone at 1e-5, which moves the sidecar barely at all: the
-    chained run's ``W_side_proj`` went 2.1055 -> 2.1077 across an entire epoch, and the
-    PLE module's weights did not change to five significant figures over fifty logged
-    steps. The backbone then adapts around a sidecar that is effectively frozen, which
-    is not what "unlocking both" was supposed to mean.
+# Backward compatibility shims
+_apply_sidecar_lr = apply_sidecar_lr
+_apply_blend_lr = apply_blend_lr
 
-    Splits the auxiliary parameters out of whichever groups HF put them in, preserving
-    each group's weight decay, and re-adds them at ``sidecar_lr``. Done inside
-    ``create_optimizer`` so the scheduler, built afterwards, records the right
-    ``initial_lr`` per group and scales them proportionally.
-    """
-    if sidecar_lr is None:
-        return optimizer
-    from distillkit.optimizers import architecture_parameter_ids
-
-    # Architecture only. The distillation projections are auxiliary too, but they exist
-    # solely to compute the hidden-state term; giving them a raised rate lets them fit
-    # their own objective, which is the confound that made the first sweep meaningless.
-    auxiliary = architecture_parameter_ids(model)
-    moved: dict[float, list] = {}
-    for group in optimizer.param_groups:
-        kept = []
-        for parameter in group["params"]:
-            if id(parameter) in auxiliary:
-                moved.setdefault(group.get("weight_decay", 0.0), []).append(parameter)
-            else:
-                kept.append(parameter)
-        group["params"] = kept
-    for weight_decay, params in moved.items():
-        optimizer.add_param_group(
-            {"params": params, "lr": sidecar_lr, "weight_decay": weight_decay}
-        )
-    return optimizer
-
-
-def _apply_blend_lr(optimizer, model, blend_lr):
-    """Give the learned blend scalars their own rate, after every other regrouping.
-
-    AdamW moves a parameter by roughly ``lr`` per step whatever its gradient, so at the
-    run's 1e-4 a 72-step budget is 0.0072: a blend initialised at 0.10 could reach 0.107
-    and the run would report that it "wants" to stay put. That is the same arithmetic
-    that made a learning-rate sweep the wrong knob for the sidecar gate -- PROGRESS.md,
-    2026-09-10 -- and it is why this is a separate group rather than a hyperparameter
-    inherited from the backbone.
-
-    Weight decay is forced to zero. These are interpolation coefficients, not weights,
-    and decaying them would pull the blend toward "no donor" for reasons unrelated to
-    the objective -- which is precisely the question being asked.
-    """
-    if blend_lr is None:
-        return optimizer
-    from distillkit.hyper_connection import HyperConnection
-
-    blends = {id(module.blend) for module in model.modules()
-              if isinstance(module, HyperConnection) and module.learnable_blend}
-    if not blends:
-        raise ValueError("blend_lr was set but no learnable blend parameter exists")
-    moved = []
-    for group in optimizer.param_groups:
-        kept = []
-        for parameter in group["params"]:
-            (moved if id(parameter) in blends else kept).append(parameter)
-        group["params"] = kept
-    if moved:
-        optimizer.add_param_group({"params": moved, "lr": blend_lr, "weight_decay": 0.0})
-    return optimizer

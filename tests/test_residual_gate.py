@@ -11,11 +11,10 @@ import pytest
 import torch
 
 from distillkit.optimizers import architecture_parameter_ids, freeze_backbone_for_stage1
-from distillkit.residual_gate import (FAMILIES, ResidualAdmissionGate,
-                                      TrigramFamiliarity, calibrate_gates,
-                                      family_features, gate_parameter_count,
-                                      install_residual_gates, remove_residual_gates,
-                                      residual_gates)
+from distillkit.experimental.residual_gate import (
+    FAMILIES, ResidualAdmissionGate, TrigramFamiliarity, calibrate_gates,
+    family_features, gate_parameter_count, install_residual_gates,
+    remove_residual_gates, residual_gates)
 from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
 from tests.test_sidecar_model import tiny_config
