@@ -4841,6 +4841,124 @@ training procedure here has produced, and whether a properly calibrated strength
 forensics found the optimum near twice the fitted magnitude, on a screen-selected lambda
 that still needs a held-out calibration split -- is worth more still.
 
+## The hash was never a memory. It is a structural prior, and it is worth a lot
+
+PLE closed negative as semantic memory: a backbone trained beside a 268.7M-row table
+gained nothing in content over one trained without it, and 79% of what the table did buy
+was layout. The narrower claim that survived was never tested on its own -- that hashed
+local context might be a cheap prior for *structural* prediction. The residual-gate work
+then supplied the regime to test it in: train the backbone normally, freeze it, fit the
+auxiliary mechanism afterwards, so nothing can co-adapt around it.
+
+The sidecar biases the logits of structural tokens only -- newline, other whitespace,
+punctuation, control -- which is 6,166 ids out of 248,320. Content logits are untouched by
+construction, so content can only move through the softmax denominator, and the objective
+constrains that explicitly:
+
+    L = CE_struct(z + b) + 10 * relu(CE_content(z + b) - CE_content(z))
+
+The hash is the historical `NGramHasher`, EOS reset and all. The backbone is verified
+bitwise unchanged between the start and end of every run rather than assumed to be.
+
+### It works, and it is not small
+
+Screen corpus, on the stock seed-42 backbone from the residual-gate controls, at the
+strength a separate calibration split chose:
+
+| arm | trainable | newline | whitespace | punctuation | control | content | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fixed code, d=32 | 0.40M | -0.4684 | -0.1502 | -0.2101 | -0.1852 | **-0.0053** | -0.0811 |
+| fixed code, d=384 | 4.74M | **-0.5953** | -0.1771 | -0.3078 | -0.2685 | **-0.0067** | -0.1100 |
+| learned table, d=32 | 4.60M | -0.5655 | -0.1705 | -0.3125 | -0.2733 | **-0.0169** | -0.1139 |
+| no hash, d=32 | 0.40M | -0.0585 | -0.1248 | -0.0264 | -0.0274 | -0.0017 | -0.0139 |
+
+Content *improves* in every arm. The guardrail was never reached. The confirmation corpus
+reproduces every row to within 0.02 nats, scored once at the already-fixed strength.
+
+Per-class nats on the screen for the cheapest arm: newline -5,337, punctuation -6,844,
+whitespace -577, control -370, content -509. This is a structural result with a small
+content bonus, which is what it was built to be.
+
+### Learned rows were the confound, not the mechanism
+
+The first comparison had the learned table beating fixed random codes on every structural
+class, which would have said addressed memory contributes beyond context identity. It has
+11.5 times the trainable parameters. Giving the fixed arm matched capacity -- same frozen
+random codes, wider decoder -- closes the gap entirely: -0.595 against -0.565 on newline,
+-0.308 against -0.312 on punctuation, -0.110 against -0.114 aggregate.
+
+**At matched capacity, deterministic random codes match learned rows.** The table's
+advantage was decoder width. A second independently seeded code basis gives -0.427 newline
+and -0.210 punctuation against the first seed's -0.468 and -0.210, so this is not one lucky
+draw either.
+
+### The addressing is doing all of the work
+
+Same trained sidecar, addresses rolled seven positions along the sequence:
+
+| arm | newline real | newline wrong | punctuation real | punctuation wrong |
+| --- | ---: | ---: | ---: | ---: |
+| fixed code | -0.4684 | -0.0128 | -0.2101 | **+0.0631** |
+| learned table | -0.5655 | **+0.3595** | -0.3125 | **+0.5023** |
+| no hash | -0.0585 | -0.0585 | -0.0264 | -0.0264 |
+
+97% of the newline gain and all of the punctuation gain disappear under wrong addressing,
+and both flip sign for the learned table. The unaddressed control is unchanged by rolling
+addresses it does not read, which is the arm behaving exactly as designed.
+
+Against that control, hashing carries 87% of the newline gain and 87% of the punctuation
+gain. The exception is whitespace: the no-hash arm gets -0.125 of the hashed arm's -0.150,
+so **most of the whitespace gain is a generic structural bias and only newline and
+punctuation are genuinely context-addressed.**
+
+### It transfers to a backbone it was never fitted on
+
+The seed-42 sidecar attached unchanged to the independently trained seed-43 stock backbone:
+
+| class | on its own backbone | on the other backbone | retained |
+| --- | ---: | ---: | ---: |
+| newline | -0.4684 | -0.4102 | 88% |
+| punctuation | -0.2101 | -0.1965 | 94% |
+| control | -0.1852 | -0.1838 | 99% |
+| content | -0.0053 | -0.0081 | better |
+| whitespace | -0.1502 | -0.0231 | **15%** |
+
+No retraining, no recalibration of the strength. The context-addressed classes port almost
+completely; whitespace, which the control already showed is the generic part, is the part
+that does not. That split is the same one twice, from two different directions.
+
+### It composes with the residual gate
+
+Both post-hoc, both frozen, neither refitted:
+
+| class | gate | sidecar | both | interaction |
+| --- | ---: | ---: | ---: | ---: |
+| content | -0.011745 | -0.005266 | **-0.015999** | +0.001012 |
+| newline | -0.040377 | -0.468408 | -0.465778 | +0.043008 |
+| punctuation | -0.024737 | -0.210090 | -0.213727 | +0.021099 |
+| aggregate | -0.015079 | -0.081101 | **-0.088207** | +0.007974 |
+
+Content is 94% additive, the aggregate 92%. The interference sits where it should -- both
+mechanisms read local context and both move structural tokens -- and it is small. Two
+independently fitted corrections on a frozen backbone stack.
+
+### Verdict
+
+**POSITIVE BUT TABLE UNNECESSARY -- FIXED HASH CODE IS SUFFICIENT.** All six acceptance
+criteria hold: large improvement on four structural classes, content improving rather than
+degrading, full reproduction on the untouched confirmation corpus, the gain destroyed by
+wrong addressing, transfer to an independently trained backbone, and no single token type
+carrying the aggregate.
+
+The 268.7 GiB-class learned n-gram memory is replaced by 400K trainable parameters and a
+deterministic code basis -- 9.2 MB in bf16, and the codes are a seeded draw that need not
+be stored at all. What PLE was actually doing, when it did anything, is visible here
+without the memory: **local context identity is a structural prediction prior, and
+addressing is the whole of it.**
+
+This is not a revival of PLE as semantic memory. That remains closed. It is the narrower
+surviving claim, tested in a regime where the backbone cannot absorb it, and it held.
+
 ## Reproduction
 
 ```powershell
