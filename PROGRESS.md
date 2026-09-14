@@ -5308,9 +5308,11 @@ originally found.
 
 On the independently trained seed-43 backbone, with that checkpoint's own whitespace
 values and nothing refitted: `G_S + S` gives content -0.078186 against `G + S`'s
--0.023503. The sidecar-specific part survives at **-0.000821** against -0.004742 at home,
-so roughly a sixth. The harness advantage transfers almost completely; the specialization
-does not.
+-0.023503. The sidecar-specific part survives at **-0.000821** on the screen and
+**-0.000493** on the confirmation corpus, against -0.004742 and -0.004436 at home -- so a
+sixth, and a ninth on the corpus that was never looked at. The harness advantage transfers
+almost completely (-0.053862 and -0.055524); the specialization mostly does not, and the
+weaker of the two transfer numbers is the one to quote.
 
 ### Verdict
 
