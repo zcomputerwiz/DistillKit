@@ -38,7 +38,7 @@ from distillkit.experimental.residual_gate import (
     TrigramFamiliarity, family_features, install_residual_gates,
     remove_residual_gates)
 from distillkit.experimental.structural_sidecar import (
-    StructuralSidecar, apply_structural_bias, structural_token_ids)
+    FactorizedSidecar, StructuralSidecar, apply_structural_bias, structural_token_ids)
 from evaluate import DEFAULT_CACHE, split_layout
 from fit import BACKBONES, BASE
 from repeatability import DEFAULT_BUNDLE
@@ -60,6 +60,8 @@ def main() -> int:
     parser.add_argument("--sidecar", type=Path,
                         default=Path("scratch/structural_sidecar/fixed-B42/sidecar.pt"))
     parser.add_argument("--gate", type=Path, default=GATE)
+    parser.add_argument("--whitespace", type=Path, default=None,
+                        help="a fitted whitespace bias; factorizes the sidecar first")
     parser.add_argument("--bundle", default=DEFAULT_BUNDLE)
     parser.add_argument("--cache", type=Path, default=DEFAULT_CACHE)
     parser.add_argument("--device", default="cuda:0")
@@ -97,6 +99,15 @@ def main() -> int:
     sidecar.load_state_dict(saved["state_dict"])
     sidecar.requires_grad_(False)
     strength = saved["strength"]
+    whitespace_strength = 0.0
+    if args.whitespace is not None:
+        payload = torch.load(args.whitespace, map_location="cpu", weights_only=False)
+        ids = [index for index, label in enumerate(classes) if label == "whitespace"]
+        sidecar = FactorizedSidecar(sidecar, structural.cpu(),
+                                    torch.tensor(ids, dtype=torch.long)).to(args.device)
+        sidecar.white.load_state_dict(payload["state_dict"])
+        sidecar.requires_grad_(False)
+        whitespace_strength = payload["whitespace_strength"] / strength
     hasher = NGramHasher(NGramHashConfig(
         vocab_size=config.vocab_size, ngram_size=3, heads_per_ngram=1,
         ngram_vocab_size_base=saved["rows"] // 2 - 64, seed=1234,
@@ -136,7 +147,9 @@ def main() -> int:
                                 attention_mask=torch.ones_like(tokens)
                             ).logits[0, :-1].float()
                             if sidecar_on:
-                                bias = sidecar(hasher.row_indices(tokens))[0, :-1]
+                                rows = hasher.row_indices(tokens)
+                                bias = (sidecar(rows, whitespace_strength)
+                                        if args.whitespace else sidecar(rows))[0, :-1]
                                 logits = apply_structural_bias(
                                     logits.unsqueeze(0), bias.unsqueeze(0), structural,
                                     strength)[0]

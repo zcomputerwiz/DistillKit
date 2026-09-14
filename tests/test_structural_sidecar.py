@@ -13,8 +13,9 @@ import torch
 from distillkit.experimental.ngram_hash import NGramHashConfig, NGramHasher
 from distillkit.experimental.ngram_hash import splitmix64
 from distillkit.experimental.structural_sidecar import (
-    MODES, StructuralSidecar, apply_structural_bias, signed_hash_features,
-    splitmix64_tensor, structural_token_ids, wrong_context_rows)
+    MODES, FactorizedSidecar, StructuralSidecar, WhitespaceBias,
+    apply_structural_bias, signed_hash_features, splitmix64_tensor,
+    structural_token_ids, wrong_context_rows)
 
 MASK64 = (1 << 64) - 1
 
@@ -281,3 +282,122 @@ def test_direct_features_survive_a_round_trip_to_another_device():
 def test_a_feature_width_beyond_one_hash_word_is_refused():
     with pytest.raises(ValueError, match="between 1 and 32"):
         signed_hash_features(torch.zeros(1, 2, 2, dtype=torch.int64), 64, seed=1)
+
+
+# --- factorization --------------------------------------------------------------
+#
+# Two controls said "structural" was hiding two mechanisms: the unaddressed baseline kept
+# 83% of the whitespace gain and 12% of newline, and cross-backbone transfer kept 16% of
+# whitespace and 89% of newline. Splitting the module along that line is only a test of
+# that claim if the two halves are genuinely separate -- an addressed branch that still
+# writes whitespace, or a bias that quietly depends on the hash, would produce the same
+# numbers and mean nothing.
+
+STRUCTURAL_IDS = torch.tensor(STRUCTURAL, dtype=torch.long)
+WHITESPACE_IDS = torch.tensor([STRUCTURAL[1], STRUCTURAL[3]], dtype=torch.long)
+
+
+def factorized(mode="direct", trained=True):
+    addressed = sidecar(mode)
+    if trained:
+        addressed.decoder[-1].weight.data.normal_(0, 0.5)
+        addressed.decoder[-1].bias.data.normal_(0, 0.5)
+    module = FactorizedSidecar(addressed, STRUCTURAL_IDS, WHITESPACE_IDS)
+    module.white.bias.data.normal_(0, 0.5)
+    return module
+
+
+def slots():
+    positions = {value: index for index, value in enumerate(STRUCTURAL)}
+    return torch.tensor([positions[int(value)] for value in WHITESPACE_IDS])
+
+
+def others():
+    keep = [index for index, value in enumerate(STRUCTURAL)
+            if value not in set(WHITESPACE_IDS.tolist())]
+    return torch.tensor(keep)
+
+
+def test_the_addressed_branch_writes_nothing_to_whitespace():
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    out = module(rows, 0.0)
+    assert torch.equal(out[..., slots()], torch.zeros(2, 16, len(WHITESPACE_IDS)))
+    assert torch.any(out[..., others()] != 0)
+
+
+def test_the_whitespace_branch_writes_nothing_outside_whitespace():
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    only_addressed = module(rows, 0.0)
+    with_bias = module(rows, 1.0)
+    assert torch.equal(with_bias[..., others()], only_addressed[..., others()])
+    assert torch.any(with_bias[..., slots()] != 0)
+
+
+def test_the_whitespace_branch_ignores_the_addresses():
+    """Context-free means context-free: the same bias wherever the hash points."""
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    wrong = wrong_context_rows(rows)
+    assert torch.equal(module(rows, 1.0)[..., slots()],
+                       module(wrong, 1.0)[..., slots()])
+    assert not torch.equal(module(rows, 1.0)[..., others()],
+                           module(wrong, 1.0)[..., others()])
+
+
+def test_each_branch_can_be_disabled_independently():
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    assert torch.equal(module(rows, 0.0)[..., slots()],
+                       torch.zeros(2, 16, len(WHITESPACE_IDS)))
+    module.addressed.decoder[-1].weight.data.zero_()
+    module.addressed.decoder[-1].bias.data.zero_()
+    out = module(rows, 1.0)
+    assert torch.equal(out[..., others()], torch.zeros(2, 16, len(others())))
+
+
+def test_the_whitespace_strength_scales_only_that_branch():
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    half = module(rows, 0.5)
+    full = module(rows, 1.0)
+    assert torch.allclose(half[..., slots()], 0.5 * full[..., slots()])
+    assert torch.equal(half[..., others()], full[..., others()])
+
+
+def test_fitting_the_bias_leaves_the_addressed_decoder_alone():
+    module = factorized()
+    rows = hasher().row_indices(ids(length=16))
+    before = {name: value.clone()
+              for name, value in module.addressed.state_dict().items()}
+    module.addressed.requires_grad_(False)
+    optimizer = torch.optim.AdamW(module.white.parameters(), lr=0.1, weight_decay=0.5)
+    module(rows, 1.0).sum().backward()
+    optimizer.step()
+    after = module.addressed.state_dict()
+    for name, value in before.items():
+        assert torch.equal(after[name], value), name
+    assert module.white.bias.grad is not None
+
+
+def test_the_whitespace_branch_is_one_parameter_per_token():
+    module = factorized()
+    report = module.parameter_report()
+    assert report["whitespace_parameters"] == len(WHITESPACE_IDS)
+    assert report["whitespace_tokens"] == len(WHITESPACE_IDS)
+    assert report["total_parameters"] == (report["addressed_parameters"]
+                                          + report["whitespace_parameters"])
+
+
+def test_a_whitespace_id_outside_the_structural_set_is_refused():
+    with pytest.raises(ValueError, match="not in the structural set"):
+        FactorizedSidecar(sidecar("direct"), STRUCTURAL_IDS,
+                          torch.tensor([999], dtype=torch.long))
+
+
+def test_a_fresh_whitespace_bias_contributes_nothing():
+    module = FactorizedSidecar(sidecar("direct"), STRUCTURAL_IDS, WHITESPACE_IDS)
+    assert torch.equal(module.white(), torch.zeros(len(WHITESPACE_IDS)))
+    with pytest.raises(ValueError, match="at least one token"):
+        WhitespaceBias(0)

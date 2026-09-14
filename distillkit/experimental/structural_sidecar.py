@@ -45,8 +45,9 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-__all__ = ["StructuralSidecar", "apply_structural_bias", "structural_token_ids",
-           "wrong_context_rows", "signed_hash_features", "splitmix64_tensor", "MODES"]
+__all__ = ["StructuralSidecar", "FactorizedSidecar", "WhitespaceBias",
+           "apply_structural_bias", "structural_token_ids", "wrong_context_rows",
+           "signed_hash_features", "splitmix64_tensor", "MODES"]
 
 MODES = ("table", "fixed", "direct", "none")
 
@@ -226,3 +227,77 @@ def apply_structural_bias(logits: torch.Tensor, bias: torch.Tensor,
     out = logits.clone()
     return out.index_add_(-1, structural.to(out.device),
                           (strength * bias).to(out.dtype))
+
+
+class WhitespaceBias(nn.Module):
+    """One learned scalar per whitespace token id, and no input at all.
+
+    Two independent controls pointed the same way. The unaddressed baseline kept 83% of
+    the whitespace gain while keeping only 12% of newline and punctuation, and the
+    cross-backbone transfer kept 16% of whitespace against 89% and 93%. Both say the
+    whitespace half of "structural" is not using local context for anything -- which, if
+    true, means it is a calibration error and needs 485 numbers rather than a decoder.
+    """
+
+    def __init__(self, count: int) -> None:
+        super().__init__()
+        if count < 1:
+            raise ValueError("a whitespace branch needs at least one token")
+        self.bias = nn.Parameter(torch.zeros(count))
+
+    def forward(self) -> torch.Tensor:
+        return self.bias
+
+
+class FactorizedSidecar(nn.Module):
+    """``addressed(hash)`` off the whitespace columns, plus a context-free bias on them.
+
+    The addressed module is used exactly as trained and is never modified; its whitespace
+    outputs are masked to zero and replaced. That is what makes this cheap enough to be
+    the first thing tried: if a 485-parameter bias recovers the whitespace behaviour, the
+    decomposition is established without retraining the part that was already validated.
+
+    The two halves carry separate strengths, because they answer to different evidence --
+    the addressed strength was calibrated with the monolithic module and has no reason to
+    move, and the whitespace strength has never been calibrated at all.
+    """
+
+    def __init__(self, addressed: StructuralSidecar, structural: torch.Tensor,
+                 whitespace: torch.Tensor) -> None:
+        super().__init__()
+        if whitespace.numel() < 1:
+            raise ValueError("no whitespace tokens to factor out")
+        positions = {int(value): index for index, value in enumerate(structural.tolist())}
+        missing = [int(value) for value in whitespace.tolist() if int(value) not in positions]
+        if missing:
+            raise ValueError("whitespace ids %s are not in the structural set"
+                             % missing[:4])
+        slots = torch.tensor([positions[int(value)] for value in whitespace.tolist()],
+                             dtype=torch.long)
+        self.addressed = addressed
+        self.white = WhitespaceBias(int(whitespace.numel()))
+        self.register_buffer("slots", slots)
+        # 1 on the columns the addressed branch may still write, 0 on the whitespace
+        # columns it has been relieved of.
+        keep = torch.ones(int(structural.numel()))
+        keep[slots] = 0.0
+        self.register_buffer("keep", keep)
+
+    def forward(self, rows: torch.Tensor, whitespace_strength: float = 1.0
+                ) -> torch.Tensor:
+        """``[batch, seq, structural]``, addressed off whitespace and bias only on it."""
+        out = self.addressed(rows) * self.keep
+        if whitespace_strength == 0.0:
+            return out
+        full = torch.zeros(self.keep.numel(), device=out.device, dtype=out.dtype)
+        full = full.index_add(0, self.slots, self.white().to(out.dtype))
+        return out + whitespace_strength * full
+
+    def parameter_report(self) -> dict:
+        addressed = sum(p.numel() for p in self.addressed.parameters()
+                        if p.requires_grad)
+        whitespace = sum(p.numel() for p in self.white.parameters())
+        return {"addressed_parameters": addressed,
+                "whitespace_parameters": whitespace,
+                "whitespace_tokens": int(self.slots.numel()),
+                "total_parameters": addressed + whitespace}

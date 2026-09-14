@@ -5045,6 +5045,98 @@ decoder, which is what the evidence said the mechanism was three experiments ago
 Nothing more elaborate was implemented. The stop rule said the minimum sufficient
 mechanism is the answer, and it was sufficient.
 
+## "Structural" was two mechanisms, and only one of them needs the hash
+
+Two independent controls had said the same thing. The unaddressed baseline kept 83% of the
+whitespace gain and 12% of newline and punctuation; cross-backbone transfer kept 16% of
+whitespace and 89% and 93% of the others. Both said whitespace was not using local context
+for anything.
+
+So the table-free sidecar was reused untouched, its whitespace outputs masked to zero, and
+one learned bias per whitespace token trained in their place. **485 parameters**, no hash
+input, no features of any kind. The addressed decoder took no gradient and is verified
+bitwise unchanged; so is the backbone.
+
+### The addressed half loses nothing when whitespace is taken away from it
+
+| class | monolithic | addressed only | retained |
+| --- | ---: | ---: | ---: |
+| newline | -0.5011 | -0.5018 | **100.1%** |
+| punctuation | -0.2148 | -0.2154 | **100.3%** |
+| control | -0.2044 | -0.2043 | **100.0%** |
+| whitespace | -0.1512 | -0.0037 | 2% |
+
+The hash-conditioned decoder was never using its whitespace columns for anything. Masking
+them costs it nothing measurable, which is the decomposition demonstrated rather than
+argued: these are two mechanisms sharing an output layer, not one mechanism spanning five
+classes.
+
+The 485-parameter bias is provably the context-free half. Under wrong addressing the
+factorized module keeps its whitespace gain at -0.1827 against -0.1831, while newline goes
+-0.4998 to +0.0382 and punctuation -0.2097 to +0.0663.
+
+### But the monolithic module was trading between the two, and the split cannot
+
+Walking the whitespace strength, everything else fixed:
+
+| lambda_w | whitespace | vs monolithic | content | vs monolithic | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0.25 | -0.0742 | 49% | -0.004443 | +0.0010 | 97.3% |
+| 0.50 | -0.1260 | 83% | -0.003443 | +0.0020 | 97.8% |
+| 1.00 | **-0.1831** | **121%** | -0.000779 | +0.0047 | 96.5% |
+
+A context-free bias can beat the monolithic on whitespace by 21% or match it on content,
+not both. Every point keeps 97-100% of newline, punctuation and control and lands within
+5% on aggregate, so the acceptance criteria split: the addressed classes pass everywhere,
+whitespace passes from lambda_w = 0.5, and the content bar of 0.001 only holds at 0.25.
+
+### Why, measured rather than guessed
+
+Mean probability mass on structural tokens at content-target positions:
+
+| arm | structural mass | content |
+| --- | ---: | ---: |
+| stock | 0.046706 | -- |
+| addressed only | **0.044491** | -0.005285 |
+| whitespace only | **0.049250** | +0.004497 |
+| monolithic | 0.044215 | -0.005439 |
+| factorized, lambda_w = 1 | 0.047047 | -0.000779 |
+
+That is the whole mechanism. The addressed branch improves content by *removing*
+inappropriate structural probability from content positions -- it knows from context when
+a newline is not coming. A context-free bias cannot: raising whitespace probability helps
+wherever whitespace belongs and costs everywhere else, and the content improvement the
+monolithic module reported was partly bought by having whitespace columns to trade
+against.
+
+### Whitespace calibration is mostly checkpoint-specific
+
+Fitted on the seed-42 backbone, attached to the independently trained seed-43 one:
+
+| branch | own backbone | other backbone | retained |
+| --- | ---: | ---: | ---: |
+| whitespace bias alone | -0.1850 | -0.0669 | **36%** |
+| hash-conditioned whitespace (previous) | -0.1512 | -0.0239 | 16% |
+| addressed classes (previous) | -0.5011 | -0.4483 | 89% |
+
+Disentangling whitespace from the hash more than doubles its portability, so some of the
+old 16% was entanglement -- but 36% is still mostly checkpoint-specific. The addressed
+branch ports; the whitespace calibration largely does not, and at 485 parameters refitting
+it per checkpoint costs nothing.
+
+Composition with the residual gate is unchanged at 91% additive on aggregate.
+
+### Verdict
+
+**FACTORIZED -- TINY CHECKPOINT-SPECIFIC WHITESPACE CALIBRATION IS SUFFICIENT**, with one
+qualification worth keeping: sufficient for whitespace, not for the monolithic module's
+content bonus, which came from the two halves being optimised against one budget.
+
+The final shape is a portable addressed branch -- 3-gram hash, 32 signed bits, 400K
+decoder, 89-94% cross-backbone retention -- plus 485 per-checkpoint scalars. What was
+called "structural" was a context mechanism for newline, punctuation and control, and a
+calibration error for whitespace, and the two had nothing to do with each other.
+
 ## Reproduction
 
 ```powershell
