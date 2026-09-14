@@ -5327,6 +5327,106 @@ change that had nothing to do with the sidecar, and the control gate fitted in t
 harness is the only reason that is visible. Anyone quoting `G_S + S` against the original
 `G + S` without that control would be reporting a harness as an architecture.
 
+## The mask was the mismatch, and the specialization reproduces on a fresh fit
+
+Two questions were open: which part of the gate's training regime bought the 0.056 nats,
+and whether the structural specialization is a B42 accident. Both are now answered, and
+the first one had a wrong premise that had to be checked before anything was launched.
+
+### There is no corpus factor
+
+The factorial was specified as corpus x loss. The "memoisation corpus" and the teacher
+cache are **the same documents in the same order** -- `capture-data/heldout.jsonl` is the
+file the cache was built from. All 24 of the first 24 match token for token, lengths
+included, and the assistant-mask probe returned identical statistics on both because it
+was reading the same text twice.
+
+So the two things that actually differed between the original gate's training and the
+harness that beat it are the mask and the optimisation regime:
+
+| factor | original | harness |
+| --- | --- | --- |
+| loss | assistant-masked CE, 63% of tokens scored | plain CE, 100% |
+| regime | 284 steps, sequence 4096, cosine + warmup | 1536 steps, sequence 512, constant |
+
+### The mask is the whole effect
+
+Content NLL against stock, four arms, everything else identical -- architecture, layers,
+features, 260 parameters, initialisation, optimizer, rate, seed, evaluation, frozen
+backbone:
+
+| | assistant-masked | plain CE | mask effect |
+| --- | ---: | ---: | ---: |
+| original regime | -0.003794 | **-0.064782** | **-0.060988** |
+| harness regime | **+0.025606** | **-0.070019** | **-0.095625** |
+| regime effect | +0.029400 | -0.005237 | |
+
+The confirmation corpus reproduces every cell to within 0.001. Changing the regime alone,
+under plain CE, is worth -0.005237. Changing the mask alone is worth -0.061 to -0.096.
+There is a large interaction and it runs the wrong way for masking: under assistant
+masking, giving the gate five times as many updates makes it **worse than stock**
+(+0.0256), because more passes over a loss that scores half the tokens overfits to that
+half.
+
+### The mask did not weaken the policy. It prevented it
+
+Mean admission at layer 14 by trigram bucket, and the reach each arm reached:
+
+| arm | reach | unseen | 4-100 | 400-800 | 3000+ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| assistant, original | **0.0491** | 1.0254 | 1.0130 | 1.0004 | 0.9965 |
+| plain, original | 0.8547 | 1.0649 | 0.7365 | 0.3905 | 0.3002 |
+| assistant, harness | 0.4351 | 0.9880 | 0.9238 | 0.8320 | 0.7993 |
+| plain, harness | 0.9982 | 0.9048 | 0.9796 | 0.3842 | 0.1459 |
+
+Under the original condition the assistant-masked gate has a reach of 0.049 and admission
+flat at 1.01 across every familiarity bucket. **It never learned the familiarity policy at
+all.** The monotone shape that the whole residual-admission programme is built on only
+appears under plain cross-entropy. That is a much stronger statement than "the mismatch
+cost some nats": the original gate was trained under a loss that hid the phenomenon it
+was supposed to exploit.
+
+### The specialization reproduces on a fresh fit
+
+The earlier transfer test moved B42's gate parameters to B43 and found almost nothing
+left. That tested parameter portability, not whether the mechanism recurs. Fitting a fresh
+pair on B43 -- one with its own structural sidecar present, one without, everything else
+identical -- answers the second question:
+
+| measurement | B42 | B43 fresh fit | B42 parameters moved to B43 |
+| --- | ---: | ---: | ---: |
+| sidecar-specific, screen | -0.004742 | **-0.002804** | -0.000821 |
+| sidecar-specific, confirmation | -0.004436 | **-0.002594** | -0.000493 |
+
+t -5.2 and -5.1 on the fresh fit. The gradient decomposition reproduces too: on B43 the
+content share of the gate's gradient goes 26.6% to 52.6% when the sidecar is enabled,
+against 17.5% to 48.5% on B42. And the fresh B43 gate shows the same specialization
+signature -- with the sidecar present it does less structural work, newline -0.033 against
+-0.059 and punctuation +0.004 against -0.031, and more content work.
+
+So the mechanism is reproducible and the fitted policy is not portable. A fresh fit
+recovers three to six times what moved parameters do.
+
+### The four claims, kept apart
+
+**Training regime.** -0.061 to -0.096 nats of content, entirely from the mask, replicated
+on both corpora. Not an architecture result. This is the largest number in the residual-
+admission programme and it was a training bug.
+
+**Structural specialization.** -0.0047 on B42, -0.0028 on a fresh B43 fit. Real,
+mechanistically confirmed at the gradient on two backbones, and small.
+
+**Parameter transfer.** -0.0008 and -0.0005. Weak.
+
+**Fresh-fit replication.** Reproduces at roughly 60% of the home magnitude. The
+specialization is a property of the setup, not of B42.
+
+The promotion policy stands: original `G` remains the historical baseline, `G'` is the
+matched-training reference any new gate must beat, and `G_S + S` is not promoted. But
+`G'` itself -- the same 260 parameters, trained under plain cross-entropy -- is worth
+-0.070 nats of content against stock and transfers across backbones essentially intact,
+which makes it the most valuable artefact this line has produced.
+
 ## Reproduction
 
 ```powershell

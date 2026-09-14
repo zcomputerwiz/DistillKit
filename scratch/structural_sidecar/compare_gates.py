@@ -48,6 +48,10 @@ GATES = {
     "G": GATE,
     "G_harness": Path("scratch/structural_sidecar/gate-without-S/gate.pt"),
     "G_S": Path("scratch/structural_sidecar/gate-with-S/gate.pt"),
+    # Fitted fresh on the seed-43 backbone, to separate "the B42 parameters do not
+    # transfer" from "the specialization does not reproduce".
+    "B43_G": Path("scratch/structural_sidecar/B43-gate-without-S/gate.pt"),
+    "B43_G_S": Path("scratch/structural_sidecar/B43-gate-with-S/gate.pt"),
 }
 CLASSES = ("content", "newline", "whitespace", "punctuation", "control", "all")
 
@@ -219,12 +223,11 @@ def main() -> int:
                 label: paired(series[name]["per_document"][label],
                               series["stock"]["per_document"][label])
                 for label in series["stock"]["per_document"]}
-        for name in args.gates:
-            if name == "G":
-                continue
-            entry["differences"]["%s+S - G+S" % name] = {
+        reference = args.gates[0]
+        for name in args.gates[1:]:
+            entry["differences"]["%s+S - %s+S" % (name, reference)] = {
                 label: paired(series[name + "+S"]["per_document"][label],
-                              series["G+S"]["per_document"][label])
+                              series[reference + "+S"]["per_document"][label])
                 for label in series["stock"]["per_document"]}
         if split == "screen":
             entry["admission"] = {name: series[name].get("admission")
