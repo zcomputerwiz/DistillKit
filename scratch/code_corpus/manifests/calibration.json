@@ -1,0 +1,209 @@
+{
+  "index_shingles": 25934,
+  "benchmarks": {
+    "sets": {
+      "evalplus/mbppplus": {
+        "problems": 378,
+        "columns": [
+          "prompt",
+          "code",
+          "test_list"
+        ],
+        "shingles_added": 10335
+      },
+      "evalplus/humanevalplus": {
+        "problems": 164,
+        "columns": [
+          "prompt",
+          "canonical_solution"
+        ],
+        "shingles_added": 15599
+      }
+    },
+    "threshold": 8,
+    "shingle_width": 13,
+    "min_identifiers": 4
+  },
+  "coverage": {
+    "problems_indexed": 535,
+    "problems_total": 542,
+    "shingles_per_problem": {
+      "min": 1,
+      "p50": 31,
+      "p90": 114,
+      "p99": 238,
+      "max": 416
+    },
+    "detectable_at_threshold": 474
+  },
+  "sweep": [
+    {
+      "threshold": 2,
+      "verbatim_caught": 504,
+      "reformatted_caught": 503,
+      "renamed_caught": 174,
+      "ordinary_files_flagged": 1
+    },
+    {
+      "threshold": 3,
+      "verbatim_caught": 479,
+      "reformatted_caught": 478,
+      "renamed_caught": 152,
+      "ordinary_files_flagged": 1
+    },
+    {
+      "threshold": 4,
+      "verbatim_caught": 462,
+      "reformatted_caught": 461,
+      "renamed_caught": 141,
+      "ordinary_files_flagged": 1
+    },
+    {
+      "threshold": 6,
+      "verbatim_caught": 444,
+      "reformatted_caught": 441,
+      "renamed_caught": 115,
+      "ordinary_files_flagged": 1
+    },
+    {
+      "threshold": 8,
+      "verbatim_caught": 410,
+      "reformatted_caught": 407,
+      "renamed_caught": 99,
+      "ordinary_files_flagged": 1
+    },
+    {
+      "threshold": 12,
+      "verbatim_caught": 358,
+      "reformatted_caught": 355,
+      "renamed_caught": 73,
+      "ordinary_files_flagged": 0
+    },
+    {
+      "threshold": 16,
+      "verbatim_caught": 309,
+      "reformatted_caught": 306,
+      "renamed_caught": 56,
+      "ordinary_files_flagged": 0
+    },
+    {
+      "threshold": 24,
+      "verbatim_caught": 249,
+      "reformatted_caught": 245,
+      "renamed_caught": 34,
+      "ordinary_files_flagged": 0
+    }
+  ],
+  "positives": {
+    "verbatim": {
+      "min": 0,
+      "p50": 20,
+      "p90": 114,
+      "p99": 238,
+      "max": 416,
+      "below_threshold": 132
+    },
+    "reformatted": {
+      "min": 0,
+      "p50": 19,
+      "p90": 109,
+      "p99": 238,
+      "max": 416,
+      "below_threshold": 135
+    },
+    "renamed": {
+      "min": 0,
+      "p50": 0,
+      "p90": 16,
+      "p99": 62,
+      "max": 117,
+      "below_threshold": 443
+    }
+  },
+  "negatives": {
+    "min": 0,
+    "p50": 0,
+    "p90": 0,
+    "p99": 0,
+    "max": 8,
+    "above_threshold": 1
+  },
+  "negatives_examined": 582,
+  "highest_scoring_negatives": [
+    {
+      "score": 8,
+      "matched": "mbppplus:721",
+      "file": "lilium513/competition_programing/23ABC/c.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "zwolf21/MonthlyUseAmountInHos/\uc6d0\ub0b4\uc57d\ud488\uc0ac\uc6a9\ub7c9\uc6d4\ubcc4\ud1b5\uacc4.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "ziweiwu/MIT-introduction-in-computer-science/week2/problem-1.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "zhouhaosame/leetcode_zh/\u5b9e\u9a8c\u56fe/MAE.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "zdltheone/mmdgm/mlp-mmdgm/run_gpulearn_mm_z_x.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yklim1/Ourchord/07_TEST/DEEPLEARNING/test/CNN_test_02.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yjlolo/constant-memory-waveglow/inference.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yiulau/thesis_code/explain_hmc/hs_plus_cp.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yinzanxia/dna_info_process/DrawShape.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yingxingtianxia/python/PycharmProjects/my_practice/python_practice/prac_75.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yidasanqian/Beautyleg7Spider/www.beautyleg7.com/beautyleg7/spiders/beautyleg7_spider.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "yangjichen/PublicOpinionAnalysis-TrendPrediction-TensorCompletion/pyten/UI/scalable.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "xinchenxy/ncov2019-/wechat_virus/virus-weixinbot-master/daily_news.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "xiao2912008572/Appium/\u6d4b\u8bd5\u4ee3\u7801/\u5b57\u5178.py"
+    },
+    {
+      "score": 0,
+      "matched": null,
+      "file": "xgao0412/stock_price_app/aa.py"
+    }
+  ]
+}
