@@ -5231,6 +5231,100 @@ gate spent the freedom on whitespace: content +0.0104, worse than stock. Hinging
 content alone produced every number above. A guardrail averaged over classes that are
 already improving is not a guardrail.
 
+## Solving structure triples the content share of the gate's gradient
+
+The residual gate was fitted before the structural sidecar existed, so its 260 parameters
+were spent against an error budget that still held half a nat of newline and a fifth of a
+nat of punctuation. The sidecar now removes most of that without touching the backbone.
+The question is whether the gate's remaining pressure is then mostly content -- which is a
+claim about what the optimizer sees, so it was measured before anything was trained.
+
+### The gradient decomposition
+
+Per-class gate gradient at exact identity, 48 documents, backbone and sidecar frozen:
+
+| class | sidecar off | share | sidecar on | share |
+| --- | ---: | ---: | ---: | ---: |
+| content | 1.566e-01 | 17.5% | 1.518e-01 | **48.5%** |
+| newline | 1.846e-01 | 20.7% | 5.272e-02 | 16.8% |
+| whitespace | 2.996e-01 | **33.6%** | 2.661e-02 | **8.5%** |
+| punctuation | 1.104e-01 | 12.4% | 3.979e-02 | 12.7% |
+| control | 1.418e-01 | 15.9% | 4.211e-02 | 13.5% |
+
+Content's share of the pressure nearly triples while its absolute norm barely moves --
+0.1566 to 0.1518. The sidecar does not give the gate more content signal; it removes the
+structural signal that was drowning it. Whitespace pressure falls elevenfold.
+
+The cosines say the remaining structural pressure is not merely smaller but more hostile.
+Content against newline goes -0.168 to -0.650, content against punctuation -0.053 to
+-0.296. What is left after the sidecar actively competes with content, which is why
+removing it matters more than its share alone suggests.
+
+### The gate that learns under those gradients
+
+Three gates, identical architecture, scored on the same frozen backbone:
+
+| arm | content | newline | whitespace | punctuation | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S alone | -0.000779 | -0.499778 | -0.183050 | -0.209696 | -0.081699 |
+| G (original) | -0.011745 | -0.040377 | -0.007959 | -0.024737 | -0.015079 |
+| G + S | -0.011819 | -0.491460 | -0.177941 | -0.211013 | -0.088267 |
+| G' (this harness, no S) | -0.070294 | -0.051846 | -0.009588 | -0.029511 | -0.055252 |
+| G' + S | -0.067488 | -0.494463 | -0.177149 | -0.205257 | -0.124105 |
+| G_S (fitted with S) | **-0.075061** | -0.017487 | -0.022819 | -0.003673 | -0.051442 |
+| **G_S + S** | **-0.072230** | -0.499894 | -0.182339 | -0.197594 | **-0.126430** |
+
+`G_S + S` beats `G + S` by **-0.060411** of content (t -58.2, 384/384 documents), and the
+confirmation corpus gives -0.061197. But most of that is the harness, not the sidecar.
+This harness trains on plain cross-entropy over the memoisation corpus while the original
+gate was trained on assistant-masked cross-entropy over the teacher cache, and the control
+gate fitted here without the sidecar already gets -0.055669 of it.
+
+**The sidecar-specific part is -0.004742 on the screen and -0.004436 on the confirmation
+corpus.** That is the number this experiment is actually about, and it is worth stating
+plainly rather than quoting the 0.060 that the harness change bought.
+
+### It is specialization, not just a better gate
+
+`G_S` alone does measurably less structural work than the control fitted without the
+sidecar -- newline -0.017 against -0.052, punctuation -0.004 against -0.030 -- and more
+content work, -0.075 against -0.070. It stopped solving problems the sidecar had already
+solved.
+
+The policy shows the same thing. Mean admission at layer 14 by target class:
+
+| gate | content | newline | whitespace | punctuation | control |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| G | 0.7385 | 0.6554 | 0.6469 | 0.7316 | 0.6250 |
+| G' | 0.7397 | 0.6646 | 0.8120 | 0.8027 | 0.5725 |
+| G_S | **0.8066** | **0.8073** | **0.9335** | **0.8789** | **0.8304** |
+
+`G_S` intervenes less everywhere. With structure handled elsewhere it does not need to
+attenuate as hard, and at the most familiar contexts it admits 0.245 where the control
+drops to 0.126. All three keep the monotone familiarity policy the intervention study
+originally found.
+
+### It transfers, weakly
+
+On the independently trained seed-43 backbone, with that checkpoint's own whitespace
+values and nothing refitted: `G_S + S` gives content -0.078186 against `G + S`'s
+-0.023503. The sidecar-specific part survives at **-0.000821** against -0.004742 at home,
+so roughly a sixth. The harness advantage transfers almost completely; the specialization
+does not.
+
+### Verdict
+
+**POSITIVE -- STRUCTURAL CORRECTION FREES RESIDUAL GATING TO SPECIALIZE ON CONTENT.** The
+mechanism is confirmed directly at the gradient: the structural share of the gate's
+pressure collapses from 66% to 46%, content goes 17.5% to 48.5%, and a gate trained under
+those gradients does less structural work, more content work, and yields a better combined
+system on both corpora.
+
+The effect size is 0.0047 nats, not 0.060. The larger number is a training-objective
+change that had nothing to do with the sidecar, and the control gate fitted in the same
+harness is the only reason that is visible. Anyone quoting `G_S + S` against the original
+`G + S` without that control would be reporting a harness as an architecture.
+
 ## Reproduction
 
 ```powershell
