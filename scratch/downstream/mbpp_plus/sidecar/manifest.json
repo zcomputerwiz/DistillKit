@@ -1,0 +1,30 @@
+{
+  "arm": "sidecar",
+  "backbone": "B42",
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\gate-coadapt-armB\\checkpoint-284",
+  "backbone_sha256": "0b52cb3f4c66e9768dd0dd70273fa2adc5412960937c8724b42afff190d80a84",
+  "gate": null,
+  "sidecar": {
+    "addressed": "scratch\\structural_sidecar\\direct-B42\\sidecar.pt",
+    "addressed_sha256": "a5488dbbf0c036d2612fafc549e5e2c4a71e8969cc893750dd5205c0ccc5bbc6",
+    "whitespace": "scratch\\structural_sidecar\\factorized-B42-stockref\\whitespace.pt",
+    "whitespace_sha256": "375ea6419e2f21d206def27a10f3ec77f399e68439459f3dd8e4cb4a96dbb204",
+    "strength": 1.0
+  },
+  "problems": 378,
+  "max_new_tokens": 768,
+  "batch_size": 32,
+  "decoding": {
+    "do_sample": false,
+    "greedy": true,
+    "padding_side": "left",
+    "pad_token": "eos"
+  },
+  "instruction_template": "Write a Python function for the following task. Respond with a single fenced Python code block and no explanation.\n\n{prompt}\n\nYour function must satisfy this test:\n{test}\n",
+  "mean_generated_tokens": 342.8412698412698,
+  "median_generated_tokens": 270,
+  "truncations": 56,
+  "elapsed_seconds": 800.0939999999973,
+  "tokens_per_second": 161.97346811749674,
+  "peak_allocated_bytes": 5809426432
+}

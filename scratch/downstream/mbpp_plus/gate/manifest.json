@@ -1,0 +1,35 @@
+{
+  "arm": "gate",
+  "backbone": "B42",
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\gate-coadapt-armB\\checkpoint-284",
+  "backbone_sha256": "0b52cb3f4c66e9768dd0dd70273fa2adc5412960937c8724b42afff190d80a84",
+  "gate": {
+    "path": "scratch\\gate_regime\\plain-harness\\gate.pt",
+    "sha256": "f393c8383b1579f2afe11feca6c50694fd24d37aca15d61a237b9f7f2b05b98a",
+    "layers": [
+      10,
+      12,
+      14,
+      16
+    ],
+    "mask": "plain",
+    "regime": "harness"
+  },
+  "sidecar": null,
+  "problems": 378,
+  "max_new_tokens": 768,
+  "batch_size": 32,
+  "decoding": {
+    "do_sample": false,
+    "greedy": true,
+    "padding_side": "left",
+    "pad_token": "eos"
+  },
+  "instruction_template": "Write a Python function for the following task. Respond with a single fenced Python code block and no explanation.\n\n{prompt}\n\nYour function must satisfy this test:\n{test}\n",
+  "mean_generated_tokens": 344.68518518518516,
+  "median_generated_tokens": 270,
+  "truncations": 64,
+  "elapsed_seconds": 813.1720000000059,
+  "tokens_per_second": 160.22563492102415,
+  "peak_allocated_bytes": 7901923328
+}

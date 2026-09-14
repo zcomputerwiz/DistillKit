@@ -255,6 +255,13 @@ class ResidualGateHandle:
         self.features = family_features(family)
         self.familiarity = familiarity
         self.context: torch.Tensor | None = None   # [batch, sequence, 2]
+        # Cached decoding hands forward() only the newest token, so a trigram computed
+        # from that call alone addresses the wrong rows -- silently, since the lookup
+        # still returns something. Teacher-forced scoring never hit this because the
+        # whole sequence arrives at once. During generation the handle keeps the running
+        # sequence itself, so no caller has to remember to plumb history through.
+        self.generating = False
+        self.history: torch.Tensor | None = None
         self.calibrating = False
         # The same-checkpoint ablation: admission forced back to unit strength without
         # touching a weight, so 'does this model depend on its gate at inference' is a
@@ -292,10 +299,33 @@ class ResidualGateHandle:
         return self.gates[str(layer)]
 
     def set_context(self, input_ids: torch.Tensor) -> None:
-        """Compute the familiarity features once per forward, not once per layer."""
+        """Compute the familiarity features once per forward, not once per layer.
+
+        In generation mode the features are computed over the whole running sequence and
+        then sliced back to the positions this call is actually about, so a one-token
+        forward still sees the trigram that precedes it.
+        """
         if self.familiarity is None:
             return
-        self.context = self.familiarity.features(input_ids)
+        if not self.generating:
+            self.context = self.familiarity.features(input_ids)
+            return
+        if self.history is None or input_ids.shape[1] >= self.history.shape[1]:
+            # The first call, or a re-prefill: this call carries the whole prefix.
+            self.history = input_ids.detach()
+        else:
+            self.history = torch.cat([self.history, input_ids.detach()], dim=1)
+        features = self.familiarity.features(self.history)
+        self.context = features[:, -input_ids.shape[1]:]
+
+    def begin_generation(self) -> None:
+        """Start a fresh decoded sequence; the next forward carries its prefix."""
+        self.generating = True
+        self.history = None
+
+    def end_generation(self) -> None:
+        self.generating = False
+        self.history = None
 
     def reset_stats(self) -> None:
         self.stats = {}
