@@ -5137,6 +5137,100 @@ decoder, 89-94% cross-backbone retention -- plus 485 per-checkpoint scalars. Wha
 called "structural" was a context mechanism for newline, punctuation and control, and a
 calibration error for whitespace, and the two had nothing to do with each other.
 
+## Whitespace admission is contextual, and 33 numbers nearly close the frontier
+
+The factorization left a precise failure: 485 context-free biases beat the monolithic
+module on whitespace by 21% and could not do that and match its content at the same time.
+The measured reason was that a global strength applies the correction everywhere --
+structural probability on content targets went from 0.0445 with the addressed branch alone
+to 0.0493 once the static bias joined it, against 0.0467 stock. The bias knew what to
+correct and not when.
+
+So: 33 parameters. One scalar per token, `a(x) = 2 sigmoid(w . c + b)` over the 32 trigram
+context bits the addressed branch already computes, multiplying a whitespace correction
+that stays frozen. Zero weights give `a = 1`, which is the static arm exactly. Everything
+else -- backbone, 400K decoder, 485 values, hash -- is frozen and verified bitwise.
+
+### The gate does exactly what it was asked to
+
+| arm | P(structural) on content targets | P(whitespace) on whitespace targets |
+| --- | ---: | ---: |
+| stock | 0.046706 | 0.861798 |
+| addressed only | 0.044491 | 0.862951 |
+| static bias | **0.047047** | 0.937936 |
+| **gated** | **0.046632** | **0.944339** |
+
+The static bias pushed structural mass on content positions *above* stock. The gate pulls
+it back below stock while pushing whitespace mass on whitespace targets higher than the
+static arm managed. It suppresses the correction where it does not belong and keeps it
+where it does, which is the entire hypothesis, measured directly rather than inferred from
+NLL.
+
+Admission by target class: whitespace 0.977, newline 0.953, punctuation 0.931, content
+0.924, control 0.677, with p10 to p90 spanning roughly 0.42 to 1.47. Population-level
+separation, not a classifier -- and genuinely context-varying, which the wrong-address
+control confirms: whitespace goes -0.192 to -0.160 under wrong addressing, where the
+static bias was completely unaffected by it. The decomposition is therefore generic
+whitespace value plus a context-dependent admission improvement, exactly as predicted.
+
+### It nearly closes the frontier, and misses by 0.0007
+
+Walking the whitespace strength with the gate in place:
+
+| arm | content | newline | whitespace | punctuation | control | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| monolithic | **-0.005439** | -0.501120 | -0.151211 | -0.214791 | -0.204409 | **-0.084666** |
+| addressed only | -0.005285 | -0.501833 | -0.003675 | -0.215433 | -0.204308 | -0.081332 |
+| static bias | -0.000779 | -0.499778 | -0.183050 | -0.209696 | -0.201385 | -0.081699 |
+| gated, full | -0.001405 | -0.499506 | **-0.192047** | -0.209236 | -0.201290 | -0.082163 |
+| **gated at 0.50** | -0.003765 | -0.500915 | -0.153179 | -0.213178 | -0.203596 | -0.083563 |
+| gated at 0.25 | -0.004594 | -0.501416 | -0.100999 | -0.214456 | -0.204057 | -0.083090 |
+
+Five of the six acceptance criteria hold at the 0.50 point: whitespace 101%, newline
+99.96%, punctuation 99.2%, control 99.6%, aggregate 98.7%. Content is -0.003765 against
+the monolithic's -0.005439, so it **misses the 0.001 bar by 0.00067**.
+
+The gate is a strict improvement on the static arm -- better on whitespace *and* better on
+content at every matched strength -- and it does not recover the monolithic's content
+number. The addressed branch alone gives -0.005285, so essentially the whole content bonus
+comes from it, and adding any whitespace correction costs some of it back: 0.0045 for the
+static bias, 0.0039 with the gate, 0.0017 at half strength. Contextual admission relaxes
+that conflict by about 15% and does not remove it.
+
+### Portability decomposes
+
+| configuration | whitespace on B43 | content |
+| --- | ---: | ---: |
+| B42 gate + B42 values | -0.0676 | -0.0013 |
+| B42 gate + B43-refit values | **-0.0919** | +0.0009 |
+| B43-refit values, no gate | -0.0869 | +0.0031 |
+
+Refitting the 485 values locally recovers 36% more whitespace, and the B42-fitted gate
+still helps on top of them -- better whitespace and better content than the ungated
+refit. So the admission policy is portable and the values are not, which is the
+decomposition the experiment was hoping for; B43's whitespace headroom is simply smaller
+than B42's.
+
+### Verdict
+
+**CONTEXT-GATED WHITESPACE BIAS IS NEARLY SUFFICIENT -- the mechanism is confirmed, the
+frontier is not quite closed.** The hypothesis was right: whitespace values are simple,
+whitespace admission is contextual, and 33 parameters demonstrate it. What they do not do
+is buy back the last 0.0007 nats of content.
+
+Not building a bigger gate. The deficit is 0.0007 nats of content against a 0.153
+whitespace gain; the gate provably works on the mechanism it was built for; and a hidden
+layer chasing that number is the machinery the stop rules exist to prevent. The final
+whitespace mechanism is 518 parameters -- 485 checkpoint-specific values and 33 portable
+admission weights.
+
+One methodological correction, because it changed a verdict. The first fit put the content
+guardrail on all non-whitespace targets pooled. The addressed branch improves newline and
+punctuation by half a nat each, so that mean never rose, the hinge never fired, and the
+gate spent the freedom on whitespace: content +0.0104, worse than stock. Hinging on
+content alone produced every number above. A guardrail averaged over classes that are
+already improving is not a guardrail.
+
 ## Reproduction
 
 ```powershell

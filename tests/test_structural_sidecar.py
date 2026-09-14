@@ -13,7 +13,7 @@ import torch
 from distillkit.experimental.ngram_hash import NGramHashConfig, NGramHasher
 from distillkit.experimental.ngram_hash import splitmix64
 from distillkit.experimental.structural_sidecar import (
-    MODES, FactorizedSidecar, StructuralSidecar, WhitespaceBias,
+    MODES, FactorizedSidecar, StructuralSidecar, WhitespaceBias, WhitespaceGate,
     apply_structural_bias, signed_hash_features, splitmix64_tensor,
     structural_token_ids, wrong_context_rows)
 
@@ -401,3 +401,134 @@ def test_a_fresh_whitespace_bias_contributes_nothing():
     assert torch.equal(module.white(), torch.zeros(len(WHITESPACE_IDS)))
     with pytest.raises(ValueError, match="at least one token"):
         WhitespaceBias(0)
+
+
+# --- contextual admission -------------------------------------------------------
+#
+# The 485 values know what correction to make and a global strength applies it
+# everywhere, which is why whitespace and content traded against each other. The gate
+# asks only how much of that fixed correction belongs here. Zero weights have to mean
+# "all of it", or the experiment would not start from the arm it has to beat.
+
+
+def gated_module(trained=True):
+    module = FactorizedSidecar(sidecar("direct", code_dim=32), STRUCTURAL_IDS,
+                               WHITESPACE_IDS, gated=True)
+    module.addressed.decoder[-1].weight.data.normal_(0, 0.5)
+    module.white.bias.data.normal_(0, 0.4)
+    if trained:
+        module.gate.weight.data.normal_(0, 1.5)
+        module.gate.bias.data.fill_(-0.5)
+    return module
+
+
+def test_a_fresh_gate_admits_exactly_all_of_it():
+    gate = WhitespaceGate(32)
+    code = torch.randn(3, 5, 32).sign()
+    assert torch.equal(gate(code), torch.ones(3, 5))
+
+
+def test_a_fresh_gate_reproduces_the_static_arm():
+    plain = FactorizedSidecar(sidecar("direct", code_dim=32), STRUCTURAL_IDS,
+                              WHITESPACE_IDS)
+    gated = FactorizedSidecar(plain.addressed, STRUCTURAL_IDS, WHITESPACE_IDS,
+                              gated=True)
+    gated.white.bias.data.normal_(0, 0.4)
+    plain.white.bias.data.copy_(gated.white.bias.data)
+    rows = hasher().row_indices(ids(length=16))
+    assert torch.allclose(gated(rows, 1.0), plain(rows, 1.0))
+
+
+def test_admission_stays_inside_its_range():
+    """(0, 2) in exact arithmetic, [0, 2] in float32 once the sigmoid saturates.
+
+    Driven to +-332 the sigmoid rounds to 0 and 1, so the bound is closed rather than
+    open in practice. What matters is that it is a bound: no weights produce admission
+    outside it, and the trained gate lives at 0.37 to 1.60, nowhere near the edge.
+    """
+    gate = WhitespaceGate(32)
+    gate.weight.data.fill_(50.0)
+    gate.bias.data.fill_(50.0)
+    for sign in (+1.0, -1.0):
+        values = gate(torch.full((64, 32), sign / 32 ** 0.5))
+        assert 0.0 <= float(values.min().detach())
+        assert float(values.max().detach()) <= 2.0
+
+    gate.weight.data.normal_(0, 1.0)
+    gate.bias.data.fill_(0.0)
+    values = gate(torch.randn(256, 32).sign() / 32 ** 0.5)
+    assert 0.0 < float(values.min().detach())
+    assert float(values.max().detach()) < 2.0
+
+
+def test_admission_is_one_scalar_per_token():
+    module = gated_module()
+    rows = hasher().row_indices(ids(length=16))
+    assert module.admission(rows).shape == (2, 16)
+
+
+def test_the_gate_scales_only_the_whitespace_columns():
+    module = gated_module()
+    rows = hasher().row_indices(ids(length=16))
+    flat = FactorizedSidecar(module.addressed, STRUCTURAL_IDS, WHITESPACE_IDS)
+    flat.white.bias.data.copy_(module.white.bias.data)
+    assert torch.equal(module(rows, 1.0)[..., others()],
+                       flat(rows, 1.0)[..., others()])
+    assert not torch.allclose(module(rows, 1.0)[..., slots()],
+                              flat(rows, 1.0)[..., slots()])
+
+
+def test_the_gate_multiplies_the_fixed_values():
+    """The bias vector is the correction; the gate is only how much of it is admitted."""
+    module = gated_module()
+    rows = hasher().row_indices(ids(length=16))
+    admission = module.admission(rows)
+    expected = admission.unsqueeze(-1) * module.white.bias
+    assert torch.allclose(module(rows, 1.0)[..., slots()], expected, atol=1e-6)
+
+
+def test_admission_is_deterministic_and_context_dependent():
+    module = gated_module()
+    rows = hasher().row_indices(ids(length=16))
+    assert torch.equal(module.admission(rows), module.admission(rows.clone()))
+    assert not torch.equal(module.admission(rows),
+                           module.admission(wrong_context_rows(rows)))
+
+
+def test_the_gate_reads_the_trigram_half_of_the_code():
+    """Thirty-two features, not sixty-four: the whole mechanism is 33 parameters."""
+    module = gated_module()
+    assert module.gate.weight.numel() == module.addressed.code_dim
+    assert module.parameter_report()["gate_parameters"] == (
+        module.addressed.code_dim + 1)
+
+
+def test_an_ungated_module_refuses_to_report_admission():
+    module = FactorizedSidecar(sidecar("direct"), STRUCTURAL_IDS, WHITESPACE_IDS)
+    assert module.gate is None
+    with pytest.raises(ValueError, match="no admission gate"):
+        module.admission(hasher().row_indices(ids()))
+
+
+def test_fitting_the_gate_leaves_the_values_and_the_decoder_alone():
+    module = gated_module()
+    rows = hasher().row_indices(ids(length=16))
+    module.addressed.requires_grad_(False)
+    module.white.requires_grad_(False)
+    before = {"addressed": {k: v.clone()
+                            for k, v in module.addressed.state_dict().items()},
+              "white": module.white.bias.clone()}
+    optimizer = torch.optim.AdamW(module.gate.parameters(), lr=0.1, weight_decay=0.5)
+    module(rows, 1.0).sum().backward()
+    optimizer.step()
+    for key, value in before["addressed"].items():
+        assert torch.equal(module.addressed.state_dict()[key], value), key
+    assert torch.equal(module.white.bias, before["white"])
+    assert module.gate.weight.grad is not None
+
+
+def test_a_gate_needs_features():
+    with pytest.raises(ValueError, match="at least one feature"):
+        WhitespaceGate(0)
+    with pytest.raises(ValueError, match="expects 32 features"):
+        WhitespaceGate(32)(torch.randn(2, 3, 16))

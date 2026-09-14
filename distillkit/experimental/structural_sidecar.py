@@ -46,6 +46,7 @@ import torch
 from torch import nn
 
 __all__ = ["StructuralSidecar", "FactorizedSidecar", "WhitespaceBias",
+           "WhitespaceGate",
            "apply_structural_bias", "structural_token_ids", "wrong_context_rows",
            "signed_hash_features", "splitmix64_tensor", "MODES"]
 
@@ -249,6 +250,37 @@ class WhitespaceBias(nn.Module):
         return self.bias
 
 
+class WhitespaceGate(nn.Module):
+    """``a(x) = 2 sigmoid(w . c + b)``, exactly 1 at initialization.
+
+    The factorization left one specific failure. The 485 whitespace biases know *what*
+    correction to make -- they beat the monolithic module on whitespace by 21% -- but a
+    single global strength applies them everywhere, so the correction that helps where
+    whitespace belongs costs probability mass everywhere else. Measured: structural mass
+    on content targets is 0.0445 with the addressed branch alone and 0.0493 with the
+    static bias added, against 0.0467 stock.
+
+    So the gate is not asked which whitespace token to prefer. It is asked how much of an
+    already-known correction belongs here, from the context bits the addressed branch
+    already computes. Zero weights give ``a = 1``, which is the static bias exactly, so
+    the experiment starts from the arm it has to beat.
+    """
+
+    def __init__(self, features: int = 32) -> None:
+        super().__init__()
+        if features < 1:
+            raise ValueError("a gate needs at least one feature")
+        self.weight = nn.Parameter(torch.zeros(features))
+        self.bias = nn.Parameter(torch.zeros(()))
+
+    def forward(self, code: torch.Tensor) -> torch.Tensor:
+        """``[batch, seq, features]`` in, ``[batch, seq]`` of admission in (0, 2)."""
+        if code.shape[-1] != self.weight.numel():
+            raise ValueError("gate expects %d features, got %d"
+                             % (self.weight.numel(), code.shape[-1]))
+        return 2.0 * torch.sigmoid(code @ self.weight + self.bias)
+
+
 class FactorizedSidecar(nn.Module):
     """``addressed(hash)`` off the whitespace columns, plus a context-free bias on them.
 
@@ -263,7 +295,7 @@ class FactorizedSidecar(nn.Module):
     """
 
     def __init__(self, addressed: StructuralSidecar, structural: torch.Tensor,
-                 whitespace: torch.Tensor) -> None:
+                 whitespace: torch.Tensor, gated: bool = False) -> None:
         super().__init__()
         if whitespace.numel() < 1:
             raise ValueError("no whitespace tokens to factor out")
@@ -276,6 +308,10 @@ class FactorizedSidecar(nn.Module):
                              dtype=torch.long)
         self.addressed = addressed
         self.white = WhitespaceBias(int(whitespace.numel()))
+        # Reads the trigram half of the code the addressed branch already builds: the
+        # longer context, and 32 features rather than 64, which keeps the whole
+        # contextual mechanism at 33 parameters.
+        self.gate = WhitespaceGate(addressed.code_dim) if gated else None
         self.register_buffer("slots", slots)
         # 1 on the columns the addressed branch may still write, 0 on the whitespace
         # columns it has been relieved of.
@@ -291,13 +327,26 @@ class FactorizedSidecar(nn.Module):
             return out
         full = torch.zeros(self.keep.numel(), device=out.device, dtype=out.dtype)
         full = full.index_add(0, self.slots, self.white().to(out.dtype))
-        return out + whitespace_strength * full
+        scale = whitespace_strength
+        if self.gate is not None:
+            scale = whitespace_strength * self.admission(rows).unsqueeze(-1)
+        return out + scale * full
+
+    def admission(self, rows: torch.Tensor) -> torch.Tensor:
+        """``[batch, seq]`` of how much of the whitespace correction to admit."""
+        if self.gate is None:
+            raise ValueError("this module has no admission gate")
+        code = self.addressed.code(rows)
+        return self.gate(code[..., self.addressed.code_dim:])
 
     def parameter_report(self) -> dict:
         addressed = sum(p.numel() for p in self.addressed.parameters()
                         if p.requires_grad)
         whitespace = sum(p.numel() for p in self.white.parameters())
+        gate = 0 if self.gate is None else sum(p.numel()
+                                               for p in self.gate.parameters())
         return {"addressed_parameters": addressed,
                 "whitespace_parameters": whitespace,
+                "gate_parameters": gate,
                 "whitespace_tokens": int(self.slots.numel()),
-                "total_parameters": addressed + whitespace}
+                "total_parameters": addressed + whitespace + gate}
