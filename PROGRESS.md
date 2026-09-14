@@ -4959,6 +4959,92 @@ addressing is the whole of it.**
 This is not a revival of PLE as semantic memory. That remains closed. It is the narrower
 surviving claim, tested in a regime where the backbone cannot absorb it, and it held.
 
+## The code table goes too: 32 signed bits off one hash word
+
+The structural sidecar had already shed its learned rows. What was left was a frozen
+random code basis -- 4.2M numbers, 16.8 MB resident -- reconstructible from a seed but
+still allocated and gathered from at every forward. The obvious question was whether it
+needs to exist.
+
+It does not. The whole basis is one splitmix64 mix of the row id, sliced into 32 bits:
+
+    c_j = (+-1) / sqrt(32)      from bit j of splitmix64(row ^ splitmix64(seed))
+
+No table, no buffer, no stored rows, no PRNG state. The mixer is the one the hasher
+already uses, vectorised over int64 and pinned bit-identical to the scalar reference --
+torch has no unsigned 64-bit type and `>>` on int64 is arithmetic, so every shift inside
+the mix needs masking or the sign bit quietly poisons it.
+
+Nothing else changed: same historical `NGramHasher` addressing with its EOS reset, same
+decoder width, same 400,790 trainable parameters, same splits, same loss, same guardrail,
+same calibration protocol.
+
+### It is better than the table it replaces
+
+| class | fixed code, d=32 | table-free | confirmation (table-free) |
+| --- | ---: | ---: | ---: |
+| newline | -0.4684 | **-0.5011** | -0.5006 |
+| whitespace | -0.1502 | -0.1512 | -0.1695 |
+| punctuation | -0.2101 | -0.2148 | -0.2182 |
+| control | -0.1852 | -0.2044 | -0.2191 |
+| content | -0.0053 | -0.0054 | -0.0054 |
+| aggregate | -0.0811 | **-0.0847** | -0.0848 |
+
+Every class is equal or better, the aggregate by 4.4%, and the confirmation corpus
+reproduces all of it. The equivalence criterion asked for within 5% either way; the
+cheapest construction came out on the right side of it.
+
+Wrong addressing still destroys the gain -- newline -0.5011 becomes +0.0363, punctuation
+-0.2148 becomes +0.0603 -- so this is the same mechanism, not a different one that happens
+to score similarly.
+
+### It transfers like the table did
+
+Fitted on the seed-42 stock backbone, attached unchanged to the independently trained
+seed-43 one, no recalibration:
+
+| class | own backbone | other backbone | retained | table arm retained |
+| --- | ---: | ---: | ---: | ---: |
+| newline | -0.5011 | -0.4483 | 89% | 88% |
+| punctuation | -0.2148 | -0.1996 | 93% | 94% |
+| control | -0.2044 | -0.2025 | 99% | 99% |
+| whitespace | -0.1512 | -0.0239 | 16% | 15% |
+
+The same profile to within a point, including the whitespace exception the no-hash control
+independently identified as the generic part.
+
+### And it is not slower
+
+Timing the integrated path -- backbone, hash, code construction, decoder, logit bias --
+interleaved, minimum of six rounds of eight forwards:
+
+| arm | s/forward | tokens/s | resident code table | checkpoint |
+| --- | ---: | ---: | ---: | ---: |
+| fixed code | 0.07235 | 6,054 | 16,793,600 B | 1.6 MB |
+| table-free | 0.07028 | 6,232 | **0 B** | 1.6 MB |
+
+The table-free arm measures 2.9% faster, which is not a result: the spread of repeated
+identical work was 36% and 55% on the two arms. The honest statement is that the
+difference is below what this machine resolves, which is all the performance rule needed.
+Peak allocated memory is identical at 4.56 GiB.
+
+Composition with the scalar residual gate is unchanged -- content -0.0117 and -0.0054
+separately, -0.0163 together, 95% additive; aggregate 91% additive.
+
+### Verdict
+
+**TABLE ELIMINATED -- DIRECT HASH FEATURES ARE SUFFICIENT.** The structural sidecar is now
+a 3-gram hash, 32 signed bits taken from its mixed row id, and a 400K-parameter decoder
+over the 6,166 structural token ids. There is no table of any kind left in it.
+
+The progression is worth stating plainly, because each step removed something the previous
+result had made look essential: 268.7M learned rows, then learned rows at all, then the
+stored random basis. What remains is deterministic local-context identity and a small
+decoder, which is what the evidence said the mechanism was three experiments ago.
+
+Nothing more elaborate was implemented. The stop rule said the minimum sufficient
+mechanism is the answer, and it was sufficient.
+
 ## Reproduction
 
 ```powershell

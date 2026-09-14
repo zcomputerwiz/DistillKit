@@ -11,9 +11,12 @@ import pytest
 import torch
 
 from distillkit.experimental.ngram_hash import NGramHashConfig, NGramHasher
+from distillkit.experimental.ngram_hash import splitmix64
 from distillkit.experimental.structural_sidecar import (
-    MODES, StructuralSidecar, apply_structural_bias, structural_token_ids,
-    wrong_context_rows)
+    MODES, StructuralSidecar, apply_structural_bias, signed_hash_features,
+    splitmix64_tensor, structural_token_ids, wrong_context_rows)
+
+MASK64 = (1 << 64) - 1
 
 VOCAB = 64
 STRUCTURAL = (3, 5, 7, 11)
@@ -190,3 +193,91 @@ def test_structural_ids_come_from_the_class_splitter():
     assert structural_token_ids(classes).tolist() == [1, 3, 4]
     with pytest.raises(ValueError, match="no structural tokens"):
         structural_token_ids(["content", "content"])
+
+
+# --- table-free codes -----------------------------------------------------------
+#
+# The previous experiment found that learned rows were unnecessary once decoder capacity
+# was matched, which leaves an obvious question: is a stored random basis necessary
+# either? The direct mode answers it by slicing signed features out of one mixed hash
+# word. Everything below exists because "no table" has to mean no table -- not a table
+# that is allocated somewhere less visible -- and because a hand-vectorised mixer is
+# exactly the kind of code that is subtly wrong and still looks random.
+
+
+def test_the_vectorised_mixer_matches_the_scalar_reference():
+    """Bit-identity, not distributional similarity. torch has no unsigned int64."""
+    values = [0, 1, 2, 12345, 2 ** 40, 2 ** 62, 131199, -5, -(2 ** 62)]
+    mixed = splitmix64_tensor(torch.tensor(values, dtype=torch.int64))
+    for value, result in zip(values, mixed.tolist()):
+        assert splitmix64(value & MASK64) == (result & MASK64), value
+
+
+def test_direct_features_are_signed_and_normalised():
+    features = signed_hash_features(torch.arange(64).reshape(1, 32, 2), 32, seed=7)
+    assert features.shape == (1, 32, 2, 32)
+    # float32, so compare against the value the construction actually produces rather
+    # than against Python's float64 reciprocal square root.
+    magnitude = torch.tensor(1.0 / 32 ** 0.5)
+    assert torch.equal(features.abs(), magnitude.expand_as(features))
+    assert torch.allclose(features.norm(dim=-1), torch.ones(1, 32, 2), atol=1e-5)
+
+
+def test_direct_features_are_deterministic():
+    rows = torch.arange(128).reshape(1, 64, 2)
+    assert torch.equal(signed_hash_features(rows, 32, 7),
+                       signed_hash_features(rows.clone(), 32, 7))
+    assert not torch.equal(signed_hash_features(rows, 32, 7),
+                           signed_hash_features(rows, 32, 8))
+
+
+def test_direct_features_decorrelate_distinct_rows():
+    """A mixer that collapsed nearby ids would look fine and carry no identity."""
+    rows = torch.arange(4096, dtype=torch.int64)
+    features = signed_hash_features(rows.reshape(1, 2048, 2), 32, seed=7)
+    flat = features.reshape(-1, 32)
+    assert len({tuple(row) for row in flat.tolist()}) > 4000
+    gram = (flat @ flat.T) * 32
+    off = gram - torch.diag(torch.diagonal(gram))
+    assert float(off.abs().max()) < 32, "two distinct ids produced the same code"
+    assert abs(float(off.sum()) / (4096 * 4095)) < 0.5
+
+
+def test_direct_mode_allocates_no_table():
+    module = sidecar("direct")
+    assert module.codes is None
+    assert list(module.named_buffers()) == []
+    report = module.parameter_report()
+    assert report["frozen_code_entries"] == 0
+    # Same trainable footprint as the stored-basis arm it is replacing, so the
+    # comparison is about representation rather than capacity.
+    assert report["trainable_parameters"] == sidecar("fixed").parameter_report()[
+        "trainable_parameters"]
+
+
+def test_direct_mode_is_addressed_and_respects_wrong_context():
+    module = sidecar("direct")
+    module.decoder[-1].weight.data.normal_(0, 0.5)
+    rows = hasher().row_indices(ids(length=16))
+    assert not torch.equal(module(rows), module(wrong_context_rows(rows)))
+
+
+def test_direct_mode_starts_at_exactly_zero():
+    module = sidecar("direct")
+    rows = hasher().row_indices(ids())
+    assert torch.equal(module(rows), torch.zeros(2, 9, len(STRUCTURAL)))
+
+
+def test_direct_features_survive_a_round_trip_to_another_device():
+    """CPU and GPU must agree, or a benchmark would compare two different functions."""
+    if not torch.cuda.is_available():
+        pytest.skip("no CUDA device")
+    rows = torch.arange(256, dtype=torch.int64).reshape(1, 128, 2)
+    host = signed_hash_features(rows, 32, 7)
+    device = signed_hash_features(rows.cuda(), 32, 7).cpu()
+    assert torch.equal(host, device)
+
+
+def test_a_feature_width_beyond_one_hash_word_is_refused():
+    with pytest.raises(ValueError, match="between 1 and 32"):
+        signed_hash_features(torch.zeros(1, 2, 2, dtype=torch.int64), 64, seed=1)

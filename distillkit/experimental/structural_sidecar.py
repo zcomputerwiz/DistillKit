@@ -26,6 +26,8 @@ frozen here and never sees a gradient.
 ``fixed``   a deterministic seeded random code per bucket, frozen, with only the decoder
             trainable -- if this matches ``table`` then local context *identity* is the
             signal and the learned rows were never the point
+``direct``  the same idea with the table removed: signed features sliced straight out of
+            one mixed hash word, so nothing per-row is stored or allocated at all
 ``none``    one learned code for every position, no addressing at all, which is the
             control that says whether hashing contributes anything over a generic
             structural bias
@@ -44,9 +46,60 @@ import torch
 from torch import nn
 
 __all__ = ["StructuralSidecar", "apply_structural_bias", "structural_token_ids",
-           "wrong_context_rows", "MODES"]
+           "wrong_context_rows", "signed_hash_features", "splitmix64_tensor", "MODES"]
 
-MODES = ("table", "fixed", "none")
+MODES = ("table", "fixed", "direct", "none")
+
+# splitmix64's constants, taken from the hasher this module addresses through. Reusing
+# that finalizer rather than inventing a mixer keeps one well-understood function in the
+# codebase and one set of tests pinning it.
+_GAMMA = 0x9E3779B97F4A7C15
+_M1 = 0xBF58476D1CE4E5B9
+_M2 = 0x94D049BB133111EB
+
+
+def _logical_shift(value, bits: int):
+    """``value >> bits`` as if the int64 were unsigned.
+
+    torch has no unsigned 64-bit type and ``>>`` on int64 is arithmetic, so a negative
+    value -- which every well-mixed hash word is, about half the time -- would shift ones
+    in from the top and quietly break the mixer. Masking to the bits that should survive
+    restores the unsigned meaning exactly.
+    """
+    return (value >> bits) & ((1 << (64 - bits)) - 1)
+
+
+def splitmix64_tensor(value):
+    """The scalar ``splitmix64`` from the hasher, vectorised over int64 tensors.
+
+    int64 multiplication wraps in two's complement, which is the same bit pattern as the
+    unsigned wrap the reference performs, so only the shifts need care. Bit-identity
+    against the scalar reference is pinned by the tests rather than argued for here.
+    """
+    value = value + _GAMMA
+    value = (value ^ _logical_shift(value, 30)) * _M1
+    value = (value ^ _logical_shift(value, 27)) * _M2
+    return value ^ _logical_shift(value, 31)
+
+
+def signed_hash_features(rows, dim: int, seed: int):
+    """``+-1 / sqrt(dim)`` features derived from a row id, with no table anywhere.
+
+    One mix per row, then one bit per feature. That is the cheapest construction that
+    could work, and the previous experiment is exactly why it is worth trying first: what
+    mattered there was deterministic context *identity*, not the particular random
+    vectors a stored basis happened to hold. If a bit-sliced hash word is a good enough
+    basis, the table is machinery with nothing left to do.
+    """
+    if not 1 <= dim <= 32:
+        raise ValueError("dim must be between 1 and 32; got %d" % dim)
+    seeded = splitmix64_tensor(
+        torch.tensor(seed, dtype=torch.int64, device=rows.device))
+    mixed = splitmix64_tensor(rows.to(torch.int64) ^ seeded)
+    shifts = torch.arange(dim, device=rows.device, dtype=torch.int64)
+    # Arithmetic shift is harmless here: only bit 0 of each shifted word is read.
+    bits = (mixed.unsqueeze(-1) >> shifts) & 1
+    return (bits.to(torch.float32) * 2.0 - 1.0) / dim ** 0.5
 
 
 def structural_token_ids(classes, device=None) -> torch.Tensor:
@@ -97,6 +150,9 @@ class StructuralSidecar(nn.Module):
             # Learned rows, initialised from the same draw the fixed arm freezes, so the
             # two arms differ in what trains rather than in where they start.
             self.codes = nn.Parameter(codes)
+        elif mode == "direct":
+            # No table at all: the code is computed from the row id where it is used.
+            self.codes = None
         elif mode == "fixed":
             # Not persistent: this is a seeded draw, reconstructed exactly by __init__
             # from (rows, code_dim, seed), and a checkpoint that stores it is 210 MB of
@@ -133,6 +189,9 @@ class StructuralSidecar(nn.Module):
         if rows.shape[-1] != self.heads:
             raise ValueError("expected %d heads of row indices, got %d"
                              % (self.heads, rows.shape[-1]))
+        if self.mode == "direct":
+            gathered = signed_hash_features(rows, self.code_dim, self.seed)
+            return gathered.reshape(rows.shape[:2] + (self.heads * self.code_dim,))
         gathered = self.codes[rows.clamp(0, self.rows - 1)]
         return gathered.reshape(rows.shape[:2] + (self.heads * self.code_dim,))
 

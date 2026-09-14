@@ -142,7 +142,7 @@ def evaluate(model, sidecar, hasher, documents, device, structural, classes, str
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", default="fixed", choices=("table", "fixed", "none"))
+    parser.add_argument("--mode", default="fixed", choices=("table", "fixed", "direct", "none"))
     parser.add_argument("--backbone", default="B42", choices=sorted(BACKBONES))
     parser.add_argument("--rows", type=int, default=1 << 17)
     parser.add_argument("--code-dim", type=int, default=32)
