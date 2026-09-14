@@ -4726,6 +4726,121 @@ the Stage-1 gate and train only the backbone, which no arm has ever run; and sca
 frozen policy, since `lambda = 2` on a stock-trained backbone is the best model this
 programme has produced.
 
+## Training under fixed routing loses to bolting the same routing on afterwards
+
+The forensics left an obvious next move: the Stage-1 policy is better than anything joint
+training produces, so freeze it and let only the backbone move. Arm D does exactly that --
+260 parameters held bitwise fixed and absent from the optimizer, backbone trainable, every
+other setting identical to the stock control B.
+
+The PLE programme is why arm D needed two controls rather than one. There, a memory the
+backbone plainly used still failed to beat a backbone trained without it. So `D` beating
+its own gate ablation proves nothing, and the comparisons that decide this are `D - B` and
+`D - (B + G_S1)`, both at run level, because three runs of one configuration were measured
+0.0033 nats apart.
+
+Three runs per cell, screen corpus, content NLL:
+
+| cell | n | mean | min | max | spread |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| B, seed 42 | 3 | 1.658420 | 1.657842 | 1.658790 | 0.000948 |
+| B + Stage-1, seed 42 | 3 | **1.646919** | 1.646753 | 1.647045 | 0.000292 |
+| D, seed 42 | 3 | 1.650918 | 1.650499 | 1.651403 | 0.000904 |
+| D at g=1, seed 42 | 3 | 1.668678 | 1.668159 | 1.669660 | 0.001501 |
+| B, seed 43 | 3 | 1.669296 | 1.668956 | 1.669748 | 0.000792 |
+| B + Stage-1, seed 43 | 3 | **1.641224** | 1.640971 | 1.641369 | 0.000398 |
+| D, seed 43 | 3 | 1.662824 | 1.662364 | 1.663355 | 0.000991 |
+| D at g=1, seed 43 | 3 | 1.695361 | 1.694642 | 1.696663 | 0.002021 |
+
+| comparison | seed 42 | seed 43 |
+| --- | ---: | ---: |
+| D - B | **-0.007502** | **-0.006472** |
+| D - (B + Stage-1) | **+0.003999** | **+0.021600** |
+| D - D at g=1 | -0.017760 | -0.032538 |
+| (B + Stage-1) - B | -0.011501 | -0.028072 |
+
+Arm D passes the control the PLE work demanded: it beats an independently trained stock
+backbone by 0.0075 and 0.0065 nats, at both seeds, with no overlap between cells. Fixed
+routing is worth having.
+
+And it loses to the control that costs nothing. Taking a backbone that never saw a gate
+and attaching the same policy afterwards is better at both seeds -- by 0.004 and 0.022 --
+again with no overlap. **Training in the gate's presence is worse than bolting the gate on
+at the end.**
+
+### The deficit is there from the first checkpoint and grows
+
+| step | D+S1 (42) | B+S1 (42) | difference | D+S1 (43) | B+S1 (43) | difference |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 57 | 1.651703 | 1.649967 | +0.001736 | 1.662921 | 1.649100 | +0.013821 |
+| 114 | 1.657916 | 1.654716 | +0.003200 | 1.666688 | 1.644614 | +0.022073 |
+| 171 | 1.656171 | 1.649009 | +0.007163 | 1.661883 | 1.639233 | +0.022650 |
+| 228 | 1.651887 | 1.647038 | +0.004849 | 1.662813 | 1.639969 | +0.022844 |
+| 284 | 1.650918 | 1.646919 | +0.003999 | 1.662824 | 1.641224 | +0.021600 |
+
+There is no crossover to wait for. Meanwhile `D - D(g=1)` widens from -0.0166 to -0.0181
+and from -0.0210 to -0.0330: the backbone grows steadily more dependent on a gate that is
+not earning its keep. That is the PLE pattern exactly, and it is why dependence was never
+allowed to be the headline.
+
+### It is not cancelling the gate through the FFN
+
+The obvious mechanism would be the backbone shrinking its own proposals to undo an
+imposed scaling. It does the opposite. Mean `||r||` at the gated layers, same fixed gate
+on both arms:
+
+| layer | bucket | B, seed 42 | D, seed 42 | B, seed 43 | D, seed 43 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 10 | 4-100 | 1.8736 | 1.8838 | 1.8775 | 1.8873 |
+| 12 | 400-800 | 2.4636 | 2.4815 | 2.4706 | 2.4873 |
+| 14 | 4-100 | 4.1673 | 4.1928 | 4.1728 | 4.1945 |
+| 16 | 400-800 | 5.7843 | 5.8045 | 5.7543 | 5.7803 |
+
+D's proposals are 0.3-0.6% *larger* everywhere, not smaller. No compensatory rescaling,
+no familiarity-dependent counter-response. The correction `(g-1)r` is preserved, not
+erased.
+
+What does change is where the backbone goes. Relative parameter movement at the gated
+MLPs is identical between D and B to three figures, but the *direction* diverges further
+than in any other arm: cosine to the stock trajectory is 0.992-0.994 between two runs of
+one arm, 0.985-0.988 for the trainable-gate arm A, 0.947-0.951 for the warm-start arm C,
+and **0.921-0.932 for D**. Arm D's backbone is pushed furthest off the stock path, and it
+is the arm that gains least against post-hoc routing.
+
+### And the structural cost grows
+
+| combination | content | punctuation | newline | whitespace | control | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| B, seed 42 | 1.65879 | 0.62357 | 0.79591 | 0.32487 | 0.44869 | 1.33153 |
+| B + Stage-1, seed 42 | 1.64704 | 0.59883 | 0.75554 | 0.31691 | 0.47258 | **1.31646** |
+| D, seed 42 | 1.65085 | 0.59961 | 0.82174 | **0.81425** | 0.47367 | 1.33706 |
+| D at g=1, seed 42 | 1.66966 | 0.62620 | 0.79101 | 0.65949 | 0.47517 | 1.34821 |
+
+The whitespace loss on the seed-42 D backbone is 0.814 against 0.317 for post-hoc routing,
+and 0.659 even with the gate switched off -- the damage is in the backbone, not in the
+routing. D's aggregate is worse than both controls despite its content advantage over B.
+Training under the fixed gate amplifies the structural side effects rather than reducing
+them.
+
+### Verdict
+
+**NEGATIVE CO-ADAPTATION -- TRAINING UNDER FIXED ROUTING REDUCES ITS VALUE.** Fixed
+routing clears the PLE-style control against stock training, which is more than the PLE
+memory ever managed. It does not clear the control that matters more: the same policy is
+worth more attached to a backbone that never trained with it. Exposure to the gate during
+training teaches the backbone to lean on it without teaching it to exploit it, and costs
+structure on the way.
+
+The cheapest useful recipe this programme has found is therefore: **train the backbone
+normally, attach the routing policy afterwards.** That is `B + G_S1`, it needs no
+architectural training at all, and at 1.6469 and 1.6412 it beats every trained arm.
+
+Before routing capacity grows, the open question is no longer how to train a gate. It is
+why a routing policy fitted to a frozen representation is worth more than any policy any
+training procedure here has produced, and whether a properly calibrated strength -- the
+forensics found the optimum near twice the fitted magnitude, on a screen-selected lambda
+that still needs a held-out calibration split -- is worth more still.
+
 ## Reproduction
 
 ```powershell

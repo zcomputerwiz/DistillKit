@@ -71,7 +71,7 @@ from transformers import TrainerCallback
 __all__ = ["ResidualAdmissionGate", "ResidualGateHandle", "TrigramFamiliarity",
            "install_residual_gates", "remove_residual_gates", "residual_gates",
            "calibrate_gates", "attach_residual_gates",
-           "load_gate_checkpoint",
+           "load_gate_checkpoint", "freeze_gate_parameters",
            "ResidualGateCheckpointCallback", "FAMILIES", "family_features",
            "gate_parameter_count"]
 
@@ -588,9 +588,13 @@ def attach_residual_gates(config, model, dataset):
                                     familiarity=statistics)
     if section.init_from:
         digest = load_gate_checkpoint(model, handle, section.init_from)
+        frozen = ""
+        if section.freeze:
+            frozen = freeze_gate_parameters(model)
+            frozen = ", frozen (%d parameters held fixed)" % frozen
         LOG.info("Residual gates on layers %s, family %s, %d parameters; warm-started "
-                 "from %s (sha256 %s)", list(handle.layer_indices), section.family,
-                 gate_parameter_count(model), section.init_from, digest[:16])
+                 "from %s (sha256 %s)%s", list(handle.layer_indices), section.family,
+                 gate_parameter_count(model), section.init_from, digest[:16], frozen)
         return handle
     device = next(model.parameters()).device
     batches = []
@@ -637,3 +641,29 @@ def load_gate_checkpoint(model, handle: ResidualGateHandle, path) -> str:
             raise ValueError("gate parameter %s did not survive loading" % key)
     with io.open(path, "rb") as handle_in:
         return hashlib.sha256(handle_in.read()).hexdigest()
+
+
+def freeze_gate_parameters(model: nn.Module) -> int:
+    """Hold the gate fixed, and say how many parameters that is.
+
+    Called before the optimizer is built so the parameters are filtered out of its
+    groups. Setting a zero learning rate would not be the same thing: a parameter inside
+    an AdamW group is still reachable by weight decay, and "not updated by the loss" is
+    not "does not move". The buffers -- the frozen feature normalizer among them -- are
+    not parameters and were never trainable, but the postcondition asserted here covers
+    the whole module.
+    """
+    gates = getattr(model, "residual_gates", None)
+    if gates is None:
+        raise ValueError("there is no gate to freeze")
+    held = 0
+    for parameter in gates.parameters():
+        parameter.requires_grad_(False)
+        parameter.grad = None
+        held += parameter.numel()
+    still_trainable = [name for name, parameter in model.named_parameters()
+                       if name.startswith("residual_gates.") and parameter.requires_grad]
+    if still_trainable:
+        raise ValueError("gate parameters still trainable after freezing: %s"
+                         % ", ".join(still_trainable[:4]))
+    return held

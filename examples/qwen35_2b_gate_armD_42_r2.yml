@@ -1,0 +1,111 @@
+# Arm D of the residual-gate programme: the backbone trains under a routing policy it
+# cannot change.
+#
+# The checkpoint forensics found that joint cross-entropy collapses a trainable gate
+# toward the identity -- reach 0.46-0.81 frozen against 0.07-0.15 co-adapted at the same
+# gate rate -- and that every co-adapted gate was beaten on its own backbone by the
+# Stage-1 policy fitted before that backbone existed, by 0.008 to 0.028 nats. So this arm
+# removes the gate from the optimizer entirely and lets only the backbone move.
+#
+# What this arm must clear is not its own gate ablation. The PLE programme already
+# produced a memory the backbone clearly used and which still failed to beat a backbone
+# trained without it, so "D with its gate beats D without its gate" proves only that this
+# backbone adapted around the gate. The comparisons that decide the outcome are D against
+# the independently trained stock control B, and D against that same stock backbone with
+# the Stage-1 gate simply attached afterwards -- which the forensics showed is already
+# worth -0.0117 and -0.0282 nats. Training in the gate's presence has to beat bolting the
+# gate on at the end, or there is no reason to train under it.
+#
+# Identical to examples/qwen35_2b_gate_coadapt_armB.yml except for output_path and the
+# residual_gate section. Gate learning rate is deliberately absent: there is nothing to
+# apply it to, and the configuration refuses the combination rather than silently
+# ignoring it.
+#
+# Seed 42, repeat r2. The experimental unit is the training run -- three runs of
+# one seed-43 configuration landed 0.0033 nats apart -- so each cell is run three times
+# and the comparison is between distributions, never between single endpoints.
+
+model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/gate-d-42-r2
+project_name: hybridmodel-gate-coadapt
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+residual_gate:
+  # The canonical frozen-stage policy: familiarity alone, 260 parameters, sha256
+  # 1d0ba5de1503e231... Lambda stays at 1. The forensics found that scaling this policy
+  # up toward 2 keeps improving on adapted backbones, but that optimum was selected on
+  # the screen corpus and has no business being the treatment in a causal test.
+  layers: [10, 12, 14, 16]
+  family: familiarity
+  hidden: 16
+  span: 1.0
+  familiarity_cache: scratch/ffn_memo/cache/layer-12.npz
+  init_from: scratch/residual_gate/gates/familiarity-lr3e3-step284.pt
+  freeze: true
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # The backbone trains. There is nothing else.
+  freeze_backbone: false
+  freeze_sidecar: false
+  unfreeze_at_step: null
+  # No sidecar_lr: there is no gate, so there is no second group. The backbone rate
+  # below is identical to arm A's, which is the rate the comparison depends on.
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# Enforced by the allocator: an overrun raises instead of paging into shared system
+# memory, which on Windows is a 70x slowdown rather than an error.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # 8-bit AdamW state: two moments at one byte each over 1.88B parameters is 3.8 GiB,
+  # against 15 GiB for fp32 moments. This is what makes a fully trainable backbone fit
+  # on one 24 GiB card.
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update, matching the frozen stage
+  # and both earlier co-adaptation screens.
+  max_steps: 284
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 284
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

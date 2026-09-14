@@ -36,6 +36,10 @@ ARMS = {
     "A43r": "gate-coadapt-s43r-armA", "B43": "gate-coadapt-s43-armB",
     "C43": "gate-coadapt-s43-armC", "C43r1": "gate-coadapt-s43-armC-r1",
     "C43r2": "gate-coadapt-s43-armC-r2",
+    "D42": "gate-d-42-r0", "D42r1": "gate-d-42-r1", "D42r2": "gate-d-42-r2",
+    "D43": "gate-d-43-r0", "D43r1": "gate-d-43-r1", "D43r2": "gate-d-43-r2",
+    "B42r1": "gate-coadapt-armB-r1", "B42r2": "gate-coadapt-armB-r2",
+    "B43m": "gate-coadapt-s43m-armB", "B43r": "gate-coadapt-s43r-armB",
 }
 
 
