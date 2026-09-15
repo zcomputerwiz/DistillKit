@@ -212,3 +212,45 @@ def test_tensor_parallel_attention_cpu_fallback_preserves_numerical_exactness():
     loss.backward()
     assert x.grad is not None
     assert torch.isfinite(x.grad).all()
+
+
+@pytest.mark.skipif(not torch.cuda.is_available() or not is_flash_attn_available(), reason="requires CUDA and working flash_attn")
+def test_tensor_parallel_attention_live_cuda_matches_sdpa():
+    """Live CUDA test verifying TensorParallelAttention runs with real flash_attn_func and matches SDPA."""
+    device = torch.device("cuda:0")
+    head_dim = 128
+    num_heads = 8
+    num_kv_heads = 2
+    hidden_dim = num_heads * head_dim
+
+    attention = _mock_attention_module(head_dim=head_dim, num_heads=num_heads, num_kv_heads=num_kv_heads, attn_impl="flash_attention_2")
+    attention.to(device=device, dtype=torch.bfloat16)
+
+    tp_attn = TensorParallelAttention(attention, [device, device])
+
+    batch_size = 2
+    seq_len = 16
+    x = torch.randn(batch_size, seq_len, hidden_dim, device=device, dtype=torch.bfloat16, requires_grad=True)
+
+    cos = torch.ones(batch_size, seq_len, head_dim, device=device, dtype=torch.bfloat16)
+    sin = torch.zeros(batch_size, seq_len, head_dim, device=device, dtype=torch.bfloat16)
+
+    # Run with flash attention enabled
+    out_fa, _ = tp_attn(x, position_embeddings=(cos, sin), attention_mask=None)
+    assert out_fa.shape == (batch_size, seq_len, hidden_dim)
+    assert torch.isfinite(out_fa).all()
+
+    loss_fa = out_fa.sum()
+    loss_fa.backward()
+    assert x.grad is not None
+    assert torch.isfinite(x.grad).all()
+
+    # Compare with SDPA path by forcing _can_use_flash_attn to False
+    x_sdpa = x.detach().clone().requires_grad_(True)
+    with patch.object(tp_attn, "_can_use_flash_attn", return_value=False):
+        out_sdpa, _ = tp_attn(x_sdpa, position_embeddings=(cos, sin), attention_mask=None)
+
+    # In bfloat16, FlashAttention (which uses online softmax accumulation in fp32)
+    # matches standard SDPA within tight numerical tolerances.
+    torch.testing.assert_close(out_fa, out_sdpa, rtol=1e-2, atol=1e-2)
+
