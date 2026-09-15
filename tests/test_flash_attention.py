@@ -123,9 +123,17 @@ def test_can_use_flash_attn_predicate_checks():
         assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, None) is True
         assert tp_attn._can_use_flash_attn(cuda_dev, torch.float16, None) is True
 
-        # Non-causal attention mask with zeros (padding) -> False
+        # Attention mask with padding zeros: True if varlen available, False if varlen is None
         mask_with_padding = torch.tensor([[1, 1, 0, 0]])
-        assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, mask_with_padding) is False
+        with patch.object(parallel_blocks, "flash_attn_varlen_func", None):
+            assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, mask_with_padding) is False
+        with patch.object(parallel_blocks, "flash_attn_varlen_func", MagicMock()), \
+             patch.object(parallel_blocks, "unpad_input", MagicMock()):
+            assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, mask_with_padding) is True
+
+        # Non-2D mask -> False
+        mask_3d = torch.ones(1, 1, 4)
+        assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, mask_3d) is False
 
         # All-ones mask (unpadded) -> True
         all_ones_mask = torch.tensor([[1, 1, 1, 1]])
@@ -258,4 +266,40 @@ def test_tensor_parallel_attention_live_cuda_matches_sdpa():
     # In bfloat16, FlashAttention (which uses online softmax accumulation in fp32)
     # matches standard SDPA within tight numerical tolerances.
     torch.testing.assert_close(out_fa, out_sdpa, rtol=1e-2, atol=1e-2)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available() or not is_flash_attn_available(), reason="requires CUDA and working flash_attn")
+def test_tensor_parallel_attention_live_cuda_padded_batch():
+    """Live CUDA test verifying TensorParallelAttention runs with flash_attn_varlen_func on padded batches."""
+    device = torch.device("cuda:0")
+    head_dim = 256
+    num_heads = 8
+    num_kv_heads = 2
+    hidden_dim = num_heads * head_dim
+
+    attention = _mock_attention_module(head_dim=head_dim, num_heads=num_heads, num_kv_heads=num_kv_heads, attn_impl="flash_attention_2")
+    attention.to(device=device, dtype=torch.bfloat16)
+
+    tp_attn = TensorParallelAttention(attention, [device, device])
+
+    batch_size = 2
+    seq_len = 16
+    x = torch.randn(batch_size, seq_len, hidden_dim, device=device, dtype=torch.bfloat16, requires_grad=True)
+
+    cos = torch.ones(batch_size, seq_len, head_dim, device=device, dtype=torch.bfloat16)
+    sin = torch.zeros(batch_size, seq_len, head_dim, device=device, dtype=torch.bfloat16)
+
+    # 2D attention mask with padding at the end of example 0
+    attention_mask = torch.ones(batch_size, seq_len, device=device, dtype=torch.bool)
+    attention_mask[0, 10:] = False
+
+    out_fa, _ = tp_attn(x, position_embeddings=(cos, sin), attention_mask=attention_mask)
+    assert out_fa.shape == (batch_size, seq_len, hidden_dim)
+    assert torch.isfinite(out_fa).all()
+
+    loss = out_fa.sum()
+    loss.backward()
+    assert x.grad is not None
+    assert torch.isfinite(x.grad).all()
+
 

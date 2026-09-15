@@ -30,11 +30,15 @@ from distillkit.parallel.collectives import all_reduce, replicate
 from distillkit.parallel.linear import ColumnParallelLinear, RowParallelLinear, split_sizes
 
 try:
-    from flash_attn import flash_attn_func
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
+    from flash_attn.bert_padding import pad_input, unpad_input
     _HAS_FLASH_ATTN = True
 except (ImportError, OSError):
     _HAS_FLASH_ATTN = False
     flash_attn_func = None
+    flash_attn_varlen_func = None
+    pad_input = None
+    unpad_input = None
 
 
 class TensorParallelMLP(nn.Module):
@@ -158,7 +162,7 @@ class TensorParallelAttention(nn.Module):
             return False
         if attention_mask is not None:
             if attention_mask.ndim == 2:
-                if not bool((attention_mask == 1).all()):
+                if not bool((attention_mask == 1).all()) and (flash_attn_varlen_func is None or unpad_input is None):
                     return False
             else:
                 return False
@@ -192,31 +196,54 @@ class TensorParallelAttention(nn.Module):
                 q_fa = q.transpose(1, 2)
                 k_fa = k.transpose(1, 2)
                 v_fa = v.transpose(1, 2)
-                is_causal = (
-                    attention_mask is None or bool((attention_mask == 1).all())
-                ) and q_fa.shape[1] > 1
-                attention_output = flash_attn_func(
-                    q_fa,
-                    k_fa,
-                    v_fa,
-                    dropout_p=self.attention_dropout if self.training else 0.0,
-                    softmax_scale=self.scaling,
-                    causal=is_causal,
-                )
+                is_causal = q_fa.shape[1] > 1
+                if attention_mask is None or bool((attention_mask == 1).all()):
+                    attention_output = flash_attn_func(
+                        q_fa,
+                        k_fa,
+                        v_fa,
+                        dropout_p=self.attention_dropout if self.training else 0.0,
+                        softmax_scale=self.scaling,
+                        causal=is_causal,
+                    )
+                else:
+                    batch_size, seq_len = q_fa.shape[:2]
+                    mask_dev = (attention_mask != 0).to(device)
+                    q_unpad, indices_q, cu_seqlens_q, max_seqlen_q, _ = unpad_input(q_fa, mask_dev)
+                    k_unpad, _, cu_seqlens_k, max_seqlen_k, _ = unpad_input(k_fa, mask_dev)
+                    v_unpad, _, _, _, _ = unpad_input(v_fa, mask_dev)
+                    out_unpad = flash_attn_varlen_func(
+                        q_unpad,
+                        k_unpad,
+                        v_unpad,
+                        cu_seqlens_q=cu_seqlens_q,
+                        cu_seqlens_k=cu_seqlens_k,
+                        max_seqlen_q=max_seqlen_q,
+                        max_seqlen_k=max_seqlen_k,
+                        dropout_p=self.attention_dropout if self.training else 0.0,
+                        softmax_scale=self.scaling,
+                        causal=is_causal,
+                    )
+                    attention_output = pad_input(out_unpad, indices_q, batch_size, seq_len)
                 attention_output = attention_output.reshape(*input_shape, -1)
             else:
                 # repeat_kv rather than enable_gqa: no fused kernel on this build
                 # broadcasts grouped-query heads, so asking for it selects the math
                 # kernel. See distillkit/gqa_dispatch.py.
                 groups = self.heads_per_rank // self.kv_heads_per_rank
+                attn_mask = None
+                if attention_mask is not None:
+                    attn_mask = attention_mask.to(device)
+                    if attn_mask.ndim == 2:
+                        attn_mask = attn_mask[:, None, None, :]
                 attention_output = torch.nn.functional.scaled_dot_product_attention(
                     q,
                     _repeat_kv(k, groups),
                     _repeat_kv(v, groups),
-                    attn_mask=None if attention_mask is None else attention_mask.to(device),
+                    attn_mask=attn_mask,
                     dropout_p=self.attention_dropout if self.training else 0.0,
                     scale=self.scaling,
-                    is_causal=attention_mask is None and q.shape[2] > 1,
+                    is_causal=q.shape[2] > 1 if attn_mask is None else True,
                 )
                 attention_output = attention_output.transpose(1, 2).reshape(*input_shape, -1)
             outputs.append(attention_output.contiguous() * torch.sigmoid(gate))
