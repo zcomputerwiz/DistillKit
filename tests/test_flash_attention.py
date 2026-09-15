@@ -131,7 +131,12 @@ def test_can_use_flash_attn_predicate_checks():
         all_ones_mask = torch.tensor([[1, 1, 1, 1]])
         assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, all_ones_mask) is True
 
-        # Unsupported head dim (e.g. 96 when wheel only compiled 64 and 128)
+        # Supported head dimensions: 64, 128, 256
+        for hdim in (64, 128, 256):
+            tp_attn.head_dim = hdim
+            assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, None) is True
+
+        # Unsupported head dim (e.g. 96 or 32 when not compiled)
         tp_attn.head_dim = 96
         assert tp_attn._can_use_flash_attn(cuda_dev, torch.bfloat16, None) is False
         tp_attn.head_dim = 128

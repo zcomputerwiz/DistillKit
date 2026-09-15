@@ -22,6 +22,7 @@ would exceed the flops saved.
 
 from __future__ import annotations
 
+import functools
 import torch
 from torch import nn
 
@@ -62,6 +63,25 @@ class TensorParallelMLP(nn.Module):
         ups = self.up_proj(x, copies)
         hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
         return self.down_proj(hidden)[0]
+
+
+@functools.lru_cache(maxsize=None)
+def _is_flash_attn_head_dim_supported(head_dim: int, dtype: torch.dtype, device_str: str) -> bool:
+    """Probe whether the installed flash_attn binary was compiled with support for this head_dim.
+
+    Results are cached via lru_cache so the probe executes at most once per
+    (head_dim, dtype, device) across the process lifetime, introducing 0 overhead during training.
+    """
+    if not _HAS_FLASH_ATTN or flash_attn_func is None:
+        return False
+    try:
+        q = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        k = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        v = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        flash_attn_func(q, k, v)
+        return True
+    except Exception:
+        return False
 
 
 class TensorParallelAttention(nn.Module):
@@ -132,7 +152,9 @@ class TensorParallelAttention(nn.Module):
             return False
         if dtype not in (torch.float16, torch.bfloat16):
             return False
-        if self.head_dim not in (64, 128):
+        if self.head_dim not in (64, 128, 256):
+            return False
+        if not _is_flash_attn_head_dim_supported(self.head_dim, dtype, str(device)):
             return False
         if attention_mask is not None:
             if attention_mask.ndim == 2:
