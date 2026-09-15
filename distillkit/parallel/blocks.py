@@ -28,6 +28,13 @@ from torch import nn
 from distillkit.parallel.collectives import all_reduce, replicate
 from distillkit.parallel.linear import ColumnParallelLinear, RowParallelLinear, split_sizes
 
+try:
+    from flash_attn import flash_attn_func
+    _HAS_FLASH_ATTN = True
+except (ImportError, OSError):
+    _HAS_FLASH_ATTN = False
+    flash_attn_func = None
+
 
 class TensorParallelMLP(nn.Module):
     """gate/up column-parallel, down row-parallel: one all-reduce, no gather.
@@ -110,6 +117,31 @@ class TensorParallelAttention(nn.Module):
         """Both per-head norms receive partial gradients from each head shard."""
         return [list(q.parameters()) + list(k.parameters()) for q, k in zip(self.q_norms, self.k_norms)]
 
+    def _can_use_flash_attn(
+        self,
+        device: torch.device,
+        dtype: torch.dtype,
+        attention_mask: torch.Tensor | None,
+    ) -> bool:
+        attn_impl = getattr(self.config, "_attn_implementation", None)
+        if attn_impl in ("eager", "sdpa"):
+            return False
+        if not _HAS_FLASH_ATTN or flash_attn_func is None:
+            return False
+        if device.type != "cuda":
+            return False
+        if dtype not in (torch.float16, torch.bfloat16):
+            return False
+        if self.head_dim not in (64, 128):
+            return False
+        if attention_mask is not None:
+            if attention_mask.ndim == 2:
+                if not bool((attention_mask == 1).all()):
+                    return False
+            else:
+                return False
+        return True
+
     def forward(self, hidden_states, position_embeddings, attention_mask=None, **kwargs):
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
 
@@ -130,18 +162,41 @@ class TensorParallelAttention(nn.Module):
             k = self.k_norms[index](keys[index].view(shape)).transpose(1, 2)
             v = values[index].view(shape).transpose(1, 2)
             q, k = apply_rotary_pos_emb(q, k, cos.to(device), sin.to(device))
-            # repeat_kv rather than enable_gqa: no fused kernel on this build
-            # broadcasts grouped-query heads, so asking for it selects the math
-            # kernel. See distillkit/gqa_dispatch.py.
-            groups = self.heads_per_rank // self.kv_heads_per_rank
-            attention_output = torch.nn.functional.scaled_dot_product_attention(
-                q, _repeat_kv(k, groups), _repeat_kv(v, groups),
-                attn_mask=None if attention_mask is None else attention_mask.to(device),
-                dropout_p=self.attention_dropout if self.training else 0.0,
-                scale=self.scaling,
-                is_causal=attention_mask is None and q.shape[2] > 1,
-            )
-            attention_output = attention_output.transpose(1, 2).reshape(*input_shape, -1)
+            if self._can_use_flash_attn(device, q.dtype, attention_mask):
+                # FA2 expects non-transposed (batch, seqlen, heads, head_dim).
+                # FA2 natively supports GQA (heads_per_rank % kv_heads_per_rank == 0)
+                # without materializing repeated KV heads in memory, saving ~0.5-4 GiB
+                # of transient activation per card per layer.
+                q_fa = q.transpose(1, 2)
+                k_fa = k.transpose(1, 2)
+                v_fa = v.transpose(1, 2)
+                is_causal = (
+                    attention_mask is None or bool((attention_mask == 1).all())
+                ) and q_fa.shape[1] > 1
+                attention_output = flash_attn_func(
+                    q_fa,
+                    k_fa,
+                    v_fa,
+                    dropout_p=self.attention_dropout if self.training else 0.0,
+                    softmax_scale=self.scaling,
+                    causal=is_causal,
+                )
+                attention_output = attention_output.reshape(*input_shape, -1)
+            else:
+                # repeat_kv rather than enable_gqa: no fused kernel on this build
+                # broadcasts grouped-query heads, so asking for it selects the math
+                # kernel. See distillkit/gqa_dispatch.py.
+                groups = self.heads_per_rank // self.kv_heads_per_rank
+                attention_output = torch.nn.functional.scaled_dot_product_attention(
+                    q,
+                    _repeat_kv(k, groups),
+                    _repeat_kv(v, groups),
+                    attn_mask=None if attention_mask is None else attention_mask.to(device),
+                    dropout_p=self.attention_dropout if self.training else 0.0,
+                    scale=self.scaling,
+                    is_causal=attention_mask is None and q.shape[2] > 1,
+                )
+                attention_output = attention_output.transpose(1, 2).reshape(*input_shape, -1)
             outputs.append(attention_output.contiguous() * torch.sigmoid(gate))
         return self.o_proj(outputs)[0], None
 

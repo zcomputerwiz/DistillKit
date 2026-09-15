@@ -246,6 +246,17 @@ def apply_freeze_rules(model: transformers.PreTrainedModel, config: Distillation
             print(f"Froze {num_frozen} tensors by regular expression")
 
 
+def is_flash_attn_available() -> bool:
+    """True if flash_attn is installed and its compiled C/CUDA extension loads."""
+    if importlib.util.find_spec("flash_attn") is None:
+        return False
+    try:
+        import flash_attn  # noqa: F401
+        return True
+    except (ImportError, OSError):
+        return False
+
+
 def load_student_model(
     config: DistillationRunConfig,
     tokenizer_vocab_size: int,
@@ -260,10 +271,10 @@ def load_student_model(
 
     extra_kwargs = {"trust_remote_code": config.trust_remote_code}
     if config.use_flash_attention:
-        if importlib.util.find_spec("flash_attn") is None:
+        if importlib.util.find_spec("flash_attn") is None or not is_flash_attn_available():
             raise RuntimeError(
                 "use_flash_attention is true but flash_attn is not installed "
-                "(it has no Windows wheels). Install it, or set "
+                "or failed to load. Install a compatible wheel, or set "
                 "use_flash_attention: false and set training_args.bf16 so the "
                 "student still loads in bfloat16."
             )
@@ -292,6 +303,7 @@ def load_student_model(
 
 
 __all__ = [
+    "is_flash_attn_available",
     "load_student_model",
     "prepare_student_config",
     "post_init_student_model",

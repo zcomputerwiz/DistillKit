@@ -22,7 +22,12 @@ allocation left in the step.
 
 The patch is conditional: it probes whether a fused kernel actually accepts a
 broadcast GQA call and only forces expansion when none does, so a build that gains
-flash attention keeps the upstream behaviour.
+fused SDPA attention keeps the upstream behaviour.
+
+Note that when Flash-Attention 2 is enabled (`attn_implementation="flash_attention_2"`
+or via ``TensorParallelAttention`` with ``flash_attn``), FlashAttention natively
+handles grouped-query broadcasting directly in SRAM without materializing repeated
+heads, bypassing both SDPA and this patch.
 """
 
 from __future__ import annotations
