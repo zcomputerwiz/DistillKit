@@ -128,7 +128,8 @@ def main() -> int:
     parser.add_argument("--log-every", type=int, default=10)
     parser.add_argument("--no-checkpointing", action="store_true",
                         help="8-bit optimizer states may leave room to skip recompute")
-    parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--resume-from", type=Path, default=None,
+                        help="a milestone directory to continue from after an interruption")
     args = parser.parse_args()
 
     if torch.cuda.device_count() != 1:
@@ -145,11 +146,28 @@ def main() -> int:
     state_path = root / "state.json"
     milestones = sorted(int(m) for m in args.milestones.split(","))
 
-    config = AutoConfig.from_pretrained(args.backbone, local_files_only=True)
+    # Resuming continues the *same* stream rather than restarting it. The packed stream
+    # is a pure function of the corpus and the data seed, so replaying and discarding the
+    # sequences already consumed reproduces exactly what an uninterrupted run would have
+    # seen next -- no document is trained on twice and none is skipped.
+    #
+    # What is genuinely lost is the AdamW moment estimates, which are not saved with the
+    # weights. That is a real discontinuity and it is recorded as one; it lands in the low
+    # tail of the cosine schedule, where the step sizes it affects are smallest.
+    resume = None
+    weights = args.backbone
+    if args.resume_from is not None:
+        resume = json.loads((args.resume_from / "milestone.json").read_text(encoding="utf-8"))
+        weights = str(args.resume_from)
+        print("resuming from %s: %d tokens, %d steps, %d sequences already consumed"
+              % (args.resume_from, resume["actual_tokens"], resume["optimizer_steps"],
+                 resume["sequences"]))
+
+    config = AutoConfig.from_pretrained(weights, local_files_only=True)
     config = getattr(config, "text_config", config)
     config.use_cache = False
     model = Qwen3_5ForCausalLM.from_pretrained(
-        args.backbone, config=config, dtype=torch.bfloat16,
+        weights, config=config, dtype=torch.bfloat16,
         local_files_only=True).to(args.device)
     if not args.no_checkpointing:
         model.gradient_checkpointing_enable()
@@ -194,6 +212,11 @@ def main() -> int:
         "gradient_checkpointing": not args.no_checkpointing,
         "chunked_cross_entropy": chunked,
         "seed": args.seed, "data_seed": args.data_seed,
+        "resumed_from": str(args.resume_from) if args.resume_from else None,
+        "resume_note": (None if args.resume_from is None else
+                        "machine crashed mid-run; weights and the data stream continue "
+                        "exactly, AdamW moment estimates were not saved and restart from "
+                        "zero at this point"),
         "milestones": milestones,
         "gpu": torch.cuda.get_device_name(0),
         "torch": torch.__version__, "python": platform.python_version(),
@@ -219,6 +242,15 @@ def main() -> int:
     pending = list(milestones)
     started = time.monotonic()
     stream = packed_stream(store, args.sequence_length, args.data_seed)
+    if resume is not None:
+        tokens_seen = resume["actual_tokens"]
+        updates = resume["optimizer_steps"]
+        sequences = resume["sequences"]
+        pending = [m for m in milestones if m > tokens_seen]
+        for _ in range(sequences):
+            next(stream)
+        print("skipped %d sequences; %d tokens to go, milestones %s"
+              % (sequences, store.total_tokens - tokens_seen, pending), flush=True)
     micro = []
     accumulated = 0.0
     exhausted = False

@@ -192,7 +192,10 @@ def main() -> int:
     found = []
     for name, tokens in (("b0", 0), ("5m", 5_000_000), ("10m", 10_000_000),
                          ("20m", 20_000_000), ("final", 30_725_434)):
+        # The final checkpoint's four-arm report doubles as the curve's last point: its
+        # stock arm is the same measurement the milestone passes made.
         path = (args.baseline if name == "b0"
+                else args.post if name == "final"
                 else args.milestones / ("%s.json" % name))
         report = load(path)
         if report is not None:

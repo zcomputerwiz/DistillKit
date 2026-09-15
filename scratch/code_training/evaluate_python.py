@@ -285,6 +285,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backbone", required=True)
     parser.add_argument("--label", default=None, help="name for this backbone in the report")
+    parser.add_argument("--trained-tokens", type=int, default=0,
+                        help="Python tokens this backbone was trained on, for the curve")
     parser.add_argument("--split", default="heldout", choices=SPLITS)
     parser.add_argument("--subset-tokens", type=int, default=0,
                         help="0 evaluates the whole split")
@@ -327,6 +329,7 @@ def main() -> int:
           % (args.split, subset["documents"], subset["tokens"], subset["digest"][:12]), flush=True)
 
     report = {"backbone": str(args.backbone), "label": args.label or Path(args.backbone).name,
+              "trained_tokens": args.trained_tokens,
               "corpus": corpus_identity(), "evaluation_subset": subset,
               "split": args.split, "arms": {}}
 

@@ -1,0 +1,32 @@
+{
+  "backbone": "scratch/code_training/checkpoints/v1/final",
+  "label": "B_code",
+  "source": "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\heldout.jsonl",
+  "documents": 400,
+  "objective": "plain causal CE over 100% of targets; NOT the historical assistant-masked number, so comparable across checkpoints here but not against earlier general-domain results",
+  "tokens": 298744,
+  "mean_nll": 1.1391434866897643,
+  "classes": {
+    "content": {
+      "nll": 1.4303917579855194,
+      "tokens": 194882
+    },
+    "newline": {
+      "nll": 0.6659617902365436,
+      "tokens": 20177
+    },
+    "whitespace": {
+      "nll": 0.4026679415954222,
+      "tokens": 14100
+    },
+    "punctuation": {
+      "nll": 0.5241760187455673,
+      "tokens": 66827
+    },
+    "control": {
+      "nll": 2.687032409392564,
+      "tokens": 2758
+    }
+  },
+  "seconds": 61.40599999999995
+}
