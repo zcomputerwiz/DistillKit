@@ -1,0 +1,244 @@
+{
+  "backbone": "scratch\\code_training\\checkpoints\\v1\\final",
+  "backbone_sha256_before": "1aa723f0410777e55590aef3a1b3e453e7b36232f95ad4ca619741213572b2ad",
+  "backbone_sha256_after": "1aa723f0410777e55590aef3a1b3e453e7b36232f95ad4ca619741213572b2ad",
+  "backbone_frozen": true,
+  "cache": "scratch\\code_gate\\cache\\layer-12.npz",
+  "corpus": {
+    "corpus": "code_corpus/v1",
+    "dataset": "bigcode/the-stack-v2-dedup",
+    "config": "Python",
+    "dataset_revision": "611ef38fbfab78b65b38be47e870e4b3d70de038",
+    "split_seed": 20260914,
+    "split_algorithm": "blake2b-64('<seed>:<repo_name>') / 2**64, tiled over splits in sorted name order",
+    "filters": {
+      "min_bytes": 64,
+      "max_bytes": 1048576,
+      "max_tokens": 32768,
+      "min_bytes_per_token": 1.8,
+      "exclude_generated": true,
+      "exclude_vendor": true,
+      "license_types": null
+    },
+    "tokenizer": {
+      "source": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+      "class": "Qwen2Tokenizer",
+      "vocab_size": 248044,
+      "tokenizer_json_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+    },
+    "manifest_sha256": "81871bf4ef3120c9a84acd55aeabcd36be5c1f68008aa11d976a2a3d0488573d",
+    "splits": {
+      "train": {
+        "repositories": 32519,
+        "files": 34606,
+        "model_tokens": 30725434,
+        "parts": 21
+      },
+      "calibration": {
+        "repositories": 1978,
+        "files": 2218,
+        "model_tokens": 2034946,
+        "parts": 11
+      },
+      "heldout": {
+        "repositories": 5137,
+        "files": 5405,
+        "model_tokens": 5011233,
+        "parts": 11
+      }
+    }
+  },
+  "layers": [
+    10,
+    12,
+    14,
+    16
+  ],
+  "family": "familiarity",
+  "parameters": 260,
+  "trainable_parameters": 260,
+  "identity_at_initialization": 0.0,
+  "optimizer": "AdamW",
+  "lr": 0.003,
+  "schedule": "constant",
+  "steps": 1536,
+  "sequence_length": 512,
+  "scored_tokens": 784896,
+  "objective": "plain CE over all causal targets",
+  "normalizer": {
+    "10": {
+      "batches": 64,
+      "tokens": 32768.0,
+      "mean": [
+        2.45327091217041,
+        0.8049541711807251
+      ],
+      "std": [
+        3.187319040298462,
+        0.25138092041015625
+      ]
+    },
+    "12": {
+      "batches": 64,
+      "tokens": 32768.0,
+      "mean": [
+        2.45327091217041,
+        0.8049541711807251
+      ],
+      "std": [
+        3.187319040298462,
+        0.25138092041015625
+      ]
+    },
+    "14": {
+      "batches": 64,
+      "tokens": 32768.0,
+      "mean": [
+        2.45327091217041,
+        0.8049541711807251
+      ],
+      "std": [
+        3.187319040298462,
+        0.25138092041015625
+      ]
+    },
+    "16": {
+      "batches": 64,
+      "tokens": 32768.0,
+      "mean": [
+        2.45327091217041,
+        0.8049541711807251
+      ],
+      "std": [
+        3.187319040298462,
+        0.25138092041015625
+      ]
+    }
+  },
+  "selection": {
+    "content": 1.7108257585868782,
+    "aggregate": 1.2540127704140227,
+    "step": 512,
+    "scored_tokens": 261632
+  },
+  "selection_criterion": "calibration content NLL, aggregate as guardrail",
+  "history": [
+    {
+      "step": 256,
+      "scored_tokens": 130816,
+      "calibration": {
+        "aggregate": 1.2543302993436338,
+        "tokens": 76989,
+        "content": 1.7111875627298982,
+        "punctuation": 0.7255975147913172,
+        "newline": 0.61831976075681,
+        "whitespace": 0.33371681247420903,
+        "control": 2.138862271294264
+      },
+      "reach": {
+        "10": 0.03295761978398035,
+        "12": 0.11596597494640816,
+        "14": 0.21345804155201323,
+        "16": 0.11571326858064336
+      }
+    },
+    {
+      "step": 512,
+      "scored_tokens": 261632,
+      "calibration": {
+        "aggregate": 1.2540127704140227,
+        "tokens": 76989,
+        "content": 1.7108257585868782,
+        "punctuation": 0.7250986512283228,
+        "newline": 0.6186676468997294,
+        "whitespace": 0.3332045780349451,
+        "control": 2.148675788989194
+      },
+      "reach": {
+        "10": 0.2411754887616633,
+        "12": 0.19708821997120402,
+        "14": 0.10371786518342406,
+        "16": 0.07837305287124754
+      }
+    },
+    {
+      "step": 768,
+      "scored_tokens": 392448,
+      "calibration": {
+        "aggregate": 1.2543996697209114,
+        "tokens": 76989,
+        "content": 1.7113030254071517,
+        "punctuation": 0.7255654581555133,
+        "newline": 0.6185755200668428,
+        "whitespace": 0.33351499814383395,
+        "control": 2.1396925394247925
+      },
+      "reach": {
+        "10": 0.14424264018064156,
+        "12": 0.21915896026502232,
+        "14": 0.25907836711915283,
+        "16": 0.14997957914543714
+      }
+    },
+    {
+      "step": 1024,
+      "scored_tokens": 523264,
+      "calibration": {
+        "aggregate": 1.254014251612809,
+        "tokens": 76989,
+        "content": 1.7106483413933846,
+        "punctuation": 0.7253935807542107,
+        "newline": 0.6186639191925859,
+        "whitespace": 0.33370093415526997,
+        "control": 2.144862507149432
+      },
+      "reach": {
+        "10": 0.1852357679316145,
+        "12": 0.15747700887102603,
+        "14": 0.1582602951042921,
+        "16": 0.08795777128230994
+      }
+    },
+    {
+      "step": 1280,
+      "scored_tokens": 654080,
+      "calibration": {
+        "aggregate": 1.2541149663771305,
+        "tokens": 76989,
+        "content": 1.7107199965937965,
+        "punctuation": 0.7255676047103876,
+        "newline": 0.618830362319602,
+        "whitespace": 0.3339038080306765,
+        "control": 2.137077980717136
+      },
+      "reach": {
+        "10": 0.06278557821158104,
+        "12": 0.1369089635750079,
+        "14": 0.09752473243255823,
+        "16": 0.1690587873325953
+      }
+    },
+    {
+      "step": 1536,
+      "scored_tokens": 784896,
+      "calibration": {
+        "aggregate": 1.2540409990187757,
+        "tokens": 76989,
+        "content": 1.7108241261405488,
+        "punctuation": 0.7250370149353071,
+        "newline": 0.6190084666175922,
+        "whitespace": 0.3335575371978502,
+        "control": 2.1402519194397156
+      },
+      "reach": {
+        "10": 0.10479679601173297,
+        "12": 0.1680103985485418,
+        "14": 0.09434236503465196,
+        "16": 0.12041539140972445
+      }
+    }
+  ],
+  "final_loss": 1.2642671418190004,
+  "elapsed_seconds": 363.98399999999856,
+  "peak_allocated_bytes": 16919908864
+}

@@ -71,7 +71,7 @@ from transformers import TrainerCallback
 __all__ = ["ResidualAdmissionGate", "ResidualGateHandle", "TrigramFamiliarity",
            "install_residual_gates", "remove_residual_gates", "residual_gates",
            "calibrate_gates", "attach_residual_gates",
-           "load_gate_checkpoint",
+           "load_gate_checkpoint", "freeze_gate_parameters",
            "ResidualGateCheckpointCallback", "FAMILIES", "family_features",
            "gate_parameter_count"]
 
@@ -255,17 +255,39 @@ class ResidualGateHandle:
         self.features = family_features(family)
         self.familiarity = familiarity
         self.context: torch.Tensor | None = None   # [batch, sequence, 2]
+        # Cached decoding hands forward() only the newest token, so a trigram computed
+        # from that call alone addresses the wrong rows -- silently, since the lookup
+        # still returns something. Teacher-forced scoring never hit this because the
+        # whole sequence arrives at once. During generation the handle keeps the running
+        # sequence itself, so no caller has to remember to plumb history through.
+        self.generating = False
+        self.history: torch.Tensor | None = None
         self.calibrating = False
         # The same-checkpoint ablation: admission forced back to unit strength without
         # touching a weight, so 'does this model depend on its gate at inference' is a
         # question about one set of parameters rather than two runs.
         self.force_identity = False
+        # How much of the learned departure from unit admission to admit::
+        #
+        #     g_lambda = 1 + strength * (g - 1)
+        #
+        # 1.0 is the gate as trained and 0.0 is the identity, so this is a continuous
+        # version of the same ablation. It exists to ask whether a learned correction is
+        # the right *size* for the backbone it ended up with, which no amount of staring
+        # at the weights can answer.
+        self.strength = 1.0
         self.record = False
         # Per-token gate values, kept only when a scorer asks: the distributions are
         # the mechanistic evidence, and a running mean cannot be split by context
         # afterwards.
         self.keep = False
         self.kept: dict[int, list] = {}
+        # The norm of the FFN's own proposal, beside the gate that scales it. The
+        # network consumes g * r, not g: two runs with different gate policies and
+        # compensating update magnitudes can be the same function, and only this tells
+        # them apart from two runs that genuinely route differently.
+        self.keep_update = False
+        self.kept_norms: dict[int, list] = {}
         self.stats: dict[int, dict] = {}
         self.gated_calls = 0
 
@@ -277,14 +299,38 @@ class ResidualGateHandle:
         return self.gates[str(layer)]
 
     def set_context(self, input_ids: torch.Tensor) -> None:
-        """Compute the familiarity features once per forward, not once per layer."""
+        """Compute the familiarity features once per forward, not once per layer.
+
+        In generation mode the features are computed over the whole running sequence and
+        then sliced back to the positions this call is actually about, so a one-token
+        forward still sees the trigram that precedes it.
+        """
         if self.familiarity is None:
             return
-        self.context = self.familiarity.features(input_ids)
+        if not self.generating:
+            self.context = self.familiarity.features(input_ids)
+            return
+        if self.history is None or input_ids.shape[1] >= self.history.shape[1]:
+            # The first call, or a re-prefill: this call carries the whole prefix.
+            self.history = input_ids.detach()
+        else:
+            self.history = torch.cat([self.history, input_ids.detach()], dim=1)
+        features = self.familiarity.features(self.history)
+        self.context = features[:, -input_ids.shape[1]:]
+
+    def begin_generation(self) -> None:
+        """Start a fresh decoded sequence; the next forward carries its prefix."""
+        self.generating = True
+        self.history = None
+
+    def end_generation(self) -> None:
+        self.generating = False
+        self.history = None
 
     def reset_stats(self) -> None:
         self.stats = {}
         self.kept = {}
+        self.kept_norms = {}
         self.gated_calls = 0
 
     def _observe(self, layer: int, values: torch.Tensor) -> None:
@@ -353,10 +399,15 @@ class ResidualGateHandle:
         values = gate(features)
         if self.force_identity:
             values = torch.ones_like(values)
+        elif self.strength != 1.0:
+            values = 1.0 + self.strength * (values - 1.0)
         if self.record:
             self._observe(layer, values)
         if self.keep:
             self.kept.setdefault(layer, []).append(values.detach().float().cpu())
+        if self.keep_update:
+            self.kept_norms.setdefault(layer, []).append(
+                update.detach().float().norm(dim=-1).cpu())
         self.gated_calls += int(values.numel())
         return update * values.unsqueeze(-1).to(update.dtype)
 
@@ -567,9 +618,13 @@ def attach_residual_gates(config, model, dataset):
                                     familiarity=statistics)
     if section.init_from:
         digest = load_gate_checkpoint(model, handle, section.init_from)
+        frozen = ""
+        if section.freeze:
+            frozen = freeze_gate_parameters(model)
+            frozen = ", frozen (%d parameters held fixed)" % frozen
         LOG.info("Residual gates on layers %s, family %s, %d parameters; warm-started "
-                 "from %s (sha256 %s)", list(handle.layer_indices), section.family,
-                 gate_parameter_count(model), section.init_from, digest[:16])
+                 "from %s (sha256 %s)%s", list(handle.layer_indices), section.family,
+                 gate_parameter_count(model), section.init_from, digest[:16], frozen)
         return handle
     device = next(model.parameters()).device
     batches = []
@@ -616,3 +671,29 @@ def load_gate_checkpoint(model, handle: ResidualGateHandle, path) -> str:
             raise ValueError("gate parameter %s did not survive loading" % key)
     with io.open(path, "rb") as handle_in:
         return hashlib.sha256(handle_in.read()).hexdigest()
+
+
+def freeze_gate_parameters(model: nn.Module) -> int:
+    """Hold the gate fixed, and say how many parameters that is.
+
+    Called before the optimizer is built so the parameters are filtered out of its
+    groups. Setting a zero learning rate would not be the same thing: a parameter inside
+    an AdamW group is still reachable by weight decay, and "not updated by the loss" is
+    not "does not move". The buffers -- the frozen feature normalizer among them -- are
+    not parameters and were never trainable, but the postcondition asserted here covers
+    the whole module.
+    """
+    gates = getattr(model, "residual_gates", None)
+    if gates is None:
+        raise ValueError("there is no gate to freeze")
+    held = 0
+    for parameter in gates.parameters():
+        parameter.requires_grad_(False)
+        parameter.grad = None
+        held += parameter.numel()
+    still_trainable = [name for name, parameter in model.named_parameters()
+                       if name.startswith("residual_gates.") and parameter.requires_grad]
+    if still_trainable:
+        raise ValueError("gate parameters still trainable after freezing: %s"
+                         % ", ".join(still_trainable[:4]))
+    return held

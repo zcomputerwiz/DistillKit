@@ -4583,6 +4583,850 @@ not fix the seed instability it was proposed to fix, and before routing capacity
 the thing worth fixing is that a 250K-token co-adaptation of this backbone has a 0.0033
 nat noise floor that no single run can see past.
 
+## Checkpoint forensics: co-adaptation destroys the routing policy it starts from
+
+Three screens had produced sixteen trained backbones and their gates, and the question
+they left -- which half of `(B, G)` decides whether a warm-started run wins -- does not
+need another training run to answer. It needs the states we already paid for, taken
+apart and recombined at inference. No optimizer step appears anywhere in this section.
+
+The mechanism it found is not the one any of the hypotheses on the table proposed.
+
+### The frozen-stage gate beats every co-adapted gate, on every backbone
+
+Content NLL on the screen, each backbone carrying its own learned gate and then carrying
+the Stage-1 familiarity gate instead:
+
+| backbone | own gate | + Stage-1 gate | delta |
+| --- | ---: | ---: | ---: |
+| C42 (warm, seed 42) | 1.655552 | 1.640604 | **-0.014948** |
+| C43 (warm, seed 43) | 1.668988 | 1.644146 | **-0.024842** |
+| A42 (fresh, seed 42) | 1.656474 | 1.648271 | -0.008203 |
+| A43 (fresh, seed 43) | 1.664657 | 1.642613 | -0.022044 |
+| B42 (stock, no gate) | 1.658790 | 1.647045 | -0.011745 |
+| B43 (stock, no gate) | 1.669182 | 1.640971 | **-0.028211** |
+
+Every row, both corpora, t between -14 and -32 on paired documents. The confirmation
+corpus reproduces each delta to within 0.001.
+
+Two of those rows are the ones that matter most. **B42 and B43 never saw a gate at all**:
+they are the stock controls, 250K supervised tokens of ordinary fine-tuning. Dropping the
+frozen-stage routing policy onto them afterwards is worth -0.0117 and -0.0282 nats. The
+Stage-1 policy is not stale after backbone adaptation. It is portable to backbones that
+adapted without it.
+
+### And it is too weak, not too strong
+
+Scaling a gate at inference without retraining it -- `g_lambda = 1 + lambda (g - 1)`, so
+`lambda = 0` is the identity and `lambda = 1` is the gate as trained:
+
+| lambda | 0.0 | 0.25 | 0.5 | 0.75 | 1.0 | 1.25 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| C43 own gate | 1.674155 | 1.672963 | 1.671027 | 1.670327 | 1.668988 | **1.668039** |
+
+Monotone *down*. Weakening the learned gate makes C43 worse at every step; the best point
+in its own family is the strongest one tested. The gate-plasticity hypothesis -- that the
+losing run over-corrected and wants a lower learning rate -- is the opposite of what the
+checkpoint says.
+
+The Stage-1 gate on the same backbones goes further in the same direction:
+
+| lambda | 0.5 | 1.0 | 1.25 | 1.5 | 1.75 | 2.0 | 2.5 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| C43 + Stage-1 | 1.661926 | 1.644146 | 1.634699 | 1.624624 | 1.618579 | **1.617801** | 1.665263 |
+| B43 + Stage-1 | 1.657745 | 1.640971 | 1.633199 | 1.625651 | 1.618362 | **1.617300** | -- |
+
+At `lambda = 2` the frozen policy applied twice as hard takes the losing warm-start
+backbone from 1.668988 to **1.617801**, and the stock backbone from 1.669182 to
+**1.617300** -- a recovery of 0.051 nats, the size of the original attenuation effect,
+on a backbone that spent 250K tokens adapting away from it. The optimum was chosen on the
+screen; the confirmation corpus was then scored at that fixed lambda and gives 1.658268
+against C43's own 1.709855, the same -0.0516.
+
+### Gate drift is immediate, not a response to representation drift
+
+Every milestone of both warm-start runs, backbone and gate taken from the same step:
+
+| step | C43 own gate | + Stage-1 | Stage-1 advantage |
+| --- | ---: | ---: | ---: |
+| 57 | 1.674116 | 1.655443 | -0.018672 |
+| 114 | 1.677907 | 1.648500 | -0.029406 |
+| 171 | 1.664238 | 1.643995 | -0.020243 |
+| 228 | 1.669489 | 1.644544 | -0.024945 |
+| 284 | 1.668988 | 1.644146 | -0.024842 |
+
+The frozen policy is already better by the first checkpoint and never stops being better.
+There is no window in which the learned gate is ahead and then falls behind, and no decay
+in the Stage-1 advantage as the representation moves. Seed 42 shows the same shape at
+smaller magnitude. **The gate degrades first and the backbone never invalidates the
+policy** -- which is the opposite temporal ordering to the one that would justify calling
+this representation drift.
+
+### The outcome follows the backbone; the gate is a small correction on top
+
+Cross-seed swaps, each backbone carrying the other seed's gate:
+
+| combination | content | vs its own pairing |
+| --- | ---: | ---: |
+| C42 + C42 | 1.655552 | -- |
+| C42 + C43 | 1.652408 | **-0.003144** |
+| C43 + C43 | 1.668988 | -- |
+| C43 + C42 | 1.670843 | +0.001855 |
+| A42 + A43 | 1.653376 | -0.003097 |
+| A43 + A42 | 1.669057 | +0.004400 |
+
+Seed-42 backbones score 1.652-1.656 whatever gate they carry; seed-43 backbones score
+1.665-1.671. The level follows `B`. There is no matched-pair epistasis at all -- the
+cross-pairs are not worse than the matched pairs, and on the seed-42 backbone the foreign
+gate is *better* than the one that trained with it.
+
+Backbone movement agrees. Relative parameter displacement at the gated MLPs is
+0.0047/0.0045/0.0042/0.0037 for arm A and 0.0049/0.0045/0.0044/0.0037 for arm C -- the
+same to three figures. Mean cosine between arms (0.885-0.901) barely exceeds the cosine
+between two runs of the same arm (0.909-0.939). Carrying a warm-started gate does not send
+the backbone anywhere different.
+
+### Not an identifiability artefact
+
+The network consumes `g * r`, so a gate that looks different could be the same function
+with a compensating FFN. It is not. Across the layer x familiarity grid, comparing seed 42
+with seed 43: the FFN's own proposal `||r||` is identical (Pearson 1.000, relative RMS
+0.006), the gate `g` differs by 4.0%, the product `g * r` by 5.0%, and the size of the
+correction `|g - 1| * ||r||` by **57%**. The FFN did not move to absorb the gate. The
+routing function genuinely differs, and what differs most is how much correction is
+applied.
+
+### What it costs
+
+The Stage-1 rescue is not free on every class. On C43 it improves content by 0.0248 and
+punctuation by 0.0206, leaves control flat, and worsens whitespace from 0.2888 to 0.5377 --
+a small class, 4% of tokens, and the aggregate still improves by 0.0123. On the stock B43
+backbone the same swap moves whitespace by only 0.016, so the whitespace cost belongs to
+the warm-started backbone rather than to the policy.
+
+### Verdict
+
+**GATE COLLAPSE UNDER JOINT TRAINING.** Not gate drift in the sense of over-correction --
+the learned gates are too weak, and every one of them is beaten on its own backbone by a
+policy fitted before that backbone existed. Not backbone drift: the frozen policy gets
+*better* in relative terms as training proceeds and works on backbones that never saw a
+gate. Not epistasis: cross-pairs beat matched pairs. Not identifiability: `g * r` is no
+more stable than `g`.
+
+What happens is that joint cross-entropy training collapses the gate toward the identity.
+The training log already said so and nobody read it that way: gate reach runs 0.46-0.81
+frozen and 0.07-0.15 co-adapted at an identical gate learning rate. As the backbone starts
+absorbing the correction, the gradient asking for the correction shrinks, and the gate
+gives up a policy worth five times what co-adaptation ends up extracting from it.
+
+**DO NOT SPEND GPU TIME ON THE GATE-LR SCREEN.** A learning-rate grid searches for a gate
+that trains better under joint cross-entropy, and the evidence says joint cross-entropy is
+the thing destroying it. The cheap experiments the forensics point at instead are: freeze
+the Stage-1 gate and train only the backbone, which no arm has ever run; and scale the
+frozen policy, since `lambda = 2` on a stock-trained backbone is the best model this
+programme has produced.
+
+## Training under fixed routing loses to bolting the same routing on afterwards
+
+The forensics left an obvious next move: the Stage-1 policy is better than anything joint
+training produces, so freeze it and let only the backbone move. Arm D does exactly that --
+260 parameters held bitwise fixed and absent from the optimizer, backbone trainable, every
+other setting identical to the stock control B.
+
+The PLE programme is why arm D needed two controls rather than one. There, a memory the
+backbone plainly used still failed to beat a backbone trained without it. So `D` beating
+its own gate ablation proves nothing, and the comparisons that decide this are `D - B` and
+`D - (B + G_S1)`, both at run level, because three runs of one configuration were measured
+0.0033 nats apart.
+
+Three runs per cell, screen corpus, content NLL:
+
+| cell | n | mean | min | max | spread |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| B, seed 42 | 3 | 1.658420 | 1.657842 | 1.658790 | 0.000948 |
+| B + Stage-1, seed 42 | 3 | **1.646919** | 1.646753 | 1.647045 | 0.000292 |
+| D, seed 42 | 3 | 1.650918 | 1.650499 | 1.651403 | 0.000904 |
+| D at g=1, seed 42 | 3 | 1.668678 | 1.668159 | 1.669660 | 0.001501 |
+| B, seed 43 | 3 | 1.669296 | 1.668956 | 1.669748 | 0.000792 |
+| B + Stage-1, seed 43 | 3 | **1.641224** | 1.640971 | 1.641369 | 0.000398 |
+| D, seed 43 | 3 | 1.662824 | 1.662364 | 1.663355 | 0.000991 |
+| D at g=1, seed 43 | 3 | 1.695361 | 1.694642 | 1.696663 | 0.002021 |
+
+| comparison | seed 42 | seed 43 |
+| --- | ---: | ---: |
+| D - B | **-0.007502** | **-0.006472** |
+| D - (B + Stage-1) | **+0.003999** | **+0.021600** |
+| D - D at g=1 | -0.017760 | -0.032538 |
+| (B + Stage-1) - B | -0.011501 | -0.028072 |
+
+Arm D passes the control the PLE work demanded: it beats an independently trained stock
+backbone by 0.0075 and 0.0065 nats, at both seeds, with no overlap between cells. Fixed
+routing is worth having.
+
+And it loses to the control that costs nothing. Taking a backbone that never saw a gate
+and attaching the same policy afterwards is better at both seeds -- by 0.004 and 0.022 --
+again with no overlap. **Training in the gate's presence is worse than bolting the gate on
+at the end.**
+
+### The deficit is there from the first checkpoint and grows
+
+| step | D+S1 (42) | B+S1 (42) | difference | D+S1 (43) | B+S1 (43) | difference |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 57 | 1.651703 | 1.649967 | +0.001736 | 1.662921 | 1.649100 | +0.013821 |
+| 114 | 1.657916 | 1.654716 | +0.003200 | 1.666688 | 1.644614 | +0.022073 |
+| 171 | 1.656171 | 1.649009 | +0.007163 | 1.661883 | 1.639233 | +0.022650 |
+| 228 | 1.651887 | 1.647038 | +0.004849 | 1.662813 | 1.639969 | +0.022844 |
+| 284 | 1.650918 | 1.646919 | +0.003999 | 1.662824 | 1.641224 | +0.021600 |
+
+There is no crossover to wait for. Meanwhile `D - D(g=1)` widens from -0.0166 to -0.0181
+and from -0.0210 to -0.0330: the backbone grows steadily more dependent on a gate that is
+not earning its keep. That is the PLE pattern exactly, and it is why dependence was never
+allowed to be the headline.
+
+### It is not cancelling the gate through the FFN
+
+The obvious mechanism would be the backbone shrinking its own proposals to undo an
+imposed scaling. It does the opposite. Mean `||r||` at the gated layers, same fixed gate
+on both arms:
+
+| layer | bucket | B, seed 42 | D, seed 42 | B, seed 43 | D, seed 43 |
+| --- | --- | ---: | ---: | ---: | ---: |
+| 10 | 4-100 | 1.8736 | 1.8838 | 1.8775 | 1.8873 |
+| 12 | 400-800 | 2.4636 | 2.4815 | 2.4706 | 2.4873 |
+| 14 | 4-100 | 4.1673 | 4.1928 | 4.1728 | 4.1945 |
+| 16 | 400-800 | 5.7843 | 5.8045 | 5.7543 | 5.7803 |
+
+D's proposals are 0.3-0.6% *larger* everywhere, not smaller. No compensatory rescaling,
+no familiarity-dependent counter-response. The correction `(g-1)r` is preserved, not
+erased.
+
+What does change is where the backbone goes. Relative parameter movement at the gated
+MLPs is identical between D and B to three figures, but the *direction* diverges further
+than in any other arm: cosine to the stock trajectory is 0.992-0.994 between two runs of
+one arm, 0.985-0.988 for the trainable-gate arm A, 0.947-0.951 for the warm-start arm C,
+and **0.921-0.932 for D**. Arm D's backbone is pushed furthest off the stock path, and it
+is the arm that gains least against post-hoc routing.
+
+### And the structural cost grows
+
+| combination | content | punctuation | newline | whitespace | control | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| B, seed 42 | 1.65879 | 0.62357 | 0.79591 | 0.32487 | 0.44869 | 1.33153 |
+| B + Stage-1, seed 42 | 1.64704 | 0.59883 | 0.75554 | 0.31691 | 0.47258 | **1.31646** |
+| D, seed 42 | 1.65085 | 0.59961 | 0.82174 | **0.81425** | 0.47367 | 1.33706 |
+| D at g=1, seed 42 | 1.66966 | 0.62620 | 0.79101 | 0.65949 | 0.47517 | 1.34821 |
+
+The whitespace loss on the seed-42 D backbone is 0.814 against 0.317 for post-hoc routing,
+and 0.659 even with the gate switched off -- the damage is in the backbone, not in the
+routing. D's aggregate is worse than both controls despite its content advantage over B.
+Training under the fixed gate amplifies the structural side effects rather than reducing
+them.
+
+### Verdict
+
+**NEGATIVE CO-ADAPTATION -- TRAINING UNDER FIXED ROUTING REDUCES ITS VALUE.** Fixed
+routing clears the PLE-style control against stock training, which is more than the PLE
+memory ever managed. It does not clear the control that matters more: the same policy is
+worth more attached to a backbone that never trained with it. Exposure to the gate during
+training teaches the backbone to lean on it without teaching it to exploit it, and costs
+structure on the way.
+
+The cheapest useful recipe this programme has found is therefore: **train the backbone
+normally, attach the routing policy afterwards.** That is `B + G_S1`, it needs no
+architectural training at all, and at 1.6469 and 1.6412 it beats every trained arm.
+
+Before routing capacity grows, the open question is no longer how to train a gate. It is
+why a routing policy fitted to a frozen representation is worth more than any policy any
+training procedure here has produced, and whether a properly calibrated strength -- the
+forensics found the optimum near twice the fitted magnitude, on a screen-selected lambda
+that still needs a held-out calibration split -- is worth more still.
+
+## The hash was never a memory. It is a structural prior, and it is worth a lot
+
+PLE closed negative as semantic memory: a backbone trained beside a 268.7M-row table
+gained nothing in content over one trained without it, and 79% of what the table did buy
+was layout. The narrower claim that survived was never tested on its own -- that hashed
+local context might be a cheap prior for *structural* prediction. The residual-gate work
+then supplied the regime to test it in: train the backbone normally, freeze it, fit the
+auxiliary mechanism afterwards, so nothing can co-adapt around it.
+
+The sidecar biases the logits of structural tokens only -- newline, other whitespace,
+punctuation, control -- which is 6,166 ids out of 248,320. Content logits are untouched by
+construction, so content can only move through the softmax denominator, and the objective
+constrains that explicitly:
+
+    L = CE_struct(z + b) + 10 * relu(CE_content(z + b) - CE_content(z))
+
+The hash is the historical `NGramHasher`, EOS reset and all. The backbone is verified
+bitwise unchanged between the start and end of every run rather than assumed to be.
+
+### It works, and it is not small
+
+Screen corpus, on the stock seed-42 backbone from the residual-gate controls, at the
+strength a separate calibration split chose:
+
+| arm | trainable | newline | whitespace | punctuation | control | content | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| fixed code, d=32 | 0.40M | -0.4684 | -0.1502 | -0.2101 | -0.1852 | **-0.0053** | -0.0811 |
+| fixed code, d=384 | 4.74M | **-0.5953** | -0.1771 | -0.3078 | -0.2685 | **-0.0067** | -0.1100 |
+| learned table, d=32 | 4.60M | -0.5655 | -0.1705 | -0.3125 | -0.2733 | **-0.0169** | -0.1139 |
+| no hash, d=32 | 0.40M | -0.0585 | -0.1248 | -0.0264 | -0.0274 | -0.0017 | -0.0139 |
+
+Content *improves* in every arm. The guardrail was never reached. The confirmation corpus
+reproduces every row to within 0.02 nats, scored once at the already-fixed strength.
+
+Per-class nats on the screen for the cheapest arm: newline -5,337, punctuation -6,844,
+whitespace -577, control -370, content -509. This is a structural result with a small
+content bonus, which is what it was built to be.
+
+### Learned rows were the confound, not the mechanism
+
+The first comparison had the learned table beating fixed random codes on every structural
+class, which would have said addressed memory contributes beyond context identity. It has
+11.5 times the trainable parameters. Giving the fixed arm matched capacity -- same frozen
+random codes, wider decoder -- closes the gap entirely: -0.595 against -0.565 on newline,
+-0.308 against -0.312 on punctuation, -0.110 against -0.114 aggregate.
+
+**At matched capacity, deterministic random codes match learned rows.** The table's
+advantage was decoder width. A second independently seeded code basis gives -0.427 newline
+and -0.210 punctuation against the first seed's -0.468 and -0.210, so this is not one lucky
+draw either.
+
+### The addressing is doing all of the work
+
+Same trained sidecar, addresses rolled seven positions along the sequence:
+
+| arm | newline real | newline wrong | punctuation real | punctuation wrong |
+| --- | ---: | ---: | ---: | ---: |
+| fixed code | -0.4684 | -0.0128 | -0.2101 | **+0.0631** |
+| learned table | -0.5655 | **+0.3595** | -0.3125 | **+0.5023** |
+| no hash | -0.0585 | -0.0585 | -0.0264 | -0.0264 |
+
+97% of the newline gain and all of the punctuation gain disappear under wrong addressing,
+and both flip sign for the learned table. The unaddressed control is unchanged by rolling
+addresses it does not read, which is the arm behaving exactly as designed.
+
+Against that control, hashing carries 87% of the newline gain and 87% of the punctuation
+gain. The exception is whitespace: the no-hash arm gets -0.125 of the hashed arm's -0.150,
+so **most of the whitespace gain is a generic structural bias and only newline and
+punctuation are genuinely context-addressed.**
+
+### It transfers to a backbone it was never fitted on
+
+The seed-42 sidecar attached unchanged to the independently trained seed-43 stock backbone:
+
+| class | on its own backbone | on the other backbone | retained |
+| --- | ---: | ---: | ---: |
+| newline | -0.4684 | -0.4102 | 88% |
+| punctuation | -0.2101 | -0.1965 | 94% |
+| control | -0.1852 | -0.1838 | 99% |
+| content | -0.0053 | -0.0081 | better |
+| whitespace | -0.1502 | -0.0231 | **15%** |
+
+No retraining, no recalibration of the strength. The context-addressed classes port almost
+completely; whitespace, which the control already showed is the generic part, is the part
+that does not. That split is the same one twice, from two different directions.
+
+### It composes with the residual gate
+
+Both post-hoc, both frozen, neither refitted:
+
+| class | gate | sidecar | both | interaction |
+| --- | ---: | ---: | ---: | ---: |
+| content | -0.011745 | -0.005266 | **-0.015999** | +0.001012 |
+| newline | -0.040377 | -0.468408 | -0.465778 | +0.043008 |
+| punctuation | -0.024737 | -0.210090 | -0.213727 | +0.021099 |
+| aggregate | -0.015079 | -0.081101 | **-0.088207** | +0.007974 |
+
+Content is 94% additive, the aggregate 92%. The interference sits where it should -- both
+mechanisms read local context and both move structural tokens -- and it is small. Two
+independently fitted corrections on a frozen backbone stack.
+
+### Verdict
+
+**POSITIVE BUT TABLE UNNECESSARY -- FIXED HASH CODE IS SUFFICIENT.** All six acceptance
+criteria hold: large improvement on four structural classes, content improving rather than
+degrading, full reproduction on the untouched confirmation corpus, the gain destroyed by
+wrong addressing, transfer to an independently trained backbone, and no single token type
+carrying the aggregate.
+
+The 268.7 GiB-class learned n-gram memory is replaced by 400K trainable parameters and a
+deterministic code basis -- 9.2 MB in bf16, and the codes are a seeded draw that need not
+be stored at all. What PLE was actually doing, when it did anything, is visible here
+without the memory: **local context identity is a structural prediction prior, and
+addressing is the whole of it.**
+
+This is not a revival of PLE as semantic memory. That remains closed. It is the narrower
+surviving claim, tested in a regime where the backbone cannot absorb it, and it held.
+
+## The code table goes too: 32 signed bits off one hash word
+
+The structural sidecar had already shed its learned rows. What was left was a frozen
+random code basis -- 4.2M numbers, 16.8 MB resident -- reconstructible from a seed but
+still allocated and gathered from at every forward. The obvious question was whether it
+needs to exist.
+
+It does not. The whole basis is one splitmix64 mix of the row id, sliced into 32 bits:
+
+    c_j = (+-1) / sqrt(32)      from bit j of splitmix64(row ^ splitmix64(seed))
+
+No table, no buffer, no stored rows, no PRNG state. The mixer is the one the hasher
+already uses, vectorised over int64 and pinned bit-identical to the scalar reference --
+torch has no unsigned 64-bit type and `>>` on int64 is arithmetic, so every shift inside
+the mix needs masking or the sign bit quietly poisons it.
+
+Nothing else changed: same historical `NGramHasher` addressing with its EOS reset, same
+decoder width, same 400,790 trainable parameters, same splits, same loss, same guardrail,
+same calibration protocol.
+
+### It is better than the table it replaces
+
+| class | fixed code, d=32 | table-free | confirmation (table-free) |
+| --- | ---: | ---: | ---: |
+| newline | -0.4684 | **-0.5011** | -0.5006 |
+| whitespace | -0.1502 | -0.1512 | -0.1695 |
+| punctuation | -0.2101 | -0.2148 | -0.2182 |
+| control | -0.1852 | -0.2044 | -0.2191 |
+| content | -0.0053 | -0.0054 | -0.0054 |
+| aggregate | -0.0811 | **-0.0847** | -0.0848 |
+
+Every class is equal or better, the aggregate by 4.4%, and the confirmation corpus
+reproduces all of it. The equivalence criterion asked for within 5% either way; the
+cheapest construction came out on the right side of it.
+
+Wrong addressing still destroys the gain -- newline -0.5011 becomes +0.0363, punctuation
+-0.2148 becomes +0.0603 -- so this is the same mechanism, not a different one that happens
+to score similarly.
+
+### It transfers like the table did
+
+Fitted on the seed-42 stock backbone, attached unchanged to the independently trained
+seed-43 one, no recalibration:
+
+| class | own backbone | other backbone | retained | table arm retained |
+| --- | ---: | ---: | ---: | ---: |
+| newline | -0.5011 | -0.4483 | 89% | 88% |
+| punctuation | -0.2148 | -0.1996 | 93% | 94% |
+| control | -0.2044 | -0.2025 | 99% | 99% |
+| whitespace | -0.1512 | -0.0239 | 16% | 15% |
+
+The same profile to within a point, including the whitespace exception the no-hash control
+independently identified as the generic part.
+
+### And it is not slower
+
+Timing the integrated path -- backbone, hash, code construction, decoder, logit bias --
+interleaved, minimum of six rounds of eight forwards:
+
+| arm | s/forward | tokens/s | resident code table | checkpoint |
+| --- | ---: | ---: | ---: | ---: |
+| fixed code | 0.07235 | 6,054 | 16,793,600 B | 1.6 MB |
+| table-free | 0.07028 | 6,232 | **0 B** | 1.6 MB |
+
+The table-free arm measures 2.9% faster, which is not a result: the spread of repeated
+identical work was 36% and 55% on the two arms. The honest statement is that the
+difference is below what this machine resolves, which is all the performance rule needed.
+Peak allocated memory is identical at 4.56 GiB.
+
+Composition with the scalar residual gate is unchanged -- content -0.0117 and -0.0054
+separately, -0.0163 together, 95% additive; aggregate 91% additive.
+
+### Verdict
+
+**TABLE ELIMINATED -- DIRECT HASH FEATURES ARE SUFFICIENT.** The structural sidecar is now
+a 3-gram hash, 32 signed bits taken from its mixed row id, and a 400K-parameter decoder
+over the 6,166 structural token ids. There is no table of any kind left in it.
+
+The progression is worth stating plainly, because each step removed something the previous
+result had made look essential: 268.7M learned rows, then learned rows at all, then the
+stored random basis. What remains is deterministic local-context identity and a small
+decoder, which is what the evidence said the mechanism was three experiments ago.
+
+Nothing more elaborate was implemented. The stop rule said the minimum sufficient
+mechanism is the answer, and it was sufficient.
+
+## "Structural" was two mechanisms, and only one of them needs the hash
+
+Two independent controls had said the same thing. The unaddressed baseline kept 83% of the
+whitespace gain and 12% of newline and punctuation; cross-backbone transfer kept 16% of
+whitespace and 89% and 93% of the others. Both said whitespace was not using local context
+for anything.
+
+So the table-free sidecar was reused untouched, its whitespace outputs masked to zero, and
+one learned bias per whitespace token trained in their place. **485 parameters**, no hash
+input, no features of any kind. The addressed decoder took no gradient and is verified
+bitwise unchanged; so is the backbone.
+
+### The addressed half loses nothing when whitespace is taken away from it
+
+| class | monolithic | addressed only | retained |
+| --- | ---: | ---: | ---: |
+| newline | -0.5011 | -0.5018 | **100.1%** |
+| punctuation | -0.2148 | -0.2154 | **100.3%** |
+| control | -0.2044 | -0.2043 | **100.0%** |
+| whitespace | -0.1512 | -0.0037 | 2% |
+
+The hash-conditioned decoder was never using its whitespace columns for anything. Masking
+them costs it nothing measurable, which is the decomposition demonstrated rather than
+argued: these are two mechanisms sharing an output layer, not one mechanism spanning five
+classes.
+
+The 485-parameter bias is provably the context-free half. Under wrong addressing the
+factorized module keeps its whitespace gain at -0.1827 against -0.1831, while newline goes
+-0.4998 to +0.0382 and punctuation -0.2097 to +0.0663.
+
+### But the monolithic module was trading between the two, and the split cannot
+
+Walking the whitespace strength, everything else fixed:
+
+| lambda_w | whitespace | vs monolithic | content | vs monolithic | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0.25 | -0.0742 | 49% | -0.004443 | +0.0010 | 97.3% |
+| 0.50 | -0.1260 | 83% | -0.003443 | +0.0020 | 97.8% |
+| 1.00 | **-0.1831** | **121%** | -0.000779 | +0.0047 | 96.5% |
+
+A context-free bias can beat the monolithic on whitespace by 21% or match it on content,
+not both. Every point keeps 97-100% of newline, punctuation and control and lands within
+5% on aggregate, so the acceptance criteria split: the addressed classes pass everywhere,
+whitespace passes from lambda_w = 0.5, and the content bar of 0.001 only holds at 0.25.
+
+### Why, measured rather than guessed
+
+Mean probability mass on structural tokens at content-target positions:
+
+| arm | structural mass | content |
+| --- | ---: | ---: |
+| stock | 0.046706 | -- |
+| addressed only | **0.044491** | -0.005285 |
+| whitespace only | **0.049250** | +0.004497 |
+| monolithic | 0.044215 | -0.005439 |
+| factorized, lambda_w = 1 | 0.047047 | -0.000779 |
+
+That is the whole mechanism. The addressed branch improves content by *removing*
+inappropriate structural probability from content positions -- it knows from context when
+a newline is not coming. A context-free bias cannot: raising whitespace probability helps
+wherever whitespace belongs and costs everywhere else, and the content improvement the
+monolithic module reported was partly bought by having whitespace columns to trade
+against.
+
+### Whitespace calibration is mostly checkpoint-specific
+
+Fitted on the seed-42 backbone, attached to the independently trained seed-43 one:
+
+| branch | own backbone | other backbone | retained |
+| --- | ---: | ---: | ---: |
+| whitespace bias alone | -0.1850 | -0.0669 | **36%** |
+| hash-conditioned whitespace (previous) | -0.1512 | -0.0239 | 16% |
+| addressed classes (previous) | -0.5011 | -0.4483 | 89% |
+
+Disentangling whitespace from the hash more than doubles its portability, so some of the
+old 16% was entanglement -- but 36% is still mostly checkpoint-specific. The addressed
+branch ports; the whitespace calibration largely does not, and at 485 parameters refitting
+it per checkpoint costs nothing.
+
+Composition with the residual gate is unchanged at 91% additive on aggregate.
+
+### Verdict
+
+**FACTORIZED -- TINY CHECKPOINT-SPECIFIC WHITESPACE CALIBRATION IS SUFFICIENT**, with one
+qualification worth keeping: sufficient for whitespace, not for the monolithic module's
+content bonus, which came from the two halves being optimised against one budget.
+
+The final shape is a portable addressed branch -- 3-gram hash, 32 signed bits, 400K
+decoder, 89-94% cross-backbone retention -- plus 485 per-checkpoint scalars. What was
+called "structural" was a context mechanism for newline, punctuation and control, and a
+calibration error for whitespace, and the two had nothing to do with each other.
+
+## Whitespace admission is contextual, and 33 numbers nearly close the frontier
+
+The factorization left a precise failure: 485 context-free biases beat the monolithic
+module on whitespace by 21% and could not do that and match its content at the same time.
+The measured reason was that a global strength applies the correction everywhere --
+structural probability on content targets went from 0.0445 with the addressed branch alone
+to 0.0493 once the static bias joined it, against 0.0467 stock. The bias knew what to
+correct and not when.
+
+So: 33 parameters. One scalar per token, `a(x) = 2 sigmoid(w . c + b)` over the 32 trigram
+context bits the addressed branch already computes, multiplying a whitespace correction
+that stays frozen. Zero weights give `a = 1`, which is the static arm exactly. Everything
+else -- backbone, 400K decoder, 485 values, hash -- is frozen and verified bitwise.
+
+### The gate does exactly what it was asked to
+
+| arm | P(structural) on content targets | P(whitespace) on whitespace targets |
+| --- | ---: | ---: |
+| stock | 0.046706 | 0.861798 |
+| addressed only | 0.044491 | 0.862951 |
+| static bias | **0.047047** | 0.937936 |
+| **gated** | **0.046632** | **0.944339** |
+
+The static bias pushed structural mass on content positions *above* stock. The gate pulls
+it back below stock while pushing whitespace mass on whitespace targets higher than the
+static arm managed. It suppresses the correction where it does not belong and keeps it
+where it does, which is the entire hypothesis, measured directly rather than inferred from
+NLL.
+
+Admission by target class: whitespace 0.977, newline 0.953, punctuation 0.931, content
+0.924, control 0.677, with p10 to p90 spanning roughly 0.42 to 1.47. Population-level
+separation, not a classifier -- and genuinely context-varying, which the wrong-address
+control confirms: whitespace goes -0.192 to -0.160 under wrong addressing, where the
+static bias was completely unaffected by it. The decomposition is therefore generic
+whitespace value plus a context-dependent admission improvement, exactly as predicted.
+
+### It nearly closes the frontier, and misses by 0.0007
+
+Walking the whitespace strength with the gate in place:
+
+| arm | content | newline | whitespace | punctuation | control | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| monolithic | **-0.005439** | -0.501120 | -0.151211 | -0.214791 | -0.204409 | **-0.084666** |
+| addressed only | -0.005285 | -0.501833 | -0.003675 | -0.215433 | -0.204308 | -0.081332 |
+| static bias | -0.000779 | -0.499778 | -0.183050 | -0.209696 | -0.201385 | -0.081699 |
+| gated, full | -0.001405 | -0.499506 | **-0.192047** | -0.209236 | -0.201290 | -0.082163 |
+| **gated at 0.50** | -0.003765 | -0.500915 | -0.153179 | -0.213178 | -0.203596 | -0.083563 |
+| gated at 0.25 | -0.004594 | -0.501416 | -0.100999 | -0.214456 | -0.204057 | -0.083090 |
+
+Five of the six acceptance criteria hold at the 0.50 point: whitespace 101%, newline
+99.96%, punctuation 99.2%, control 99.6%, aggregate 98.7%. Content is -0.003765 against
+the monolithic's -0.005439, so it **misses the 0.001 bar by 0.00067**.
+
+The gate is a strict improvement on the static arm -- better on whitespace *and* better on
+content at every matched strength -- and it does not recover the monolithic's content
+number. The addressed branch alone gives -0.005285, so essentially the whole content bonus
+comes from it, and adding any whitespace correction costs some of it back: 0.0045 for the
+static bias, 0.0039 with the gate, 0.0017 at half strength. Contextual admission relaxes
+that conflict by about 15% and does not remove it.
+
+### Portability decomposes
+
+| configuration | whitespace on B43 | content |
+| --- | ---: | ---: |
+| B42 gate + B42 values | -0.0676 | -0.0013 |
+| B42 gate + B43-refit values | **-0.0919** | +0.0009 |
+| B43-refit values, no gate | -0.0869 | +0.0031 |
+
+Refitting the 485 values locally recovers 36% more whitespace, and the B42-fitted gate
+still helps on top of them -- better whitespace and better content than the ungated
+refit. So the admission policy is portable and the values are not, which is the
+decomposition the experiment was hoping for; B43's whitespace headroom is simply smaller
+than B42's.
+
+### Verdict
+
+**CONTEXT-GATED WHITESPACE BIAS IS NEARLY SUFFICIENT -- the mechanism is confirmed, the
+frontier is not quite closed.** The hypothesis was right: whitespace values are simple,
+whitespace admission is contextual, and 33 parameters demonstrate it. What they do not do
+is buy back the last 0.0007 nats of content.
+
+Not building a bigger gate. The deficit is 0.0007 nats of content against a 0.153
+whitespace gain; the gate provably works on the mechanism it was built for; and a hidden
+layer chasing that number is the machinery the stop rules exist to prevent. The final
+whitespace mechanism is 518 parameters -- 485 checkpoint-specific values and 33 portable
+admission weights.
+
+One methodological correction, because it changed a verdict. The first fit put the content
+guardrail on all non-whitespace targets pooled. The addressed branch improves newline and
+punctuation by half a nat each, so that mean never rose, the hinge never fired, and the
+gate spent the freedom on whitespace: content +0.0104, worse than stock. Hinging on
+content alone produced every number above. A guardrail averaged over classes that are
+already improving is not a guardrail.
+
+## Solving structure triples the content share of the gate's gradient
+
+The residual gate was fitted before the structural sidecar existed, so its 260 parameters
+were spent against an error budget that still held half a nat of newline and a fifth of a
+nat of punctuation. The sidecar now removes most of that without touching the backbone.
+The question is whether the gate's remaining pressure is then mostly content -- which is a
+claim about what the optimizer sees, so it was measured before anything was trained.
+
+### The gradient decomposition
+
+Per-class gate gradient at exact identity, 48 documents, backbone and sidecar frozen:
+
+| class | sidecar off | share | sidecar on | share |
+| --- | ---: | ---: | ---: | ---: |
+| content | 1.566e-01 | 17.5% | 1.518e-01 | **48.5%** |
+| newline | 1.846e-01 | 20.7% | 5.272e-02 | 16.8% |
+| whitespace | 2.996e-01 | **33.6%** | 2.661e-02 | **8.5%** |
+| punctuation | 1.104e-01 | 12.4% | 3.979e-02 | 12.7% |
+| control | 1.418e-01 | 15.9% | 4.211e-02 | 13.5% |
+
+Content's share of the pressure nearly triples while its absolute norm barely moves --
+0.1566 to 0.1518. The sidecar does not give the gate more content signal; it removes the
+structural signal that was drowning it. Whitespace pressure falls elevenfold.
+
+The cosines say the remaining structural pressure is not merely smaller but more hostile.
+Content against newline goes -0.168 to -0.650, content against punctuation -0.053 to
+-0.296. What is left after the sidecar actively competes with content, which is why
+removing it matters more than its share alone suggests.
+
+### The gate that learns under those gradients
+
+Three gates, identical architecture, scored on the same frozen backbone:
+
+| arm | content | newline | whitespace | punctuation | aggregate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| S alone | -0.000779 | -0.499778 | -0.183050 | -0.209696 | -0.081699 |
+| G (original) | -0.011745 | -0.040377 | -0.007959 | -0.024737 | -0.015079 |
+| G + S | -0.011819 | -0.491460 | -0.177941 | -0.211013 | -0.088267 |
+| G' (this harness, no S) | -0.070294 | -0.051846 | -0.009588 | -0.029511 | -0.055252 |
+| G' + S | -0.067488 | -0.494463 | -0.177149 | -0.205257 | -0.124105 |
+| G_S (fitted with S) | **-0.075061** | -0.017487 | -0.022819 | -0.003673 | -0.051442 |
+| **G_S + S** | **-0.072230** | -0.499894 | -0.182339 | -0.197594 | **-0.126430** |
+
+`G_S + S` beats `G + S` by **-0.060411** of content (t -58.2, 384/384 documents), and the
+confirmation corpus gives -0.061197. But most of that is the harness, not the sidecar.
+This harness trains on plain cross-entropy over the memoisation corpus while the original
+gate was trained on assistant-masked cross-entropy over the teacher cache, and the control
+gate fitted here without the sidecar already gets -0.055669 of it.
+
+**The sidecar-specific part is -0.004742 on the screen and -0.004436 on the confirmation
+corpus.** That is the number this experiment is actually about, and it is worth stating
+plainly rather than quoting the 0.060 that the harness change bought.
+
+### It is specialization, not just a better gate
+
+`G_S` alone does measurably less structural work than the control fitted without the
+sidecar -- newline -0.017 against -0.052, punctuation -0.004 against -0.030 -- and more
+content work, -0.075 against -0.070. It stopped solving problems the sidecar had already
+solved.
+
+The policy shows the same thing. Mean admission at layer 14 by target class:
+
+| gate | content | newline | whitespace | punctuation | control |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| G | 0.7385 | 0.6554 | 0.6469 | 0.7316 | 0.6250 |
+| G' | 0.7397 | 0.6646 | 0.8120 | 0.8027 | 0.5725 |
+| G_S | **0.8066** | **0.8073** | **0.9335** | **0.8789** | **0.8304** |
+
+`G_S` intervenes less everywhere. With structure handled elsewhere it does not need to
+attenuate as hard, and at the most familiar contexts it admits 0.245 where the control
+drops to 0.126. All three keep the monotone familiarity policy the intervention study
+originally found.
+
+### It transfers, weakly
+
+On the independently trained seed-43 backbone, with that checkpoint's own whitespace
+values and nothing refitted: `G_S + S` gives content -0.078186 against `G + S`'s
+-0.023503. The sidecar-specific part survives at **-0.000821** on the screen and
+**-0.000493** on the confirmation corpus, against -0.004742 and -0.004436 at home -- so a
+sixth, and a ninth on the corpus that was never looked at. The harness advantage transfers
+almost completely (-0.053862 and -0.055524); the specialization mostly does not, and the
+weaker of the two transfer numbers is the one to quote.
+
+### Verdict
+
+**POSITIVE -- STRUCTURAL CORRECTION FREES RESIDUAL GATING TO SPECIALIZE ON CONTENT.** The
+mechanism is confirmed directly at the gradient: the structural share of the gate's
+pressure collapses from 66% to 46%, content goes 17.5% to 48.5%, and a gate trained under
+those gradients does less structural work, more content work, and yields a better combined
+system on both corpora.
+
+The effect size is 0.0047 nats, not 0.060. The larger number is a training-objective
+change that had nothing to do with the sidecar, and the control gate fitted in the same
+harness is the only reason that is visible. Anyone quoting `G_S + S` against the original
+`G + S` without that control would be reporting a harness as an architecture.
+
+## The mask was the mismatch, and the specialization reproduces on a fresh fit
+
+Two questions were open: which part of the gate's training regime bought the 0.056 nats,
+and whether the structural specialization is a B42 accident. Both are now answered, and
+the first one had a wrong premise that had to be checked before anything was launched.
+
+### There is no corpus factor
+
+The factorial was specified as corpus x loss. The "memoisation corpus" and the teacher
+cache are **the same documents in the same order** -- `capture-data/heldout.jsonl` is the
+file the cache was built from. All 24 of the first 24 match token for token, lengths
+included, and the assistant-mask probe returned identical statistics on both because it
+was reading the same text twice.
+
+So the two things that actually differed between the original gate's training and the
+harness that beat it are the mask and the optimisation regime:
+
+| factor | original | harness |
+| --- | --- | --- |
+| loss | assistant-masked CE, 63% of tokens scored | plain CE, 100% |
+| regime | 284 steps, sequence 4096, cosine + warmup | 1536 steps, sequence 512, constant |
+
+### The mask is the whole effect
+
+Content NLL against stock, four arms, everything else identical -- architecture, layers,
+features, 260 parameters, initialisation, optimizer, rate, seed, evaluation, frozen
+backbone:
+
+| | assistant-masked | plain CE | mask effect |
+| --- | ---: | ---: | ---: |
+| original regime | -0.003794 | **-0.064782** | **-0.060988** |
+| harness regime | **+0.025606** | **-0.070019** | **-0.095625** |
+| regime effect | +0.029400 | -0.005237 | |
+
+The confirmation corpus reproduces every cell to within 0.001. Changing the regime alone,
+under plain CE, is worth -0.005237. Changing the mask alone is worth -0.061 to -0.096.
+There is a large interaction and it runs the wrong way for masking: under assistant
+masking, giving the gate five times as many updates makes it **worse than stock**
+(+0.0256), because more passes over a loss that scores half the tokens overfits to that
+half.
+
+### The mask did not weaken the policy. It prevented it
+
+Mean admission at layer 14 by trigram bucket, and the reach each arm reached:
+
+| arm | reach | unseen | 4-100 | 400-800 | 3000+ |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| assistant, original | **0.0491** | 1.0254 | 1.0130 | 1.0004 | 0.9965 |
+| plain, original | 0.8547 | 1.0649 | 0.7365 | 0.3905 | 0.3002 |
+| assistant, harness | 0.4351 | 0.9880 | 0.9238 | 0.8320 | 0.7993 |
+| plain, harness | 0.9982 | 0.9048 | 0.9796 | 0.3842 | 0.1459 |
+
+Under the original condition the assistant-masked gate has a reach of 0.049 and admission
+flat at 1.01 across every familiarity bucket. **It never learned the familiarity policy at
+all.** The monotone shape that the whole residual-admission programme is built on only
+appears under plain cross-entropy. That is a much stronger statement than "the mismatch
+cost some nats": the original gate was trained under a loss that hid the phenomenon it
+was supposed to exploit.
+
+### The specialization reproduces on a fresh fit
+
+The earlier transfer test moved B42's gate parameters to B43 and found almost nothing
+left. That tested parameter portability, not whether the mechanism recurs. Fitting a fresh
+pair on B43 -- one with its own structural sidecar present, one without, everything else
+identical -- answers the second question:
+
+| measurement | B42 | B43 fresh fit | B42 parameters moved to B43 |
+| --- | ---: | ---: | ---: |
+| sidecar-specific, screen | -0.004742 | **-0.002804** | -0.000821 |
+| sidecar-specific, confirmation | -0.004436 | **-0.002594** | -0.000493 |
+
+t -5.2 and -5.1 on the fresh fit. The gradient decomposition reproduces too: on B43 the
+content share of the gate's gradient goes 26.6% to 52.6% when the sidecar is enabled,
+against 17.5% to 48.5% on B42. And the fresh B43 gate shows the same specialization
+signature -- with the sidecar present it does less structural work, newline -0.033 against
+-0.059 and punctuation +0.004 against -0.031, and more content work.
+
+So the mechanism is reproducible and the fitted policy is not portable. A fresh fit
+recovers three to six times what moved parameters do.
+
+### The four claims, kept apart
+
+**Training regime.** -0.061 to -0.096 nats of content, entirely from the mask, replicated
+on both corpora. Not an architecture result. This is the largest number in the residual-
+admission programme and it was a training bug.
+
+**Structural specialization.** -0.0047 on B42, -0.0028 on a fresh B43 fit. Real,
+mechanistically confirmed at the gradient on two backbones, and small.
+
+**Parameter transfer.** -0.0008 and -0.0005. Weak.
+
+**Fresh-fit replication.** Reproduces at roughly 60% of the home magnitude. The
+specialization is a property of the setup, not of B42.
+
+The promotion policy stands: original `G` remains the historical baseline, `G'` is the
+matched-training reference any new gate must beat, and `G_S + S` is not promoted. But
+`G'` itself -- the same 260 parameters, trained under plain cross-entropy -- is worth
+-0.070 nats of content against stock and transfers across backbones essentially intact,
+which makes it the most valuable artefact this line has produced.
+
 ## Reproduction
 
 ```powershell

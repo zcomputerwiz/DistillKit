@@ -1,0 +1,97 @@
+{
+  "mode": "direct",
+  "backbone": "B42",
+  "corpus": "python",
+  "checkpoint": "scratch\\code_training\\checkpoints\\v1\\final",
+  "sidecar": {
+    "mode": "direct",
+    "rows": 131200,
+    "code_dim": 32,
+    "heads": 2,
+    "structural": 6166,
+    "trainable_parameters": 400790,
+    "frozen_code_entries": 0,
+    "bf16_bytes": 801580
+  },
+  "train_documents": 512,
+  "calibration_documents": 128,
+  "lr": 0.003,
+  "epochs": 3,
+  "beta": 10.0,
+  "backbone_sha256_before": "eb5a495fc1a4217cd86830716872b861c290330f512bad7cc57c71becef974e4",
+  "loss_history": [
+    0.7343618854720262,
+    0.7060286592604825,
+    0.6820817997577251
+  ],
+  "calibration_curve": {
+    "0.0": {
+      "newline": 0.7063274670853964,
+      "content": 1.7989900830463919,
+      "punctuation": 0.8880576049912625,
+      "whitespace": 0.3826235958123904,
+      "control": 2.08149345348735,
+      "all": 1.37273823628853
+    },
+    "0.25": {
+      "newline": 0.7086449307119348,
+      "content": 1.7981658656374937,
+      "punctuation": 0.8881002616186932,
+      "whitespace": 0.3843646863097273,
+      "control": 1.9329065594608974,
+      "all": 1.3715710111332804
+    },
+    "0.5": {
+      "newline": 0.7119831781067989,
+      "content": 1.7975851143725718,
+      "punctuation": 0.8890975877974425,
+      "whitespace": 0.3867116145578655,
+      "control": 1.7942747489734363,
+      "all": 1.3709951497084194
+    },
+    "0.75": {
+      "newline": 0.7163708697485931,
+      "content": 1.7972554908115572,
+      "punctuation": 0.8910426346820038,
+      "whitespace": 0.3896812700235114,
+      "control": 1.6652587504962078,
+      "all": 1.3710138570154153
+    },
+    "1.0": {
+      "newline": 0.7218500249424947,
+      "content": 1.797204260910605,
+      "punctuation": 0.8939477588923201,
+      "whitespace": 0.39329962745902475,
+      "control": 1.545423998129947,
+      "all": 1.3716476490134604
+    },
+    "1.5": {
+      "newline": 0.736312601031425,
+      "content": 1.7981802325717722,
+      "punctuation": 0.902817090502809,
+      "whitespace": 0.4026373320340289,
+      "control": 1.331169851673753,
+      "all": 1.3749610467858666
+    },
+    "2.0": {
+      "newline": 0.7559112380547186,
+      "content": 1.8010514642498257,
+      "punctuation": 0.916148641725463,
+      "whitespace": 0.4151451716756028,
+      "control": 1.1468368392786241,
+      "all": 1.3814065465105516
+    },
+    "3.0": {
+      "newline": 0.8127862436123756,
+      "content": 1.8117008344896355,
+      "punctuation": 0.9556830874786735,
+      "whitespace": 0.45234346697482186,
+      "control": 0.8497551163184773,
+      "all": 1.4034175341547817
+    }
+  },
+  "guardrail": 0.001,
+  "selected_strength": 1.5,
+  "backbone_sha256_after": "eb5a495fc1a4217cd86830716872b861c290330f512bad7cc57c71becef974e4",
+  "elapsed_seconds": 223.88999999999942
+}

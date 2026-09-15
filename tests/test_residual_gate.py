@@ -13,9 +13,9 @@ import torch
 from distillkit.optimizers import architecture_parameter_ids, freeze_backbone_for_stage1
 from distillkit.experimental.residual_gate import (
     FAMILIES, ResidualAdmissionGate, ResidualGateCheckpointCallback,
-    TrigramFamiliarity, calibrate_gates, family_features, gate_parameter_count,
-    install_residual_gates, load_gate_checkpoint, remove_residual_gates,
-    residual_gates)
+    TrigramFamiliarity, calibrate_gates, family_features, freeze_gate_parameters,
+    gate_parameter_count, install_residual_gates, load_gate_checkpoint,
+    remove_residual_gates, residual_gates)
 from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5ForCausalLM
 
 from tests.test_sidecar_model import tiny_config
@@ -470,5 +470,203 @@ def test_a_warm_started_gate_still_trains_with_the_backbone(tmp_path):
             assert grad is not None and torch.any(grad != 0)
         embedding = model.get_input_embeddings().weight
         assert embedding.grad is not None and torch.any(embedding.grad != 0)
+    finally:
+        remove_residual_gates(model)
+
+
+# --- inference-time strength --------------------------------------------------
+#
+# The forensics scale a trained gate without retraining it: g_lambda = 1 + lambda (g - 1).
+# Two endpoints have to be exact or the curve between them means nothing -- lambda = 0 is
+# the identity the ablation already uses, and lambda = 1 is the gate as trained.
+
+
+def test_strength_zero_is_the_identity(tmp_path):
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+            handle.gate(index).output.bias.data.normal_(0, 0.6)
+        assert not torch.equal(reference, logits_of(model, ids))
+        handle.strength = 0.0
+        assert torch.equal(reference, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_strength_one_is_the_gate_as_trained(tmp_path):
+    model = build()
+    ids = batch(model)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+            handle.gate(index).output.bias.data.normal_(0, 0.6)
+        trained = logits_of(model, ids)
+        handle.strength = 1.0
+        assert torch.equal(trained, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_strength_scales_the_departure_from_unit_admission():
+    """The interpolation is on g - 1, not on g: halving must not halve admission."""
+    gate = ResidualAdmissionGate(4)
+    gate.observe(torch.randn(64, 4))
+    gate.finalize()
+    gate.output.weight.data.normal_(0, 0.6)
+    gate.output.bias.data.fill_(0.3)
+    features = torch.randn(32, 4)
+    full = gate(features)
+    for strength in (0.0, 0.25, 0.5, 1.0, 1.5):
+        scaled = 1.0 + strength * (full - 1.0)
+        assert torch.allclose(scaled - 1.0, strength * (full - 1.0), atol=1e-6)
+    assert torch.allclose(1.0 + 0.0 * (full - 1.0), torch.ones_like(full))
+
+
+def test_forced_identity_wins_over_strength(tmp_path):
+    """Both knobs exist; the ablation must not be silently rescaled by the other."""
+    model = build()
+    ids = batch(model)
+    reference = logits_of(model, ids)
+    handle = calibrated(model, ids)
+    try:
+        for index in handle.layer_indices:
+            handle.gate(index).output.weight.data.normal_(0, 0.6)
+        handle.strength = 1.5
+        handle.force_identity = True
+        assert torch.equal(reference, logits_of(model, ids))
+    finally:
+        remove_residual_gates(model)
+
+
+def test_the_update_norm_is_recorded_beside_the_gate(tmp_path):
+    """g * r is the thing the network consumes; both halves have to be observable."""
+    model = build()
+    ids = batch(model)
+    handle = calibrated(model, ids)
+    try:
+        handle.keep = True
+        handle.keep_update = True
+        handle.reset_stats()
+        logits_of(model, ids)
+        for index in handle.layer_indices:
+            gates = torch.cat([part.reshape(-1) for part in handle.kept[index]])
+            norms = torch.cat([part.reshape(-1) for part in handle.kept_norms[index]])
+            assert gates.shape == norms.shape == (ids.numel(),)
+            assert torch.all(norms >= 0)
+    finally:
+        remove_residual_gates(model)
+
+
+# --- frozen routing -----------------------------------------------------------
+#
+# The redundancy test trains a backbone in the presence of a policy it may not change.
+# That only means anything if the policy really does not change: a gate left inside an
+# optimizer at a zero learning rate is still reachable by weight decay, and "not updated
+# by the loss" is not "did not move".
+
+
+def test_freezing_removes_the_gate_from_gradients(tmp_path):
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids)
+    remove_residual_gates(source)
+
+    model = build()
+    handle = install_residual_gates(model, GATED, family="familiarity",
+                                    familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, handle, path)
+        held = freeze_gate_parameters(model)
+        assert held == gate_parameter_count(model)
+        loss_of(model, ids).backward()
+        for index in handle.layer_indices:
+            gate = handle.gate(index)
+            assert gate.output.weight.grad is None
+            assert gate.project.weight.grad is None
+        embedding = model.get_input_embeddings().weight
+        assert embedding.grad is not None and torch.any(embedding.grad != 0)
+    finally:
+        remove_residual_gates(model)
+
+
+def test_a_frozen_gate_is_absent_from_the_optimizer(tmp_path):
+    """HF builds its groups from requires_grad, so freezing has to happen first."""
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids)
+    remove_residual_gates(source)
+
+    model = build()
+    handle = install_residual_gates(model, GATED, family="familiarity",
+                                    familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, handle, path)
+        freeze_gate_parameters(model)
+        trainable = [parameter for parameter in model.parameters()
+                     if parameter.requires_grad]
+        optimizer = torch.optim.AdamW(trainable, lr=1e-5)
+        inside = {id(parameter) for group in optimizer.param_groups
+                  for parameter in group["params"]}
+        assert not any(id(parameter) in inside
+                       for parameter in model.residual_gates.parameters())
+    finally:
+        remove_residual_gates(model)
+
+
+def test_a_frozen_gate_survives_an_optimizer_step_bitwise(tmp_path):
+    """The contract the whole arm rests on, asserted against a real step."""
+    source = build()
+    ids = batch(source)
+    _, path = trained_gate(tmp_path, source, ids)
+    remove_residual_gates(source)
+
+    model = build()
+    handle = install_residual_gates(model, GATED, family="familiarity",
+                                    familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, handle, path)
+        freeze_gate_parameters(model)
+        before = {name: value.clone()
+                  for name, value in model.residual_gates.state_dict().items()}
+        optimizer = torch.optim.AdamW(
+            [parameter for parameter in model.parameters() if parameter.requires_grad],
+            lr=1e-3, weight_decay=0.1)
+        loss_of(model, ids).backward()
+        optimizer.step()
+        after = model.residual_gates.state_dict()
+        for name, value in before.items():
+            assert torch.equal(after[name], value), name
+    finally:
+        remove_residual_gates(model)
+
+
+def test_freezing_needs_a_gate():
+    model = build()
+    with pytest.raises(ValueError, match="no gate to freeze"):
+        freeze_gate_parameters(model)
+
+
+def test_a_frozen_run_still_predicts_with_its_gate(tmp_path):
+    """Frozen means not trainable, not switched off."""
+    source = build()
+    ids = batch(source)
+    handle, path = trained_gate(tmp_path, source, ids)
+    expected = logits_of(source, ids)
+    remove_residual_gates(source)
+
+    model = build()
+    fresh = install_residual_gates(model, GATED, family="familiarity",
+                                   familiarity=familiarity_for(model, tmp_path))
+    try:
+        load_gate_checkpoint(model, fresh, path)
+        freeze_gate_parameters(model)
+        assert torch.equal(expected, logits_of(model, ids))
+        fresh.force_identity = True
+        assert not torch.equal(expected, logits_of(model, ids))
     finally:
         remove_residual_gates(model)

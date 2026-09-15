@@ -17,6 +17,11 @@ from transformers import TrainerCallback
 
 from distillkit.experimental.widened_residual import _BranchNorm
 
+#: The one fixed perturbation for the asymmetric recipient initialization. Mean-zero, so
+#: the average branch gain -- and therefore the initial read -- is unchanged in exact
+#: arithmetic. An engineering choice, not an optimum, and deliberately not swept.
+DEFAULT_EPSILON = torch.tensor([-3.0, -1.0, 1.0, 3.0]) / 128.0
+
 
 class _GatedMean(torch.autograd.Function):
     """Branchwise gate/product, without full widened gate/product temporaries.
@@ -89,6 +94,77 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.W_down = nn.Linear(num_branches * hidden_size, lowrank, bias=False)
         self.W_up = nn.Linear(lowrank, num_branches * hidden_size, bias=False)
         self.W_write = nn.Linear(num_branches * hidden_size, num_branches, bias=False)
+
+    @torch.no_grad()
+    def recipient_initialize(self, norm, asymmetric=False, seed=0, epsilon=None):
+        """Set this route to reproduce ``norm``'s sublayer with GR fully active.
+
+        The recipient computes ``h + F(RMSNorm(h; gamma, eps))``. With ``W_up = 0`` the
+        gate logits are exactly zero, so every read gate is ``1/2``; with ``W_write = 0``
+        every write multiplier is ``2 * sigmoid(0) = 1``. Setting each branch gain to
+        ``2 * gamma`` then makes the read
+
+            mean_i(1/2 * RMSNorm(h; 2 gamma)) = RMSNorm(h; gamma)
+
+        and gives every branch the recipient's own update, so branches that start equal
+        stay equal and the mean collapse returns ``h``.
+
+        Two details are easy to get wrong and both would be silent:
+
+        ``Qwen3_5RMSNorm`` stores a *deviation* -- it applies ``1 + weight`` -- and this
+        module also applies ``1 + branch_gain_delta``, as a *replacement* for the block
+        norm rather than a gain on top of it. The effective gain we need is ``2 * gamma``
+        with ``gamma = 1 + weight``, so the stored delta is ``1 + 2 * weight``. Writing
+        ``2 * weight`` would be wrong by exactly one on every branch.
+
+        ``W_down`` is seeded nonzero on purpose. Zeroing both factors of the read
+        bottleneck would leave it with no gradient path even after ``W_up`` moves -- the
+        same zero-multiplier trap that made the first borrowed-routing transfer inert.
+
+        The asymmetric variant scales the gains by ``1 + epsilon_i`` with mean-zero
+        ``epsilon``, which leaves the average read unchanged in exact arithmetic while
+        letting the branches carry different gains. It is a predeclared comparison, not
+        the primary candidate: the synthetic diagnostic in ``scratch/gr_retrofit`` found
+        it advances symmetry onset by one or two optimizer steps and is then overtaken by
+        the symmetric mode.
+        """
+        from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5RMSNorm
+
+        if not isinstance(norm, Qwen3_5RMSNorm):
+            raise TypeError(
+                "recipient initialization supports Qwen3_5RMSNorm, which applies "
+                "1 + weight; got %s. Refusing rather than guessing the gain convention."
+                % type(norm).__name__)
+        if abs(float(norm.eps) - float(self.norm_eps)) > 0:
+            raise ValueError("norm epsilon %r does not match the route's %r"
+                             % (norm.eps, self.norm_eps))
+        gamma = 1.0 + norm.weight.detach().to(torch.float32)
+        scale = torch.ones(self.num_branches, dtype=torch.float32)
+        if asymmetric:
+            values = DEFAULT_EPSILON if epsilon is None else torch.as_tensor(epsilon)
+            values = values.to(torch.float32)
+            if values.numel() != self.num_branches:
+                raise ValueError("epsilon has %d entries for %d branches"
+                                 % (values.numel(), self.num_branches))
+            if float(values.sum().abs()) > 1e-6:
+                raise ValueError("epsilon must be mean-zero to preserve the initial read")
+            scale = 1.0 + values
+        effective = 2.0 * gamma.unsqueeze(0) * scale.unsqueeze(-1)
+        self.branch_gain_delta.data = (effective - 1.0).to(
+            self.branch_gain_delta.dtype).to(self.branch_gain_delta.device)
+        self.W_up.weight.zero_()
+        self.W_write.weight.zero_()
+        generator = torch.Generator(device="cpu").manual_seed(int(seed))
+        fan_in = self.W_down.weight.shape[1]
+        self.W_down.weight.data = (
+            torch.randn(self.W_down.weight.shape, generator=generator,
+                        dtype=torch.float32) / fan_in ** 0.5
+        ).to(self.W_down.weight.dtype).to(self.W_down.weight.device)
+        self.set_blend(1.0)
+        self.recipient_initialized = True
+        self.recipient_mode = "asymmetric" if asymmetric else "symmetric"
+        return {"mode": self.recipient_mode, "seed": int(seed),
+                "epsilon": scale.sub(1.0).tolist() if asymmetric else None}
 
     def _apply(self, fn, recurse=True):
         blend = self.blend

@@ -1,0 +1,85 @@
+{
+  "run": "v1",
+  "initial_checkpoint": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "initial_sha256": "c980c584e44502328cb321b3d7ee5f00a8a422196dc8f0dfb8102027df46b759",
+  "config_digest": "17b72adfc8c7e15efa566491f6617949004d36e6f29f78fddd20e843b57d949b",
+  "corpus": {
+    "corpus": "code_corpus/v1",
+    "dataset": "bigcode/the-stack-v2-dedup",
+    "config": "Python",
+    "dataset_revision": "611ef38fbfab78b65b38be47e870e4b3d70de038",
+    "split_seed": 20260914,
+    "split_algorithm": "blake2b-64('<seed>:<repo_name>') / 2**64, tiled over splits in sorted name order",
+    "filters": {
+      "min_bytes": 64,
+      "max_bytes": 1048576,
+      "max_tokens": 32768,
+      "min_bytes_per_token": 1.8,
+      "exclude_generated": true,
+      "exclude_vendor": true,
+      "license_types": null
+    },
+    "tokenizer": {
+      "source": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+      "class": "Qwen2Tokenizer",
+      "vocab_size": 248044,
+      "tokenizer_json_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42"
+    },
+    "manifest_sha256": "81871bf4ef3120c9a84acd55aeabcd36be5c1f68008aa11d976a2a3d0488573d",
+    "splits": {
+      "train": {
+        "repositories": 32519,
+        "files": 34606,
+        "model_tokens": 30725434,
+        "parts": 21
+      },
+      "calibration": {
+        "repositories": 1978,
+        "files": 2218,
+        "model_tokens": 2034946,
+        "parts": 11
+      },
+      "heldout": {
+        "repositories": 5137,
+        "files": 5405,
+        "model_tokens": 5011233,
+        "parts": 11
+      }
+    }
+  },
+  "objective": "plain causal CE over 100% of non-padding targets; no masking",
+  "modules_attached": [],
+  "sequence_length": 2048,
+  "packing": "documents shuffled by data_seed, concatenated, cut to fixed length; each document already ends with EOS; final partial sequence dropped",
+  "micro_batch": 2,
+  "accumulate": 8,
+  "tokens_per_update": 32768,
+  "planned_updates": 938,
+  "optimizer": "bitsandbytes AdamW8bit (memory: fp32 AdamW state is 16 GB for 2B params, which does not fit beside weights and gradients on one 24 GB card)",
+  "betas": [
+    0.9,
+    0.95
+  ],
+  "eps": 1e-08,
+  "lr": 2e-05,
+  "schedule": "linear warmup 40 updates then cosine to 10%",
+  "weight_decay": 0.0,
+  "gradient_clip": 1.0,
+  "precision": "bfloat16 weights, float32 loss reduction",
+  "gradient_checkpointing": true,
+  "chunked_cross_entropy": true,
+  "seed": 20260914,
+  "data_seed": 20260914,
+  "resumed_from": "scratch\\code_training\\checkpoints\\v1\\20m",
+  "resume_note": "machine crashed mid-run; weights and the data stream continue exactly, AdamW moment estimates were not saved and restart from zero at this point",
+  "milestones": [
+    5000000,
+    10000000,
+    20000000,
+    30725434
+  ],
+  "gpu": "NVIDIA GeForce RTX 3090",
+  "torch": "2.11.0+cu128",
+  "python": "3.12.14",
+  "platform": "Windows-11-10.0.26200-SP0"
+}

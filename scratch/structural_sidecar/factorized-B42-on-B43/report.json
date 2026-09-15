@@ -1,0 +1,543 @@
+{
+  "backbone": "B43",
+  "addressed": "scratch\\structural_sidecar\\direct-B42\\sidecar.pt",
+  "addressed_strength": 1.0,
+  "parameters": {
+    "addressed_parameters": 0,
+    "whitespace_parameters": 485,
+    "whitespace_tokens": 485,
+    "total_parameters": 485
+  },
+  "loaded_whitespace": "scratch\\structural_sidecar\\factorized-B42\\whitespace.pt",
+  "calibration_curve": {
+    "0.0": {
+      "content": 1.9005294678289064,
+      "newline": 0.30405898336858117,
+      "punctuation": 0.4461268504663146,
+      "whitespace": 0.22658457330771078,
+      "control": 0.2752707934770589,
+      "all": 1.4555447439868074
+    },
+    "0.25": {
+      "content": 1.9015585401511268,
+      "newline": 0.30431555924285036,
+      "punctuation": 0.44717319171589426,
+      "whitespace": 0.20437191836110508,
+      "control": 0.276542664798938,
+      "all": 1.4558512321399937
+    },
+    "0.5": {
+      "content": 1.9027962863097987,
+      "newline": 0.3046323797358665,
+      "punctuation": 0.44845829757688604,
+      "whitespace": 0.18540278081206124,
+      "control": 0.2786449686104929,
+      "all": 1.4564635403401918
+    },
+    "0.75": {
+      "content": 1.904287461210681,
+      "newline": 0.30502874771654304,
+      "punctuation": 0.45007891901957087,
+      "whitespace": 0.1689580265029985,
+      "control": 0.2817815242764412,
+      "all": 1.4574220474180746
+    },
+    "1.0": {
+      "content": 1.9061082139703613,
+      "newline": 0.30554433947295384,
+      "punctuation": 0.45220821430764646,
+      "whitespace": 0.15484304254160378,
+      "control": 0.2861790118533125,
+      "all": 1.4588189677797432
+    },
+    "1.5": {
+      "content": 1.9114154111131676,
+      "newline": 0.30742447432029585,
+      "punctuation": 0.45953087478145854,
+      "whitespace": 0.13456098356931068,
+      "control": 0.30161009050574716,
+      "all": 1.4638015445876005
+    },
+    "2.0": {
+      "content": 1.9219830145744754,
+      "newline": 0.31404559556947825,
+      "punctuation": 0.4762412834307739,
+      "whitespace": 0.13075045784738748,
+      "control": 0.3459624633354384,
+      "all": 1.4754215966736577
+    },
+    "3.0": {
+      "content": 2.003818055005633,
+      "newline": 0.4654088663053468,
+      "punctuation": 0.5854879309585485,
+      "whitespace": 0.24321913068948542,
+      "control": 0.856656454192795,
+      "all": 1.5716049486259982
+    }
+  },
+  "calibration_addressed_only": {
+    "content": 1.9005294678289064,
+    "newline": 0.30405898336858117,
+    "punctuation": 0.4461268504663146,
+    "whitespace": 0.22658457330771078,
+    "control": 0.2752707934770589,
+    "all": 1.4555447439868074
+  },
+  "calibration_stock": {
+    "content": 1.9065342193648436,
+    "newline": 0.7626936565677406,
+    "punctuation": 0.6992460398132924,
+    "whitespace": 0.22454514489869712,
+    "control": 0.52889699045177,
+    "all": 1.5402026218869616
+  },
+  "whitespace_strength": 1.0,
+  "screen": {
+    "stock": {
+      "per_document_mean": {
+        "content": 1.6689562842118704,
+        "newline": 0.745471381078131,
+        "punctuation": 0.6036635814148422,
+        "whitespace": 0.21202225390727955,
+        "control": 0.46492243651589105,
+        "all": 1.32911179439165
+      },
+      "totals": {
+        "all": {
+          "nll": 1.334503078637817,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7157422575067796,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.5210946039293786,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.6962934072756803,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.5741746263529791,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.18547176059355283,
+          "tokens": 7054
+        }
+      },
+      "structural_mass_on_content": 0.04860165170490897
+    },
+    "current": {
+      "per_document_mean": {
+        "content": 1.662356902142755,
+        "newline": 0.2972138531056205,
+        "punctuation": 0.4040472406815523,
+        "whitespace": 0.18811413623879156,
+        "control": 0.26241026322243205,
+        "all": 1.2527749258875829
+      },
+      "totals": {
+        "all": {
+          "nll": 1.2616494238983103,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7100458203717945,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.2853460303693407,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.2759639574047273,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.39570972838017554,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.1731912256817777,
+          "tokens": 7054
+        }
+      },
+      "structural_mass_on_content": 0.04620060528638229
+    },
+    "addressed": {
+      "per_document_mean": {
+        "content": 1.6633336698989245,
+        "newline": 0.29661268710643296,
+        "punctuation": 0.40350293380370655,
+        "whitespace": 0.2156244542647334,
+        "control": 0.2625152141941606,
+        "all": 1.2539114712778412
+      },
+      "totals": {
+        "all": {
+          "nll": 1.2627367314982338,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7109597698724224,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.2855413662362814,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.275289823935606,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.3951418366550201,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.18899850300370338,
+          "tokens": 7054
+        }
+      },
+      "structural_mass_on_content": 0.04688329603717042
+    },
+    "whitespace": {
+      "per_document_mean": {
+        "content": 1.6744079182946512,
+        "newline": 0.7471694505573269,
+        "punctuation": 0.6104516910299492,
+        "whitespace": 0.14512624572097635,
+        "control": 0.473587227926273,
+        "all": 1.332196116178083
+      },
+      "totals": {
+        "all": {
+          "nll": 1.337548417146278,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7209008781564492,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.5350752357261158,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.6977987950208262,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.5809454133691438,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.133830537977616,
+          "tokens": 7054
+        }
+      },
+      "structural_mass_on_content": 0.05131714903109241
+    },
+    "factorized": {
+      "per_document_mean": {
+        "content": 1.6687766383223472,
+        "newline": 0.2984896697412096,
+        "punctuation": 0.40930946873264257,
+        "whitespace": 0.14785469043222474,
+        "control": 0.2656525035602903,
+        "all": 1.2567029414469737
+      },
+      "totals": {
+        "all": {
+          "nll": 1.2654733551454138,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7161083257673475,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.29097938432681664,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.27703194312774604,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.40098157372611554,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.1363486465382714,
+          "tokens": 7054
+        }
+      },
+      "structural_mass_on_content": 0.049580707758044205
+    },
+    "factorized_wrong_context": {
+      "per_document_mean": {
+        "content": 1.6797480042031216,
+        "newline": 0.7863999874216301,
+        "punctuation": 0.6637190064538976,
+        "whitespace": 0.14759743628019492,
+        "control": 0.4273582259427035,
+        "all": 1.3482037713045865
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3532201906210766,
+          "tokens": 175526
+        },
+        "content": {
+          "nll": 1.7269203828306334,
+          "tokens": 118090
+        },
+        "control": {
+          "nll": 0.48833142784275896,
+          "tokens": 1729
+        },
+        "newline": {
+          "nll": 0.7294868967098466,
+          "tokens": 12147
+        },
+        "punctuation": {
+          "nll": 0.6281206549923578,
+          "tokens": 36506
+        },
+        "whitespace": {
+          "nll": 0.1357704445405047,
+          "tokens": 7054
+        }
+      }
+    }
+  },
+  "confirmation": {
+    "stock": {
+      "per_document_mean": {
+        "content": 1.7098359079361847,
+        "newline": 0.7387453630840938,
+        "punctuation": 0.6254706515773043,
+        "control": 0.47380072606886764,
+        "whitespace": 0.19736893167958242,
+        "all": 1.364237501147266
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3746796209856682,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7570955727192488,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.5286416461353478,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.6915942043571822,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.5916544157807754,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.19598753036586605,
+          "tokens": 6457
+        }
+      },
+      "structural_mass_on_content": 0.049326088366797194
+    },
+    "current": {
+      "per_document_mean": {
+        "content": 1.7033369368492222,
+        "newline": 0.2992278407317858,
+        "punctuation": 0.42294817968046106,
+        "control": 0.2561821011154876,
+        "whitespace": 0.168113179055324,
+        "all": 1.2884267687706656
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3029257637686196,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7517964322113428,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.2782594427944879,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.27581727683159324,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.4135521521531607,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.17849147474552354,
+          "tokens": 6457
+        }
+      },
+      "structural_mass_on_content": 0.046958497570206724
+    },
+    "addressed": {
+      "per_document_mean": {
+        "content": 1.704351318597441,
+        "newline": 0.29872811011531386,
+        "punctuation": 0.42233045713703615,
+        "control": 0.25628355314899637,
+        "whitespace": 0.2005025726710073,
+        "all": 1.2897089955383152
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3041601139429322,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7527290019403996,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.27853099673432924,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.27520673243884647,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.4129876974585359,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.19877694724531958,
+          "tokens": 6457
+        }
+      },
+      "structural_mass_on_content": 0.04762678485470436
+    },
+    "whitespace": {
+      "per_document_mean": {
+        "content": 1.7154263110368841,
+        "newline": 0.7408581342664887,
+        "punctuation": 0.6323551479635275,
+        "control": 0.48511015937109664,
+        "whitespace": 0.13506463205205477,
+        "all": 1.3677585427785333
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3781491728914346,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7624440362927212,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.54914786607231,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.6936144484822159,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.5984777087693179,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.14482170008489748,
+          "tokens": 6457
+        }
+      },
+      "structural_mass_on_content": 0.05219529443517482
+    },
+    "factorized": {
+      "per_document_mean": {
+        "content": 1.7099350164776406,
+        "newline": 0.3011673126299788,
+        "punctuation": 0.4282327654440768,
+        "control": 0.2625549171215836,
+        "whitespace": 0.13699845121181875,
+        "all": 1.2929571406620417
+      },
+      "totals": {
+        "all": {
+          "nll": 1.3073396815906326,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7580687238203292,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.2906566051363163,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.2776316628071791,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.4189058563688262,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.146482993036154,
+          "tokens": 6457
+        }
+      },
+      "structural_mass_on_content": 0.05047698475633903
+    },
+    "factorized_wrong_context": {
+      "per_document_mean": {
+        "content": 1.7211566478527376,
+        "newline": 0.7778500303591201,
+        "punctuation": 0.6880793554647223,
+        "control": 0.44421600764100727,
+        "whitespace": 0.13716436924638184,
+        "all": 1.3846497237221127
+      },
+      "totals": {
+        "all": {
+          "nll": 1.394724598635703,
+          "tokens": 173308
+        },
+        "content": {
+          "nll": 1.7690050100119017,
+          "tokens": 117709
+        },
+        "control": {
+          "nll": 0.5149938454143448,
+          "tokens": 1740
+        },
+        "newline": {
+          "nll": 0.7260481116075738,
+          "tokens": 11868
+        },
+        "punctuation": {
+          "nll": 0.6481346668082345,
+          "tokens": 35534
+        },
+        "whitespace": {
+          "nll": 0.14642633616698264,
+          "tokens": 6457
+        }
+      }
+    }
+  },
+  "addressed_sha256": "650403e7df35940710693152635fa1426035d733a47204aa171bde68a42addf0",
+  "elapsed_seconds": 644.4370000000054
+}

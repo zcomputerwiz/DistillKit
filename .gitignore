@@ -222,3 +222,23 @@ cython_debug/
 !/scratch/ple_forensics/objective/diagnostics/tail-*.npz
 !/scratch/ple_forensics/objective/diagnostics/write-*.npz
 scratch/ffn_memo/cache/
+
+# Stack v2 corpus: retrieved third-party source and multi-hundred-megabyte parquet.
+# The builder, its tests and the manifests are tracked; the corpus itself is not.
+/scratch/code_corpus/*/
+!/scratch/code_corpus/manifests/
+/scratch/code_corpus/*/state.json
+
+# Code continued-pretraining: token store, checkpoints and per-arm evaluation dumps.
+/scratch/code_training/tokens/
+/scratch/code_training/checkpoints/
+/scratch/code_training/*.log
+
+# Code-domain module fits: the 1.6 GB Python familiarity cache and fitted decoders.
+/scratch/code_gate/cache/layer-*.npz
+/scratch/code_sidecar/*.pt
+/scratch/code_sidecar/addressed/*.pt
+/scratch/code_sidecar/whitespace/*.pt
+
+# State-conditioned sidecar checkpoints.
+/scratch/state_sidecar/*/sidecar.pt

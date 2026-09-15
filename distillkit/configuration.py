@@ -392,6 +392,19 @@ class ResidualGateConfig(BaseModel):
             "change the function the loaded weights were fitted for."
         ),
     )
+    freeze: bool = Field(
+        default=False,
+        description=(
+            "Hold the gate fixed while the backbone trains. Requires init_from: there "
+            "is nothing to hold fixed about an identity gate. The parameters are set "
+            "requires_grad=False before the optimizer is built, so they are absent from "
+            "its groups rather than sitting in them at a zero rate -- a frozen parameter "
+            "inside an optimizer is still reachable by weight decay. The forensics are "
+            "why this exists: joint cross-entropy collapses a trainable gate toward the "
+            "identity, and every co-adapted gate was beaten on its own backbone by the "
+            "policy fitted before that backbone existed."
+        ),
+    )
     calibration_batches: int = Field(
         default=8, ge=1,
         description=(
@@ -410,6 +423,9 @@ class ResidualGateConfig(BaseModel):
             raise ValueError("a geometry gate reads no context; drop familiarity_cache")
         if len(set(self.layers)) != len(self.layers):
             raise ValueError("a layer cannot be gated twice")
+        if self.freeze and not self.init_from:
+            raise ValueError("freeze needs init_from; an identity gate held fixed is "
+                             "the stock model with extra machinery")
         return self
 
 
@@ -697,6 +713,10 @@ class DistillationRunConfig(BaseModel):
             raise ValueError("resident tables require dataloader_num_workers=0 to prevent worker copies")
         if self.sidecar and self.resize_embeddings_to_multiple_of is not None:
             raise ValueError("sidecar preserves the original padded vocabulary; omit embedding resize")
+        if (self.residual_gate and self.residual_gate.freeze and self.optimizer
+                and self.optimizer.sidecar_lr is not None):
+            raise ValueError("sidecar_lr gives the architecture its own rate, "
+                             "and a frozen gate has nothing to apply it to")
         if self.optimizer and self.optimizer.freeze_backbone and not (
                 self.sidecar or self.residual_stream or self.residual_gate):
             raise ValueError("stage-1 backbone freezing requires a sidecar, residual_stream or residual_gate student")

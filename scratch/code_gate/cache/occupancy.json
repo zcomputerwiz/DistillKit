@@ -1,0 +1,77 @@
+{
+  "source": "code_corpus/v1 train split",
+  "split": "train",
+  "documents": 34606,
+  "tokens": 29017403,
+  "distinct_trigrams": 9096027,
+  "cacheable_keys": 400000,
+  "min_count": 2,
+  "max_keys": 400000,
+  "layer": 12,
+  "backbone": "scratch\\code_training\\checkpoints\\v1\\final",
+  "evaluation_subset": {
+    "documents": 1334,
+    "tokens": 1250215,
+    "seed": 20260914,
+    "digest": "0436eba10eeb2fdb36feaa59d9710e2b422c2f01542dcefd0e78ebb770d5f317",
+    "split": "heldout"
+  },
+  "bucket_occupancy": {
+    "general": {
+      "[0, 1)": {
+        "tokens": 1042847,
+        "share": 0.8359180054939814
+      },
+      "[1, 4)": {
+        "tokens": 27718,
+        "share": 0.022218000604386046
+      },
+      "[100, 400)": {
+        "tokens": 25407,
+        "share": 0.02036556538551253
+      },
+      "[3000, inf)": {
+        "tokens": 11,
+        "share": 8.81730307555547e-06
+      },
+      "[4, 100)": {
+        "tokens": 137721,
+        "share": 0.11039343607896135
+      },
+      "[400, 800)": {
+        "tokens": 8550,
+        "share": 0.006853449208727207
+      },
+      "[800, 3000)": {
+        "tokens": 5293,
+        "share": 0.004242725925355919
+      }
+    },
+    "python": {
+      "[0, 1)": {
+        "tokens": 675934,
+        "share": 0.5418104488247737
+      },
+      "[100, 400)": {
+        "tokens": 114720,
+        "share": 0.09195645534797486
+      },
+      "[3000, inf)": {
+        "tokens": 118124,
+        "share": 0.09468500986335585
+      },
+      "[4, 100)": {
+        "tokens": 218977,
+        "share": 0.17552605232508275
+      },
+      "[400, 800)": {
+        "tokens": 46205,
+        "share": 0.03703668078236732
+      },
+      "[800, 3000)": {
+        "tokens": 73587,
+        "share": 0.05898535285644549
+      }
+    }
+  }
+}

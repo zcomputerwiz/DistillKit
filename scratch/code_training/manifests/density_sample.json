@@ -1,0 +1,193 @@
+{
+  "examined": 2019,
+  "threshold": 1.8,
+  "reject_rate": 0.009905894006934125,
+  "categories": {
+    "obfuscated / data-like (long opaque tokens)": 7,
+    "other": 8,
+    "ordinary Python": 4,
+    "minified code": 1
+  },
+  "rejects": [
+    {
+      "repo_id": "mhsuab/ComputerSecurity2020",
+      "path": "/crypto/Lab0x02/COM/solve.py",
+      "bytes": 1406,
+      "tokens": 1115,
+      "bytes_per_token": 1.261,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "# Common Factor Attack\\n# n1, n2 generate from same p but different q\\n# find the greatest common divisor(gcd) of n1, n2 to get p\\n# then n1, n2, can be easily int"
+    },
+    {
+      "repo_id": "NateWeiler/Resources",
+      "path": "/Python/Scripts/Lazymux/sqlmap/plugins/dbms/informix/fingerprint.py",
+      "bytes": 129,
+      "tokens": 81,
+      "bytes_per_token": 1.593,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "version https://git-lfs.github.com/spec/v1\\noid sha256:5d594a889a22a089df3fc6314b8e9e6ab1ef0ef0f0ea1ad768d7cfb894113255\\nsize 3277\\n"
+    },
+    {
+      "repo_id": "samjones310/docker",
+      "path": "/flaskr/functions/Tokens.py",
+      "bytes": 252,
+      "tokens": 164,
+      "bytes_per_token": 1.537,
+      "category": "other",
+      "excerpt": "CONSUMER_KEY = \"GSl25oU8bWjtcctPVf0ZaDGqD\"\\nCONSUMER_SECRET = \"pxuBCGgYqEe4BTmGTBBuWYyEYuUqTbjOLPyixDWNUbZ5MgqJYk\"\\nACCESS_TOKEN = \"1090268805027119107-cJQn3oXyLC"
+    },
+    {
+      "repo_id": "datvithanh/project-euler",
+      "path": "/src/8_largest_product_in_a_series.py",
+      "bytes": 1146,
+      "tokens": 1053,
+      "bytes_per_token": 1.088,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "\\nfrom numpy import prod\\ns = [int(x) for x in \"731671765313306249192251196744265747423553491949349698352031277450632623957831801698480186947885184385861560789112"
+    },
+    {
+      "repo_id": "allan-simon/tatoebacpp",
+      "path": "/tools/generate_sphinx_conf.py",
+      "bytes": 9514,
+      "tokens": 5806,
+      "bytes_per_token": 1.639,
+      "category": "ordinary Python",
+      "excerpt": "import json\\nimport sys\\n\\nxmlDumpPath = \"/tmp/sphinxdump.xml\"\\n\\njsonFile = \"../config.js\"\\nif (len(sys.argv) == 2):\\n    jsonFile = sys.argv[1]\\n\\njsonData = open(json"
+    },
+    {
+      "repo_id": "sungminoh/algorithms",
+      "path": "/leetcode/solved/1961_Maximum_Ice_Cream_Bars/solution.py",
+      "bytes": 6815,
+      "tokens": 5238,
+      "bytes_per_token": 1.301,
+      "category": "ordinary Python",
+      "excerpt": "#! /usr/bin/env python\\n# -*- coding: utf-8 -*-\\n# vim:fenc=utf-8\\n#\\n# Copyright \u00a9 2020 sungminoh <smoh2044@gmail.com>\\n#\\n# Distributed under terms of the MIT licen"
+    },
+    {
+      "repo_id": "Dora-faith-hack/interact-with-BCH",
+      "path": "/config.py",
+      "bytes": 68,
+      "tokens": 41,
+      "bytes_per_token": 1.659,
+      "category": "other",
+      "excerpt": "sender_address = 'bchreg:qzzanl750et6tnzcvle2k59z57zle3msfqc5qslx5n'"
+    },
+    {
+      "repo_id": "AhsonAslam/webapi",
+      "path": "/flask/flaskenv/Lib/site-packages/tensorflow/python/autograph/converters/return_statements.py",
+      "bytes": 130,
+      "tokens": 83,
+      "bytes_per_token": 1.566,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "version https://git-lfs.github.com/spec/v1\\noid sha256:f27af7c39231f4843a24e2ac828e5adef93f0f734aa7c0696bf3e76766a043e1\\nsize 13884\\n"
+    },
+    {
+      "repo_id": "sumitkutty/Flight-Price-Prediction",
+      "path": "/FlaskAPI/vir_env/lib/python3.7/site-packages/sklearn/metrics/_plot/tests/test_plot_confusion_matrix.py",
+      "bytes": 130,
+      "tokens": 80,
+      "bytes_per_token": 1.625,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "version https://git-lfs.github.com/spec/v1\\noid sha256:bf35fb3c628c7d73920dae67faaa8d8ec24c6cdc2b18c787f137629edf0e1f9f\\nsize 10898\\n"
+    },
+    {
+      "repo_id": "Aasthaengg/IBMdataset",
+      "path": "/Python_codes/p02724/s580437270.py",
+      "bytes": 65,
+      "tokens": 37,
+      "bytes_per_token": 1.757,
+      "category": "other",
+      "excerpt": "X = int(input())\\na = (X//500)*1000\\nb = ((X%500)//5)*5 \\nprint(a+b)"
+    },
+    {
+      "repo_id": "Anniegard/Skipjack",
+      "path": "/Skipjack.py",
+      "bytes": 3877,
+      "tokens": 2405,
+      "bytes_per_token": 1.612,
+      "category": "ordinary Python",
+      "excerpt": "FTABLE = (\r\\n        (0xa3, 0xd7, 0x09, 0x83, 0xf8, 0x48, 0xf6, 0xf4, 0xb3, 0x21, 0x15, 0x78, 0x99, 0xb1, 0xaf, 0xf9),\r\\n        (0xe7, 0x2d, 0x4d, 0x8a, 0xce, 0x"
+    },
+    {
+      "repo_id": "BeedleEiEi/DotoAnalysis",
+      "path": "/xls_data/Pugna.py",
+      "bytes": 4254,
+      "tokens": 3163,
+      "bytes_per_token": 1.345,
+      "category": "other",
+      "excerpt": "data = \\\\n  \"\"\"\\n\tAbaddon\t0.10%\\n\t40.23%\\n\t57,441\\n\tAlchemist\t-1.47%\\n\t45.75%\\n\t101,891\\n\tAncient Apparition\t1.70%\\n\t47.93%\\n\t55,345\\n\tAnti-Mage\t-3.17%\\n\t45.90%\\n\t174,000\\n\tA"
+    },
+    {
+      "repo_id": "alhsnouf/model",
+      "path": "/research/slim/nets/lenet.py",
+      "bytes": 129,
+      "tokens": 84,
+      "bytes_per_token": 1.536,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "version https://git-lfs.github.com/spec/v1\\noid sha256:6cd709a6d5028962edc6dd26fd4820b46e19799691c106cf64e5a426b9f2d559\\nsize 3843\\n"
+    },
+    {
+      "repo_id": "pllim/playpen",
+      "path": "/advent_2019/advent_code_2019_day05.py",
+      "bytes": 5973,
+      "tokens": 3569,
+      "bytes_per_token": 1.674,
+      "category": "ordinary Python",
+      "excerpt": "import os\\nimport sys\\n\\n\\n# A modified version of the same function in Day 2.\\ndef process_opcode(opcode_in, inbuf=None, outbuf=sys.stdout, debug=False):\\n    opcode"
+    },
+    {
+      "repo_id": "YaminiHP/SimilitudeApp",
+      "path": "/ml-flask/Lib/site-packages/torch/testing/_internal/common_methods_invocations.py",
+      "bytes": 130,
+      "tokens": 84,
+      "bytes_per_token": 1.548,
+      "category": "obfuscated / data-like (long opaque tokens)",
+      "excerpt": "version https://git-lfs.github.com/spec/v1\\noid sha256:eda97c197f708e1650abfbd2c10b48ec4706b098675fca20d4472b1045762e76\\nsize 94121\\n"
+    },
+    {
+      "repo_id": "FRED-2/Fred2",
+      "path": "/Fred2/Data/pssms/smm/mat/A_02_17_9.py",
+      "bytes": 2226,
+      "tokens": 1768,
+      "bytes_per_token": 1.259,
+      "category": "minified code",
+      "excerpt": "A_02_17_9 = {0: {'A': -0.061, 'C': 0.031, 'E': 0.0, 'D': 0.482, 'G': 0.234, 'F': -0.441, 'I': -0.068, 'H': 0.133, 'K': 0.036, 'M': -0.268, 'L': -0.271, 'N': 0.0"
+    },
+    {
+      "repo_id": "Joohwans02/python-class",
+      "path": "/basics/swap.py",
+      "bytes": 77,
+      "tokens": 45,
+      "bytes_per_token": 1.711,
+      "category": "other",
+      "excerpt": "a = 2\\nb = 4\\nprint(\"a:\", a, \"b:\", b)\\nc = a\\na = b\\nb = c\\nprint(\"a:\", a, \"b:\", b)"
+    },
+    {
+      "repo_id": "KarashDariga/TSIS2",
+      "path": "/14.py",
+      "bytes": 82,
+      "tokens": 52,
+      "bytes_per_token": 1.577,
+      "category": "other",
+      "excerpt": "a = [1, 2, 3, 4, 5, 6, 7, 8] \\n# print(a[1])\\n# print(a[-1])\\n# print(b)\\nprint(a[2])\\n"
+    },
+    {
+      "repo_id": "jpata/tthbb13",
+      "path": "/Plotting/python/gregor/HiggsSamples.py",
+      "bytes": 901,
+      "tokens": 531,
+      "bytes_per_token": 1.697,
+      "category": "other",
+      "excerpt": "files = {}\\n\\nfiles[\"tth\"] = \"nhiggs_v5_tth_hbb_13tev-tagging\"     \\nfiles[\"ttj\"] = \"nhiggs_v5_ttj_13tev-tagging\"     \\n\\nfiles[\"tth_150_200\"] = files[\"tth\"]\\nfiles[\""
+    },
+    {
+      "repo_id": "jamesthetab/Project-Euler",
+      "path": "/problem8.py",
+      "bytes": 1219,
+      "tokens": 1124,
+      "bytes_per_token": 1.085,
+      "category": "other",
+      "excerpt": "x = '73167176531330624919225119674426574742355349194934\\\\n96983520312774506326239578318016984801869478851843\\\\n85861560789112949495459501737958331952853208805511\\"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+# Repeat r2 of the seed-42 stock control. The seed-43 control already has three
+# endpoints; the architecture comparison needs the same at seed 42, because the
+# experimental unit is the training run and three runs of one configuration were
+# measured 0.0033 nats apart.
+#
+# Arm B of the paired gate co-adaptation screen: the counterfactual backbone, trained
+# without a gate.
+#
+# The frozen stage established that a 260-parameter familiarity gate improves held-out
+# content NLL by 0.023510 nats (t -19.9), reproduces that at -0.023036 on a disjoint
+# corpus, learns a monotone familiarity policy per layer rather than a constant, and
+# recovers 46% of the hand-chosen fixed rule's gain. All of that was measured on a
+# backbone that never adapted to it.
+#
+# The PLE screens are why that is not enough. There, a memory that measurably worked on a
+# frozen backbone turned out to be redundant against a backbone trained without it:
+# content A - B came out at -0.000108 (t -0.2). Once the backbone can train, the same
+# checkpoint with the gate switched off measures how much this model has come to lean on
+# its gate, not what the gate was worth. Only a backbone trained from the same starting
+# point, on the same documents in the same order, without the gate, is the counterfactual.
+#
+# This arm is why the experiment can answer anything. Identical to
+# examples/qwen35_2b_gate_coadapt_armA.yml except for output_path, the absence of the
+# residual_gate section, and the absence of sidecar_lr -- which exists in arm A only to
+# give the gate its own rate, and has nothing to apply to here.
+
+model: D:/DeepThought/Projects/HybridModel/student-2b-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/gate-coadapt-armB-r2
+project_name: hybridmodel-gate-coadapt
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-5m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+model_kwargs:
+  device_map: cuda:0
+
+loss_functions:
+  - function: assistant_cross_entropy
+    weight: 1.0
+
+optimizer:
+  strategy: adamw
+  # The backbone trains. There is nothing else.
+  freeze_backbone: false
+  freeze_sidecar: false
+  unfreeze_at_step: null
+  # No sidecar_lr: there is no gate, so there is no second group. The backbone rate
+  # below is identical to arm A's, which is the rate the comparison depends on.
+  log_every_n_steps: 10
+
+chunked_head: true
+chunked_cross_entropy: true
+sortish_batching: true
+functionary_packing: false
+use_flash_attention: false
+# Enforced by the allocator: an overrun raises instead of paging into shared system
+# memory, which on Windows is a 70x slowdown rather than an error.
+max_vram_fraction: 0.9
+
+training_args:
+  bf16: true
+  remove_unused_columns: false
+  dataloader_num_workers: 0
+  # 8-bit AdamW state: two moments at one byte each over 1.88B parameters is 3.8 GiB,
+  # against 15 GiB for fp32 moments. This is what makes a fully trainable backbone fit
+  # on one 24 GiB card.
+  optim: adamw_bnb_8bit
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 1
+  # ~250K supervised tokens at the measured 880 per update, matching the frozen stage
+  # and both earlier co-adaptation screens.
+  max_steps: 284
+  learning_rate: 1.0e-5
+  lr_scheduler_type: cosine
+  warmup_steps: 5
+  max_grad_norm: 1.0
+  logging_steps: 10
+  eval_strategy: steps
+  # Every ~50K supervised tokens.
+  eval_steps: 57
+  per_device_eval_batch_size: 1
+  save_strategy: steps
+  save_steps: 284
+  save_total_limit: null
+  report_to: tensorboard
+  seed: 42
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false

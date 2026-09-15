@@ -1,0 +1,31 @@
+{
+  "backbone": "B42",
+  "tokens": 438,
+  "rounds": 6,
+  "repeats": 8,
+  "arms": {
+    "fixed": {
+      "seconds_per_forward": 0.07234622499981924,
+      "median_seconds": 0.08419962500011025,
+      "spread_fraction": 0.36013212852087273,
+      "tokens_per_second": 6054,
+      "peak_allocated_bytes": 4890925568,
+      "peak_reserved_bytes": 4980736000,
+      "code_table_bytes": 16793600,
+      "checkpoint_bytes": 1605181,
+      "trainable_parameters": 400790
+    },
+    "direct": {
+      "seconds_per_forward": 0.07027934999950958,
+      "median_seconds": 0.08395269999982702,
+      "spread_fraction": 0.5544076958687207,
+      "tokens_per_second": 6232,
+      "peak_allocated_bytes": 4890925568,
+      "peak_reserved_bytes": 4980736000,
+      "code_table_bytes": 0,
+      "checkpoint_bytes": 1605093,
+      "trainable_parameters": 400790
+    }
+  },
+  "direct_over_fixed": -0.028569216988375445
+}

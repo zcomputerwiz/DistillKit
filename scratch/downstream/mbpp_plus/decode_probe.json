@@ -1,0 +1,135 @@
+{
+  "backbone": "B42",
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\runs\\gate-coadapt-armB\\checkpoint-284",
+  "prompt": "<|im_start|>user\nWrite a Python function that returns the n largest numbers from a list, in descending order.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+  "new_tokens": 128,
+  "eval_mode": true,
+  "gradient_checkpointing": false,
+  "config_use_cache": true,
+  "generation_config_use_cache": true,
+  "attn_implementation": "sdpa",
+  "weight_dtype": "torch.bfloat16",
+  "weight_device": "cuda:0",
+  "arms": {
+    "both": {
+      "1": {
+        "batch": 1,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.06960439999966184,
+        "decode_seconds": 10.597466699997312,
+        "decode_tokens_per_second": 12.078358311806015,
+        "milliseconds_per_step": 82.792708593729,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 3.587832450866699
+      },
+      "32": {
+        "batch": 32,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.23712440000235802,
+        "decode_seconds": 10.684481199998118,
+        "decode_tokens_per_second": 383.3597460961157,
+        "milliseconds_per_step": 83.4725093749853,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 5.677953243255615
+      }
+    },
+    "gate": {
+      "1": {
+        "batch": 1,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.07569050000165589,
+        "decode_seconds": 9.708596999997098,
+        "decode_tokens_per_second": 13.18419128943536,
+        "milliseconds_per_step": 75.84841406247733,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 4.572723388671875
+      },
+      "32": {
+        "batch": 32,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.2596412999992026,
+        "decode_seconds": 9.330465200000617,
+        "decode_tokens_per_second": 438.99204511257693,
+        "milliseconds_per_step": 72.89425937500482,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 5.677953243255615
+      }
+    },
+    "sidecar": {
+      "1": {
+        "batch": 1,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.14247469999827445,
+        "decode_seconds": 8.044247700003325,
+        "decode_tokens_per_second": 15.91199137241225,
+        "milliseconds_per_step": 62.84568515627598,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 4.571033954620361
+      },
+      "32": {
+        "batch": 32,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.24302140000509098,
+        "decode_seconds": 11.614528899990546,
+        "decode_tokens_per_second": 352.66174248387586,
+        "milliseconds_per_step": 90.73850703117614,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 5.384799957275391
+      }
+    },
+    "stock": {
+      "1": {
+        "batch": 1,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.08057340000232216,
+        "decode_seconds": 8.899191799995606,
+        "decode_tokens_per_second": 14.383328607443117,
+        "milliseconds_per_step": 69.52493593746567,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 4.571039199829102
+      },
+      "32": {
+        "batch": 32,
+        "prompt_tokens": 28,
+        "generated_tokens": 128,
+        "prefill_seconds": 0.23960369999986142,
+        "decode_seconds": 9.247379699998419,
+        "decode_tokens_per_second": 442.9362838859856,
+        "milliseconds_per_step": 72.24515390623765,
+        "cache_present": true,
+        "cache_length_after_prefill": 28,
+        "cache_length_after_one_step": 29,
+        "cache_grows": true,
+        "peak_allocated_gib": 5.384799957275391
+      }
+    }
+  }
+}

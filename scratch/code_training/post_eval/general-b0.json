@@ -1,0 +1,32 @@
+{
+  "backbone": "D:/DeepThought/Projects/HybridModel/student-2b-hf",
+  "label": "B0",
+  "source": "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\heldout.jsonl",
+  "documents": 400,
+  "objective": "plain causal CE over 100% of targets; NOT the historical assistant-masked number, so comparable across checkpoints here but not against earlier general-domain results",
+  "tokens": 298744,
+  "mean_nll": 1.1291249277203752,
+  "classes": {
+    "content": {
+      "nll": 1.4556985402019362,
+      "tokens": 194882
+    },
+    "newline": {
+      "nll": 0.5027582010951999,
+      "tokens": 20177
+    },
+    "whitespace": {
+      "nll": 0.3234545593709493,
+      "tokens": 14100
+    },
+    "punctuation": {
+      "nll": 0.5253241390912671,
+      "tokens": 66827
+    },
+    "control": {
+      "nll": 1.3847558888983647,
+      "tokens": 2758
+    }
+  },
+  "seconds": 66.04700000000594
+}

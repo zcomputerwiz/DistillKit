@@ -1,0 +1,35 @@
+{
+  "tokenizer.vocab_size": 248044,
+  "len(tokenizer)": 248077,
+  "added_tokens": 33,
+  "config.vocab_size": 248320,
+  "input_embedding_rows": 248320,
+  "lm_head_rows": 248320,
+  "tie_word_embeddings": true,
+  "splits": {
+    "train": {
+      "documents": 34606,
+      "tokens": 30760040,
+      "max_token_id": 248046,
+      "within_embedding": true,
+      "sampled": 200
+    },
+    "calibration": {
+      "documents": 2218,
+      "tokens": 2037164,
+      "max_token_id": 248046,
+      "within_embedding": true,
+      "sampled": 200
+    },
+    "heldout": {
+      "documents": 5405,
+      "tokens": 5016638,
+      "max_token_id": 248046,
+      "within_embedding": true,
+      "sampled": 200
+    }
+  },
+  "round_trip_failures": [],
+  "path_mismatches": [],
+  "verdict": "vocab_size vs len(tokenizer) distinction plus embedding padding; no rebuild required"
+}
