@@ -576,6 +576,30 @@ class DistillationRunConfig(BaseModel):
             "silent degradation into an ordinary OOM."
         ),
     )
+    allow_tf32: bool = Field(
+        default=True,
+        description=(
+            "Enable TensorFloat-32 (TF32) for matmul and cuDNN on Ampere and newer GPUs "
+            "(RTX 3090, 4090, etc.). Accelerates float32 matrix operations by ~1.4x-4x."
+        ),
+    )
+    cuda_allocator_gc_threshold: float | None = Field(
+        default=0.8,
+        gt=0.0,
+        le=1.0,
+        description=(
+            "Garbage collection threshold for PyTorch's CUDA caching allocator. "
+            "Reclaims and defragments reserved memory blocks when unallocated VRAM exceeds "
+            "this fraction. Crucial on Windows where expandable_segments is unsupported."
+        ),
+    )
+    high_resolution_timer: bool = Field(
+        default=True,
+        description=(
+            "On Windows, request 1ms OS timer resolution via timeBeginPeriod(1) to avoid "
+            "15.6ms sleep/wait quantization jitter during CUDA event polling."
+        ),
+    )
     chunked_cross_entropy: bool = Field(
         default=True,
         description=(
