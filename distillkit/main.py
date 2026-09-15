@@ -547,41 +547,7 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
     is_flag=True,
     help="Build and save the model without training, for a frozen pre-training sweep.",
 )
-@click.option(
-    "--allow-tf32/--no-allow-tf32",
-    "allow_tf32",
-    default=None,
-    help="Enable or disable TensorFloat-32 (TF32) for matmul and cuDNN on Ampere+ GPUs (default: True).",
-)
-@click.option(
-    "--cuda-allocator-gc-threshold",
-    "cuda_allocator_gc_threshold",
-    type=float,
-    default=None,
-    help="Garbage collection threshold for PyTorch CUDA caching allocator (default: 0.8).",
-)
-@click.option(
-    "--high-resolution-timer/--no-high-resolution-timer",
-    "high_resolution_timer",
-    default=None,
-    help="Enable or disable Windows 1ms high-resolution timer (default: True on Windows).",
-)
-@click.option(
-    "--max-vram-fraction",
-    "max_vram_fraction",
-    type=float,
-    default=None,
-    help="Cap PyTorch VRAM fraction per GPU to prevent WDDM shared memory spilling (e.g. 0.95).",
-)
-def main(
-    config_path: str,
-    verbosity: int,
-    initialise_only: bool = False,
-    allow_tf32: bool | None = None,
-    cuda_allocator_gc_threshold: float | None = None,
-    high_resolution_timer: bool | None = None,
-    max_vram_fraction: float | None = None,
-):
+def main(config_path: str, verbosity: int, initialise_only: bool = False):
     log_level = logging.WARNING
     if verbosity >= 2:
         log_level = logging.DEBUG
@@ -591,14 +557,6 @@ def main(
     with open(config_path, "r") as f:
         config_dict = yaml.safe_load(f)
     config = DistillationRunConfig.model_validate(config_dict)
-    if allow_tf32 is not None:
-        config.allow_tf32 = allow_tf32
-    if cuda_allocator_gc_threshold is not None:
-        config.cuda_allocator_gc_threshold = cuda_allocator_gc_threshold
-    if high_resolution_timer is not None:
-        config.high_resolution_timer = high_resolution_timer
-    if max_vram_fraction is not None:
-        config.max_vram_fraction = max_vram_fraction
     do_distill(config, initialise_only=initialise_only)
 
 

@@ -35,17 +35,17 @@ def test_optimization_flags_config_override(tmp_path):
     assert cfg.high_resolution_timer is False
 
 
-def test_cli_overrides_optimization_flags(tmp_path, monkeypatch):
+def test_yaml_config_loading_and_execution(tmp_path, monkeypatch):
     config_data = {
         'model': 'dummy',
         'dataset': {},
         'teacher': {'kind': 'dataset', 'cache_path': 'dummy'},
         'sequence_length': 128,
         'output_path': str(tmp_path / 'out'),
-        'allow_tf32': True,
-        'cuda_allocator_gc_threshold': 0.8,
-        'high_resolution_timer': True,
-        'max_vram_fraction': 0.95,
+        'allow_tf32': False,
+        'cuda_allocator_gc_threshold': 0.6,
+        'high_resolution_timer': False,
+        'max_vram_fraction': 0.90,
     }
     config_file = tmp_path / 'test_config.yml'
     config_file.write_text(yaml.dump(config_data))
@@ -62,12 +62,7 @@ def test_cli_overrides_optimization_flags(tmp_path, monkeypatch):
         main,
         [
             str(config_file),
-            '--no-allow-tf32',
-            '--cuda-allocator-gc-threshold',
-            '0.6',
-            '--no-high-resolution-timer',
-            '--max-vram-fraction',
-            '0.90',
+            '-v',
         ],
     )
 
@@ -78,3 +73,4 @@ def test_cli_overrides_optimization_flags(tmp_path, monkeypatch):
     assert cfg.cuda_allocator_gc_threshold == 0.6
     assert cfg.high_resolution_timer is False
     assert cfg.max_vram_fraction == 0.90
+
