@@ -8,11 +8,21 @@ is known that early, a file bound for a split that is already satisfied is skipp
 before it costs an HTTP request. That is what makes streaming 45M metadata rows to keep
 roughly 25k files affordable.
 
-Resume is checkpointed at row-group granularity. A checkpoint names every parquet part
-already written, so a crash between a flush and its checkpoint is repaired on restart
-by deleting the orphaned part rather than by writing its rows twice. Repository
-assignments cannot drift across a restart because they are a pure function of the
-repository name and the seed.
+The invariant the splits guarantee is **isolation**, not completeness: no repository
+contributes files to more than one split. It is emphatically *not* that every selected
+repository is represented completely -- construction stops once the token targets are met,
+so almost every repository in the result contributes only some of its files. Isolation is
+what the experiment needs; completeness is not available when 45M metadata rows are
+streamed to keep about 42,000 files.
+
+Resume is checkpointed periodically within a row group, not only at its boundary. A row
+group is ~100k metadata rows and takes minutes to drain: the first full-scale run was
+killed at 120 seconds having retrieved 22,000 files with no checkpoint to resume from.
+A checkpoint carries ``(shard, row_group, row_offset)`` and names every parquet part it
+knows about, so a crash between a flush and its checkpoint is repaired on restart by
+deleting the orphaned part rather than by writing its rows twice. Repository assignments
+cannot drift across a restart because they are a pure function of the repository name and
+the seed.
 
     python scratch/code_corpus/build.py --name smoke --train 200000 \
         --calibration 20000 --heldout 50000
@@ -331,6 +341,10 @@ def main() -> int:
         "admission_policy": "a split stops admitting new repositories at its target and "
                             "closes at target * overshoot; assignment never depends on "
                             "targets or arrival order",
+        "split_invariant": "repository-level split isolation: no repository contributes "
+                           "files to more than one split. NOT repository completeness -- "
+                           "construction stops at the token targets, so most repositories "
+                           "are represented by only some of their files.",
         "overshoot": args.overshoot,
         "targets": targets,
         "filters": {"min_bytes": limits.min_bytes, "max_bytes": limits.max_bytes,
