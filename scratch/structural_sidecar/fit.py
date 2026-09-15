@@ -66,6 +66,35 @@ BACKBONES = {
 STRENGTHS = (0.0, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0)
 
 
+def python_corpus(split: str, count: int, length: int):
+    """Documents from the frozen Python token store, for the code-domain fits.
+
+    The same shape the general-text loader returns -- a list of id lists -- so the training
+    loop, the loss, the strength calibration and the guardrail are literally the same code
+    running on different text. Split isolation is the corpus builder's guarantee: ``train``
+    and ``calibration`` share no repository, so selecting on calibration is not selecting
+    on training data, and heldout is never opened here.
+    """
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    _sys.path.insert(0, str(_Path(__file__).resolve().parents[1] / "code_training"))
+    from corpus import TOKENS, TokenStore
+
+    store = TokenStore(TOKENS, split)
+    documents = []
+    for index in range(len(store)):
+        ids = [int(value) for value in store.document(index)[:length]]
+        if len(ids) >= 16:
+            documents.append(ids)
+        if len(documents) >= count:
+            break
+    if len(documents) < count:
+        raise SystemExit("only %d documents in %s, wanted %d"
+                         % (len(documents), split, count))
+    return documents
+
+
 def corpus(tokenizer, excluded, count, length, skip):
     """Documents the evaluation never sees, split by position rather than by chance."""
     documents = []
@@ -157,6 +186,10 @@ def main() -> int:
     parser.add_argument("--load", type=Path, default=None,
                         help="a fitted sidecar to reuse instead of training one")
     parser.add_argument("--bundle", default=DEFAULT_BUNDLE)
+    parser.add_argument("--backbone-path", default=None,
+                        help="a checkpoint directory, overriding the --backbone name")
+    parser.add_argument("--corpus", default="general", choices=("general", "python"),
+                        help="python fits on the frozen code corpus, train and calibration")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -170,7 +203,7 @@ def main() -> int:
     from distillkit.independent_eval import build_token_classes
 
     started = time.monotonic()
-    checkpoint = BACKBONES[args.backbone]
+    checkpoint = Path(args.backbone_path) if args.backbone_path else BACKBONES[args.backbone]
     config = AutoConfig.from_pretrained(checkpoint, local_files_only=True)
     config = getattr(config, "text_config", config)
     config.use_cache = False
@@ -202,11 +235,15 @@ def main() -> int:
                                 heads=2, hidden=args.hidden, seed=args.seed
                                 ).to(args.device).to(torch.float32)
 
-    excluded = held_out_digests(args.bundle)
-    train = corpus(tokenizer, excluded, args.documents, args.length, skip=0)
-    calibration = corpus(tokenizer, excluded, args.calibration_documents, args.length,
-                         skip=args.documents)
-    report = {"mode": args.mode, "backbone": args.backbone,
+    if args.corpus == "python":
+        train = python_corpus("train", args.documents, args.length)
+        calibration = python_corpus("calibration", args.calibration_documents, args.length)
+    else:
+        excluded = held_out_digests(args.bundle)
+        train = corpus(tokenizer, excluded, args.documents, args.length, skip=0)
+        calibration = corpus(tokenizer, excluded, args.calibration_documents, args.length,
+                             skip=args.documents)
+    report = {"mode": args.mode, "backbone": args.backbone, "corpus": args.corpus,
               "checkpoint": str(checkpoint),
               "sidecar": sidecar.parameter_report(),
               "train_documents": len(train),
@@ -278,7 +315,10 @@ def main() -> int:
     report["selected_strength"] = chosen
     print("selected strength %.2f" % chosen, flush=True)
 
-    for split in ("screen", "confirmation"):
+    # The screen and confirmation splits are general-text bundles. A Python fit is
+    # evaluated on the frozen Python heldout subset by the code-training evaluator
+    # instead, so scoring it here would only be scoring the wrong corpus.
+    for split in (() if args.corpus == "python" else ("screen", "confirmation")):
         documents = [record["ids"] for record in load_records(args.bundle, split, 0)]
         entry = {}
         for name, strength, wrong in (("stock", 0.0, False), ("sidecar", chosen, False),

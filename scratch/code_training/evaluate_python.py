@@ -62,8 +62,26 @@ from corpus import (SPLITS, TOKENS, TokenStore, class_tables, corpus_identity,
 
 GATE = Path("scratch/gate_regime/plain-harness/gate.pt")
 FAMILIARITY_CACHE = Path("scratch/ffn_memo/cache/layer-12.npz")
-ARMS = {"stock": (False, False), "gate": (True, False),
-        "sidecar": (False, True), "both": (True, True)}
+PYTHON_CACHE = Path("scratch/code_gate/cache/layer-12.npz")
+
+#: An arm names which gate checkpoint, which familiarity cache, whose feature normalizer
+#: and which sidecar are active. Spelling them out separately is the point of the whole
+#: decomposition: ``gate_py`` differs from ``gate`` in the cache alone, and
+#: ``gate_py_norm`` differs from ``gate_py`` in the normalizer alone, so a difference
+#: between two arms is attributable to exactly one thing.
+ARMS = {
+    "stock": {},
+    "gate": {"gate": "general", "cache": "general", "normalizer": "kept"},
+    "gate_py": {"gate": "general", "cache": "python", "normalizer": "kept"},
+    "gate_py_norm": {"gate": "general", "cache": "python", "normalizer": "python"},
+    "gcode": {"gate": "code", "cache": "python", "normalizer": "kept"},
+    "sidecar": {"sidecar": "general"},
+    "scode": {"sidecar": "code"},
+    "both": {"gate": "general", "cache": "general", "normalizer": "kept",
+             "sidecar": "general"},
+    "gcode_scode": {"gate": "code", "cache": "python", "normalizer": "kept",
+                    "sidecar": "code"},
+}
 #: Familiarity buckets, in cross-document trigram occurrences. Edges straddle 400 because
 #: the original intervention study found the benefit turned positive around there; they
 #: are not evenly spaced in a quantity nothing depends on.
@@ -109,9 +127,17 @@ class Sidecar:
         self.hasher = hasher
         self.structural = structural
         self.strength = strength
+        self.wrong_address = False
 
     def rows(self, ids):
-        return self.hasher.row_indices(ids)
+        rows = self.hasher.row_indices(ids)
+        if self.wrong_address:
+            # Every learned parameter is untouched; only which row the context addresses
+            # is corrupted, by rolling the sequence so position t reads a real row that
+            # belongs to a different context. A gain that survives this was a prior over
+            # the structural vocabulary, not a use of local context.
+            rows = torch.roll(rows, shifts=7, dims=1)
+        return rows
 
     def bias(self, rows, start, stop):
         return self.module(rows[:, start:stop], self.strength)
@@ -234,12 +260,37 @@ class GateDiagnostics:
         self.layer_count = collections.defaultdict(int)
         self.bucket = collections.defaultdict(lambda: [0.0, 0])
         self.by_class = collections.defaultdict(lambda: [0.0, 0])
+        self.by_class_values = collections.defaultdict(list)
+        self.feature_range = {}
+        self.saturated = 0
+        self.standardized = 0
+        self.kept_values = 0
 
     def observe(self, handle, ids, mask, code):
         # ``kept[layer]`` holds one [batch, sequence] tensor per forward call, and there
         # is exactly one call per batch here.
         keep = mask.bool().cpu()
-        counts = torch.expm1(self.familiarity.features(ids)[..., 0]).cpu()[keep]
+        raw = self.familiarity.features(ids)
+        # Section 9 asks whether the swapped cache puts the features outside the range the
+        # learned normalizer was fitted on. Standardized values far from zero mean the
+        # gate is reading its inputs off the end of its calibrated scale, which is a
+        # different failure from having no signal at all.
+        for index in range(raw.shape[-1]):
+            values = raw[..., index].cpu()[keep]
+            entry = self.feature_range.setdefault(index, [float("inf"), -float("inf"),
+                                                          0.0, 0.0, 0])
+            entry[0] = min(entry[0], float(values.min()))
+            entry[1] = max(entry[1], float(values.max()))
+            entry[2] += float(values.sum())
+            entry[3] += float((values * values).sum())
+            entry[4] += int(values.numel())
+        if handle.layer_indices:
+            gate = handle.gate(handle.layer_indices[0])
+            standard = ((raw.cpu() - gate.feature_mean.cpu()) / gate.feature_std.cpu())
+            flat = standard[keep]
+            self.saturated += int((flat.abs() > 4.0).sum())
+            self.standardized += int(flat.numel())
+        counts = torch.expm1(raw[..., 0]).cpu()[keep]
         labels = torch.from_numpy(code[ids.cpu().numpy()].astype(np.int64))[keep]
         buckets = [(counts >= low) & (counts < high)
                    for low, high in zip(COUNT_EDGES, COUNT_EDGES[1:] + (float("inf"),))]
@@ -260,6 +311,14 @@ class GateDiagnostics:
                     entry = self.by_class[name]
                     entry[0] += float(values.sum())
                     entry[1] += int(values.numel())
+                    # Percentiles need the values, not a running mean: a policy that
+                    # sometimes closes hard and sometimes opens hard has the same mean as
+                    # one that does nothing at all. Kept for the first gated layer only,
+                    # and capped, because this is a diagnostic and not the measurement.
+                    if (layer == handle.layer_indices[0]
+                            and self.kept_values < 4_000_000):
+                        self.by_class_values[name].append(values.numpy())
+                        self.kept_values += int(values.numel())
 
     def report(self, handle):
         mean = lambda pair: pair[0] / pair[1] if pair[1] else None
@@ -278,6 +337,22 @@ class GateDiagnostics:
                                         for key, value in sorted(self.bucket.items())},
             "mean_by_target_class": {key: mean(value)
                                      for key, value in sorted(self.by_class.items())},
+            "by_target_class": {
+                key: {"mean": mean(self.by_class[key]),
+                      "p10": float(np.percentile(np.concatenate(values), 10)),
+                      "median": float(np.percentile(np.concatenate(values), 50)),
+                      "p90": float(np.percentile(np.concatenate(values), 90)),
+                      "tokens": self.by_class[key][1]}
+                for key, values in sorted(self.by_class_values.items()) if values},
+            "feature_range": {
+                str(index): {"min": entry[0], "max": entry[1],
+                             "mean": entry[2] / max(entry[4], 1),
+                             "std": max(entry[3] / max(entry[4], 1)
+                                        - (entry[2] / max(entry[4], 1)) ** 2, 0.0) ** 0.5,
+                             "tokens": entry[4]}
+                for index, entry in sorted(self.feature_range.items())},
+            "standardized_beyond_4_sigma": (self.saturated / self.standardized
+                                            if self.standardized else None),
         }
 
 
@@ -291,8 +366,17 @@ def main() -> int:
     parser.add_argument("--subset-tokens", type=int, default=0,
                         help="0 evaluates the whole split")
     parser.add_argument("--arms", default="stock,gate,sidecar,both")
-    parser.add_argument("--gate", type=Path, default=GATE)
+    parser.add_argument("--gate", type=Path, default=GATE,
+                        help="the canonical general-domain G'")
+    parser.add_argument("--code-gate", type=Path,
+                        default=Path("scratch/code_gate/gcode/gate.pt"))
     parser.add_argument("--cache", type=Path, default=FAMILIARITY_CACHE)
+    parser.add_argument("--python-cache", type=Path, default=PYTHON_CACHE)
+    parser.add_argument("--normalizer", type=Path,
+                        default=Path("scratch/code_gate/cache/normalizer.json"))
+    parser.add_argument("--code-sidecar", type=Path, default=Path("scratch/code_sidecar"))
+    parser.add_argument("--wrong-address", action="store_true",
+                        help="structural control: keep the weights, corrupt the addressing")
     parser.add_argument("--max-batch-tokens", type=int, default=16384)
     parser.add_argument("--max-length", type=int, default=8192)
     parser.add_argument("--head-positions", type=int, default=4096,
@@ -335,24 +419,39 @@ def main() -> int:
 
     baseline = None
     for arm in args.arms.split(","):
-        use_gate, use_sidecar = ARMS[arm]
+        spec = ARMS[arm]
+        use_gate, use_sidecar = spec.get("gate"), spec.get("sidecar")
         handle = diagnostics = sidecar = None
         if use_gate:
-            payload = torch.load(args.gate, map_location="cpu", weights_only=False)
-            familiarity = TrigramFamiliarity(args.cache, config.vocab_size,
-                                             device=args.device)
+            checkpoint = args.gate if use_gate == "general" else args.code_gate
+            cache = (args.cache if spec.get("cache") == "general" else args.python_cache)
+            payload = torch.load(checkpoint, map_location="cpu", weights_only=False)
+            familiarity = TrigramFamiliarity(cache, config.vocab_size, device=args.device)
             handle = install_residual_gates(model, payload["layers"],
                                             family=payload["family"],
                                             familiarity=familiarity)
             model.residual_gates.load_state_dict(payload["state_dict"], strict=True)
+            if spec.get("normalizer") == "python":
+                # Section 10: the *non-learned* feature statistics only, recomputed from
+                # Python train. Labelled domain-normalized policy transfer rather than
+                # strict parameter transfer, because it changes what the learned weights
+                # are reading even though it changes none of them.
+                statistics = json.loads(args.normalizer.read_text(encoding="utf-8"))
+                for layer in handle.layer_indices:
+                    gate = handle.gate(layer)
+                    gate.feature_mean.copy_(torch.tensor(statistics["mean"],
+                                                         dtype=gate.feature_mean.dtype))
+                    gate.feature_std.copy_(torch.tensor(statistics["std"],
+                                                        dtype=gate.feature_std.dtype))
             model.residual_gates.requires_grad_(False)
             handle.keep = True
             diagnostics = GateDiagnostics(familiarity, config.vocab_size)
-            report.setdefault("gate_checkpoint", {"path": str(args.gate),
-                                                  "layers": payload["layers"],
-                                                  "mask": payload.get("mask"),
-                                                  "regime": payload.get("regime")})
+            report.setdefault("gate_checkpoints", {})[arm] = {
+                "path": str(checkpoint), "cache": str(cache),
+                "normalizer": spec.get("normalizer"), "layers": payload["layers"],
+                "mask": payload.get("mask"), "regime": payload.get("regime")}
         if use_sidecar:
+            import gate_after_structure
             from factorize import class_ids
             from gate_after_structure import build_structural
             from evaluate import split_layout
@@ -361,9 +460,22 @@ def main() -> int:
                                    tokenizer, config.vocab_size)
             structural = structural_token_ids(classes, device=args.device)
             whitespace = class_ids(classes, "whitespace", device=args.device)
+            if use_sidecar == "code":
+                # The fresh Python fit, same architecture and same loader; only the
+                # checkpoint paths the canonical builder reads are redirected.
+                gate_after_structure.ADDRESSED = args.code_sidecar / "addressed.pt"
+                gate_after_structure.WHITESPACE = args.code_sidecar / "whitespace.pt"
             module, hasher, strength = build_structural(config, structural, whitespace,
                                                         args.device)
             sidecar = Sidecar(module, hasher, structural, strength)
+            report.setdefault("sidecar_checkpoints", {})[arm] = {
+                "addressed": str(gate_after_structure.ADDRESSED),
+                "whitespace": str(gate_after_structure.WHITESPACE),
+                "strength": strength}
+            if args.wrong_address:
+                # Section 32 control: keep every learned parameter, corrupt only which row
+                # the context addresses. A gain that survives this was never about context.
+                sidecar.wrong_address = True
 
         began = time.monotonic()
         result, per_token = run_arm(model, store, indices, code, historical, args.device,

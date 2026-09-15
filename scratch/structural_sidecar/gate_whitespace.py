@@ -42,7 +42,7 @@ from distillkit.experimental.structural_sidecar import (
     structural_token_ids, wrong_context_rows)
 from evaluate import split_layout
 from factorize import class_ids, logits_of
-from fit import BACKBONES, BASE, corpus
+from fit import BACKBONES, BASE, corpus, python_corpus
 from repeatability import DEFAULT_BUNDLE, held_out_digests
 
 
@@ -143,6 +143,9 @@ def main() -> int:
     parser.add_argument("--lr", type=float, default=3e-2)
     parser.add_argument("--beta", type=float, default=10.0)
     parser.add_argument("--bundle", default=DEFAULT_BUNDLE)
+    parser.add_argument("--backbone-path", default=None,
+                        help="a checkpoint directory, overriding the --backbone name")
+    parser.add_argument("--corpus", default="general", choices=("general", "python"))
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -156,7 +159,8 @@ def main() -> int:
     from distillkit.independent_eval import build_token_classes
 
     started = time.monotonic()
-    checkpoint = BACKBONES[args.backbone]
+    checkpoint = (Path(args.backbone_path) if args.backbone_path
+                  else BACKBONES[args.backbone])
     config = AutoConfig.from_pretrained(checkpoint, local_files_only=True)
     config = getattr(config, "text_config", config)
     config.use_cache = False
@@ -217,8 +221,11 @@ def main() -> int:
         white_mask = white_mask.to(args.device)
         content_mask = torch.tensor([label == "content" for label in classes],
                                     dtype=torch.bool, device=args.device)
-        excluded = held_out_digests(args.bundle)
-        train = corpus(tokenizer, excluded, args.documents, args.length, skip=0)
+        if args.corpus == "python":
+            train = python_corpus("train", args.documents, args.length)
+        else:
+            excluded = held_out_digests(args.bundle)
+            train = corpus(tokenizer, excluded, args.documents, args.length, skip=0)
         history = []
         for epoch in range(args.epochs):
             losses = []

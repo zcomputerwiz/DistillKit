@@ -233,3 +233,9 @@ scratch/ffn_memo/cache/
 /scratch/code_training/tokens/
 /scratch/code_training/checkpoints/
 /scratch/code_training/*.log
+
+# Code-domain module fits: the 1.6 GB Python familiarity cache and fitted decoders.
+/scratch/code_gate/cache/layer-*.npz
+/scratch/code_sidecar/*.pt
+/scratch/code_sidecar/addressed/*.pt
+/scratch/code_sidecar/whitespace/*.pt
