@@ -85,9 +85,9 @@ def _sum_to_each(shards):
     home = shards[0].device
     total = shards[0]
     for shard in shards[1:]:
-        total = total + shard.to(home)
+        total = total + shard.to(home, non_blocking=True)
     return tuple(
-        total if shard.device == home else total.to(shard.device)
+        total if shard.device == home else total.to(shard.device, non_blocking=True)
         for shard in shards
     )
 
@@ -109,7 +109,7 @@ class Replicate(torch.autograd.Function):
     def forward(ctx, source, *devices):
         ctx.source_device = source.device
         return tuple(
-            source if source.device == device else source.to(device)
+            source if source.device == device else source.to(device, non_blocking=True)
             for device in devices
         )
 
@@ -118,7 +118,7 @@ class Replicate(torch.autograd.Function):
         home = ctx.source_device
         total = None
         for grad in grads:
-            moved = grad if grad.device == home else grad.to(home)
+            moved = grad if grad.device == home else grad.to(home, non_blocking=True)
             total = moved if total is None else total + moved
         return (total,) + (None,) * len(grads)
 
@@ -144,16 +144,16 @@ class Reduce(torch.autograd.Function):
     def forward(ctx, home, *shards):
         ctx.shard_devices = [shard.device for shard in shards]
         _save_recompute_barrier(ctx, shards[0])
-        total = shards[0] if shards[0].device == home else shards[0].to(home)
+        total = shards[0] if shards[0].device == home else shards[0].to(home, non_blocking=True)
         for shard in shards[1:]:
-            total = total + shard.to(home)
+            total = total + shard.to(home, non_blocking=True)
         return total
 
     @staticmethod
     def backward(ctx, grad):
         _ = ctx.saved_tensors  # Recompute before releasing per-device branches.
         return (None,) + tuple(
-            grad if grad.device == device else grad.to(device)
+            grad if grad.device == device else grad.to(device, non_blocking=True)
             for device in ctx.shard_devices
         )
 

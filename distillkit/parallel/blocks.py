@@ -40,6 +40,13 @@ except (ImportError, OSError):
     pad_input = None
     unpad_input = None
 
+try:
+    from fla.modules.activations import swiglu as _fla_swiglu
+    _HAS_FLA_SWIGLU = True
+except (ImportError, OSError):
+    _HAS_FLA_SWIGLU = False
+    _fla_swiglu = None
+
 
 class TensorParallelMLP(nn.Module):
     """gate/up column-parallel, down row-parallel: one all-reduce, no gather.
@@ -53,6 +60,8 @@ class TensorParallelMLP(nn.Module):
         super().__init__()
         self.devices = [torch.device(d) for d in devices]
         self.act_fn = mlp.act_fn
+        act_name = getattr(self.act_fn, "__name__", "") or self.act_fn.__class__.__name__.lower()
+        self._use_fused_swiglu = _HAS_FLA_SWIGLU and act_name in ("silu", "siluactivation")
         self.gate_proj = ColumnParallelLinear(mlp.gate_proj, self.devices)
         self.up_proj = ColumnParallelLinear(mlp.up_proj, self.devices)
         # reduce_only: the residual stream is on the home card, so producing a
@@ -65,7 +74,10 @@ class TensorParallelMLP(nn.Module):
         copies = replicate(x, self.devices)
         gates = self.gate_proj(x, copies)
         ups = self.up_proj(x, copies)
-        hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
+        if self._use_fused_swiglu and x.is_cuda:
+            hidden = [_fla_swiglu(g, u) for g, u in zip(gates, ups)]
+        else:
+            hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
         return self.down_proj(hidden)[0]
 
 
