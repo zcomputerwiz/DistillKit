@@ -50,11 +50,18 @@ def states(route, batch=2, length=5, dtype=torch.float32, device="cpu"):
 class TestTheModuleReproducesTheRecipient:
     """What `scratch/gr_retrofit` reported by hand, as assertions."""
 
-    def test_symmetric_read_is_bitwise_the_original_norm(self):
-        route, norm, _ = converted()
-        hidden, branches = states(route)
-        read, _weights = route.read(branches, norm)
+    @pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+    def test_symmetric_read_is_bitwise_the_original_norm(self, dtype):
+        # bf16 is the deployed precision, and the conversion survives it for a reason
+        # worth stating: `2 * gamma` differs from `gamma` by an exact power of two, so
+        # the branch normalization rounds to the same significand and the gate of
+        # exactly one half undoes the scale without touching it.
+        route, norm, _ = converted(dtype=dtype)
+        hidden, branches = states(route, dtype=dtype)
+        read, weights = route.read(branches, norm)
+        assert read.dtype == dtype
         assert torch.equal(read, norm(hidden))
+        assert torch.equal(weights, torch.ones_like(weights))
 
     def test_asymmetric_read_is_within_a_rounding_step(self):
         route, norm, _ = converted(asymmetric=True)
@@ -250,6 +257,25 @@ class TestTheWholeModelConverts:
         for before, after in zip(trained, routes):
             assert torch.equal(before.branch_gain_delta, after.branch_gain_delta)
             assert torch.equal(before.W_up.weight, after.W_up.weight)
+        with torch.no_grad():
+            assert torch.equal(model(sample()).logits, restored(sample()).logits)
+
+    def test_a_bf16_reload_does_not_round_the_gains(self, tmp_path):
+        # The loader casts every loaded tensor to the requested dtype, which undoes the
+        # fp32 storage `_apply` protects. Found by the real-recipient gate: the
+        # checkpoint held fp32 and the reloaded model disagreed with the one that
+        # wrote it, by up to 0.44 of a logit.
+        _stock, model = widened(tmp_path, dtype=torch.bfloat16)
+        model.recipient_initialize()
+        model.save_pretrained(tmp_path / "converted")
+        restored = Qwen35WidenedForCausalLM.from_pretrained(
+            tmp_path / "converted", dtype=torch.bfloat16).eval()
+        routes = [m for m in restored.modules() if isinstance(m, HyperConnection)]
+        assert all(route.branch_gain_delta.dtype == torch.float32 for route in routes)
+        assert restored.model.layers[0].mlp.gate_proj.weight.dtype == torch.bfloat16
+        for before, after in zip((m for m in model.modules()
+                                  if isinstance(m, HyperConnection)), routes):
+            assert torch.equal(before.branch_gain_delta, after.branch_gain_delta)
         with torch.no_grad():
             assert torch.equal(model(sample()).logits, restored(sample()).logits)
 

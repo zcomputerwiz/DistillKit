@@ -187,6 +187,13 @@ class Qwen35WidenedForCausalLM(_WidenedWeightInit, Qwen3_5ForCausalLM):
     """Load explicitly for widened checkpoints; config records all architecture data."""
     config_class = Qwen3_5TextConfig
     _no_split_modules = ["WidenedDecoderLayer"]
+    # The branch gains are held at fp32 in memory, and the loader would undo that. A
+    # converted route stores `1 + 2 * weight`, near 3, where bf16 spacing is 1.6e-2 --
+    # `from_pretrained(dtype=bfloat16)` casts every loaded tensor on the way in, so a
+    # checkpoint written correctly at fp32 came back rounded and the reloaded model
+    # disagreed with the one that saved it. Strict, because bf16 is the deployed
+    # precision here and the plain flag only fires for fp16.
+    _keep_in_fp32_modules_strict = ["branch_gain_delta"]
 
     @classmethod
     def is_custom_code(cls):

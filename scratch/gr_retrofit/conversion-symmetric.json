@@ -1,0 +1,257 @@
+{
+  "mode": "symmetric",
+  "threshold_nats": 0.0001,
+  "recipient": "D:\\DeepThought\\Projects\\HybridModel\\student-2b-hf",
+  "recipient_weights_sha256": "c980c584e44502328cb321b3d7ee5f00a8a422196dc8f0dfb8102027df46b759",
+  "tokenizer_sha256": "5f9e4d4901a92b997e463c1f46055088b6cca5ca61a6522d1b9f64c4bb81cb42",
+  "execution_dtype": "torch.bfloat16",
+  "device": "NVIDIA GeForce RTX 3090",
+  "fused_kernel_supports_gqa": false,
+  "branches": 4,
+  "lowrank": 320,
+  "seed": 0,
+  "documents": 64,
+  "bundle": "scratch\\independent-eval\\full-bundle-384.json",
+  "split": "screen",
+  "document_ids": [
+    "1c88d10fed8e5d7929bd8237e00cc804",
+    "1fa0c7a3b9b650269df134fc3cc4ab9c",
+    "1eec6419dba44b0c528531bee3b6ab74",
+    "1ea40d8a7c4b2636644ff07a61d90ad8",
+    "230b9d09eba77d3bba635b3069752c24",
+    "20dcde0ea7bb1db4c192d5a425eedd14",
+    "2323fdb3b702137f379546cd2467b2a5",
+    "2239b7474c7e25d5920914e71eb3eb63",
+    "22fffd62e15ac26b8fb43e429af8bae6",
+    "21bb69e9db5e74b7859fe1c934afe506",
+    "1f139af8cc5352e4",
+    "1ee78ff77a4a39cf9858ee679542b8aa",
+    "238a891afe4d419a1453f9ba3b4e9e8f",
+    "227db29c45708a61ff0ae57145930e2d",
+    "20f7fb187fbc70c991e9e818b7e8ac46",
+    "1e65013257ed1b65b8eb4343b3034ba2",
+    "1e616cc9960aeb4d184520a402c52910",
+    "2331687318325234e268f9c0ed58528a",
+    "20bc2085b4b48d85bb0d32d711c388e0",
+    "226ade2101a266b45ad2bb05813e3a81",
+    "23e59ec752a889eb3926b87e4dda80bf",
+    "20d01de9de941efe4a10674e64d9ab4a",
+    "1e89220548440e661fd54ac4089afca3",
+    "2101be5131c1f729ca668e13139f5663",
+    "1e9a2c034427ff183ae1b3ada0a36554",
+    "1fe12ac56ff14110b17384ec679480a6",
+    "1ea9088154a7073cc465e6a32fbca08b",
+    "1efc1d0319cffef18dc2bbfab7014bd9",
+    "1fd8d92d2f28ee1756bdd18edd9c516a",
+    "246b597fb52afa334b5cfced1d61f7d3",
+    "1e32258f88b7dee3e33ecb1f9e1d7f16",
+    "21beb2868bcd90bf41a0c6ce5f1c1ea3",
+    "2442ffe403f0af3c3eac82a3a98ce6b4",
+    "221f1654da2d49045631d00d142819cd",
+    "1df907895c7436aaf3949a9ad9030576",
+    "1d58201864abe1f494bae9f9b975208d",
+    "22a5fdf0b25c6a9337a57931e9a86b9c",
+    "1e7ff05249b54afe7f991a8038766cc2",
+    "21e0b5281d603f460a82833103bbfe8a",
+    "1e2420b3c7c74f348b8bf308d386e6b6",
+    "237b2cb8843ae4c84e952f8bf2903274",
+    "2479ba76935b7f61b80d4edd23e0b2a1",
+    "1eaef392555b1b829e13d1ea025af29c",
+    "1f53f73799f6326bb5720607bfae4661",
+    "224ee7ca0631aabf697c91c57c5974f6",
+    "1d65e295fb73822ba63a98121da7b22b",
+    "202a43d50465021053cf1091ffbaf4d5",
+    "1df55141c3613421",
+    "20813d488b824240",
+    "22e17f0c933997c39509a30430a7013b",
+    "227c3b8ba050164808f79645e442d4c0",
+    "202f5c43eb8fca58",
+    "1d21bd9524ad3553b3cded86f8b36a6b",
+    "2480e8fc87a78fff",
+    "1cf48eea817e987f997dc25153cdf3ef",
+    "23d81067abfdd7beb0b3a94f0382d905",
+    "24358a1ab96e9e7cf925aa024f6cc4bf",
+    "2004e77b2ee755e82637785fe21bc09e",
+    "20ed690c6d6c0819f17d0fe2f6dea4a1",
+    "2410a390309338e5a243430eba84c796",
+    "1fea4bd53359ddf7ad0293f55907e103",
+    "21c0a7ae9f0a924f7124013a8c27996f",
+    "1dd9639abf88606e9ab6193e240f4d0b",
+    "1e62d2458d28718bdcc33829ead6fb58"
+  ],
+  "baseline_nondeterminism": {
+    "max": 0.0,
+    "rms": 0.0,
+    "bitwise": true
+  },
+  "conversion": {
+    "sublayers": 48,
+    "mode": "symmetric",
+    "epsilon": null,
+    "seeds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47
+    ],
+    "blend": 1.0,
+    "gain_dtype": "torch.float32"
+  },
+  "backbone_unchanged": true,
+  "logits": {
+    "max": 0.0,
+    "rms": 0.0,
+    "bitwise": true
+  },
+  "per_layer_states": {
+    "layers": 25,
+    "max": 0.0,
+    "bitwise": true
+  },
+  "argmax_agreement": 1.0,
+  "nll": {
+    "tokens": 29477,
+    "content_tokens": 20079,
+    "original_aggregate": 1.4711105833788976,
+    "converted_aggregate": 1.4711105833788976,
+    "aggregate_delta": 0.0,
+    "original_content": 1.8741004389473104,
+    "converted_content": 1.8741004389473104,
+    "content_delta": 0.0,
+    "worst_document_delta": 0.0,
+    "documents_changed": 0
+  },
+  "cached_decoding": {
+    "steps": 16,
+    "identical": true,
+    "original": [
+      198,
+      248068,
+      198,
+      58,
+      21825,
+      1441,
+      279,
+      3377,
+      1083,
+      6599,
+      13,
+      198,
+      35944,
+      5081,
+      70915,
+      413
+    ],
+    "converted": [
+      198,
+      248068,
+      198,
+      58,
+      21825,
+      1441,
+      279,
+      3377,
+      1083,
+      6599,
+      13,
+      198,
+      35944,
+      5081,
+      70915,
+      413
+    ]
+  },
+  "padding": {
+    "converted": [
+      {
+        "max": 0.34375,
+        "rms": 0.04050685837864876
+      },
+      {
+        "max": 0.3203125,
+        "rms": 0.039195943623781204
+      }
+    ],
+    "original": [
+      {
+        "max": 0.34375,
+        "rms": 0.04050685837864876
+      },
+      {
+        "max": 0.3203125,
+        "rms": 0.039195943623781204
+      }
+    ],
+    "padded_rows_match": [
+      {
+        "max": 0.0,
+        "rms": 0.0
+      },
+      {
+        "max": 0.0,
+        "rms": 0.0
+      }
+    ]
+  },
+  "save_reload": {
+    "mode_restored": "symmetric",
+    "gains_bitwise": true,
+    "logits": {
+      "max": 0.0,
+      "rms": 0.0
+    }
+  },
+  "trained_round_trip": {
+    "logits": {
+      "max": 0.0,
+      "rms": 0.0
+    },
+    "initialization_not_reapplied": true
+  },
+  "verdict": "PASS",
+  "elapsed_seconds": 65.03099999998813
+}
