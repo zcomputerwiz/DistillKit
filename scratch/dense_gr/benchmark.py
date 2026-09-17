@@ -31,6 +31,41 @@ from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from distillkit.core.chunked_ce import maybe_install_chunked_loss
 from distillkit.models import Qwen35WidenedForCausalLM
+from distillkit.models.qwen35.gqa_dispatch import (
+    fused_kernel_supports_gqa, install_expanded_gqa_attention)
+from distillkit.models.qwen35.linear_attention_dispatch import (
+    fused_linear_attention_available, install_device_aware_linear_attention)
+
+def _shim_triton_metadata():
+    """Let CCE find Triton's version on Windows.
+
+    `cut_cross_entropy.utils.is_triton_3_2` reads
+    `importlib.metadata.version("triton")` to decide which kernel path to take, but the
+    Windows distribution is packaged as `triton-windows`, so that lookup raises
+    PackageNotFoundError at call time rather than import time. Resolving the alias keeps
+    CCE's own version comparison intact instead of hard-coding the answer.
+    """
+    import importlib.metadata as metadata
+
+    original = metadata.version
+
+    def version(name):
+        try:
+            return original(name)
+        except metadata.PackageNotFoundError:
+            if name == "triton":
+                return original("triton-windows")
+            raise
+
+    metadata.version = version
+
+
+_shim_triton_metadata()
+
+try:
+    from cut_cross_entropy import linear_cross_entropy
+except ImportError:  # optional; --loss cce is simply unavailable
+    linear_cross_entropy = None
 
 #: (label, hidden, layers, vocab). Two ~0.8B shapes at the same budget but different
 #: depth/width splits, plus the small candidates for the first experiment.
@@ -42,7 +77,8 @@ CONFIGURATIONS = [
 ]
 
 
-def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2):
+def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2,
+          attn_implementation="sdpa"):
     heads = max(2, hidden // head_dim)
     pairs = int(head_dim * 0.25) // 2
     section = [pairs - 2 * (pairs // 3), pairs // 3, pairs // 3]
@@ -66,7 +102,18 @@ def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2):
     config.residual_stream_lowrank = max(8, hidden // 8)
     config.residual_stream_sidecar = False
     config.residual_stream_blend = 0.0
+    # Only the full-attention layers consult this; the linear-attention layers go
+    # through the gated delta rule and the conv, which fla and causal_conv1d own.
+    config._attn_implementation = attn_implementation
     return config
+
+
+def _module_version(name):
+    import importlib
+    try:
+        return getattr(importlib.import_module(name), "__version__", "present")
+    except Exception:
+        return None
 
 
 def shared_gpu_gib():
@@ -139,7 +186,14 @@ def measure(model, config, batch, length, steps, warmup, device="cuda",
 
     def step():
         optimizer.zero_grad(set_to_none=True)
-        if loss_kind == "chunked_head":
+        if loss_kind == "cce":
+            # Never forms the logits at all: the log-sum-exp over the vocabulary is
+            # reduced in SRAM, so memory is O(N + |V|) rather than O(N|V|).
+            hidden = model.model(input_ids=tokens, attention_mask=attention,
+                                 use_cache=False).last_hidden_state
+            loss = linear_cross_entropy(hidden, model.lm_head.weight, tokens,
+                                        shift=1, reduction="mean")
+        elif loss_kind == "chunked_head":
             # The head never runs over the whole sequence: take the model's post-norm
             # state and fold the projection into the loss instead.
             hidden = model.model(input_ids=tokens, attention_mask=attention,
@@ -192,10 +246,14 @@ def main() -> int:
     parser.add_argument("--only", nargs="*", default=None)
     parser.add_argument("--no-checkpointing", action="store_true")
     parser.add_argument("--loss", default="chunked_ce",
-                        choices=("chunked_ce", "chunked_head"),
+                        choices=("chunked_ce", "chunked_head", "cce"),
                         help="chunked_ce materializes logits then chunks the upcast; "
                              "chunked_head folds the projection into the loss loop")
     parser.add_argument("--position-budget", type=int, default=4096)
+    parser.add_argument("--attn", default="sdpa",
+                        choices=("sdpa", "flash_attention_2", "eager"))
+    parser.add_argument("--compile", action="store_true",
+                        help="torch.compile the text model")
     parser.add_argument("--spill-tolerance-gib", type=float, default=0.25,
                         help="abort if WDDM shared GPU memory climbs this far "
                              "above baseline: the run would be measuring PCIe")
@@ -221,6 +279,24 @@ def main() -> int:
     # `max_vram_fraction` in distillkit/configuration.py does the same thing for runs.
     torch.cuda.set_per_process_memory_fraction(args.vram_fraction, 0)
 
+    if args.loss == "cce" and linear_cross_entropy is None:
+        raise SystemExit("cut-cross-entropy is not installed")
+    patched_linear = install_device_aware_linear_attention()
+    install_expanded_gqa_attention()
+    kernels = {
+        "attn_implementation": args.attn,
+        "flash_attn": _module_version("flash_attn"),
+        "fla": _module_version("fla"),
+        "causal_conv1d": _module_version("causal_conv1d"),
+        "triton": _module_version("triton"),
+        "cut_cross_entropy": _module_version("cut_cross_entropy"),
+        "linear_attention_ops_patched": patched_linear,
+        "fused_linear_attention_available": bool(fused_linear_attention_available()),
+        "fused_kernel_supports_gqa": bool(fused_kernel_supports_gqa()),
+        "torch_compile": bool(args.compile),
+    }
+    print(json.dumps(kernels), flush=True)
+
     baseline_shared = shared_gpu_gib()
     print("baseline shared GPU memory: %.2f GiB (spill guard trips at +%.2f)"
           % (baseline_shared, args.spill_tolerance_gib), flush=True)
@@ -231,6 +307,7 @@ def main() -> int:
               "dtype": "bfloat16", "optimizer": "bnb.AdamW8bit",
               "gradient_checkpointing": not args.no_checkpointing,
               "loss": args.loss, "position_budget": args.position_budget,
+              "kernels": kernels,
               "vram_fraction": args.vram_fraction,
               "total_vram_gib": torch.cuda.get_device_properties(0).total_memory / 2 ** 30,
               "configurations": {}}
@@ -238,7 +315,7 @@ def main() -> int:
     for label, hidden, layers, vocab in CONFIGURATIONS:
         if args.only and label not in args.only:
             continue
-        config = build(hidden, layers, vocab)
+        config = build(hidden, layers, vocab, attn_implementation=args.attn)
         with torch.device("meta"):
             counted = Qwen35WidenedForCausalLM(config)
         total = sum(p.numel() for p in counted.parameters())
@@ -259,6 +336,11 @@ def main() -> int:
             model.gradient_checkpointing_enable()
         model.train()
         maybe_install_chunked_loss(model, need_model_loss=True, enabled=True)
+        if args.compile:
+            # Only the decoder stack. The loss paths are chunked or fused already,
+            # and compiling across a checkpoint boundary is what an earlier branch
+            # found buys nothing here.
+            model.model = torch.compile(model.model)
         for batch in args.batches:
             try:
                 row = measure(model, config, batch, args.length, args.steps,

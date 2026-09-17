@@ -172,11 +172,53 @@ that choice can be made on other grounds.
 Per arm, multiplied by three arms at 1B tokens each: 5.4 days at 0.8B, 1.1 days at 125M,
 half a day at 38M.
 
-[Cut Cross-Entropy](https://arxiv.org/abs/2411.09009) goes further -- it never forms the
-logits at all, computing the log-sum-exp in SRAM, for `O(N + |V|)` memory instead of
-`O(N|V|)`. It is not yet used here. Folding the head recovers most of the available gain
-with no new dependency, and throughput is nearly flat from batch 16 to 32 (+1.9%), so the
-remaining headroom is memory rather than speed.
+### With every available kernel
+
+[Cut Cross-Entropy](https://arxiv.org/abs/2411.09009) goes further still: it never forms
+the logits at all, reducing the log-sum-exp in SRAM for `O(N + |V|)` memory instead of
+`O(N|V|)`. With CCE and Flash-Attention 2 (`benchmark-cce.json`):
+
+| configuration | best batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| d1536-L12, v248k | 32 | 9,437 | 54% | 29.4 h | 88.3 h |
+| d1280-L18, v248k | 32 | 9,178 | 54% | 30.3 h | 90.8 h |
+| d768-L12, v32k | 64 | 35,760 | 40% | 7.8 h | 23.3 h |
+| d512-L8, v16k | 64 | 91,018 | 21% | 3.1 h | 9.2 h |
+
+Against the original materialized-logits path that is **2.05x** at the 248,320 vocabulary
+and 1.29x at 16,384. Three arms at 1B tokens each: 3.7 days at 0.8B, 1 day at 125M, half a
+day at 38M.
+
+The contributions are wildly unequal, and only measuring them separately shows it:
+
+| change | gain at 0.8B, v248k |
+| --- | ---: |
+| chunked head over materialized logits | 1.41x |
+| CCE over chunked head | 1.45x |
+| Flash-Attention 2 over SDPA | 1.01x |
+| `torch.compile` on the decoder stack | 1.00x, and +1.2 GiB reserved |
+
+Attention is not the bottleneck here and compiling buys nothing -- which reproduces the
+earlier finding on the memory-headroom branch that every hot region already sits inside a
+checkpoint frame. Both are still worth leaving on: FA2 costs nothing, and compile should
+be left off.
+
+FLA and `causal_conv1d` are already live for the linear-attention layers without any
+action. `install_device_aware_linear_attention` reports patching nothing, which is not a
+failure: this version of transformers binds the fused implementations directly, and
+`fla.ops.gated_delta_rule.backends.flash_qla` loads during the forward. The dispatch
+exists for CPU fallback.
+
+**CCE weakens the throughput case for cutting the vocabulary.** The head is no longer what
+limits the large configurations -- batch 64 now fails on backbone activations, not logits.
+What remains is the parameter-allocation argument: the embedding is still 49% of the 0.8B
+model, with a gradient-starved tail.
+
+Installing CCE on Windows needs two workarounds. `uv pip install --no-deps`, because it
+declares `triton>=3.0.0` while the platform package is `triton-windows` and the dependency
+cannot resolve; and a shim for `importlib.metadata.version("triton")`, which
+`cut_cross_entropy.utils.is_triton_3_2` calls at *run* time rather than import time, so
+without it the first step raises `PackageNotFoundError`.
 
 **Measure with the allocator capped.** `torch.cuda.set_per_process_memory_fraction`, or
 `max_vram_fraction` for a real run. An uncapped first pass of this benchmark reserved
