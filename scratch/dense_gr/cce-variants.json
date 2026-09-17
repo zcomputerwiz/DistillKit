@@ -1,0 +1,64 @@
+{
+  "vocab": 248320,
+  "hidden": 1536,
+  "tokens": 4096,
+  "dtype": "bfloat16",
+  "device": "NVIDIA GeForce RTX 3090",
+  "variants": [
+    {
+      "variant": "reference_fp32",
+      "loss": 12.42284107208252,
+      "loss_delta": 0.0,
+      "grad_hidden_rel_max": 0.0,
+      "grad_weight_rel_max": 0.0,
+      "grad_hidden_zeros": 0.0,
+      "grad_weight_zeros": 7.865354589853268e-09,
+      "seconds": 0.2633904000016628,
+      "peak_gib": 11.367188453674316
+    },
+    {
+      "variant": "cce_filter_auto",
+      "loss": 12.422840118408203,
+      "loss_delta": -9.5367431640625e-07,
+      "grad_hidden_rel_max": 0.0025167784187942743,
+      "grad_weight_rel_max": 0.00657894741743803,
+      "grad_hidden_zeros": 0.0,
+      "grad_weight_zeros": 0.11132881790399551,
+      "seconds": 0.1273216900008265,
+      "peak_gib": 0.7242107391357422
+    },
+    {
+      "variant": "cce_filter_none",
+      "loss": 12.422840118408203,
+      "loss_delta": -9.5367431640625e-07,
+      "grad_hidden_rel_max": 0.0018875838723033667,
+      "grad_weight_rel_max": 0.00657894741743803,
+      "grad_hidden_zeros": 0.0,
+      "grad_weight_zeros": 0.00029729469679296017,
+      "seconds": 0.28352969999832567,
+      "peak_gib": 0.7223606109619141
+    },
+    {
+      "variant": "cce_exact",
+      "loss": 12.422840118408203,
+      "loss_delta": -9.5367431640625e-07,
+      "grad_hidden_rel_max": 0.003355704713612795,
+      "grad_weight_rel_max": 0.003289473708719015,
+      "grad_hidden_zeros": 0.0,
+      "grad_weight_zeros": 2.6217850113141594e-09,
+      "seconds": 0.4290718100004597,
+      "peak_gib": 2.154977798461914
+    },
+    {
+      "variant": "torch_compile",
+      "loss": 12.422840118408203,
+      "loss_delta": -9.5367431640625e-07,
+      "grad_hidden_rel_max": 0.0008389261784031987,
+      "grad_weight_rel_max": 0.00010279605339746922,
+      "grad_hidden_zeros": 0.0,
+      "grad_weight_zeros": 7.865354589853268e-09,
+      "seconds": 0.18707799999974667,
+      "peak_gib": 2.6176767349243164
+    }
+  ]
+}

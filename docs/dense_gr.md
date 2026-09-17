@@ -257,3 +257,32 @@ Free, and to be decided before anything runs: `d_model`, depth, the linear-to-fu
 attention ratio, `r` as a ratio of `d`, `ngram_vocab_size_base`, whether the final
 collapse is a mean or a learned mixer (Qwen uses a learned mixer; this repository has
 deliberately used a mean collapse), and whether PLE is present in a given run.
+
+### CCE gradient filtering
+
+`linear_cross_entropy` defaults to `filter_eps="auto"`, which skips vocabulary entries
+whose contribution falls below a dtype-derived threshold in the backward pass. Measured at
+4,096 tokens, hidden 1,536, vocabulary 248,320 (`cce-variants.json`):
+
+| variant | ms | peak GiB | dW zeroed |
+| --- | ---: | ---: | ---: |
+| reference fp32 | 263.4 | 11.367 | 0% |
+| cce, `filter_eps="auto"` | 127.3 | 0.724 | 11.13% |
+| cce, `filter_eps=None` | 283.5 | 0.722 | 0.03% |
+| `impl="cce_exact"` | 429.1 | 2.155 | 0% |
+| `impl="torch_compile"` | 187.1 | 2.618 | 0% |
+
+The loss is unchanged to bf16 rounding in every variant, and the ~1e-3 relative gradient
+differences are precision rather than approximation -- `cce_exact` shows them too.
+
+Two things are easy to get wrong here. **Memory is flat between `auto` and `None`**, so
+the filtering buys time (2.2x) and nothing else; exact gradients cost time, not memory,
+and `filter_eps=None` is the route rather than `impl="cce_exact"`, which is worse on both
+axes. And **`impl="torch_compile"` is not a cheaper CCE** -- it is CCE's fallback for
+systems without Triton and materializes the logits, at 3.6x the memory. Its good timing
+comes from doing the expensive thing efficiently.
+
+`auto` is kept. What it drops is the small gradient pushing away from tokens the model
+already assigns near-zero probability, the 11.13% was measured on random weights (the
+near-uniform regime that is worst case for a threshold), and a failure would show up as
+rare classes not improving in the per-class evaluation breakdown.
