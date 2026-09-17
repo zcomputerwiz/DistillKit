@@ -1,0 +1,43 @@
+{
+  "phase": "modular_phase1d_learned_specialist_handoff",
+  "source_phase1_config": "experiments/modular_phase1/configs/pilot.json",
+  "source_phase1_run_dir": "scratch/modular-phase1",
+  "source_phase1b_run_dir": "scratch/modular-phase1b",
+  "source_phase1c_run_dir": "scratch/modular-phase1c",
+  "base_checkpoint": "scratch/modular-phase1/backbones/l6_w256/plain/seed_11/checkpoint.pt",
+  "readout_checkpoint": "scratch/modular-phase1c/readout.pt",
+  "seed": 1701,
+  "specialist": {
+    "embedding_dim": 32,
+    "hidden_dim": 96,
+    "batch_size": 16,
+    "corrupt_fraction": 0.1,
+    "max_parameters": 100000
+  },
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 0.0003,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "weight_decay": 0.1,
+    "gradient_clip": 1.0,
+    "schedule": "constant"
+  },
+  "budget": {
+    "specialist_tokens": 2097152,
+    "specialist_accelerator_seconds": 1800,
+    "whole_run_accelerator_seconds": 2100
+  },
+  "qualification": {
+    "binding_accuracy": 0.99,
+    "structural_event_accuracy": 0.99
+  },
+  "acceptance": {
+    "end_to_end_conditional_accuracy": 0.99,
+    "intervention_accuracy": 0.99,
+    "variant_accuracy": 0.99,
+    "coverage": 0.99,
+    "probability_preservation_tolerance": 1e-6
+  },
+  "runtime": {"device": "cuda:0", "bf16": true}
+}

@@ -1,0 +1,67 @@
+{
+  "phase": "bounded_modular_phase1",
+  "run_kind": "pilot",
+  "seeds": [11, 22, 33],
+  "data": {
+    "literal_fraction": 0.2,
+    "invariance_pairs": 128,
+    "documents": {
+      "specialist_train": 36000,
+      "specialist_validation": 2048,
+      "backbone_train": 22000,
+      "backbone_validation": 1024,
+      "confirmation": 1024
+    }
+  },
+  "specialist": {
+    "seed": 1701,
+    "embedding_dim": 24,
+    "hidden_dim": 48,
+    "batch_size": 16,
+    "corrupt_fraction": 0.1,
+    "max_parameters": 100000,
+    "gate": {
+      "binding_accuracy": 0.99,
+      "structural_event_macro_f1": 0.95,
+      "depth_accuracy": 0.0,
+      "validity_accuracy": 0.95
+    }
+  },
+  "backbones": {
+    "sizes": [[2, 64], [4, 128], [6, 256]],
+    "arms": ["plain", "specialist", "matched"],
+    "attention_heads": {"64": 4, "128": 4, "256": 8},
+    "sequence_length": 512,
+    "batch_sizes": {"64": 64, "128": 32, "256": 12}
+  },
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 0.0003,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "weight_decay": 0.1,
+    "gradient_clip": 1.0,
+    "schedule": "constant"
+  },
+  "evaluation": {
+    "non_inferiority": {"accuracy_points": 0.01, "nll_nats": 0.02},
+    "non_inferiority_slices": [
+      "confirmation",
+      "depth_ood_5_8",
+      "long_history",
+      "heldout_combo"
+    ],
+    "target_savings_fraction": 0.1,
+    "primary_cost_metric": "amortized_training_accelerator_seconds",
+    "bootstrap_samples": 1000,
+    "benchmark_repeats": 20,
+    "batch_sizes": {"64": 64, "128": 32, "256": 12}
+  },
+  "budget": {
+    "specialist_tokens": 2097152,
+    "backbone_tokens_per_run": 1048576,
+    "specialist_accelerator_minutes": 30,
+    "pilot_accelerator_hours": 4
+  },
+  "runtime": {"device": "cuda:0", "bf16": true}
+}

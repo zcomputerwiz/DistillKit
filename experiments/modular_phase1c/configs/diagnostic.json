@@ -1,0 +1,31 @@
+{
+  "phase": "modular_phase1c_direct_lookup_readout",
+  "source_phase1_config": "experiments/modular_phase1/configs/pilot.json",
+  "source_phase1_run_dir": "scratch/modular-phase1",
+  "source_phase1b_run_dir": "scratch/modular-phase1b",
+  "base_checkpoint": "scratch/modular-phase1/backbones/l6_w256/plain/seed_11/checkpoint.pt",
+  "seed": 11,
+  "training": {
+    "optimizer": "AdamW",
+    "learning_rate": 0.05,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "weight_decay": 0.0,
+    "pairs_per_batch": 128,
+    "check_every_updates": 5,
+    "required_consecutive_passes": 2
+  },
+  "budget": {
+    "max_updates": 500,
+    "max_supervised_answers": 32768,
+    "max_accelerator_seconds": 300
+  },
+  "acceptance": {
+    "conditional_accuracy": 0.99,
+    "intervention_accuracy": 0.99,
+    "variant_accuracy": 0.99,
+    "probability_preservation_tolerance": 1e-6,
+    "control_chance_tolerance": 0.05
+  },
+  "runtime": {"device": "cuda:0", "bf16": true}
+}

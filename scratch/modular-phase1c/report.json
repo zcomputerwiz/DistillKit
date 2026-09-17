@@ -1,0 +1,721 @@
+{
+  "acceptance": {
+    "criteria": {
+      "accelerator_budget": true,
+      "bit_category_preserved": true,
+      "heldout_conditional_accuracy": true,
+      "inactive_output_exact": true,
+      "nonbit_probabilities_preserved": true,
+      "opposite_pointer_conditional_accuracy": true,
+      "opposite_pointer_predictions_change_toward_new": true,
+      "prefix_causality": true,
+      "renaming_conditional_accuracy": true,
+      "supervision_budget": true,
+      "update_budget": true,
+      "value_independent_control_at_chance": true,
+      "whitespace_conditional_accuracy": true
+    },
+    "passed": true
+  },
+  "base_checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\checkpoint.pt",
+  "base_checkpoint_sha256": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+  "base_checkpoint_sha256_after": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+  "base_checkpoint_sha256_before": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+  "base_frozen": true,
+  "base_state_sha256": "c020d05903cccc8aba6dbb7e80cafffa1b74040605bed1d2d9738a0bbb036721",
+  "budget": {
+    "accelerator_seconds": 4.312152900005458,
+    "accelerator_seconds_cap": 300.0,
+    "frozen_backbone_cache_seconds": 0.6847656999889296,
+    "within_cap": true
+  },
+  "causality": {
+    "active_answers_after_arrow_whitespace": 460,
+    "active_answers_immediately_after_arrow": 148,
+    "all_prefix_fields_invariant_to_unseen_suffix": true,
+    "all_score_prefix_documents_checked": 608,
+    "answer_annotation_is_not_an_activation_input": true,
+    "prefix_comparisons": 3896,
+    "xor_documents_checked": 64,
+    "xor_documents_inactive": 64
+  },
+  "composition_checks": {
+    "inactive_output_exactly_unchanged": true,
+    "inactive_tensor_equal": true,
+    "preservation": {
+      "baseline": {
+        "max_abs_bit_category_probability_change": 0.0,
+        "max_abs_nonbit_probability_change": 0.0
+      },
+      "deterministic_copy": {
+        "max_abs_bit_category_probability_change": 1.7881393432617188e-07,
+        "max_abs_nonbit_probability_change": 0.0
+      },
+      "learned_readout": {
+        "max_abs_bit_category_probability_change": 2.384185791015625e-07,
+        "max_abs_nonbit_probability_change": 0.0
+      },
+      "value_independent_control": {
+        "max_abs_bit_category_probability_change": 1.7881393432617188e-07,
+        "max_abs_nonbit_probability_change": 0.0
+      }
+    }
+  },
+  "config_sha256": "ba981ef3b77de9190a2fdb419a5aca245d09dde1c843e6d456a61320cb912667",
+  "data": {
+    "balanced_targets": {
+      "heldout": {
+        "one": 304,
+        "zero": 304
+      },
+      "train": {
+        "one": 8239,
+        "zero": 8239
+      },
+      "validation": {
+        "one": 368,
+        "zero": 368
+      }
+    },
+    "examples": {
+      "heldout": 608,
+      "renamed": 37,
+      "train": 16478,
+      "validation": 736,
+      "whitespace": 111
+    },
+    "pair_id_overlap": {
+      "train_heldout": 0,
+      "train_validation": 0,
+      "validation_heldout": 0
+    },
+    "pairs": {
+      "heldout": 304,
+      "train": 8239,
+      "validation": 368
+    }
+  },
+  "device": "NVIDIA GeForce RTX 3090",
+  "diagnostic_only": true,
+  "heldout_metrics": {
+    "baseline": {
+      "answer_nll": 1.6495109796524048,
+      "conditional_bit_accuracy": 0.5,
+      "conditional_bit_nll": 0.951106607913971,
+      "documents": 608,
+      "full_vocabulary_answer_accuracy": 0.34210526943206787,
+      "mean_bit_category_probability": 0.7069240808486938
+    },
+    "deterministic_copy": {
+      "answer_nll": 0.6984044313430786,
+      "conditional_bit_accuracy": 1.0,
+      "conditional_bit_nll": 0.0,
+      "documents": 608,
+      "full_vocabulary_answer_accuracy": 0.6940789818763733,
+      "mean_bit_category_probability": 0.7069240808486938
+    },
+    "learned_readout": {
+      "answer_nll": 1.015653133392334,
+      "conditional_bit_accuracy": 1.0,
+      "conditional_bit_nll": 0.31724879145622253,
+      "documents": 608,
+      "full_vocabulary_answer_accuracy": 0.6809210777282715,
+      "mean_bit_category_probability": 0.7069240808486938
+    },
+    "value_independent_control": {
+      "answer_nll": 1.3915516138076782,
+      "conditional_bit_accuracy": 0.5,
+      "conditional_bit_nll": 0.6931473612785339,
+      "documents": 608,
+      "full_vocabulary_answer_accuracy": 0.3371710479259491,
+      "mean_bit_category_probability": 0.7069240808486938
+    }
+  },
+  "overhead": {
+    "combined_microseconds_per_document": 83.12336266547055,
+    "cuda_synchronized": true,
+    "documents_per_measurement": 608,
+    "gpu_timed_iterations": 200,
+    "prefix_cpu_microseconds_per_document": 81.75842105365997,
+    "readout_and_logspace_composition_gpu_microseconds_per_document": 1.3649416118105844,
+    "warmup_iterations": 20
+  },
+  "phase": "modular_phase1c_direct_lookup_readout",
+  "pointer_interventions": {
+    "baseline": {
+      "conditional_accuracy_correct_pointer": 0.5066224932670593,
+      "conditional_accuracy_intervened_pointer": 0.4933774769306183,
+      "eligible_cases": 302,
+      "new_required_normalized_probability_delta": {
+        "count": 302,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "median": 0.0,
+        "minimum": 0.0,
+        "nonzero": 0
+      },
+      "prediction_changed_toward_new_required": 0.0,
+      "reader_distribution_delta_l2": {
+        "count": 302,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "median": 0.0,
+        "minimum": 0.0,
+        "nonzero": 0
+      },
+      "retrieved_literal_changed": 302,
+      "signed_log_odds_shift_toward_new_required": {
+        "count": 302,
+        "maximum": 8.940696716308594e-08,
+        "mean": -7.697288563709385e-09,
+        "mean_absolute": 1.2828814272848975e-08,
+        "median": 0.0,
+        "minimum": -4.470348358154297e-08,
+        "nonzero": 126
+      }
+    },
+    "deterministic_copy": {
+      "conditional_accuracy_correct_pointer": 1.0,
+      "conditional_accuracy_intervened_pointer": 1.0,
+      "eligible_cases": 302,
+      "new_required_normalized_probability_delta": {
+        "count": 302,
+        "maximum": 1.0,
+        "mean": 1.0,
+        "mean_absolute": 1.0,
+        "median": 1.0,
+        "minimum": 1.0,
+        "nonzero": 302
+      },
+      "prediction_changed_toward_new_required": 1.0,
+      "reader_distribution_delta_l2": {
+        "count": 302,
+        "maximum": 1.4142135381698608,
+        "mean": 1.4142135381698608,
+        "mean_absolute": 1.4142135381698608,
+        "median": 1.4142135381698608,
+        "minimum": 1.4142135381698608,
+        "nonzero": 302
+      },
+      "retrieved_literal_changed": 302,
+      "signed_log_odds_shift_toward_new_required": {
+        "count": 302,
+        "maximum": 174.673095703125,
+        "mean": 174.673095703125,
+        "mean_absolute": 174.673095703125,
+        "median": 174.673095703125,
+        "minimum": 174.673095703125,
+        "nonzero": 302
+      }
+    },
+    "learned_readout": {
+      "conditional_accuracy_correct_pointer": 1.0,
+      "conditional_accuracy_intervened_pointer": 1.0,
+      "eligible_cases": 302,
+      "new_required_normalized_probability_delta": {
+        "count": 302,
+        "maximum": 0.4562992453575134,
+        "mean": 0.45629918831863153,
+        "mean_absolute": 0.45629918831863153,
+        "median": 0.45629918575286865,
+        "minimum": 0.4562990665435791,
+        "nonzero": 302
+      },
+      "prediction_changed_toward_new_required": 1.0,
+      "reader_distribution_delta_l2": {
+        "count": 302,
+        "maximum": 0.6453045010566711,
+        "mean": 0.6453045010566711,
+        "mean_absolute": 0.6453045010566711,
+        "median": 0.6453045010566711,
+        "minimum": 0.6453045010566711,
+        "nonzero": 302
+      },
+      "retrieved_literal_changed": 302,
+      "signed_log_odds_shift_toward_new_required": {
+        "count": 302,
+        "maximum": 1.9705095291137695,
+        "mean": 1.9705090743816451,
+        "mean_absolute": 1.9705090743816451,
+        "median": 1.9705090522766113,
+        "minimum": 1.9705085754394531,
+        "nonzero": 302
+      }
+    },
+    "value_independent_control": {
+      "conditional_accuracy_correct_pointer": 0.4933774769306183,
+      "conditional_accuracy_intervened_pointer": 0.5066224932670593,
+      "eligible_cases": 302,
+      "new_required_normalized_probability_delta": {
+        "count": 302,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "median": 0.0,
+        "minimum": 0.0,
+        "nonzero": 0
+      },
+      "prediction_changed_toward_new_required": 0.0,
+      "reader_distribution_delta_l2": {
+        "count": 302,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "median": 0.0,
+        "minimum": 0.0,
+        "nonzero": 0
+      },
+      "retrieved_literal_changed": 302,
+      "signed_log_odds_shift_toward_new_required": {
+        "count": 302,
+        "maximum": 0.0,
+        "mean": 0.0,
+        "mean_absolute": 0.0,
+        "median": 0.0,
+        "minimum": 0.0,
+        "nonzero": 0
+      }
+    }
+  },
+  "preserved_phase1_verdict": "failed composition",
+  "readout_checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1c\\readout.pt",
+  "readout_checkpoint_sha256": "eb101ea56901fd6d6f2e5d525dc6d5ab2092ea73e8053487879aca02daaadb98",
+  "schema": 1,
+  "scope_limit": "Output-facing lookup integration only; no XOR, backbone-layer-use, efficiency, or learned-specialist claim.",
+  "source_artifacts_unchanged": true,
+  "source_hashes_after": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\AUDIT.md": "6a9ce574000bfb5f0c23fb7d6cf4310a65418da089a975e6281003977c48f5e4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\REPORT.md": "119eec5e02314a4ae674fb67af8adf3b8d23e74c19afb75962f18e8832b01d0c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\audit.json": "b48091837394b2d8bc76ee9b07773c656fb636cdc4cd9b23fba937bd6635cdd3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\checkpoint.pt": "06afce10afc9bc0b7655e6d02e732aa38443be5efaf0a1e126f63e834105dac0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\evaluation.json": "c91b6daf65885eaa122bd6f033fe89f6cae0c25d95ee34fc59f8e18a9c75d739",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\evaluation_rows.jsonl.gz": "75cd826c0c67c747323cae1d2915efa767106f1bb3ab586e84e6d89efce5f5e6",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\train_metrics.json": "961477d237add03746dc4635e9b9d0ccd7953d471157235b3e9d9cefe771907b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\checkpoint.pt": "174b022a334adff439368aa6634788e49624e89fa54662a6c286db91b916cad1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\evaluation.json": "02c6e3073ad35ea6300717a90fbe9d8fdfd4b7a4cd70acaf70a4379c8bf1b7f3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\evaluation_rows.jsonl.gz": "1c637b6cac8c556c76d8b803b160b085ed4dc9cac94a83806e20b90f80ffc3f0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\train_metrics.json": "a3f1844fe565ccda1a25537fc45cb255914133fb343b0eddbd4a16e564518450",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\checkpoint.pt": "cbdda1f762bb6ab16c3c40b3c54d392de6515a71f85e000b1b18c6f8ac898b4a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\evaluation.json": "4578f6e9a9a54338dddd53960db7a5e1e15c58810fb1494ef502bef2ccb83358",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\evaluation_rows.jsonl.gz": "bc6aeaacb4d72eb61303269eb444ccdae6a4372365bf2e680b58161b6a953542",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\train_metrics.json": "0a8ca2d3379711a069929c8f100242001099311afff873bbb042f3f8902a1a39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\checkpoint.pt": "c045643756c809eadb69675417b6ff398343057aa74b5cfd7fbc0b04f27d6ecf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\evaluation.json": "4e05b4aa62be34b5485017dfc10a5394330603236c0e8a6fcb41f25fab952434",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\evaluation_rows.jsonl.gz": "4559cfb81c96509a757e2ffbbee70bebe0f06d4d2c7dabd535bb83b3a494364c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\train_metrics.json": "24d0df8c26a2752683d91a2959ec9733f5d0b0f19878f0a821bade849795f9f4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\checkpoint.pt": "07b05fc2f1735382013aba5a4b0b776fc05423cfde376e4224b63d661b1109cb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\evaluation.json": "985be693eda54b7ae5e258994d6b2d4f092c27169414789884113e7e30a5e2dd",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\evaluation_rows.jsonl.gz": "fcef551e98fc710aba28f3486a5bb6a7969f4cecdd2a3efad119f1c4cffd5cf2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\train_metrics.json": "c75b3ed4cd0ca77c02950291338a9ef14fde65a8deae664e6ed3af100e8984f2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\checkpoint.pt": "5e08b115c32b21b8ea2322fb22cae351b246f95c79406387c458784eec9ce56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\evaluation.json": "4f00c1300b06ee90eabc8642cc6c0b760aa261368d50f327af14965cf2cef897",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\evaluation_rows.jsonl.gz": "81903678e1831ffdd8264e2e5d80877c4933d326838d02018a83f5d25af0c048",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\train_metrics.json": "dac185bbc59dff160d991af8bcf5d3ec09c257d28a9601836f637fa5777c79d7",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\checkpoint.pt": "3f1843b3f306ddca0c9c1b06d8151b400cb383da4f466813751d7a988ecc149e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\evaluation.json": "c86dd13824dd2d1bd2b750e435b325b9f1217b1787308ad0b1e1630c0875308f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "a7e64de3e34351726614a481c8ae29e8105c61903121bdb7a05aa0df2137abb4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\train_metrics.json": "3003c45b9fc0416730993accd3abc801a89d916c3a349c5a1d96d633f84bdeee",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\checkpoint.pt": "c9d19f1243d87bc3f070c010b85e113df22634ed8157323c5088e11bb39fd214",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\evaluation.json": "a657b8dc51cf5dcbcb6ac2a236be3ad911abced77ac02a8ab9e8469a07041460",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "ca6a9283d8ab0310e5de9209b44051515a5fd1ba0c8aae459fa63781f30ce997",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\train_metrics.json": "753f27207b76cf95e3ad5006dba3a34bc058fe53148ab8c15a3db464bc13d8cc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\checkpoint.pt": "0fbef0695d3cd6a6ec93db8e0ee4973593b4e330ad1ec52e22ce78152acac141",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\evaluation.json": "380c3ffd6f86a6a0eff29817574ceb1e2bb801c97305437b099027d6b5af3372",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "b61bef588ec61977eba0b7abb84ab9fcb1fef1cc15df908878a5e6e98208bd7d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\train_metrics.json": "fe187d4af45736facc08106242f9b87987ef6d1d809a1de9e011453c1f601404",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\checkpoint.pt": "e73c6f92fbd3e9b75d5328d19a59d551e255abbb5b4f895e3a52922fb7c55d56",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\evaluation.json": "1b38f01f77c7565521fafacf617c062af5499eea681c62d62e450d1dd96e54bb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\evaluation_rows.jsonl.gz": "0fce0a4c0b9beae7a7653a9010c3717a51746bd55998cb56273d09aab7b55e71",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\train_metrics.json": "032ad83b0450a2e4bb3679a3ebc52e7cfc5bb0e5984c644d3f93dc94fb731e1e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\checkpoint.pt": "e8dde02f2bee43691e545ecde9f823a4d3d5ec8c1cfac5a65ee83f5b7a55aff2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\evaluation.json": "e6098e4410fcd133f57befffeea22bbe216f003305500ccd048355ffe1b2c4d4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\evaluation_rows.jsonl.gz": "333a728c070500e35923704266a3e23b151accf421a93b249c0183bbc906771e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\train_metrics.json": "54a8aa52b24e1ba57b166c61d5c281fe560c9a23df764dbf0257002b165a3829",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\checkpoint.pt": "cff8e0b4208477942f247ae767835bc6fe1a857c0b29949ded5429792de5880f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\evaluation.json": "ed79a1fc83b326de45db21617e5dcc15b6b1c66f52fea65a9479c2edfee199fc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\evaluation_rows.jsonl.gz": "60197691105fe5a070f4fb836e8cc5c5d950e3a24c8684d9a700b5b9430916b1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\train_metrics.json": "37dd3d41227226b1850b0b9a224c38de39526af0600bfc0beaf2fb25abe74981",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\checkpoint.pt": "de4bce1557ba7fc8c301ffbe72b4436778ae445b93ef3bd0c98e39ab2c44e18d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\evaluation.json": "052932c8dd060bcc26e6b8d4bf8913cec6acb8285de399945d24614cccc2d706",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\evaluation_rows.jsonl.gz": "29aa0466161d81c38e12b95a12e57fa6f60facf4d259bc48acedd2800cd9c9c0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\train_metrics.json": "569c2ce6efeaea2d96d039848a1875fc8342c3fc21d24a49548db7afa8cb1603",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\checkpoint.pt": "039726ab103dab5e7d7ecf0d597aa9ecfe09165cd04ca83227a2c3897b6262a2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\evaluation.json": "ac177fc4e18880227217e4b17925e1ec91b005914b08a3aab4eb353506381bad",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\evaluation_rows.jsonl.gz": "bb9a36676f7bd2dff29fb6a48580fc176410525506d4e577efe641470279729f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\train_metrics.json": "85b7153ff71a6bd0acc7c546f8bb7bf81fe0d8583472d08293e8988194b141fb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\checkpoint.pt": "90469a692243e67e23fedcd3a0907af81b86fa87df98a3662f66d89f12f9d4df",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\evaluation.json": "df043636ffd8f3a693fa26b2571a62d3a70fc95e1a64ab2f8ab2fd193a23d08f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\evaluation_rows.jsonl.gz": "c3726dfdcad72be6faa8a973ed87136faed875b0214d77fd2bc5756375f083da",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\train_metrics.json": "ccf46fb123472242da6b782522d7ba16379dcb8d4382e8dd715a87668f14fcaf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\checkpoint.pt": "0719abef025d1859907d7fbe9309481ce54a960be52ba542c923330857b90286",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\evaluation.json": "7db667688eee1cda84532bcad94139ab5259f6d1f0f53e46354392e3f71687d1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "f99c5d3bce0c54265ad118c7375e940bd5b84067db26b226a08b88b189077039",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\train_metrics.json": "31e44043b3e8be4bd4012f268877f574eb6d4c998625ed870edc4fd99813dc58",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\checkpoint.pt": "e3385fcf7bf643c6e2facb96a77c4cfb8c957be0efadca3865c052f2373c1349",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\evaluation.json": "e8f57937902599a85070268160f03b850a6993b7c5cf37aab7f9e126b0b41327",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "7df43d443e080a71c7ec570c549bb8c8f8331e4d3620330b6a13ddb9231656ac",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\train_metrics.json": "8814a7e8a42d175c69dc7652e99ee0b947edd590f2e0b6846f3cde21260a3347",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\checkpoint.pt": "e4cae157b524f8e24f470934d103dc84da2e3954241c37d306109e2ebf64705a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\evaluation.json": "df7b556a26cb726a1baea6367b7edccc80f48b2fe895016ca46823ec0b215b5c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "47178e0d943a6a8f391036f20394a12bd45b7fe87184a8b3b98206231df92da4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\train_metrics.json": "0770ebbe208ba90e685adf8fcb9905b0bed0ff9ae3d732d8e16620a9d28282aa",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\checkpoint.pt": "e14348d81cb79a8e2a4decc5de7f30175e122997e42d2e6ed1b300628e9ae695",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\evaluation.json": "b2a6fc08c383df71d8996627606e1f92d357dc7997b755bc6752bb5f96ff7ddd",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\evaluation_rows.jsonl.gz": "3011392409f47d92c0c98e8bc3143492020538694243fac711a3ea57997a8ee6",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\train_metrics.json": "f5d7cb7255234a6aec068dd5213ae246c1085f2c844032d32e0e8fc66d46250b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\checkpoint.pt": "537104a38a8ccbf69be8aa2df314a66871b9cd191d6df4c110d00a1c888e5b1b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\evaluation.json": "ce2bc55d6d85e0bd4ea40babf10d6b716c2fda817bb9caa6cc1ef489eb2c3cda",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\evaluation_rows.jsonl.gz": "4b76cc060f308e37b77203e3b416135fe38085ef83b619257e963b4f779d6eed",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\train_metrics.json": "f1ab3a51a77941f3a35c408afc4c90f4791911c75c79e9e21726bc7b39ec0454",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\checkpoint.pt": "874203ffc5c6170af1cff327866234933575f3d45389271f52589def9e9bbf00",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\evaluation.json": "69fd127a23a543023662f1ce54425bfd3926ba769ea59857fcf94116ae1d617d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\evaluation_rows.jsonl.gz": "caad8a4207085d31578ec2f5fdc6f30ab33813adde509d774449a361dcc5c259",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\train_metrics.json": "2054152a9d62fcf047eebc2f095431ad41275a13a5f29ce35fbd63a3281aadcf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\checkpoint.pt": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\evaluation.json": "319d5dfdc78fa52295cf51d6dcf72e2bc768da6a784ed8237404f9d368143a2f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\evaluation_rows.jsonl.gz": "409a76fb989cc2c5bda0249b56408ed05cef43a953cfab1aef4364b7e7a8ba55",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\train_metrics.json": "6ccd74a48aa5d2d44469559fda2ca964d7192c49f3f206a3376a4171fb2e396e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\checkpoint.pt": "f14a61a2157394d51e512084ef08bbe4d26e0371124249da9c8a2ce393cf47cf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\evaluation.json": "dc70dde68a545b66d031b9513b781f3a34701f3e91d2b093522462d70fa087fc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\evaluation_rows.jsonl.gz": "e3d4d78d2df51d07bf3110534982ace367e0a20a94b7f8c2aa9c04f8b94f781c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\train_metrics.json": "b1eb949ac8538a984d05ce4fbefa7c74033a92d5c1e3e63c83dc9e4dad5c583a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\checkpoint.pt": "8e531568ea25b8c86743f0db3d993ff27c959cfbdac9f2a78ab5b2b8993812e9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\evaluation.json": "69d449b2c1153adb79bb2d5eb2122208700bb78a467df5804192f67976afbd39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\evaluation_rows.jsonl.gz": "7485092cc8bd1b90460f6bb18ea7482c2fb8596fdc3e70a6ce9391f62eab6df7",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\train_metrics.json": "d2b41396cdfc2da4198172dc0a8d08500455c6ff1f587ce913536626b2ebb4ba",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\checkpoint.pt": "58e6765f88095938e001f1145067976424fc6c0016f114849066f45fae4bd664",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\evaluation.json": "8494f46b33ca432700b45200d6e99c0a1a802ec15b8488e7307cd66154c3f583",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "6a979a2ed89faf11aa538626f2ac6ead3d549febf968bbbefe6260b2301f16fa",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\train_metrics.json": "0ae599ae1683760044bf2da039703a116e9a5bea1f8ccc05bd1888b18feb9651",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\checkpoint.pt": "54825d1ffc5cb60a60fe909085c9e2b776be40c2b29d9dd2dadff90b48bb4b91",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\evaluation.json": "c87018b08850b75adbfb202a8bcc8537c10e598cfafe9b4e41413f427f75226a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "655149262eb1f1291dc9d2f90ba72b923e3270844c5efaa93094f16745054fa3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\train_metrics.json": "5079f35bd5899058196f5bda9834f688b110cc7debaaab9bbec7bfec5997de4e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\checkpoint.pt": "3456cc4b33d4b5bf00372aa9138dbff95bf6f5339dc1b40df4a7d182417b7cf4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\evaluation.json": "8634b8721f3255442ad6f388919fffbbf50bd5dc2ff8266351124ab5c47027eb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "9af0a9c63c924ff62f3c6a4d8c7990513978414c59b7bd9f934a79e9d4100f18",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\train_metrics.json": "0c64255bf8ab8ca480e8fcffbe1f55b19f40f29c51b3d2d95c87a0b70c6d20ce",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\backbone_train.jsonl.gz": "d3b9a9f98746904ecd7ba14e0a600fb5f8303b8ab057bba4a1c3ef10ceb49093",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\backbone_validation.jsonl.gz": "6a539e17efe781dbf5eae695f9ee9cbd35c476450311a536aa8aee1b55642901",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\confirmation.jsonl.gz": "c2793cd99678e7f20e17e45f8325416bff37a35c7173414c23d7b0cb5fde1382",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\manifest.json": "623ef525335a7b079706f8bcedcd664e5fefb61c185dca4f9cbde1a4af02ff84",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\specialist_train.jsonl.gz": "b095cd0f110c257a2d4f959e8cdcdb435dd32e2a8dfdf78f8aa14378ed4030c0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\specialist_validation.jsonl.gz": "4f05cac77899deb8fb88f81250b22053df20d23b1affd2f9889beeeed304aec8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\report.json": "d9720cf2fd7d25215a57ada78f0858f968bd9bec0fa122a321ade44a93e4792a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\manifest.json": "704fc4abd5d0160a44bc6e6d53af2e9cfea8ceb7e34381af5dda4dc0546ed314",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\specialist.pt": "e0dcb68ba8c236533460ac2a8c2ac7f4319d4c4585cdd5ed4fc85ae26578ade0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\ANSWER_ANALYSIS.md": "b435ab771f96a82245d0e7ddb097991dc9271b4eff1a64706f9e8ec66dac6a39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\REPORT.md": "ca9f51d11197e0e931d5bfd7588eb6c29cadbe137f125e0b73e3459c929ee3b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\answer_analysis.json": "3e8e45ca8c2ce43117e3c4e62ce4d9067e83fadf4db7a4313f9184ea57282580",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\current_window\\checkpoint.pt": "1cf106223b70b5cfd102c6ec56b1d9a74932317b30bbd7f32adc7bb4cd31cd29",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\current_window\\train_metrics.json": "16fef7b0e587b61a1905c3628d291905f5f0b41c8b133ae27faa25fee8d244d0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\exact_value\\checkpoint.pt": "67e7c5c909e087a5dfb81dfbb3dfecd0a6d5267e75d0e727ac8485ddedda914b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\exact_value\\train_metrics.json": "680159803b2a859e91e254f219e3b37959e00bb33b4d1dbd6b6cb7f93c0a80e8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\report.json": "ae6fce60d109287293b6b2c49e953600f9c6d7580b0009b04eae0e4faeecd98a"
+  },
+  "source_hashes_before": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\AUDIT.md": "6a9ce574000bfb5f0c23fb7d6cf4310a65418da089a975e6281003977c48f5e4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\REPORT.md": "119eec5e02314a4ae674fb67af8adf3b8d23e74c19afb75962f18e8832b01d0c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\audit.json": "b48091837394b2d8bc76ee9b07773c656fb636cdc4cd9b23fba937bd6635cdd3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\checkpoint.pt": "06afce10afc9bc0b7655e6d02e732aa38443be5efaf0a1e126f63e834105dac0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\evaluation.json": "c91b6daf65885eaa122bd6f033fe89f6cae0c25d95ee34fc59f8e18a9c75d739",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\evaluation_rows.jsonl.gz": "75cd826c0c67c747323cae1d2915efa767106f1bb3ab586e84e6d89efce5f5e6",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\train_metrics.json": "961477d237add03746dc4635e9b9d0ccd7953d471157235b3e9d9cefe771907b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\checkpoint.pt": "174b022a334adff439368aa6634788e49624e89fa54662a6c286db91b916cad1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\evaluation.json": "02c6e3073ad35ea6300717a90fbe9d8fdfd4b7a4cd70acaf70a4379c8bf1b7f3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\evaluation_rows.jsonl.gz": "1c637b6cac8c556c76d8b803b160b085ed4dc9cac94a83806e20b90f80ffc3f0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\train_metrics.json": "a3f1844fe565ccda1a25537fc45cb255914133fb343b0eddbd4a16e564518450",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\checkpoint.pt": "cbdda1f762bb6ab16c3c40b3c54d392de6515a71f85e000b1b18c6f8ac898b4a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\evaluation.json": "4578f6e9a9a54338dddd53960db7a5e1e15c58810fb1494ef502bef2ccb83358",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\evaluation_rows.jsonl.gz": "bc6aeaacb4d72eb61303269eb444ccdae6a4372365bf2e680b58161b6a953542",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\train_metrics.json": "0a8ca2d3379711a069929c8f100242001099311afff873bbb042f3f8902a1a39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\checkpoint.pt": "c045643756c809eadb69675417b6ff398343057aa74b5cfd7fbc0b04f27d6ecf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\evaluation.json": "4e05b4aa62be34b5485017dfc10a5394330603236c0e8a6fcb41f25fab952434",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\evaluation_rows.jsonl.gz": "4559cfb81c96509a757e2ffbbee70bebe0f06d4d2c7dabd535bb83b3a494364c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\train_metrics.json": "24d0df8c26a2752683d91a2959ec9733f5d0b0f19878f0a821bade849795f9f4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\checkpoint.pt": "07b05fc2f1735382013aba5a4b0b776fc05423cfde376e4224b63d661b1109cb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\evaluation.json": "985be693eda54b7ae5e258994d6b2d4f092c27169414789884113e7e30a5e2dd",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\evaluation_rows.jsonl.gz": "fcef551e98fc710aba28f3486a5bb6a7969f4cecdd2a3efad119f1c4cffd5cf2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\train_metrics.json": "c75b3ed4cd0ca77c02950291338a9ef14fde65a8deae664e6ed3af100e8984f2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\checkpoint.pt": "5e08b115c32b21b8ea2322fb22cae351b246f95c79406387c458784eec9ce56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\evaluation.json": "4f00c1300b06ee90eabc8642cc6c0b760aa261368d50f327af14965cf2cef897",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\evaluation_rows.jsonl.gz": "81903678e1831ffdd8264e2e5d80877c4933d326838d02018a83f5d25af0c048",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\train_metrics.json": "dac185bbc59dff160d991af8bcf5d3ec09c257d28a9601836f637fa5777c79d7",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\checkpoint.pt": "3f1843b3f306ddca0c9c1b06d8151b400cb383da4f466813751d7a988ecc149e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\evaluation.json": "c86dd13824dd2d1bd2b750e435b325b9f1217b1787308ad0b1e1630c0875308f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "a7e64de3e34351726614a481c8ae29e8105c61903121bdb7a05aa0df2137abb4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\train_metrics.json": "3003c45b9fc0416730993accd3abc801a89d916c3a349c5a1d96d633f84bdeee",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\checkpoint.pt": "c9d19f1243d87bc3f070c010b85e113df22634ed8157323c5088e11bb39fd214",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\evaluation.json": "a657b8dc51cf5dcbcb6ac2a236be3ad911abced77ac02a8ab9e8469a07041460",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "ca6a9283d8ab0310e5de9209b44051515a5fd1ba0c8aae459fa63781f30ce997",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\train_metrics.json": "753f27207b76cf95e3ad5006dba3a34bc058fe53148ab8c15a3db464bc13d8cc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\checkpoint.pt": "0fbef0695d3cd6a6ec93db8e0ee4973593b4e330ad1ec52e22ce78152acac141",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\evaluation.json": "380c3ffd6f86a6a0eff29817574ceb1e2bb801c97305437b099027d6b5af3372",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "b61bef588ec61977eba0b7abb84ab9fcb1fef1cc15df908878a5e6e98208bd7d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\train_metrics.json": "fe187d4af45736facc08106242f9b87987ef6d1d809a1de9e011453c1f601404",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\checkpoint.pt": "e73c6f92fbd3e9b75d5328d19a59d551e255abbb5b4f895e3a52922fb7c55d56",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\evaluation.json": "1b38f01f77c7565521fafacf617c062af5499eea681c62d62e450d1dd96e54bb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\evaluation_rows.jsonl.gz": "0fce0a4c0b9beae7a7653a9010c3717a51746bd55998cb56273d09aab7b55e71",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\train_metrics.json": "032ad83b0450a2e4bb3679a3ebc52e7cfc5bb0e5984c644d3f93dc94fb731e1e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\checkpoint.pt": "e8dde02f2bee43691e545ecde9f823a4d3d5ec8c1cfac5a65ee83f5b7a55aff2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\evaluation.json": "e6098e4410fcd133f57befffeea22bbe216f003305500ccd048355ffe1b2c4d4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\evaluation_rows.jsonl.gz": "333a728c070500e35923704266a3e23b151accf421a93b249c0183bbc906771e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\train_metrics.json": "54a8aa52b24e1ba57b166c61d5c281fe560c9a23df764dbf0257002b165a3829",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\checkpoint.pt": "cff8e0b4208477942f247ae767835bc6fe1a857c0b29949ded5429792de5880f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\evaluation.json": "ed79a1fc83b326de45db21617e5dcc15b6b1c66f52fea65a9479c2edfee199fc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\evaluation_rows.jsonl.gz": "60197691105fe5a070f4fb836e8cc5c5d950e3a24c8684d9a700b5b9430916b1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\train_metrics.json": "37dd3d41227226b1850b0b9a224c38de39526af0600bfc0beaf2fb25abe74981",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\checkpoint.pt": "de4bce1557ba7fc8c301ffbe72b4436778ae445b93ef3bd0c98e39ab2c44e18d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\evaluation.json": "052932c8dd060bcc26e6b8d4bf8913cec6acb8285de399945d24614cccc2d706",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\evaluation_rows.jsonl.gz": "29aa0466161d81c38e12b95a12e57fa6f60facf4d259bc48acedd2800cd9c9c0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\train_metrics.json": "569c2ce6efeaea2d96d039848a1875fc8342c3fc21d24a49548db7afa8cb1603",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\checkpoint.pt": "039726ab103dab5e7d7ecf0d597aa9ecfe09165cd04ca83227a2c3897b6262a2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\evaluation.json": "ac177fc4e18880227217e4b17925e1ec91b005914b08a3aab4eb353506381bad",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\evaluation_rows.jsonl.gz": "bb9a36676f7bd2dff29fb6a48580fc176410525506d4e577efe641470279729f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\train_metrics.json": "85b7153ff71a6bd0acc7c546f8bb7bf81fe0d8583472d08293e8988194b141fb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\checkpoint.pt": "90469a692243e67e23fedcd3a0907af81b86fa87df98a3662f66d89f12f9d4df",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\evaluation.json": "df043636ffd8f3a693fa26b2571a62d3a70fc95e1a64ab2f8ab2fd193a23d08f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\evaluation_rows.jsonl.gz": "c3726dfdcad72be6faa8a973ed87136faed875b0214d77fd2bc5756375f083da",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\train_metrics.json": "ccf46fb123472242da6b782522d7ba16379dcb8d4382e8dd715a87668f14fcaf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\checkpoint.pt": "0719abef025d1859907d7fbe9309481ce54a960be52ba542c923330857b90286",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\evaluation.json": "7db667688eee1cda84532bcad94139ab5259f6d1f0f53e46354392e3f71687d1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "f99c5d3bce0c54265ad118c7375e940bd5b84067db26b226a08b88b189077039",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\train_metrics.json": "31e44043b3e8be4bd4012f268877f574eb6d4c998625ed870edc4fd99813dc58",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\checkpoint.pt": "e3385fcf7bf643c6e2facb96a77c4cfb8c957be0efadca3865c052f2373c1349",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\evaluation.json": "e8f57937902599a85070268160f03b850a6993b7c5cf37aab7f9e126b0b41327",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "7df43d443e080a71c7ec570c549bb8c8f8331e4d3620330b6a13ddb9231656ac",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\train_metrics.json": "8814a7e8a42d175c69dc7652e99ee0b947edd590f2e0b6846f3cde21260a3347",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\checkpoint.pt": "e4cae157b524f8e24f470934d103dc84da2e3954241c37d306109e2ebf64705a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\evaluation.json": "df7b556a26cb726a1baea6367b7edccc80f48b2fe895016ca46823ec0b215b5c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "47178e0d943a6a8f391036f20394a12bd45b7fe87184a8b3b98206231df92da4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\train_metrics.json": "0770ebbe208ba90e685adf8fcb9905b0bed0ff9ae3d732d8e16620a9d28282aa",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\checkpoint.pt": "e14348d81cb79a8e2a4decc5de7f30175e122997e42d2e6ed1b300628e9ae695",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\evaluation.json": "b2a6fc08c383df71d8996627606e1f92d357dc7997b755bc6752bb5f96ff7ddd",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\evaluation_rows.jsonl.gz": "3011392409f47d92c0c98e8bc3143492020538694243fac711a3ea57997a8ee6",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\train_metrics.json": "f5d7cb7255234a6aec068dd5213ae246c1085f2c844032d32e0e8fc66d46250b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\checkpoint.pt": "537104a38a8ccbf69be8aa2df314a66871b9cd191d6df4c110d00a1c888e5b1b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\evaluation.json": "ce2bc55d6d85e0bd4ea40babf10d6b716c2fda817bb9caa6cc1ef489eb2c3cda",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\evaluation_rows.jsonl.gz": "4b76cc060f308e37b77203e3b416135fe38085ef83b619257e963b4f779d6eed",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\train_metrics.json": "f1ab3a51a77941f3a35c408afc4c90f4791911c75c79e9e21726bc7b39ec0454",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\checkpoint.pt": "874203ffc5c6170af1cff327866234933575f3d45389271f52589def9e9bbf00",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\evaluation.json": "69fd127a23a543023662f1ce54425bfd3926ba769ea59857fcf94116ae1d617d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\evaluation_rows.jsonl.gz": "caad8a4207085d31578ec2f5fdc6f30ab33813adde509d774449a361dcc5c259",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\train_metrics.json": "2054152a9d62fcf047eebc2f095431ad41275a13a5f29ce35fbd63a3281aadcf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\checkpoint.pt": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\evaluation.json": "319d5dfdc78fa52295cf51d6dcf72e2bc768da6a784ed8237404f9d368143a2f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\evaluation_rows.jsonl.gz": "409a76fb989cc2c5bda0249b56408ed05cef43a953cfab1aef4364b7e7a8ba55",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\train_metrics.json": "6ccd74a48aa5d2d44469559fda2ca964d7192c49f3f206a3376a4171fb2e396e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\checkpoint.pt": "f14a61a2157394d51e512084ef08bbe4d26e0371124249da9c8a2ce393cf47cf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\evaluation.json": "dc70dde68a545b66d031b9513b781f3a34701f3e91d2b093522462d70fa087fc",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\evaluation_rows.jsonl.gz": "e3d4d78d2df51d07bf3110534982ace367e0a20a94b7f8c2aa9c04f8b94f781c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\train_metrics.json": "b1eb949ac8538a984d05ce4fbefa7c74033a92d5c1e3e63c83dc9e4dad5c583a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\checkpoint.pt": "8e531568ea25b8c86743f0db3d993ff27c959cfbdac9f2a78ab5b2b8993812e9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\evaluation.json": "69d449b2c1153adb79bb2d5eb2122208700bb78a467df5804192f67976afbd39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\evaluation_rows.jsonl.gz": "7485092cc8bd1b90460f6bb18ea7482c2fb8596fdc3e70a6ce9391f62eab6df7",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\train_metrics.json": "d2b41396cdfc2da4198172dc0a8d08500455c6ff1f587ce913536626b2ebb4ba",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\checkpoint.pt": "58e6765f88095938e001f1145067976424fc6c0016f114849066f45fae4bd664",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\evaluation.json": "8494f46b33ca432700b45200d6e99c0a1a802ec15b8488e7307cd66154c3f583",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\evaluation_rows.jsonl.gz": "6a979a2ed89faf11aa538626f2ac6ead3d549febf968bbbefe6260b2301f16fa",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\train_metrics.json": "0ae599ae1683760044bf2da039703a116e9a5bea1f8ccc05bd1888b18feb9651",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\checkpoint.pt": "54825d1ffc5cb60a60fe909085c9e2b776be40c2b29d9dd2dadff90b48bb4b91",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\evaluation.json": "c87018b08850b75adbfb202a8bcc8537c10e598cfafe9b4e41413f427f75226a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\evaluation_rows.jsonl.gz": "655149262eb1f1291dc9d2f90ba72b923e3270844c5efaa93094f16745054fa3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\train_metrics.json": "5079f35bd5899058196f5bda9834f688b110cc7debaaab9bbec7bfec5997de4e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\checkpoint.pt": "3456cc4b33d4b5bf00372aa9138dbff95bf6f5339dc1b40df4a7d182417b7cf4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\evaluation.json": "8634b8721f3255442ad6f388919fffbbf50bd5dc2ff8266351124ab5c47027eb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\evaluation_rows.jsonl.gz": "9af0a9c63c924ff62f3c6a4d8c7990513978414c59b7bd9f934a79e9d4100f18",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\train_metrics.json": "0c64255bf8ab8ca480e8fcffbe1f55b19f40f29c51b3d2d95c87a0b70c6d20ce",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\backbone_train.jsonl.gz": "d3b9a9f98746904ecd7ba14e0a600fb5f8303b8ab057bba4a1c3ef10ceb49093",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\backbone_validation.jsonl.gz": "6a539e17efe781dbf5eae695f9ee9cbd35c476450311a536aa8aee1b55642901",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\confirmation.jsonl.gz": "c2793cd99678e7f20e17e45f8325416bff37a35c7173414c23d7b0cb5fde1382",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\manifest.json": "623ef525335a7b079706f8bcedcd664e5fefb61c185dca4f9cbde1a4af02ff84",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\specialist_train.jsonl.gz": "b095cd0f110c257a2d4f959e8cdcdb435dd32e2a8dfdf78f8aa14378ed4030c0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\data\\specialist_validation.jsonl.gz": "4f05cac77899deb8fb88f81250b22053df20d23b1affd2f9889beeeed304aec8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\report.json": "d9720cf2fd7d25215a57ada78f0858f968bd9bec0fa122a321ade44a93e4792a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\manifest.json": "704fc4abd5d0160a44bc6e6d53af2e9cfea8ceb7e34381af5dda4dc0546ed314",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\specialist.pt": "e0dcb68ba8c236533460ac2a8c2ac7f4319d4c4585cdd5ed4fc85ae26578ade0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\ANSWER_ANALYSIS.md": "b435ab771f96a82245d0e7ddb097991dc9271b4eff1a64706f9e8ec66dac6a39",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\REPORT.md": "ca9f51d11197e0e931d5bfd7588eb6c29cadbe137f125e0b73e3459c929ee3b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\answer_analysis.json": "3e8e45ca8c2ce43117e3c4e62ce4d9067e83fadf4db7a4313f9184ea57282580",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\current_window\\checkpoint.pt": "1cf106223b70b5cfd102c6ec56b1d9a74932317b30bbd7f32adc7bb4cd31cd29",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\current_window\\train_metrics.json": "16fef7b0e587b61a1905c3628d291905f5f0b41c8b133ae27faa25fee8d244d0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\exact_value\\checkpoint.pt": "67e7c5c909e087a5dfb81dfbb3dfecd0a6d5267e75d0e727ac8485ddedda914b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\exact_value\\train_metrics.json": "680159803b2a859e91e254f219e3b37959e00bb33b4d1dbd6b6cb7f93c0a80e8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\report.json": "ae6fce60d109287293b6b2c49e953600f9c6d7580b0009b04eae0e4faeecd98a"
+  },
+  "training": {
+    "available_unique_supervised_answers": 16478,
+    "checks": [
+      {
+        "control_validation_accuracy": 0.5,
+        "intervention_accuracy": 1.0,
+        "passed": true,
+        "supervised_answers": 1280,
+        "updates": 5,
+        "validation_accuracy": 1.0
+      },
+      {
+        "control_validation_accuracy": 0.5,
+        "intervention_accuracy": 1.0,
+        "passed": true,
+        "supervised_answers": 2560,
+        "updates": 10,
+        "validation_accuracy": 1.0
+      }
+    ],
+    "control_trainable_parameters": 6,
+    "final_conditional_metrics": {
+      "heldout": {
+        "learned_readout": {
+          "accuracy": 1.0,
+          "answers": 608,
+          "nll": 0.31724879145622253
+        },
+        "value_independent_control": {
+          "accuracy": 0.5,
+          "answers": 608,
+          "nll": 0.6931473612785339
+        }
+      },
+      "renamed": {
+        "learned_readout": {
+          "accuracy": 1.0,
+          "answers": 37,
+          "nll": 0.31724879145622253
+        },
+        "value_independent_control": {
+          "accuracy": 0.4864864945411682,
+          "answers": 37,
+          "nll": 0.6931471824645996
+        }
+      },
+      "train": {
+        "learned_readout": {
+          "accuracy": 1.0,
+          "answers": 16478,
+          "nll": 0.3172488212585449
+        },
+        "value_independent_control": {
+          "accuracy": 0.5,
+          "answers": 16478,
+          "nll": 0.6931473016738892
+        }
+      },
+      "validation": {
+        "learned_readout": {
+          "accuracy": 1.0,
+          "answers": 736,
+          "nll": 0.31724879145622253
+        },
+        "value_independent_control": {
+          "accuracy": 0.5,
+          "answers": 736,
+          "nll": 0.6931471824645996
+        }
+      },
+      "whitespace": {
+        "learned_readout": {
+          "accuracy": 1.0,
+          "answers": 111,
+          "nll": 0.31724876165390015
+        },
+        "value_independent_control": {
+          "accuracy": 0.4864864945411682,
+          "answers": 111,
+          "nll": 0.6931471228599548
+        }
+      }
+    },
+    "last_learned_conditional_ce": 0.34425848722457886,
+    "learned_trainable_parameters": 6,
+    "mean_learned_conditional_ce": 0.503952345252037,
+    "optimizer": {
+      "betas": [
+        0.9,
+        0.95
+      ],
+      "check_every_updates": 5,
+      "epsilon": 1e-08,
+      "learning_rate": 0.05,
+      "optimizer": "AdamW",
+      "pairs_per_batch": 128,
+      "required_consecutive_passes": 2,
+      "weight_decay": 0.0
+    },
+    "stopped_at": "acceptance_gate",
+    "supervised_answer_count": 2560,
+    "updates": 10
+  },
+  "variant_metrics": {
+    "renamed": {
+      "baseline": {
+        "answer_nll": 1.1941465139389038,
+        "conditional_bit_accuracy": 0.5135135054588318,
+        "conditional_bit_nll": 0.8691720962524414,
+        "documents": 37,
+        "full_vocabulary_answer_accuracy": 0.45945948362350464,
+        "mean_bit_category_probability": 0.8564677238464355
+      },
+      "deterministic_copy": {
+        "answer_nll": 0.3249744772911072,
+        "conditional_bit_accuracy": 1.0,
+        "conditional_bit_nll": 0.0,
+        "documents": 37,
+        "full_vocabulary_answer_accuracy": 0.8378378748893738,
+        "mean_bit_category_probability": 0.8564677834510803
+      },
+      "learned_readout": {
+        "answer_nll": 0.6422232389450073,
+        "conditional_bit_accuracy": 1.0,
+        "conditional_bit_nll": 0.31724879145622253,
+        "documents": 37,
+        "full_vocabulary_answer_accuracy": 0.8378378748893738,
+        "mean_bit_category_probability": 0.8564677834510803
+      },
+      "value_independent_control": {
+        "answer_nll": 1.0181217193603516,
+        "conditional_bit_accuracy": 0.4864864945411682,
+        "conditional_bit_nll": 0.6931471824645996,
+        "documents": 37,
+        "full_vocabulary_answer_accuracy": 0.37837839126586914,
+        "mean_bit_category_probability": 0.8564677834510803
+      }
+    },
+    "whitespace": {
+      "baseline": {
+        "answer_nll": 1.4815514087677002,
+        "conditional_bit_accuracy": 0.5135135054588318,
+        "conditional_bit_nll": 0.8986672759056091,
+        "documents": 111,
+        "full_vocabulary_answer_accuracy": 0.37837839126586914,
+        "mean_bit_category_probability": 0.7649329304695129
+      },
+      "deterministic_copy": {
+        "answer_nll": 0.5828842520713806,
+        "conditional_bit_accuracy": 1.0,
+        "conditional_bit_nll": 0.0,
+        "documents": 111,
+        "full_vocabulary_answer_accuracy": 0.7387387752532959,
+        "mean_bit_category_probability": 0.7649329304695129
+      },
+      "learned_readout": {
+        "answer_nll": 0.9001330137252808,
+        "conditional_bit_accuracy": 1.0,
+        "conditional_bit_nll": 0.31724876165390015,
+        "documents": 111,
+        "full_vocabulary_answer_accuracy": 0.7387387752532959,
+        "mean_bit_category_probability": 0.7649329304695129
+      },
+      "value_independent_control": {
+        "answer_nll": 1.276031494140625,
+        "conditional_bit_accuracy": 0.4864864945411682,
+        "conditional_bit_nll": 0.6931471228599548,
+        "documents": 111,
+        "full_vocabulary_answer_accuracy": 0.36036038398742676,
+        "mean_bit_category_probability": 0.7649329304695129
+      }
+    }
+  }
+}

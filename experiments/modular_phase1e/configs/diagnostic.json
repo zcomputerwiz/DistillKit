@@ -1,0 +1,60 @@
+{
+  "phase": "modular_phase1e_category_admission",
+  "source_phase1_config": "experiments/modular_phase1/configs/pilot.json",
+  "source_phase1_run_dir": "scratch/modular-phase1",
+  "source_phase1b_run_dir": "scratch/modular-phase1b",
+  "source_phase1c_run_dir": "scratch/modular-phase1c",
+  "source_phase1d_run_dir": "scratch/modular-phase1d",
+  "base_checkpoint": "scratch/modular-phase1/backbones/l6_w256/plain/seed_11/checkpoint.pt",
+  "specialist_checkpoint": "scratch/modular-phase1d/specialist/specialist.pt",
+  "readout_checkpoint": "scratch/modular-phase1c/readout.pt",
+  "seed": 1801,
+  "data": {
+    "train_families": 1024,
+    "calibration_families": 256,
+    "confirmation_families": 256,
+    "variants_per_family": ["base", "renamed", "whitespace"]
+  },
+  "features": [
+    "event_probability_0", "event_probability_1", "event_probability_2",
+    "event_probability_3", "event_probability_4", "event_probability_5",
+    "event_probability_6", "event_probability_7", "event_probability_8",
+    "event_probability_9", "event_probability_10", "event_probability_11",
+    "event_probability_12", "event_probability_13", "event_probability_14",
+    "event_probability_15", "event_probability_16", "validity_probability",
+    "event_confidence", "programmed_scope_depth", "current_is_whitespace",
+    "current_is_answer_marker", "normalized_prefix_position",
+    "backbone_bit_probability", "backbone_bit_log_odds", "backbone_entropy"
+  ],
+  "optimizer": {
+    "name": "AdamW",
+    "learning_rate": 0.05,
+    "betas": [0.9, 0.95],
+    "epsilon": 1e-8,
+    "weight_decay": 0.0
+  },
+  "training": {
+    "documents_per_batch": 64,
+    "max_updates": 500,
+    "max_target_exposures_per_arm": 1048576
+  },
+  "selection": {
+    "minimum_full_accuracy_gain": 0.05,
+    "maximum_whitespace_nll_degradation": 0.02,
+    "maximum_other_nonanswer_nll_degradation": 0.02,
+    "maximum_false_bit_emission_increase": 0.01,
+    "minimum_conditional_accuracy": 0.99
+  },
+  "acceptance": {
+    "minimum_full_accuracy_gain": 0.05,
+    "minimum_conditional_accuracy": 0.99,
+    "minimum_intervention_accuracy": 0.99,
+    "maximum_whitespace_nll_degradation": 0.02,
+    "maximum_other_nonanswer_nll_degradation": 0.02,
+    "maximum_false_bit_emission_increase": 0.01,
+    "probability_preservation_tolerance": 1e-6,
+    "bootstrap_samples": 2000
+  },
+  "budget": {"whole_run_accelerator_seconds": 300},
+  "runtime": {"device": "cuda:0", "bf16": true}
+}

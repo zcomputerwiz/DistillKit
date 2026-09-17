@@ -1,0 +1,577 @@
+{
+  "arms": {
+    "current_window": {
+      "assigned_bit_flip": {
+        "documents": 128,
+        "new_required_answer_probability_flipped_minus_original_input": {
+          "count": 128,
+          "maximum": 0.00785110890865326,
+          "mean": -1.667914511926938e-05,
+          "mean_absolute": 0.0012751672675221926,
+          "median": 1.2122094631195068e-05,
+          "minimum": -0.010773494839668274,
+          "nonzero": 128
+        },
+        "reader_output_delta_l2": {
+          "count": 128,
+          "maximum": 0.04956274852156639,
+          "mean": 0.013603278903246974,
+          "mean_absolute": 0.013603278903246974,
+          "median": 0.009901237674057484,
+          "minimum": 0.001525138271972537,
+          "nonzero": 128
+        }
+      },
+      "evaluation": {
+        "heldout": {
+          "answer_accuracy": 0.029605263157894735,
+          "answer_nll": 2.6986633519593037,
+          "documents": 304,
+          "overall_nll": 2.0047411469749865
+        },
+        "train": {
+          "answer_accuracy": 0.009588542298822673,
+          "answer_nll": 2.660616682547796,
+          "documents": 8239,
+          "overall_nll": 2.000891735917701
+        },
+        "validation": {
+          "answer_accuracy": 0.010869565217391304,
+          "answer_nll": 2.6668317512325617,
+          "documents": 368,
+          "overall_nll": 1.9769951479293613
+        }
+      },
+      "pointer_intervention": {
+        "correct_pointer_original_answer_accuracy": 0.026490066225165563,
+        "eligible_opposite_value_single_pointer_cases": 302,
+        "heldout_lookup_documents": 304,
+        "ineligible": 2,
+        "intervened_required_answer_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.007172763347625732,
+          "mean": 6.268601263225671e-05,
+          "mean_absolute": 0.0005999099153297528,
+          "median": 0.0,
+          "minimum": -0.00772586464881897,
+          "nonzero": 239
+        },
+        "intervened_required_binary_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.030967146158218384,
+          "mean": -0.00016853262651835056,
+          "mean_absolute": 0.0027045805920038793,
+          "median": 0.0,
+          "minimum": -0.027823805809020996,
+          "nonzero": 59
+        },
+        "original_required_answer_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.011240914463996887,
+          "mean": 0.00011043888146662159,
+          "mean_absolute": 0.0007265355416407056,
+          "median": 0.0,
+          "minimum": -0.011699497699737549,
+          "nonzero": 239
+        },
+        "reader_output_changed": 302,
+        "reader_output_delta_l2": {
+          "count": 302,
+          "maximum": 0.19227509200572968,
+          "mean": 0.11677815385212172,
+          "mean_absolute": 0.11677815385212172,
+          "median": 0.11395960301160812,
+          "minimum": 0.07383792847394943,
+          "nonzero": 302
+        },
+        "selection_and_integration": {
+          "address_feature_signal_l2": {
+            "count": 302,
+            "maximum": 0.45692673325538635,
+            "mean": 0.37003095536831987,
+            "mean_absolute": 0.37003095536831987,
+            "median": 0.36490005254745483,
+            "minimum": 0.34836483001708984,
+            "nonzero": 302
+          },
+          "attention_mass_on_observed_value_token": {
+            "count": 302,
+            "maximum": 0.32016971707344055,
+            "mean": 0.07065414871082992,
+            "mean_absolute": 0.07065414871082992,
+            "median": 0.04959912784397602,
+            "minimum": 0.0061294641345739365,
+            "nonzero": 302
+          },
+          "pointer_gate": {
+            "count": 302,
+            "maximum": 0.5390625,
+            "mean": 0.5300082781456954,
+            "mean_absolute": 0.5300082781456954,
+            "median": 0.53125,
+            "minimum": 0.52734375,
+            "nonzero": 302
+          },
+          "pointer_scale_l2": 0.23825739324092865,
+          "pointer_signal_l2": {
+            "count": 302,
+            "maximum": 0.19358113408088684,
+            "mean": 0.11254374006923461,
+            "mean_absolute": 0.11254374006923461,
+            "median": 0.10732704028487206,
+            "minimum": 0.06082088500261307,
+            "nonzero": 302
+          }
+        },
+        "wrong_pointer_intervened_required_answer_accuracy": 0.023178807947019868
+      },
+      "training": {
+        "accelerator_seconds": 5.869970100000501,
+        "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\current_window\\checkpoint.pt",
+        "checkpoint_sha256": "1cf106223b70b5cfd102c6ec56b1d9a74932317b30bbd7f32adc7bb4cd31cd29",
+        "initial_backbone_sha256": "4b115c6f082d877b8db759724b0ccc2680b5c4262be5c8d35a2eee4f8a003f51",
+        "initial_state_sha256": "eb9fb8f59ab46aa7a7ee707c8d31f0aeb5487a029d3ecd0f88aec651f3384e12",
+        "mean_training_ce": 9.494486925387378,
+        "mode": "current_window",
+        "parameters": 136607,
+        "peak_memory_bytes": 149702144,
+        "reader_parameters": 2143,
+        "steps": 181,
+        "tokens": 1048576,
+        "trained_state_sha256": "31c36ac5b3b417a8ab97160e7e00b98cc52311df6d11f287627dd5113189e191"
+      }
+    },
+    "exact_value": {
+      "assigned_bit_flip": {
+        "documents": 128,
+        "new_required_answer_probability_flipped_minus_original_input": {
+          "count": 128,
+          "maximum": 0.011386185884475708,
+          "mean": -0.00011032571455871221,
+          "mean_absolute": 0.001552683161207824,
+          "median": -7.869675755500793e-08,
+          "minimum": -0.010925501585006714,
+          "nonzero": 128
+        },
+        "reader_output_delta_l2": {
+          "count": 128,
+          "maximum": 0.11027640849351883,
+          "mean": 0.10875311534618959,
+          "mean_absolute": 0.10875311534618959,
+          "median": 0.10867819935083389,
+          "minimum": 0.10787907987833023,
+          "nonzero": 128
+        }
+      },
+      "evaluation": {
+        "heldout": {
+          "answer_accuracy": 0.029605263157894735,
+          "answer_nll": 2.699136739106555,
+          "documents": 304,
+          "overall_nll": 2.004819359244992
+        },
+        "train": {
+          "answer_accuracy": 0.009588542298822673,
+          "answer_nll": 2.660341811087514,
+          "documents": 8239,
+          "overall_nll": 2.000938574014731
+        },
+        "validation": {
+          "answer_accuracy": 0.010869565217391304,
+          "answer_nll": 2.6681167437978415,
+          "documents": 368,
+          "overall_nll": 1.9769183621092465
+        }
+      },
+      "pointer_intervention": {
+        "correct_pointer_original_answer_accuracy": 0.026490066225165563,
+        "eligible_opposite_value_single_pointer_cases": 302,
+        "heldout_lookup_documents": 304,
+        "ineligible": 2,
+        "intervened_required_answer_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.010382041335105896,
+          "mean": -0.00011170351190110114,
+          "mean_absolute": 0.0006553630802521346,
+          "median": 0.0,
+          "minimum": -0.013511180877685547,
+          "nonzero": 267
+        },
+        "intervened_required_binary_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.023397475481033325,
+          "mean": -5.5352682309434905e-05,
+          "mean_absolute": 0.0028014420870913575,
+          "median": 0.0,
+          "minimum": -0.02936762571334839,
+          "nonzero": 63
+        },
+        "original_required_answer_probability_wrong_minus_correct_pointer": {
+          "count": 302,
+          "maximum": 0.009952709078788757,
+          "mean": -5.9191638677818887e-05,
+          "mean_absolute": 0.0007146027522001243,
+          "median": 0.0,
+          "minimum": -0.008046463131904602,
+          "nonzero": 267
+        },
+        "reader_output_changed": 302,
+        "reader_output_delta_l2": {
+          "count": 302,
+          "maximum": 0.2533220648765564,
+          "mean": 0.18026672244466693,
+          "mean_absolute": 0.18026672244466693,
+          "median": 0.1793668121099472,
+          "minimum": 0.12842145562171936,
+          "nonzero": 302
+        },
+        "selection_and_integration": {
+          "address_feature_signal_l2": {
+            "count": 302,
+            "maximum": 0.45701155066490173,
+            "mean": 0.37001270864973007,
+            "mean_absolute": 0.37001270864973007,
+            "median": 0.3648901581764221,
+            "minimum": 0.3483372628688812,
+            "nonzero": 302
+          },
+          "attention_mass_on_observed_value_token": {
+            "count": 302,
+            "maximum": 1.0,
+            "mean": 1.0,
+            "mean_absolute": 1.0,
+            "median": 1.0,
+            "minimum": 1.0,
+            "nonzero": 302
+          },
+          "pointer_gate": {
+            "count": 302,
+            "maximum": 0.5390625,
+            "mean": 0.5295943708609272,
+            "mean_absolute": 0.5295943708609272,
+            "median": 0.53125,
+            "minimum": 0.52734375,
+            "nonzero": 302
+          },
+          "pointer_scale_l2": 0.19029392302036285,
+          "pointer_signal_l2": {
+            "count": 302,
+            "maximum": 0.186383917927742,
+            "mean": 0.1337267229740588,
+            "mean_absolute": 0.1337267229740588,
+            "median": 0.13314276933670044,
+            "minimum": 0.08139456063508987,
+            "nonzero": 302
+          }
+        },
+        "wrong_pointer_intervened_required_answer_accuracy": 0.023178807947019868
+      },
+      "training": {
+        "accelerator_seconds": 5.062701300004846,
+        "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1b\\arms\\exact_value\\checkpoint.pt",
+        "checkpoint_sha256": "67e7c5c909e087a5dfb81dfbb3dfecd0a6d5267e75d0e727ac8485ddedda914b",
+        "initial_backbone_sha256": "4b115c6f082d877b8db759724b0ccc2680b5c4262be5c8d35a2eee4f8a003f51",
+        "initial_state_sha256": "eb9fb8f59ab46aa7a7ee707c8d31f0aeb5487a029d3ecd0f88aec651f3384e12",
+        "mean_training_ce": 9.494415131089227,
+        "mode": "exact_value",
+        "parameters": 136607,
+        "peak_memory_bytes": 150299648,
+        "reader_parameters": 2143,
+        "steps": 181,
+        "tokens": 1048576,
+        "trained_state_sha256": "e6bd984b4791b202f822ce7e12e7f11f5968f3c227f903719d1f41ae2b7cfa71"
+      }
+    }
+  },
+  "budget": {
+    "targets_per_run_cap": 1048576,
+    "whole_diagnostic_accelerator_seconds": 29.816230800002813,
+    "whole_diagnostic_accelerator_seconds_cap": 600.0,
+    "within_cap": true
+  },
+  "config_sha256": "465a31986193ba6dcbb953f897d74492634848279be460623a00b4670d82db00",
+  "data": {
+    "heldout": {
+      "document_ids_sha256": "c67cf36f3fe39faba310d1f86c69376de43c6d81508cee11dab8452cb2de4fc8",
+      "documents": 304,
+      "tokens": 50177
+    },
+    "train": {
+      "document_ids_sha256": "57f3a23b84a7e490e049299e3c52f3e918d9fe4632a15bb83d954e7c35b901d9",
+      "documents": 8239,
+      "tokens": 756268
+    },
+    "validation": {
+      "document_ids_sha256": "767883e74875401631e4139e575afb0abc70469b372b214089f90083d1362af9",
+      "documents": 368,
+      "tokens": 36834
+    }
+  },
+  "device": "NVIDIA GeForce RTX 3090",
+  "diagnostic_only": true,
+  "oracle_address_source": "ReferenceInterpreter bindings only; interpreter values and answers are unused. Equality with the programmed causal table is asserted for every batch.",
+  "original_phase1_verdict": "failed composition",
+  "paired_initialization": {
+    "current_window": {
+      "backbone": "4b115c6f082d877b8db759724b0ccc2680b5c4262be5c8d35a2eee4f8a003f51",
+      "full": "eb9fb8f59ab46aa7a7ee707c8d31f0aeb5487a029d3ecd0f88aec651f3384e12"
+    },
+    "exact_value": {
+      "backbone": "4b115c6f082d877b8db759724b0ccc2680b5c4262be5c8d35a2eee4f8a003f51",
+      "full": "eb9fb8f59ab46aa7a7ee707c8d31f0aeb5487a029d3ecd0f88aec651f3384e12"
+    }
+  },
+  "payload_inspection": {
+    "documents": 128,
+    "exactly_one_candidate_slot_changed_and_it_was_value": 128,
+    "examples": [
+      {
+        "declaration_identifier_position": 52,
+        "document_id": "backbone_train-df425f2975bee106007f",
+        "use_position": 90,
+        "value_position": 56,
+        "value_window_offset": 4,
+        "window_positions": [
+          52,
+          53,
+          54,
+          55,
+          56,
+          57,
+          58
+        ],
+        "window_tokens": [
+          "a",
+          "<sp1>",
+          "=",
+          "<nl>",
+          "0",
+          ";",
+          "<tab>"
+        ]
+      },
+      {
+        "declaration_identifier_position": 63,
+        "document_id": "backbone_train-c68b817c6dafc673f6d0",
+        "use_position": 109,
+        "value_position": 66,
+        "value_window_offset": 3,
+        "window_positions": [
+          63,
+          64,
+          65,
+          66,
+          67,
+          68,
+          69
+        ],
+        "window_tokens": [
+          "f",
+          "=",
+          "<sp2>",
+          "0",
+          "<sp1>",
+          ";",
+          "<sp2>"
+        ]
+      },
+      {
+        "declaration_identifier_position": 24,
+        "document_id": "backbone_train-4067055a3584bbdea3eb",
+        "use_position": 109,
+        "value_position": 27,
+        "value_window_offset": 3,
+        "window_positions": [
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "window_tokens": [
+          "d",
+          "=",
+          "<nl>",
+          "0",
+          "<nl>",
+          ";",
+          "{"
+        ]
+      },
+      {
+        "declaration_identifier_position": 56,
+        "document_id": "backbone_train-dc25b810e8f710df1e2a",
+        "use_position": 65,
+        "value_position": 59,
+        "value_window_offset": 3,
+        "window_positions": [
+          56,
+          57,
+          58,
+          59,
+          60,
+          61,
+          62
+        ],
+        "window_tokens": [
+          "e",
+          "<sp2>",
+          "=",
+          "0",
+          "<sp2>",
+          ";",
+          "<sp2>"
+        ]
+      },
+      {
+        "declaration_identifier_position": 87,
+        "document_id": "backbone_train-8f737ebd8661cea697d9",
+        "use_position": 97,
+        "value_position": 91,
+        "value_window_offset": 4,
+        "window_positions": [
+          87,
+          88,
+          89,
+          90,
+          91,
+          92,
+          93
+        ],
+        "window_tokens": [
+          "b",
+          "<sp1>",
+          "=",
+          "<sp1>",
+          "1",
+          "<sp2>",
+          ";"
+        ]
+      }
+    ],
+    "fresh_reader_pointer_scale_is_zero": true,
+    "held_constant": [
+      "identifier",
+      "formatting",
+      "scope",
+      "all pre-answer tokens except assigned bit"
+    ],
+    "reader_output_delta_l2_at_fresh_initialization": {
+      "count": 128,
+      "maximum": 0.0,
+      "mean": 0.0,
+      "mean_absolute": 0.0,
+      "median": 0.0,
+      "minimum": 0.0,
+      "nonzero": 0
+    },
+    "representation_source": "Each candidate is token_embedding(input_id) + absolute_position_embedding. These are non-contextual raw embeddings. With identifier/format/scope fixed, only the value-token candidate can contain the changed assigned bit. The entire declaration window precedes the query use, so gathering it is causal.",
+    "value_candidate_embedding_delta_l2": {
+      "count": 128,
+      "maximum": 10.863790512084961,
+      "mean": 10.863789640367031,
+      "mean_absolute": 10.863789640367031,
+      "median": 10.863789558410645,
+      "minimum": 10.863789558410645,
+      "nonzero": 128
+    },
+    "value_position_precedes_query_use": 128,
+    "value_present_in_window": 128,
+    "value_window_offset_counts": {
+      "2": 7,
+      "3": 41,
+      "4": 80
+    },
+    "weighted_context_delta_l2_at_fresh_initialization": {
+      "count": 128,
+      "maximum": 5.685646057128906,
+      "mean": 1.7913978500291705,
+      "mean_absolute": 1.7913978500291705,
+      "median": 1.5075511932373047,
+      "minimum": 0.433535635471344,
+      "nonzero": 128
+    }
+  },
+  "phase": "modular_phase1b_binding_reader_diagnostic",
+  "schema": 1,
+  "source_phase1_artifact_hashes_after": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\AUDIT.md": "6a9ce574000bfb5f0c23fb7d6cf4310a65418da089a975e6281003977c48f5e4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\REPORT.md": "119eec5e02314a4ae674fb67af8adf3b8d23e74c19afb75962f18e8832b01d0c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\audit.json": "b48091837394b2d8bc76ee9b07773c656fb636cdc4cd9b23fba937bd6635cdd3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\checkpoint.pt": "06afce10afc9bc0b7655e6d02e732aa38443be5efaf0a1e126f63e834105dac0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\checkpoint.pt": "174b022a334adff439368aa6634788e49624e89fa54662a6c286db91b916cad1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\checkpoint.pt": "cbdda1f762bb6ab16c3c40b3c54d392de6515a71f85e000b1b18c6f8ac898b4a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\checkpoint.pt": "c045643756c809eadb69675417b6ff398343057aa74b5cfd7fbc0b04f27d6ecf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\checkpoint.pt": "07b05fc2f1735382013aba5a4b0b776fc05423cfde376e4224b63d661b1109cb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\checkpoint.pt": "5e08b115c32b21b8ea2322fb22cae351b246f95c79406387c458784eec9ce56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\checkpoint.pt": "3f1843b3f306ddca0c9c1b06d8151b400cb383da4f466813751d7a988ecc149e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\checkpoint.pt": "c9d19f1243d87bc3f070c010b85e113df22634ed8157323c5088e11bb39fd214",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\checkpoint.pt": "0fbef0695d3cd6a6ec93db8e0ee4973593b4e330ad1ec52e22ce78152acac141",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\checkpoint.pt": "e73c6f92fbd3e9b75d5328d19a59d551e255abbb5b4f895e3a52922fb7c55d56",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\checkpoint.pt": "e8dde02f2bee43691e545ecde9f823a4d3d5ec8c1cfac5a65ee83f5b7a55aff2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\checkpoint.pt": "cff8e0b4208477942f247ae767835bc6fe1a857c0b29949ded5429792de5880f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\checkpoint.pt": "de4bce1557ba7fc8c301ffbe72b4436778ae445b93ef3bd0c98e39ab2c44e18d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\checkpoint.pt": "039726ab103dab5e7d7ecf0d597aa9ecfe09165cd04ca83227a2c3897b6262a2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\checkpoint.pt": "90469a692243e67e23fedcd3a0907af81b86fa87df98a3662f66d89f12f9d4df",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\checkpoint.pt": "0719abef025d1859907d7fbe9309481ce54a960be52ba542c923330857b90286",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\checkpoint.pt": "e3385fcf7bf643c6e2facb96a77c4cfb8c957be0efadca3865c052f2373c1349",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\checkpoint.pt": "e4cae157b524f8e24f470934d103dc84da2e3954241c37d306109e2ebf64705a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\checkpoint.pt": "e14348d81cb79a8e2a4decc5de7f30175e122997e42d2e6ed1b300628e9ae695",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\checkpoint.pt": "537104a38a8ccbf69be8aa2df314a66871b9cd191d6df4c110d00a1c888e5b1b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\checkpoint.pt": "874203ffc5c6170af1cff327866234933575f3d45389271f52589def9e9bbf00",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\checkpoint.pt": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\checkpoint.pt": "f14a61a2157394d51e512084ef08bbe4d26e0371124249da9c8a2ce393cf47cf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\checkpoint.pt": "8e531568ea25b8c86743f0db3d993ff27c959cfbdac9f2a78ab5b2b8993812e9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\checkpoint.pt": "58e6765f88095938e001f1145067976424fc6c0016f114849066f45fae4bd664",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\checkpoint.pt": "54825d1ffc5cb60a60fe909085c9e2b776be40c2b29d9dd2dadff90b48bb4b91",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\checkpoint.pt": "3456cc4b33d4b5bf00372aa9138dbff95bf6f5339dc1b40df4a7d182417b7cf4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\report.json": "d9720cf2fd7d25215a57ada78f0858f968bd9bec0fa122a321ade44a93e4792a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\manifest.json": "704fc4abd5d0160a44bc6e6d53af2e9cfea8ceb7e34381af5dda4dc0546ed314",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\specialist.pt": "e0dcb68ba8c236533460ac2a8c2ac7f4319d4c4585cdd5ed4fc85ae26578ade0"
+  },
+  "source_phase1_artifact_hashes_before": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\AUDIT.md": "6a9ce574000bfb5f0c23fb7d6cf4310a65418da089a975e6281003977c48f5e4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\REPORT.md": "119eec5e02314a4ae674fb67af8adf3b8d23e74c19afb75962f18e8832b01d0c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\audit.json": "b48091837394b2d8bc76ee9b07773c656fb636cdc4cd9b23fba937bd6635cdd3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_11\\checkpoint.pt": "06afce10afc9bc0b7655e6d02e732aa38443be5efaf0a1e126f63e834105dac0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_22\\checkpoint.pt": "174b022a334adff439368aa6634788e49624e89fa54662a6c286db91b916cad1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\matched\\seed_33\\checkpoint.pt": "cbdda1f762bb6ab16c3c40b3c54d392de6515a71f85e000b1b18c6f8ac898b4a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_11\\checkpoint.pt": "c045643756c809eadb69675417b6ff398343057aa74b5cfd7fbc0b04f27d6ecf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_22\\checkpoint.pt": "07b05fc2f1735382013aba5a4b0b776fc05423cfde376e4224b63d661b1109cb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\plain\\seed_33\\checkpoint.pt": "5e08b115c32b21b8ea2322fb22cae351b246f95c79406387c458784eec9ce56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_11\\checkpoint.pt": "3f1843b3f306ddca0c9c1b06d8151b400cb383da4f466813751d7a988ecc149e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_22\\checkpoint.pt": "c9d19f1243d87bc3f070c010b85e113df22634ed8157323c5088e11bb39fd214",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l2_w64\\specialist\\seed_33\\checkpoint.pt": "0fbef0695d3cd6a6ec93db8e0ee4973593b4e330ad1ec52e22ce78152acac141",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_11\\checkpoint.pt": "e73c6f92fbd3e9b75d5328d19a59d551e255abbb5b4f895e3a52922fb7c55d56",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_22\\checkpoint.pt": "e8dde02f2bee43691e545ecde9f823a4d3d5ec8c1cfac5a65ee83f5b7a55aff2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\matched\\seed_33\\checkpoint.pt": "cff8e0b4208477942f247ae767835bc6fe1a857c0b29949ded5429792de5880f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_11\\checkpoint.pt": "de4bce1557ba7fc8c301ffbe72b4436778ae445b93ef3bd0c98e39ab2c44e18d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_22\\checkpoint.pt": "039726ab103dab5e7d7ecf0d597aa9ecfe09165cd04ca83227a2c3897b6262a2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\plain\\seed_33\\checkpoint.pt": "90469a692243e67e23fedcd3a0907af81b86fa87df98a3662f66d89f12f9d4df",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_11\\checkpoint.pt": "0719abef025d1859907d7fbe9309481ce54a960be52ba542c923330857b90286",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_22\\checkpoint.pt": "e3385fcf7bf643c6e2facb96a77c4cfb8c957be0efadca3865c052f2373c1349",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l4_w128\\specialist\\seed_33\\checkpoint.pt": "e4cae157b524f8e24f470934d103dc84da2e3954241c37d306109e2ebf64705a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_11\\checkpoint.pt": "e14348d81cb79a8e2a4decc5de7f30175e122997e42d2e6ed1b300628e9ae695",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_22\\checkpoint.pt": "537104a38a8ccbf69be8aa2df314a66871b9cd191d6df4c110d00a1c888e5b1b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\matched\\seed_33\\checkpoint.pt": "874203ffc5c6170af1cff327866234933575f3d45389271f52589def9e9bbf00",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_11\\checkpoint.pt": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_22\\checkpoint.pt": "f14a61a2157394d51e512084ef08bbe4d26e0371124249da9c8a2ce393cf47cf",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\plain\\seed_33\\checkpoint.pt": "8e531568ea25b8c86743f0db3d993ff27c959cfbdac9f2a78ab5b2b8993812e9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_11\\checkpoint.pt": "58e6765f88095938e001f1145067976424fc6c0016f114849066f45fae4bd664",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_22\\checkpoint.pt": "54825d1ffc5cb60a60fe909085c9e2b776be40c2b29d9dd2dadff90b48bb4b91",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\backbones\\l6_w256\\specialist\\seed_33\\checkpoint.pt": "3456cc4b33d4b5bf00372aa9138dbff95bf6f5339dc1b40df4a7d182417b7cf4",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\report.json": "d9720cf2fd7d25215a57ada78f0858f968bd9bec0fa122a321ade44a93e4792a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\manifest.json": "704fc4abd5d0160a44bc6e6d53af2e9cfea8ceb7e34381af5dda4dc0546ed314",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\specialist.pt": "e0dcb68ba8c236533460ac2a8c2ac7f4319d4c4585cdd5ed4fc85ae26578ade0"
+  },
+  "source_phase1_artifacts_unchanged": true,
+  "verdict": {
+    "classification": "ineffective integration",
+    "explanation": "Even the exact observed-value positive control remains weak and causally insensitive, so merely making the value payload explicit does not repair use.",
+    "heldout_accuracy_exact_minus_current": 0.0,
+    "intervened_required_probability_mean_exact_minus_current": -0.00017438952453335783,
+    "scope": "Diagnostic positive control only: this is not an efficiency result, does not reverse the Phase 1 failed verdict, and does not validate the learned specialist."
+  }
+}

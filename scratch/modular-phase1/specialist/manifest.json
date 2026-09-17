@@ -1,0 +1,76 @@
+{
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\modular-phase1\\specialist\\specialist.pt",
+  "checkpoint_sha256": "e0dcb68ba8c236533460ac2a8c2ac7f4319d4c4585cdd5ed4fc85ae26578ade0",
+  "config_sha256": "f76838066b612fc739f0967c3efb7a3625dc66de125ad0517d9160482cd31e3d",
+  "frozen": true,
+  "gate": {
+    "binding": true,
+    "depth": true,
+    "events": true,
+    "passed": true,
+    "time_budget_respected": true,
+    "token_budget_complete": true,
+    "validity": true
+  },
+  "interface_sha256": "3103eeaaee49aba64d11b5f056f522e6ca86e2320f6048eabf9ca07b0e074b69",
+  "parameters": {
+    "exports_hidden_state": false,
+    "exports_values_or_answers": false,
+    "interface_width": 30,
+    "learned": [
+      "event probabilities",
+      "auxiliary scope-depth head",
+      "prefix validity",
+      "event confidence"
+    ],
+    "learned_parameters": 12652,
+    "parameter_ceiling": 100000,
+    "programmed": [
+      "scope stack",
+      "exact scope depth",
+      "name-to-declaration table",
+      "declaration pointer"
+    ],
+    "redacted_value_id": 25,
+    "under_ceiling": true
+  },
+  "schema": 1,
+  "state_sha256": "933973cef7e74d6ad9680a681ffda0dabc0565a4e344d0b7e7e754f0cf8c4751",
+  "training": {
+    "accelerator_seconds": 21.077791999996407,
+    "device": "cuda:0",
+    "mean_loss": 2.0826499185753846,
+    "peak_memory_bytes": 35728384,
+    "steps": 1661,
+    "tokens": 2097152,
+    "tokens_per_second": 99495.81056689228,
+    "wall_seconds": 21.077791999996407
+  },
+  "validation": {
+    "binding_accuracy": 1.0,
+    "binding_operations": 2531,
+    "depth_accuracy": 0.8742412356106002,
+    "event_accuracy": 0.9852280616760254,
+    "mean_event_confidence": 0.932501116857138,
+    "per_event_f1": {
+      "answer_marker": 0.9855923159018143,
+      "assign": 0.9990975355779244,
+      "bos": 1.0,
+      "close": 0.9717120257407159,
+      "declaration": 0.9672295363480252,
+      "eos": 0.9874297940625836,
+      "invalid": 0.9047505655435171,
+      "let": 0.9992731803551033,
+      "open": 0.9996185632549269,
+      "output": 0.9281045751633987,
+      "query": 0.9953051643192489,
+      "semicolon": 0.9983952598444636,
+      "use": 0.8332426056976955,
+      "value": 0.999022184196052,
+      "whitespace": 0.9925146947643729,
+      "xor": 0.9946192052980133
+    },
+    "structural_event_macro_f1": 0.9708928340868989,
+    "validity_accuracy": 0.9719472773502918
+  }
+}
