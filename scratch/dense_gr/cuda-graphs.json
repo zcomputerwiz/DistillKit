@@ -1,0 +1,38 @@
+{
+  "hidden": 512,
+  "layers": 8,
+  "vocab": 16384,
+  "length": 1024,
+  "liger": false,
+  "device": "NVIDIA GeForce RTX 3090",
+  "rows": [
+    {
+      "batch": 4,
+      "eager_seconds": 0.07005701000161935,
+      "graph_seconds": 0.04221784999826923,
+      "compile_error": "RuntimeError: skipped by --skip-compile",
+      "graph_speedup": 1.6594168107682274
+    },
+    {
+      "batch": 8,
+      "eager_seconds": 0.07774772999982815,
+      "graph_seconds": 0.07411821999994572,
+      "compile_error": "RuntimeError: skipped by --skip-compile",
+      "graph_speedup": 1.0489692008238336
+    },
+    {
+      "batch": 16,
+      "eager_seconds": 0.13969907999853604,
+      "graph_seconds": 0.14226557000074536,
+      "compile_error": "RuntimeError: skipped by --skip-compile",
+      "graph_speedup": 0.9819598656077091
+    },
+    {
+      "batch": 32,
+      "eager_seconds": 0.26106587999965997,
+      "graph_seconds": 0.2746337399992626,
+      "compile_error": "RuntimeError: skipped by --skip-compile",
+      "graph_speedup": 0.950596529036676
+    }
+  ]
+}
