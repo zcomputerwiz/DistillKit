@@ -141,96 +141,192 @@ routing and memory.
 Note `r = 320` is inherited from Flash-Next at `d = 2560`, where it is `d/8`. Fix the
 ratio, not the constant.
 
-### Measured throughput
+## Measured configuration
 
-`scratch/dense_gr/benchmark.py`, one RTX 3090, sequence 1024, bf16 weights, 8-bit AdamW,
-gradient checkpointing, chunked cross-entropy, real optimizer steps. Best batch per
-configuration; full sweep in `scratch/dense_gr/benchmark.json`.
+Everything below is measured on one RTX 3090 at sequence 1024, bf16 weights, 8-bit AdamW,
+random inputs and real optimizer steps: `scratch/dense_gr/benchmark.py`, with the full
+sweep in `benchmark-full-stack.json` and the intermediate states in `benchmark.json`,
+`benchmark-chunked-head.json` and `benchmark-cce.json`.
 
-With the head folded into the loss loop (`--loss chunked_head`, position budget 2048), the
-configuration in `benchmark-chunked-head.json`:
+### What to run
 
-| configuration | params | core | best batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
+```
+Cut Cross-Entropy, filter_eps="auto"      the loss never forms the logits
+Flash-Attention 2                         free, though only worth 1%
+Liger fused SwiGLU and RMSNorm            not for anything needing bitwise agreement
+gradient checkpointing OFF                at 125M and below
+torch.compile                             off
+batch 32 to 64                            above the launch-bound crossover
+```
+
+| configuration | params | core | batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| d1536-L12, v248k | 778.8M | 51% | 32 | 6,484 | 78% | 42.8 h | 128.5 h |
-| d1280-L18, v248k | 732.0M | 57% | 32 | 6,543 | 73% | 42.5 h | 127.4 h |
-| d768-L12, v32k | 124.7M | 80% | 32 | 30,552 | 23% | 9.1 h | 27.3 h |
-| d512-L8, v16k | 38.0M | 78% | 32 | 75,440 | 11% | 3.7 h | 11.0 h |
+| d1536-L12, v248k | 778.8M | 51% | 16 | 11,651 | 66% | 23.8 h | 71.5 h |
+| d1280-L18, v248k | 732.0M | 57% | 16 | 11,796 | 79% | 23.5 h | 70.6 h |
+| d768-L12, v32k | 124.7M | 80% | 32 | 50,664 | 58% | 5.5 h | 16.4 h |
+| d512-L8, v16k | 38.0M | 78% | 64 | 132,762 | 49% | 2.1 h | 6.3 h |
 
-**Where the loss is computed matters more than the architecture.** Against
-`chunked_causal_lm_loss`, which chunks the fp32 upcast but is still handed logits the head
-has already materialized, folding the head into the loop is worth 1.41x at the 248,320
-vocabulary and 1.07x at 16,384 -- the gain tracks vocabulary size, because the head is
-what it removes. It also removes an inversion: with the logits materialized the 0.8B
-configurations peaked at batch 2 and got *slower* by batch 8 (3,671 tok/s), where folding
-the head makes them climb monotonically to batch 32 and fit at 78% of VRAM, which the
-other path could not reach at all.
+Three arms at 3B tokens each: 8.9 days at 0.8B, 2.05 days at 125M, 0.79 days at 38M.
 
-Depth against width at a fixed budget is worth 1% (`d1536-L12` against `d1280-L18`), so
-that choice can be made on other grounds.
+### What each change was worth
 
-Per arm, multiplied by three arms at 1B tokens each: 5.4 days at 0.8B, 1.1 days at 125M,
-half a day at 38M.
-
-### With every available kernel
-
-[Cut Cross-Entropy](https://arxiv.org/abs/2411.09009) goes further still: it never forms
-the logits at all, reducing the log-sum-exp in SRAM for `O(N + |V|)` memory instead of
-`O(N|V|)`. With CCE and Flash-Attention 2 (`benchmark-cce.json`):
-
-| configuration | best batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| d1536-L12, v248k | 32 | 9,437 | 54% | 29.4 h | 88.3 h |
-| d1280-L18, v248k | 32 | 9,178 | 54% | 30.3 h | 90.8 h |
-| d768-L12, v32k | 64 | 35,760 | 40% | 7.8 h | 23.3 h |
-| d512-L8, v16k | 64 | 91,018 | 21% | 3.1 h | 9.2 h |
-
-Against the original materialized-logits path that is **2.05x** at the 248,320 vocabulary
-and 1.29x at 16,384. Three arms at 1B tokens each: 3.7 days at 0.8B, 1 day at 125M, half a
-day at 38M.
-
-The contributions are wildly unequal, and only measuring them separately shows it:
+Measured separately, because crediting a stack to whichever piece was added last is how a
+1% change gets mistaken for the reason something got faster.
 
 | change | gain at 0.8B, v248k |
 | --- | ---: |
 | chunked head over materialized logits | 1.41x |
 | CCE over chunked head | 1.45x |
+| Liger fused SwiGLU and RMSNorm | 1.20x |
+| gradient checkpointing off | 1.17x at 125M, 1.21x at 38M, 1.07x at 0.8B |
 | Flash-Attention 2 over SDPA | 1.01x |
-| `torch.compile` on the decoder stack | 1.00x, and +1.2 GiB reserved |
+| `expandable_segments` | 1.005x |
+| `torch.compile` on the decoder | 1.00x, and +1.2 GiB reserved |
 
-Attention is not the bottleneck here and compiling buys nothing -- which reproduces the
-earlier finding on the memory-headroom branch that every hot region already sits inside a
-checkpoint frame. Both are still worth leaving on: FA2 costs nothing, and compile should
-be left off.
+Total against the materialized-logits path: **2.58x** at the 248,320 vocabulary and
+**1.89x** at 16,384. The gain tracks vocabulary size throughout, because the head is what
+most of it removes.
 
-FLA and `causal_conv1d` are already live for the linear-attention layers without any
-action. `install_device_aware_linear_attention` reports patching nothing, which is not a
-failure: this version of transformers binds the fused implementations directly, and
-`fla.ops.gated_delta_rule.backends.flash_qla` loads during the forward. The dispatch
-exists for CPU fallback.
+Depth against width at a fixed budget is worth 1% (`d1536-L12` against `d1280-L18`), so
+that choice can be made on other grounds.
 
-**CCE weakens the throughput case for cutting the vocabulary.** The head is no longer what
-limits the large configurations -- batch 64 now fails on backbone activations, not logits.
-What remains is the parameter-allocation argument: the embedding is still 49% of the 0.8B
-model, with a gradient-starved tail.
+### Where a step goes
 
-Installing CCE on Windows needs two workarounds. `uv pip install --no-deps`, because it
-declares `triton>=3.0.0` while the platform package is `triton-windows` and the dependency
-cannot resolve; and a shim for `importlib.metadata.version("triton")`, which
-`cut_cross_entropy.utils.is_triton_3_2` calls at *run* time rather than import time, so
-without it the first step raises `PackageNotFoundError`.
+`scratch/dense_gr/profile_step.py`, at 125M and batch 32:
 
-**Measure with the allocator capped.** `torch.cuda.set_per_process_memory_fraction`, or
-`max_vram_fraction` for a real run. An uncapped first pass of this benchmark reserved
-35.27 GiB on a 24 GiB card and reported 1,714 tok/s against 4,491 at half the batch: on
-Windows WDDM the driver pages to shared system memory rather than raising, and the result
-is a PCIe bandwidth measurement that still reports 100% GPU utilisation.
+| group | ms/step | share | launches |
+| --- | ---: | ---: | ---: |
+| matmul | 339.98 | 44.7% | 272 |
+| elementwise | 211.42 | 27.8% | 1,646 |
+| loss (cce) | 109.58 | 14.4% | 2 |
+| other | 36.25 | 4.8% | 444 |
+| attention | 28.71 | 3.8% | 24 |
+| linear attention | 13.04 | 1.7% | 66 |
+| optimizer | 9.29 | 1.2% | 189 |
 
-**Activations bind before parameters do.** Four streams carry 4x the residual state. The
-`_BranchNorm` docstring records that two branches at batch 2 x 4096 held about 670 MB per
-widened layer during backward, the largest single item in the recompute working set; four
-branches roughly doubles that, against 48 GB across two cards with no NCCL on Windows.
-Sequence length and batch are the constrained quantities, not parameter count.
+Two things this settles. **The four-stream route is not where the time is**: the same
+profile at one branch costs 725.44 ms against 761.19, so the whole GR route is 4.7% of a
+step and its per-branch Python loops are not worth fusing. And **the step is already 97%
+GPU-busy** -- 761 ms of device time against 781 ms of wall clock -- so there is at most 3%
+of launch gap at this batch size.
+
+### Measured and rejected
+
+**`torch.compile`** produces 58 graph breaks, so dynamo never gets a contiguous graph and
+is 17% *slower* with checkpointing off. One break is ours: `Tensor.item()` from
+`alpha = float(self.blend)` in `HyperConnection.read`, which is deliberate -- the CPU pin
+avoids a device synchronisation on each of the model's sublayers, and is right for eager
+and poison for dynamo. The rest are spread across transformers, fla and the custom
+autograd Functions. Chasing them to attack a bucket whose largest identified contributor
+is 4.7% is not a good trade.
+
+**CUDA graphs** are worth 1.66x at batch 4, 1.05x at batch 8, and *cost* 5% at batch 32
+(`cuda-graphs.json`). The crossover sits between batch 8 and 16, which is exactly where
+the sublinearity put it -- the 38M model takes 1.36x the time for twice the work from
+batch 8 to 16, and 1.90x from 16 to 32. Above the crossover, replay has its own fixed cost
+and no launch gap to amortise it against.
+
+A graphed step is unavailable regardless, and `graph_capture_probe.py` isolates why by
+running each component in its own process, since a failed capture invalidates the CUDA
+context and one traceback from a combined run names nothing. Plain SwiGLU captures. The
+decoder captures under sdpa, including fla's gated delta rule, `causal_conv1d` and the GR
+route. Flash-Attention 2 does not. Eager attention does not, and says why: *"Cannot copy
+between CPU and CUDA tensors during CUDA graph capture unless the CPU tensor is pinned"*.
+CCE does not. So the choice is graphs or CCE, and CCE is worth 1.45x against graphs
+costing 5% here.
+
+Keep the crossover rule even though the answer is no: **launch-bound below batch ~12,
+compute-bound above.** A configuration forced to small batch by size or sequence length
+would find graphs a 1.66x lever, at the price of sdpa and no CCE.
+
+### Two ways to measure this wrong
+
+**Spilling.** On Windows WDDM an over-budget run does not raise: the driver pages CUDA
+allocations to shared system memory and serves them over PCIe, at 100% reported GPU
+utilisation. The first pass of this benchmark reserved 35.27 GiB on a 24 GiB card and
+reported 1,714 tok/s against 4,491 at half the batch, with performance counters showing
+23.74 GiB dedicated alongside 12.22 GiB shared. `nvidia-smi` does not report shared memory
+and on this machine mirrors GPU 0's statistics onto GPU 1, so it cannot detect this at
+all. The benchmark now caps the allocator with `set_per_process_memory_fraction`, samples
+the WDDM counter before any model is built, and discards any run whose shared usage climbs
+more than 0.25 GiB above that baseline. `max_vram_fraction` does the same for training
+runs.
+
+**Budgeting the head chunk per sequence.** The position budget counts *total* positions,
+so at a budget of 4096 with batch 4 over a 1024-token sequence the chunk is the whole
+sequence and nothing is chunked -- 14.82 GiB against 9.87 at a budget of 2048. The
+"chunked" head was silently not chunking.
+
+### Liger's numerical boundary
+
+`LigerRMSNorm(offset=1.0, casting_mode="gemma")` is exactly Qwen3.5's convention: a stored
+deviation applied as `1 + weight`, multiplied in fp32 before casting back. In isolation
+and in fp32 it agrees with `Qwen3_5RMSNorm` to 1.6e-7, one ulp, which is what establishes
+the convention is right rather than merely plausible -- the same check that would have
+caught the `2 * weight` trap in the GR conversion. In bf16 that becomes 1.6e-4 and
+accumulates over twelve layers to 1.5e-2 on the logits, with 98.05% argmax agreement
+(`liger-equivalence.json`).
+
+For training from scratch that is a different but equally valid trajectory. It is not
+acceptable anywhere a bitwise gate is in play, and the swap replaces the module class, so
+a Liger-patched model no longer satisfies `recipient_initialize`'s `Qwen3_5RMSNorm` type
+check. That refusal exists to catch a guessed gain convention and it correctly catches
+this one.
+
+RoPE is not swapped: Qwen3.5 uses interleaved mRoPE with a partial rotary factor against
+Liger's standard formulation, and matching them is rework rather than a swap. The GR
+branch norms are left alone because they are a custom autograd Function written to avoid
+holding fp32 copies until backward, and the route is 4.7% of a step.
+
+### CCE gradient filtering
+
+`linear_cross_entropy` defaults to `filter_eps="auto"`, which skips vocabulary entries
+whose contribution falls below a dtype-derived threshold in the backward pass. Measured at
+4,096 tokens, hidden 1,536, vocabulary 248,320 (`cce-variants.json`):
+
+| variant | ms | peak GiB | dW zeroed |
+| --- | ---: | ---: | ---: |
+| reference fp32 | 263.4 | 11.367 | 0% |
+| cce, `filter_eps="auto"` | 127.3 | 0.724 | 11.13% |
+| cce, `filter_eps=None` | 283.5 | 0.722 | 0.03% |
+| `impl="cce_exact"` | 429.1 | 2.155 | 0% |
+| `impl="torch_compile"` | 187.1 | 2.618 | 0% |
+
+The loss is unchanged to bf16 rounding in every variant, and the ~1e-3 relative gradient
+differences are precision rather than approximation -- `cce_exact` shows them too.
+
+**Memory is flat between `auto` and `None`**, so the filtering buys time (2.2x) and
+nothing else; exact gradients cost time, not memory, and `filter_eps=None` is the route
+rather than `impl="cce_exact"`, which is worse on both axes. And **`impl="torch_compile"`
+is not a cheaper CCE** -- it is the fallback for systems without Triton, it materializes
+the logits, and its good timing comes from doing the expensive thing efficiently.
+
+`auto` is kept. What it drops is the small gradient pushing away from tokens the model
+already assigns near-zero probability, the 11.13% was measured on random weights (the
+near-uniform regime that is worst case for a threshold), and a failure would show up as
+rare classes not improving in the per-class evaluation breakdown.
+
+### Installing CCE and Liger on Windows
+
+Both declare `triton>=3.0.0` while the platform package is `triton-windows`, so both need
+`uv pip install --no-deps` against the Triton already present. CCE additionally reads
+`importlib.metadata.version("triton")` inside `is_triton_3_2` at *run* time rather than
+import time, so it imports cleanly and then raises `PackageNotFoundError` on the first
+step; the harness resolves the alias rather than hard-coding a version, which leaves CCE's
+own comparison intact.
+
+FLA and `causal_conv1d` need no action. `install_device_aware_linear_attention` reports
+patching nothing, which reads like a failure and is not: this version of transformers
+binds the fused implementations directly, and `fla.ops.gated_delta_rule.backends.flash_qla`
+loads during the forward. That dispatch exists for CPU fallback.
+
+### Sequence length and the sortish sampler
+
+`distillkit/core/sortish_sampler.py` groups by length to save padding, after finding that
+HF's sampler cost 0.0145 of `eval_loss` through ordering alone. It does not apply to
+pretraining here: slicing fixed 1024-token windows out of a packed token store produces no
+padding for it to save. It stays relevant to the SFT and distillation paths, where
+documents arrive at their own lengths.
 
 ## One interaction with the first experiment
 
@@ -258,31 +354,3 @@ attention ratio, `r` as a ratio of `d`, `ngram_vocab_size_base`, whether the fin
 collapse is a mean or a learned mixer (Qwen uses a learned mixer; this repository has
 deliberately used a mean collapse), and whether PLE is present in a given run.
 
-### CCE gradient filtering
-
-`linear_cross_entropy` defaults to `filter_eps="auto"`, which skips vocabulary entries
-whose contribution falls below a dtype-derived threshold in the backward pass. Measured at
-4,096 tokens, hidden 1,536, vocabulary 248,320 (`cce-variants.json`):
-
-| variant | ms | peak GiB | dW zeroed |
-| --- | ---: | ---: | ---: |
-| reference fp32 | 263.4 | 11.367 | 0% |
-| cce, `filter_eps="auto"` | 127.3 | 0.724 | 11.13% |
-| cce, `filter_eps=None` | 283.5 | 0.722 | 0.03% |
-| `impl="cce_exact"` | 429.1 | 2.155 | 0% |
-| `impl="torch_compile"` | 187.1 | 2.618 | 0% |
-
-The loss is unchanged to bf16 rounding in every variant, and the ~1e-3 relative gradient
-differences are precision rather than approximation -- `cce_exact` shows them too.
-
-Two things are easy to get wrong here. **Memory is flat between `auto` and `None`**, so
-the filtering buys time (2.2x) and nothing else; exact gradients cost time, not memory,
-and `filter_eps=None` is the route rather than `impl="cce_exact"`, which is worse on both
-axes. And **`impl="torch_compile"` is not a cheaper CCE** -- it is CCE's fallback for
-systems without Triton and materializes the logits, at 3.6x the memory. Its good timing
-comes from doing the expensive thing efficiently.
-
-`auto` is kept. What it drops is the small gradient pushing away from tokens the model
-already assigns near-zero probability, the 11.13% was measured on random weights (the
-near-uniform regime that is worst case for a threshold), and a failure would show up as
-rare classes not improving in the per-class evaluation breakdown.
