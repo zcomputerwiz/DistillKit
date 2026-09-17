@@ -354,3 +354,40 @@ attention ratio, `r` as a ratio of `d`, `ngram_vocab_size_base`, whether the fin
 collapse is a mean or a learned mixer (Qwen uses a learned mixer; this repository has
 deliberately used a mean collapse), and whether PLE is present in a given run.
 
+
+### Smoke test on real tokens
+
+`scratch/dense_gr/smoke_train.py` runs the smallest configuration on the actual Python
+token store with the recommended stack, which exercises what random ids cannot: the
+vocabulary remap, the data path, and whether the loss falls.
+
+It works. The remap round-trips at every vocabulary size tested, loss falls from 9.78 to
+5.81 over 2M tokens at 16,384, throughput reproduces the benchmark, and nothing spilled.
+
+It also corrected a cost that had only been thought of as a quality issue. A token below
+the cut becomes two to four byte tokens, so a small vocabulary does not merely lose
+fidelity -- it *inflates the corpus*. Measured over the same 30,760,040-token store:
+
+| vocab | coverage | expanded | stream tokens | tok/s | s / corpus pass | params |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 16,384 | 93.641% | 6.359% | 40,652,874 | 126,812 | 320.6 | 38.0M |
+| 32,768 | 97.628% | 2.372% | 34,596,431 | 119,974 | **288.4** | 46.3M |
+| 65,536 | 99.596% | 0.404% | 31,489,910 | 97,975 | 321.4 | 63.1M |
+| 248,320 | 100.000% | 0% | 30,760,040 | 59,857 | 513.9 | 156.7M |
+
+**Seconds per corpus pass is the metric, not tokens per second**, because each vocabulary
+turns the same text into a different number of tokens. On that measure 32,768 wins, and
+16,384 and 65,536 tie for opposite reasons -- one processes 32% more tokens quickly, the
+other fewer tokens slowly. The full vocabulary is 1.78x slower per unit of text than
+32,768.
+
+**The loss column is deliberately absent, and the per-run losses must not be compared
+across vocabularies.** A 16,384-way softmax has a lower entropy floor than a 248,320-way
+one and starts near `log(V)`, so at 30 steps a larger vocabulary is merely further from
+convergence. Choosing on those numbers would pick the smallest vocabulary every time for
+no reason but arithmetic. Quality has to come from the baseline qualification run at a
+real budget.
+
+The 32,768 figure is measured on 30.7M tokens of Python. Recompute the ranking on the full
+corpus before freezing it: the number of distinct ids in use grows with corpus size, so
+the expansion rates above are a lower bound.

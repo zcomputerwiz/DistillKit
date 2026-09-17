@@ -1,0 +1,41 @@
+{
+  "vocab": 248320,
+  "kept_ids": 248320,
+  "coverage": 1.0,
+  "store_tokens": 30760040,
+  "compact_tokens": 30760040,
+  "expanded_tokens": 0,
+  "round_trip": true,
+  "parameters": 156701984,
+  "liger": {
+    "swiglu": 8,
+    "rmsnorm": 25
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 30,
+  "scored_tokens": 1966080,
+  "seconds": 32.846148399985395,
+  "tokens_per_second": 59857.246458792535,
+  "first_loss": 12.50924015045166,
+  "final_loss": 8.11478042602539,
+  "peak_allocated_gib": 11.775070190429688,
+  "peak_reserved_gib": 12.048828125,
+  "shared_delta_gib": 0.0,
+  "spilled": false,
+  "setup_seconds": 5.131606200011447,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "loss": 12.50924015045166,
+      "tokens_per_second": 28064.980090109504
+    },
+    {
+      "step": 29,
+      "tokens": 1966080,
+      "loss": 8.11478042602539,
+      "tokens_per_second": 59857.416484692156
+    }
+  ]
+}

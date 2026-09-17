@@ -1,0 +1,71 @@
+{
+  "vocab": 16384,
+  "kept_ids": 16384,
+  "coverage": 0.9364100956955843,
+  "store_tokens": 30760040,
+  "compact_tokens": 40652874,
+  "expanded_tokens": 1956028,
+  "round_trip": true,
+  "parameters": 37950752,
+  "liger": {
+    "swiglu": 8,
+    "rmsnorm": 25
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 30,
+  "scored_tokens": 1966080,
+  "seconds": 15.503838800010271,
+  "tokens_per_second": 126812.46402011723,
+  "first_loss": 9.779637336730957,
+  "final_loss": 5.809321880340576,
+  "peak_allocated_gib": 11.32912826538086,
+  "peak_reserved_gib": 11.576171875,
+  "shared_delta_gib": 0.0,
+  "spilled": false,
+  "setup_seconds": 24.3108042999811,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "loss": 9.779637336730957,
+      "tokens_per_second": 27015.935799194707
+    },
+    {
+      "step": 5,
+      "tokens": 393216,
+      "loss": 8.000226020812988,
+      "tokens_per_second": 82237.7202921094
+    },
+    {
+      "step": 10,
+      "tokens": 720896,
+      "loss": 7.352994918823242,
+      "tokens_per_second": 102621.73291222325
+    },
+    {
+      "step": 15,
+      "tokens": 1048576,
+      "loss": 6.821699619293213,
+      "tokens_per_second": 113449.48333540336
+    },
+    {
+      "step": 20,
+      "tokens": 1376256,
+      "loss": 6.354032039642334,
+      "tokens_per_second": 119598.21224181839
+    },
+    {
+      "step": 25,
+      "tokens": 1703936,
+      "loss": 6.065250396728516,
+      "tokens_per_second": 124134.61301684148
+    },
+    {
+      "step": 29,
+      "tokens": 1966080,
+      "loss": 5.809321880340576,
+      "tokens_per_second": 126813.19035714309
+    }
+  ]
+}
