@@ -24,3 +24,21 @@ python -m experiments.modular_phase1e `
 
 Passing would establish category admission only on this backbone. Cross-scale reuse,
 matched-quality efficiency, XOR, and backbone-layer integration remain out of scope.
+
+## Causality repair audit (no training)
+
+The follow-up audit replaces the contextual arm's length-normalized position with the
+absolute causal token index divided by the frozen 512-token model scale. It reloads the
+existing candidate weights without optimization, checks features and final outputs under
+truncation, changed unseen suffixes, and batch padding, stratifies the unchanged Phase 1d
+answer errors by formatting position, and runs at most two ordinary greedy completion
+steps (an optional whitespace token followed by the bit).
+
+```powershell
+python -m experiments.modular_phase1e.causality_eval `
+  --config experiments/modular_phase1e/configs/diagnostic.json `
+  --run-dir scratch/modular-phase1e --force
+```
+
+This audit cannot reverse the negative Phase 1e admission verdict and performs no
+training or confirmation-based model selection.

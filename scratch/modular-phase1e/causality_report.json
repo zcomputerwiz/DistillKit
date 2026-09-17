@@ -1,0 +1,165 @@
+{
+  "accelerator_seconds": 13.947772700019414,
+  "cache_cost": {
+    "active_targets": 1353,
+    "causal_targets": 78618,
+    "deployment_state_seconds": 0.5324224000214599,
+    "documents": 768,
+    "frozen_forward_seconds": 0.5140691998822149
+  },
+  "candidate_checkpoint": {
+    "config_hash_changed_only_for_causal_feature_repair": true,
+    "repaired_config_sha256": "5bb3dfc41de36748273e8ed4b1c3ad512e3621b4a428a4eaa3847fd0542d7377",
+    "selected_arm": null,
+    "trained_config_sha256": "aaa2e7b6b0de7a4af6241bbce39f1a0ab6210d31415810d9ed0b4fb84a5e2e4b"
+  },
+  "candidate_weights_reused_without_retraining": true,
+  "causal_invariance": {
+    "all_passed": true,
+    "cases": 96,
+    "comparisons": {
+      "batch_padding": {
+        "comparison_tensor_width": 243,
+        "max_abs_feature_difference": 0.0,
+        "max_abs_final_log_probability_difference": {
+          "constant": 0.0,
+          "contextual": 0.0,
+          "unchanged_phase1d": 0.0
+        },
+        "passed": true,
+        "reference_tensor_width": 146,
+        "trace_mismatches": 0
+      },
+      "suffix_change": {
+        "comparison_tensor_width": 149,
+        "max_abs_feature_difference": 0.0,
+        "max_abs_final_log_probability_difference": {
+          "constant": 0.0,
+          "contextual": 0.0,
+          "unchanged_phase1d": 0.0
+        },
+        "passed": true,
+        "reference_tensor_width": 146,
+        "trace_mismatches": 0
+      },
+      "truncation": {
+        "comparison_tensor_width": 148,
+        "max_abs_feature_difference": 0.0,
+        "max_abs_final_log_probability_difference": {
+          "constant": 0.0,
+          "contextual": 0.0,
+          "unchanged_phase1d": 0.0
+        },
+        "passed": true,
+        "reference_tensor_width": 146,
+        "trace_mismatches": 0
+      }
+    },
+    "fixed_position_scale": 512.0,
+    "old_length_normalization_max_abs_difference": 0.40082644628099173,
+    "repaired_position_feature_max_abs_difference": 0.0,
+    "tolerance": 1e-05,
+    "variants": {
+      "base": 32,
+      "renamed": 32,
+      "whitespace": 32
+    }
+  },
+  "conclusion": "Phase 1d already answers lookup prompts reliably under the accepted optional-whitespace format; the failed admission arms are not needed for this behavior.",
+  "config_sha256": "5bb3dfc41de36748273e8ed4b1c3ad512e3621b4a428a4eaa3847fd0542d7377",
+  "documents": 768,
+  "evaluation_split": "existing_phase1e_calibration",
+  "frozen_hashes_after": {
+    "admission_candidates": "237f8068d1d936643f5dca8379e4bbdfc52374d8e5c2cf42728fde9af31ce525",
+    "backbone": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "original_phase1e_report": "239b6e010afcb8e4d18bcda2b90b8b673ff84210a65af2064f3fb9314802dbf6",
+    "readout": "eb101ea56901fd6d6f2e5d525dc6d5ab2092ea73e8053487879aca02daaadb98",
+    "specialist": "2c64666f579a89def2a66b900fff4113ffac8f8c0ef12203dd7d83c39fad2db3"
+  },
+  "frozen_hashes_before": {
+    "admission_candidates": "237f8068d1d936643f5dca8379e4bbdfc52374d8e5c2cf42728fde9af31ce525",
+    "backbone": "0c81b60f20fdb790dea46d76fc1146f36611d993b9ebdb76d8eeca3c246f0e7f",
+    "original_phase1e_report": "239b6e010afcb8e4d18bcda2b90b8b673ff84210a65af2064f3fb9314802dbf6",
+    "readout": "eb101ea56901fd6d6f2e5d525dc6d5ab2092ea73e8053487879aca02daaadb98",
+    "specialist": "2c64666f579a89def2a66b900fff4113ffac8f8c0ef12203dd7d83c39fad2db3"
+  },
+  "frozen_hashes_unchanged": true,
+  "greedy_completion": {
+    "bit_content_accuracy_when_emitted": 1.0,
+    "bit_emission_rate": 0.9973958333333334,
+    "examples": 768,
+    "first_step_activation_rate": 1.0,
+    "first_step_retrieval_rate": 1.0,
+    "first_token_predictions": {
+      "<nl>": 131,
+      "<sp2>": 358,
+      "<tab>": 279
+    },
+    "maximum_new_tokens": 2,
+    "optional_whitespace_tokens_allowed": 1,
+    "outcomes": {
+      "whitespace_then_correct": 766,
+      "whitespace_without_bit": 2
+    },
+    "second_step_activation_rate": 1.0,
+    "second_step_cases": 768,
+    "uses_answer_position_for_activation": false,
+    "valid_formatted_answer_accuracy": 0.9973958333333334
+  },
+  "phase": "modular_phase1e_causality_repair_evaluation",
+  "phase1d_answer_timing": {
+    "after_whitespace": {
+      "answer_accuracy": 0.9965811965811966,
+      "answer_nll": 0.3305338488175319,
+      "conditional_lookup_accuracy": 1.0,
+      "coverage": {
+        "activated": 585,
+        "activation_rate": 1.0,
+        "correct": 585,
+        "correct_retrieval_rate": 1.0,
+        "eligible": 585,
+        "retrieval_rate": 1.0,
+        "retrieved": 585
+      },
+      "error_predictions": {
+        "}": 2
+      },
+      "errors": 2,
+      "examples": 585,
+      "mean_bit_category_probability": 0.9889369469932002
+    },
+    "immediately_after_marker": {
+      "answer_accuracy": 0.0,
+      "answer_nll": 2.4772335883698178,
+      "conditional_lookup_accuracy": 1.0,
+      "coverage": {
+        "activated": 183,
+        "activation_rate": 1.0,
+        "correct": 183,
+        "correct_retrieval_rate": 1.0,
+        "eligible": 183,
+        "retrieval_rate": 1.0,
+        "retrieved": 183
+      },
+      "error_predictions": {
+        "<nl>": 44,
+        "<sp2>": 76,
+        "<tab>": 63
+      },
+      "errors": 183,
+      "examples": 183,
+      "mean_bit_category_probability": 0.13149910206433202
+    }
+  },
+  "preserved_verdicts": {
+    "phase1": "failed composition",
+    "phase1c": "output-facing lookup integration only",
+    "phase1d": "learned-specialist delivery only",
+    "phase1e_admission": "failed on calibration; unchanged by this audit"
+  },
+  "schema": 1,
+  "training": {
+    "optimizer_updates": 0,
+    "performed": false
+  }
+}

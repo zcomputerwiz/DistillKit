@@ -12,13 +12,16 @@ from experiments.modular_phase1.specialist import EVENTS, MAX_SCOPE_DEPTH
 from experiments.modular_phase1c.models import BIT_IDS
 
 
+CAUSAL_POSITION_SCALE = 512.0
+
+
 FEATURE_NAMES = tuple([f"event_probability_{index}" for index in range(len(EVENTS))] + [
     "validity_probability",
     "event_confidence",
     "programmed_scope_depth",
     "current_is_whitespace",
     "current_is_answer_marker",
-    "normalized_prefix_position",
+    "fixed_scale_causal_position",
     "backbone_bit_probability",
     "backbone_bit_log_odds",
     "backbone_entropy",
@@ -84,8 +87,11 @@ def build_contextual_features(
     for token in Vocabulary.WHITESPACE:
         whitespace += (input_ids == Vocabulary.TO_ID[token]).float()
     marker = (input_ids == Vocabulary.TO_ID["=>"]).float()
+    # The scale is a frozen property of the 512-token backbone, not the current
+    # tensor width.  Consequently a prefix receives the same feature when it is
+    # truncated, given another unseen suffix, or padded beside a longer example.
     position = torch.arange(input_ids.shape[1], device=input_ids.device).float()
-    position = (position / max(1, input_ids.shape[1] - 1))[None].expand_as(input_ids)
+    position = (position / CAUSAL_POSITION_SCALE)[None].expand_as(input_ids)
     bit_log_mass = torch.logsumexp(backbone_log_probs[..., list(BIT_IDS)], -1)
     nonbit_ids = [index for index in range(len(Vocabulary.TOKENS)) if index not in BIT_IDS]
     nonbit_log_mass = torch.logsumexp(backbone_log_probs[..., nonbit_ids], -1)
