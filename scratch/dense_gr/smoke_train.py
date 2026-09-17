@@ -163,6 +163,13 @@ def main() -> int:
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--tokens", type=int, default=30_000_000,
                         help="scored tokens; one pass over the v1 store is 30.7M")
+    parser.add_argument("--passes", type=float, default=None,
+                        help="passes over the corpus, which overrides --tokens. This is "
+                             "the fair budget across vocabularies: equal scored tokens "
+                             "would give a small vocabulary less text for the same count")
+    parser.add_argument("--evaluate-every", type=int, default=0,
+                        help="steps between held-out evaluations; 0 disables")
+    parser.add_argument("--evaluate-windows", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--report-every", type=int, default=25)
     parser.add_argument("--output", type=Path,
@@ -210,7 +217,44 @@ def main() -> int:
                                     weight_decay=0.1)
     baseline_shared = shared_gpu_gib()
 
+    # Held-out: the calibration split shares no repository with train, so this measures
+    # generalization rather than how much of the corpus has been memorized -- which is
+    # what training loss becomes once a budget spans several passes.
+    evaluation = None
+    if args.evaluate_every:
+        held = np.memmap(STORE / "calibration.bin", dtype=np.uint32, mode="r")
+        held_stream, held_expanded = remap(np.asarray(held), tokenizer, forward,
+                                           bytes_ids, kept)
+        rng = np.random.default_rng(12345)
+        starts = rng.integers(0, held_stream.shape[0] - args.length - 1,
+                              size=args.evaluate_windows)
+        evaluation = torch.from_numpy(
+            np.stack([held_stream[s:s + args.length] for s in starts]).astype(np.int64))
+        print("held-out: %d tokens -> %d, %d fixed windows"
+              % (held.shape[0], held_stream.shape[0], args.evaluate_windows), flush=True)
+
+    @torch.no_grad()
+    def evaluate():
+        model.eval()
+        total, batches = 0.0, 0
+        for start in range(0, evaluation.shape[0], args.batch):
+            chunk = evaluation[start:start + args.batch].to("cuda")
+            state = model.model(input_ids=chunk,
+                                attention_mask=torch.ones_like(chunk),
+                                use_cache=False).last_hidden_state
+            total += float(linear_cross_entropy(state, model.lm_head.weight, chunk,
+                                                shift=1, reduction="mean"))
+            batches += 1
+        model.train()
+        return total / max(batches, 1)
+
+    # Nats per *original* token, so vocabularies are comparable: a cut that expands more
+    # tokens is charged for the expansion rather than rewarded with an easier softmax.
+    inflation = stream.shape[0] / raw.shape[0]
+
     window = args.batch * args.length
+    if args.passes is not None:
+        args.tokens = int(args.passes * stream.shape[0])
     steps = max(1, args.tokens // window)
     generator = np.random.default_rng(0)
     history = []
@@ -234,11 +278,20 @@ def main() -> int:
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - train_started
             seen = (step + 1) * window
-            row = {"step": step, "tokens": seen, "loss": float(loss),
+            row = {"step": step, "tokens": seen, "passes": seen / stream.shape[0],
+                   "loss": float(loss), "loss_per_original_token": float(loss) * inflation,
                    "tokens_per_second": seen / elapsed}
+            if evaluation is not None and (step % args.evaluate_every == 0
+                                           or step == steps - 1):
+                row["heldout"] = evaluate()
+                row["heldout_per_original_token"] = row["heldout"] * inflation
             history.append(row)
-            print("step %5d  %10d tokens  loss %7.4f  %8.0f tok/s"
-                  % (step, seen, row["loss"], row["tokens_per_second"]), flush=True)
+            print("step %5d  %5.2f passes  train %7.4f  held %8s  norm %7.4f  %8.0f tok/s"
+                  % (step, row["passes"], row["loss"],
+                     "%.4f" % row["heldout"] if "heldout" in row else "-",
+                     row.get("heldout_per_original_token",
+                             row["loss_per_original_token"]),
+                     row["tokens_per_second"]), flush=True)
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
@@ -252,6 +305,12 @@ def main() -> int:
         "scored_tokens": steps * window,
         "seconds": elapsed, "tokens_per_second": steps * window / elapsed,
         "first_loss": history[0]["loss"], "final_loss": history[-1]["loss"],
+        "inflation": inflation,
+        "final_loss_per_original_token": history[-1]["loss_per_original_token"],
+        "final_heldout": history[-1].get("heldout"),
+        "final_heldout_per_original_token": history[-1].get(
+            "heldout_per_original_token"),
+        "passes": history[-1]["passes"],
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2 ** 30,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
         "shared_delta_gib": spilled, "spilled": bool(spilled > 0.25),

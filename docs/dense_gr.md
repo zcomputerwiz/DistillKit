@@ -391,3 +391,48 @@ real budget.
 The 32,768 figure is measured on 30.7M tokens of Python. Recompute the ranking on the full
 corpus before freezing it: the number of distinct ids in use grows with corpus size, so
 the expansion rates above are a lower bound.
+
+### Vocabulary at a real budget
+
+The smoke test ranked vocabularies on throughput alone. This trains each one for **three
+passes over the same corpus** -- equal text rather than equal tokens, which is the only
+fair budget when a cut changes how many tokens the text becomes -- and scores held-out
+loss on the calibration split, which shares no repository with train. Loss is reported in
+**nats per original token**, so a cut is charged for its own expansion instead of being
+rewarded with an easier softmax. `sweep-v*.json`.
+
+| vocab | params | inflation | scored | held-out | normalized | tok/s | seconds |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 16,384 | 38.0M | 1.3216 | 121,896,960 | 2.0280 | 2.6802 | 135,123 | 902 |
+| **32,768** | 46.3M | 1.1247 | 103,743,488 | 2.2953 | **2.5816** | 116,837 | **888** |
+| 65,536 | 63.1M | 1.0237 | 94,437,376 | 2.7490 | 2.8143 | 100,397 | 941 |
+| 248,320 | 156.7M | 1.0000 | 92,274,688 | 3.0122 | 3.0122 | 54,249 | 1,701 |
+
+**32,768 wins on both axes**, best normalized loss and fastest wall clock, so there is no
+trade-off to adjudicate. It also confirms the throughput-only prediction independently:
+288.4 s per pass predicted 865 s for three, against 888 measured.
+
+The curve is **not** monotonic and a partial run says otherwise. At half a pass the
+ordering was 16,384 < 65,536 < 248,320 and looked like "smaller is better"; by three
+passes 16,384 has fallen behind 32,768 by 0.0986. Reading a vocabulary comparison off an
+early checkpoint gives the wrong answer.
+
+**Vocabulary is confounded with model size here, and larger cuts are penalized twice.**
+
+| vocab | tokens/parameter | train | held-out | gap |
+| ---: | ---: | ---: | ---: | ---: |
+| 16,384 | 3.21 | 1.9154 | 2.0280 | +0.1126 |
+| 32,768 | 2.24 | 2.3060 | 2.2953 | -0.0107 |
+| 65,536 | 1.50 | 2.6390 | 2.7490 | +0.1100 |
+| 248,320 | 0.59 | 2.9221 | 3.0122 | +0.0901 |
+
+A bigger vocabulary adds embedding parameters *and* yields fewer tokens from the same
+text, so tokens per parameter falls 5.4x across the sweep and every arm is far below
+compute-optimal. The 248,320 result is therefore partly "this model is undertrained"
+rather than purely "this vocabulary is worse" -- the same confound that made the Phase 1
+parameter-matched arm uninformative. Separating them needs either equal parameter counts
+at different vocabularies, or a budget where all arms converge.
+
+So 32,768 is the right choice *at this scale and budget*, which is what the copy
+experiment will run at. It is not established as the right choice in general, and the
+ranking should be recomputed on the 3B corpus before it is treated as settled.

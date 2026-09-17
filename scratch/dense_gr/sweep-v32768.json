@@ -1,0 +1,204 @@
+{
+  "vocab": 32768,
+  "kept_ids": 32768,
+  "coverage": 0.9762836459250378,
+  "store_tokens": 30760040,
+  "compact_tokens": 34596431,
+  "expanded_tokens": 729516,
+  "round_trip": true,
+  "parameters": 46339360,
+  "liger": {
+    "swiglu": 8,
+    "rmsnorm": 25
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 1583,
+  "scored_tokens": 103743488,
+  "seconds": 887.9356925000029,
+  "tokens_per_second": 116836.71337493809,
+  "first_loss": 10.490864753723145,
+  "final_loss": 2.3060054779052734,
+  "inflation": 1.1247199613524559,
+  "final_loss_per_original_token": 2.593610391988171,
+  "final_heldout": 2.2953453063964844,
+  "final_heldout_per_original_token": 2.5816206843007947,
+  "passes": 2.998676019500393,
+  "peak_allocated_gib": 11.36013412475586,
+  "peak_reserved_gib": 11.591796875,
+  "shared_delta_gib": 0.0,
+  "spilled": false,
+  "setup_seconds": 26.214588699978776,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "passes": 0.0018942994437778856,
+      "loss": 10.490864753723145,
+      "loss_per_original_token": 11.799285000361337,
+      "tokens_per_second": 28195.20689201865,
+      "heldout": 9.991294860839844,
+      "heldout_per_original_token": 11.23740876974478
+    },
+    {
+      "step": 100,
+      "tokens": 6619136,
+      "passes": 0.19132424382156646,
+      "loss": 5.1510162353515625,
+      "loss_per_original_token": 5.793450781150482,
+      "tokens_per_second": 127879.71438011817,
+      "heldout": 4.96475887298584,
+      "heldout_per_original_token": 5.583963407748897
+    },
+    {
+      "step": 200,
+      "tokens": 13172736,
+      "passes": 0.380754188199355,
+      "loss": 4.495251655578613,
+      "loss_per_original_token": 5.055899268331942,
+      "tokens_per_second": 127755.70966137979,
+      "heldout": 4.418323993682861,
+      "heldout_per_original_token": 4.969377191417617
+    },
+    {
+      "step": 300,
+      "tokens": 19726336,
+      "passes": 0.5701841325771436,
+      "loss": 4.002804756164551,
+      "loss_per_original_token": 4.5020344106548205,
+      "tokens_per_second": 125884.48714579751,
+      "heldout": 4.098876953125,
+      "heldout_per_original_token": 4.610088728307222
+    },
+    {
+      "step": 400,
+      "tokens": 26279936,
+      "passes": 0.7596140769549321,
+      "loss": 3.920422077178955,
+      "loss_per_original_token": 4.409376967130029,
+      "tokens_per_second": 122488.21794124557,
+      "heldout": 3.7285523414611816,
+      "heldout_per_original_token": 4.193577245388829
+    },
+    {
+      "step": 500,
+      "tokens": 32833536,
+      "passes": 0.9490440213327207,
+      "loss": 3.6232612133026123,
+      "loss_per_original_token": 4.075154211795566,
+      "tokens_per_second": 121432.762653173,
+      "heldout": 3.3695719242095947,
+      "heldout_per_original_token": 3.7898248043713356
+    },
+    {
+      "step": 600,
+      "tokens": 39387136,
+      "passes": 1.1384739657105092,
+      "loss": 3.196277141571045,
+      "loss_per_original_token": 3.594916703139524,
+      "tokens_per_second": 120684.09251926278,
+      "heldout": 3.1180107593536377,
+      "heldout_per_original_token": 3.506888940756765
+    },
+    {
+      "step": 700,
+      "tokens": 45940736,
+      "passes": 1.327903910088298,
+      "loss": 2.9512009620666504,
+      "loss_per_original_token": 3.3192746319989337,
+      "tokens_per_second": 120026.34198968566,
+      "heldout": 2.933511257171631,
+      "heldout_per_original_token": 3.299378667793071
+    },
+    {
+      "step": 800,
+      "tokens": 52494336,
+      "passes": 1.5173338544660864,
+      "loss": 2.8756139278411865,
+      "loss_per_original_token": 3.234260385786123,
+      "tokens_per_second": 119483.63624557303,
+      "heldout": 2.7913310527801514,
+      "heldout_per_original_token": 3.1394657538048016
+    },
+    {
+      "step": 900,
+      "tokens": 59047936,
+      "passes": 1.7067637988438749,
+      "loss": 2.773315191268921,
+      "loss_per_original_token": 3.1192029547421596,
+      "tokens_per_second": 118974.63792581052,
+      "heldout": 2.6731905937194824,
+      "heldout_per_original_token": 3.0065908212559247
+    },
+    {
+      "step": 1000,
+      "tokens": 65601536,
+      "passes": 1.8961937432216636,
+      "loss": 2.7416000366210938,
+      "loss_per_original_token": 3.083532287232368,
+      "tokens_per_second": 118515.70703205417,
+      "heldout": 2.582867383956909,
+      "heldout_per_original_token": 2.9050025042625336
+    },
+    {
+      "step": 1100,
+      "tokens": 72155136,
+      "passes": 2.085623687599452,
+      "loss": 2.609996795654297,
+      "loss_per_original_token": 2.9355154951383344,
+      "tokens_per_second": 118148.85329452268,
+      "heldout": 2.51442813873291,
+      "heldout_per_original_token": 2.8280275190192063
+    },
+    {
+      "step": 1200,
+      "tokens": 78708736,
+      "passes": 2.2750536319772405,
+      "loss": 2.558020830154419,
+      "loss_per_original_token": 2.877057089230055,
+      "tokens_per_second": 117790.07438172564,
+      "heldout": 2.450455665588379,
+      "heldout_per_original_token": 2.7560764014964683
+    },
+    {
+      "step": 1300,
+      "tokens": 85262336,
+      "passes": 2.464483576355029,
+      "loss": 2.48612380027771,
+      "loss_per_original_token": 2.7961930645657667,
+      "tokens_per_second": 117511.18434324035,
+      "heldout": 2.3973119258880615,
+      "heldout_per_original_token": 2.6963045766346023
+    },
+    {
+      "step": 1400,
+      "tokens": 91815936,
+      "passes": 2.653913520732818,
+      "loss": 2.5078186988830566,
+      "loss_per_original_token": 2.8205937500867178,
+      "tokens_per_second": 117271.3015133951,
+      "heldout": 2.3597424030303955,
+      "heldout_per_original_token": 2.654049384338098
+    },
+    {
+      "step": 1500,
+      "tokens": 98369536,
+      "passes": 2.8433434651106064,
+      "loss": 2.398231267929077,
+      "loss_per_original_token": 2.697338578979443,
+      "tokens_per_second": 117029.34428225001,
+      "heldout": 2.3251900672912598,
+      "heldout_per_original_token": 2.61518768262094
+    },
+    {
+      "step": 1582,
+      "tokens": 103743488,
+      "passes": 2.998676019500393,
+      "loss": 2.3060054779052734,
+      "loss_per_original_token": 2.593610391988171,
+      "tokens_per_second": 116858.57943552732,
+      "heldout": 2.2953453063964844,
+      "heldout_per_original_token": 2.5816206843007947
+    }
+  ]
+}
