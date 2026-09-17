@@ -147,22 +147,36 @@ ratio, not the constant.
 gradient checkpointing, chunked cross-entropy, real optimizer steps. Best batch per
 configuration; full sweep in `scratch/dense_gr/benchmark.json`.
 
+With the head folded into the loss loop (`--loss chunked_head`, position budget 2048), the
+configuration in `benchmark-chunked-head.json`:
+
 | configuration | params | core | best batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| d1536-L12, v248k | 778.8M | 51% | 2 | 4,610 | 33% | 60.3 h | 180.8 h |
-| d1280-L18, v248k | 732.0M | 57% | 2 | 4,573 | 29% | 60.7 h | 182.2 h |
-| d768-L12, v32k | 124.7M | 80% | 16 | 26,926 | 22% | 10.3 h | 30.9 h |
-| d512-L8, v16k | 38.0M | 78% | 16 | 70,285 | 12% | 4.0 h | 11.9 h |
+| d1536-L12, v248k | 778.8M | 51% | 32 | 6,484 | 78% | 42.8 h | 128.5 h |
+| d1280-L18, v248k | 732.0M | 57% | 32 | 6,543 | 73% | 42.5 h | 127.4 h |
+| d768-L12, v32k | 124.7M | 80% | 32 | 30,552 | 23% | 9.1 h | 27.3 h |
+| d512-L8, v16k | 38.0M | 78% | 32 | 75,440 | 11% | 3.7 h | 11.0 h |
 
-Two things to read off this. Depth versus width at a fixed budget barely matters --
-`d1536-L12` and `d1280-L18` differ by 1% -- so that choice can be made on other grounds.
-And **the 248,320-entry head inverts batch scaling**: the large configurations peak at
-batch 2 and get *slower* by batch 8 (3,671 tok/s), because the logits tensor is
-`batch x 1024 x 248,320`, while the small-vocabulary configurations scale normally to
-batch 16. The head, not the residual streams, is what limits the big models here.
+**Where the loss is computed matters more than the architecture.** Against
+`chunked_causal_lm_loss`, which chunks the fp32 upcast but is still handed logits the head
+has already materialized, folding the head into the loop is worth 1.41x at the 248,320
+vocabulary and 1.07x at 16,384 -- the gain tracks vocabulary size, because the head is
+what it removes. It also removes an inversion: with the logits materialized the 0.8B
+configurations peaked at batch 2 and got *slower* by batch 8 (3,671 tok/s), where folding
+the head makes them climb monotonically to batch 32 and fit at 78% of VRAM, which the
+other path could not reach at all.
 
-Per experiment arm, multiplied by three arms: 7.5 days at 0.8B against 1.3 days at 125M
-and half a day at 38M, for 1B tokens each.
+Depth against width at a fixed budget is worth 1% (`d1536-L12` against `d1280-L18`), so
+that choice can be made on other grounds.
+
+Per arm, multiplied by three arms at 1B tokens each: 5.4 days at 0.8B, 1.1 days at 125M,
+half a day at 38M.
+
+[Cut Cross-Entropy](https://arxiv.org/abs/2411.09009) goes further -- it never forms the
+logits at all, computing the log-sum-exp in SRAM, for `O(N + |V|)` memory instead of
+`O(N|V|)`. It is not yet used here. Folding the head recovers most of the available gain
+with no new dependency, and throughput is nearly flat from batch 16 to 32 (+1.9%), so the
+remaining headroom is memory rather than speed.
 
 **Measure with the allocator capped.** `torch.cuda.set_per_process_memory_fraction`, or
 `max_vram_fraction` for a real run. An uncapped first pass of this benchmark reserved

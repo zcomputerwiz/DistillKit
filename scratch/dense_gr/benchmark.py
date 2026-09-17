@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -25,6 +26,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 import torch
+from torch.utils.checkpoint import checkpoint
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from distillkit.core.chunked_ce import maybe_install_chunked_loss
@@ -67,7 +69,65 @@ def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2):
     return config
 
 
-def measure(model, config, batch, length, steps, warmup, device="cuda"):
+def shared_gpu_gib():
+    """Bytes the driver is serving from system RAM as GPU memory, worst adapter.
+
+    `set_per_process_memory_fraction` caps PyTorch's allocator, which is necessary but
+    not sufficient: the CUDA context, cuBLAS and Triton workspaces allocate outside it,
+    and on Windows WDDM anything over budget is paged to shared system memory and served
+    over PCIe rather than raising. nvidia-smi does not report this, so the only honest
+    check is the WDDM performance counter. A run whose shared usage climbs is measuring
+    the bus, not the model, and its numbers must be thrown away.
+    """
+    command = ("$c = Get-Counter '\\GPU Adapter Memory(*)\\Shared Usage' "
+               "-ErrorAction SilentlyContinue; "
+               "($c.CounterSamples | Measure-Object -Property CookedValue "
+               "-Maximum).Maximum")
+    try:
+        output = subprocess.run(["powershell", "-NoProfile", "-Command", command],
+                                capture_output=True, text=True, timeout=30)
+        return float(output.stdout.strip()) / 2 ** 30
+    except Exception:
+        return float("nan")
+
+
+def chunked_head_causal_loss(hidden, head, labels, position_budget):
+    """Plain causal CE with the head folded into the chunk loop.
+
+    ``chunked_head_loss`` in distillkit does this for the sparse teacher divergences,
+    whose ``fn`` signature carries target values and a mask. Pretraining from scratch
+    has neither, so this is the same structure over ordinary cross-entropy: project one
+    slice of the post-norm state, reduce it to a scalar, free the logits, and let
+    checkpointing recompute the slice in backward. No full-vocabulary tensor is ever
+    alive -- which is the difference from ``chunked_causal_lm_loss``, which chunks the
+    fp32 upcast but is still handed logits the head has already materialized.
+
+    The budget counts *total positions*, not positions per sequence: a chunk's logits
+    are ``[batch, chunk, vocab]``, so a fixed per-sequence chunk silently allocates
+    four times as much at batch 4.
+    """
+    shifted = torch.nn.functional.pad(labels, (0, 1), value=-100)[..., 1:].contiguous()
+    batch, seq_len = hidden.shape[0], hidden.shape[1]
+    chunk = max(1, position_budget // max(1, batch))
+    counted = (shifted != -100).sum()
+    total = None
+
+    def contribution(state, ids):
+        logits = head(state)
+        return torch.nn.functional.cross_entropy(
+            logits.float().view(-1, logits.shape[-1]), ids.reshape(-1),
+            ignore_index=-100, reduction="sum")
+
+    for start in range(0, seq_len, chunk):
+        stop = min(start + chunk, seq_len)
+        piece = checkpoint(contribution, hidden[:, start:stop], shifted[:, start:stop],
+                           use_reentrant=False, preserve_rng_state=False)
+        total = piece if total is None else total + piece
+    return total / torch.clamp(counted.to(total.dtype), min=1.0)
+
+
+def measure(model, config, batch, length, steps, warmup, device="cuda",
+            loss_kind="chunked_ce", position_budget=4096):
     torch.cuda.empty_cache()
     torch.cuda.reset_peak_memory_stats()
 
@@ -79,8 +139,16 @@ def measure(model, config, batch, length, steps, warmup, device="cuda"):
 
     def step():
         optimizer.zero_grad(set_to_none=True)
-        loss = model(input_ids=tokens, attention_mask=attention, labels=tokens,
-                     use_cache=False).loss
+        if loss_kind == "chunked_head":
+            # The head never runs over the whole sequence: take the model's post-norm
+            # state and fold the projection into the loss instead.
+            hidden = model.model(input_ids=tokens, attention_mask=attention,
+                                 use_cache=False).last_hidden_state
+            loss = chunked_head_causal_loss(hidden, model.lm_head, tokens,
+                                            position_budget)
+        else:
+            loss = model(input_ids=tokens, attention_mask=attention, labels=tokens,
+                         use_cache=False).loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
@@ -105,6 +173,7 @@ def measure(model, config, batch, length, steps, warmup, device="cuda"):
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2 ** 30,
         "peak_reserved_gib": reserved / 2 ** 30,
         "reserved_fraction_of_vram": reserved / budget,
+        "shared_gib": shared_gpu_gib(),
         "loss": last,
     }
     del optimizer, tokens, attention
@@ -122,6 +191,14 @@ def main() -> int:
     parser.add_argument("--warmup", type=int, default=3)
     parser.add_argument("--only", nargs="*", default=None)
     parser.add_argument("--no-checkpointing", action="store_true")
+    parser.add_argument("--loss", default="chunked_ce",
+                        choices=("chunked_ce", "chunked_head"),
+                        help="chunked_ce materializes logits then chunks the upcast; "
+                             "chunked_head folds the projection into the loss loop")
+    parser.add_argument("--position-budget", type=int, default=4096)
+    parser.add_argument("--spill-tolerance-gib", type=float, default=0.25,
+                        help="abort if WDDM shared GPU memory climbs this far "
+                             "above baseline: the run would be measuring PCIe")
     parser.add_argument("--vram-fraction", type=float, default=0.90,
                         help="cap PyTorch's share so over-budget raises instead of "
                              "spilling to shared system memory")
@@ -144,10 +221,16 @@ def main() -> int:
     # `max_vram_fraction` in distillkit/configuration.py does the same thing for runs.
     torch.cuda.set_per_process_memory_fraction(args.vram_fraction, 0)
 
+    baseline_shared = shared_gpu_gib()
+    print("baseline shared GPU memory: %.2f GiB (spill guard trips at +%.2f)"
+          % (baseline_shared, args.spill_tolerance_gib), flush=True)
+
     report = {"device": torch.cuda.get_device_name(0), "length": args.length,
+              "baseline_shared_gib": baseline_shared,
+              "spill_tolerance_gib": args.spill_tolerance_gib,
               "dtype": "bfloat16", "optimizer": "bnb.AdamW8bit",
               "gradient_checkpointing": not args.no_checkpointing,
-              "chunked_cross_entropy": True,
+              "loss": args.loss, "position_budget": args.position_budget,
               "vram_fraction": args.vram_fraction,
               "total_vram_gib": torch.cuda.get_device_properties(0).total_memory / 2 ** 30,
               "configurations": {}}
@@ -178,7 +261,9 @@ def main() -> int:
         maybe_install_chunked_loss(model, need_model_loss=True, enabled=True)
         for batch in args.batches:
             try:
-                row = measure(model, config, batch, args.length, args.steps, args.warmup)
+                row = measure(model, config, batch, args.length, args.steps,
+                              args.warmup, loss_kind=args.loss,
+                              position_budget=args.position_budget)
             except torch.OutOfMemoryError:
                 print("  batch %-3d OOM (capped at %.0f%% of VRAM)"
                       % (batch, 100 * args.vram_fraction), flush=True)
@@ -190,7 +275,16 @@ def main() -> int:
             hours = lambda budget: budget / row["tokens_per_second"] / 3600
             row["hours_per_arm_1b"] = hours(1e9)
             row["hours_per_arm_3b"] = hours(3e9)
+            spilled = row["shared_gib"] - baseline_shared
+            row["shared_delta_gib"] = spilled
             entry["runs"].append(row)
+            if spilled > args.spill_tolerance_gib:
+                print("  batch %-3d SPILLED: shared GPU memory +%.2f GiB above "
+                      "baseline. Result discarded, sweep stopped."
+                      % (batch, spilled), flush=True)
+                row["spilled"] = True
+                entry["spilled_at_batch"] = batch
+                break
             print("  batch %-3d %8.0f tok/s  %6.3f s/step  peak %5.2f GiB alloc / "
                   "%5.2f GiB reserved (%2.0f%% VRAM)  1B: %5.1f h  3B: %5.1f h"
                   % (batch, row["tokens_per_second"], row["seconds_per_step"],
