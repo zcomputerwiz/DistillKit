@@ -1,0 +1,26 @@
+{
+  "hidden": 768,
+  "layers": 12,
+  "vocab": 32768,
+  "dtype": "torch.bfloat16",
+  "rmsnorm_isolated": {
+    "max_abs": 0.0009765625,
+    "max_rel": 0.00016276042151730508,
+    "bitwise": false
+  },
+  "rmsnorm_isolated_fp32": {
+    "max_abs": 9.5367431640625e-07,
+    "max_rel": 1.58312829512397e-07,
+    "bitwise": false
+  },
+  "swapped": {
+    "swiglu": 12,
+    "rmsnorm": 37
+  },
+  "logits": {
+    "max_abs": 0.052734375,
+    "max_rel": 0.01548165176063776,
+    "bitwise": false
+  },
+  "argmax_agreement": 0.98046875
+}

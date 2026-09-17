@@ -108,6 +108,58 @@ def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2,
     return config
 
 
+def apply_liger(model, config):
+    """Swap the stock SwiGLU and RMSNorm for Liger's fused kernels, where they fit.
+
+    Two of the three obvious candidates fit without rework and one does not.
+
+    *SwiGLU* fits cleanly: `down_proj(act(gate(x)) * up(x))` becomes one fused kernel for
+    the activation and product, and only the forward is replaced, so no parameter moves
+    and no checkpoint changes shape.
+
+    *RMSNorm* fits because `LigerRMSNorm(offset=1.0, casting_mode="gemma")` is exactly
+    Qwen3.5's convention -- it stores a deviation, applies `1 + weight`, and does the
+    weight multiply in fp32 before casting back. Note this swaps the module *class*, so a
+    model that has been Liger-patched will no longer satisfy `recipient_initialize`'s
+    `Qwen3_5RMSNorm` type check. That refusal is deliberate and this is why it exists.
+
+    *RoPE* does not fit. Qwen3.5 uses interleaved mRoPE with a partial rotary factor and
+    Liger's kernel is the standard formulation; matching them is rework, not a swap.
+
+    The branch norms inside the GR route are left alone on purpose. They are a custom
+    autograd Function written to avoid holding fp32 copies until backward, the whole
+    route is 4.7% of a step, and trading that memory design for a fused kernel is a bad
+    exchange at that share.
+    """
+    import types
+
+    from liger_kernel.ops.swiglu import LigerSiLUMulFunction
+    from liger_kernel.transformers import LigerRMSNorm
+    from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5MLP, Qwen3_5RMSNorm
+
+    def fused_mlp_forward(self, x):
+        return self.down_proj(LigerSiLUMulFunction.apply(self.gate_proj(x),
+                                                         self.up_proj(x)))
+
+    swapped = {"swiglu": 0, "rmsnorm": 0}
+    for module in model.modules():
+        if isinstance(module, Qwen3_5MLP):
+            module.forward = types.MethodType(fused_mlp_forward, module)
+            swapped["swiglu"] += 1
+    for name, parent in list(model.named_modules()):
+        for child_name, child in list(parent.named_children()):
+            if not isinstance(child, Qwen3_5RMSNorm):
+                continue
+            replacement = LigerRMSNorm(
+                child.weight.shape[0], eps=float(child.eps), offset=1.0,
+                casting_mode="gemma", init_fn="zeros").to(
+                    device=child.weight.device, dtype=child.weight.dtype)
+            replacement.weight.data.copy_(child.weight.data)
+            setattr(parent, child_name, replacement)
+            swapped["rmsnorm"] += 1
+    return swapped
+
+
 def _module_version(name):
     import importlib
     try:
@@ -252,6 +304,8 @@ def main() -> int:
     parser.add_argument("--position-budget", type=int, default=4096)
     parser.add_argument("--attn", default="sdpa",
                         choices=("sdpa", "flash_attention_2", "eager"))
+    parser.add_argument("--liger", action="store_true",
+                        help="swap SwiGLU and RMSNorm for Liger fused kernels")
     parser.add_argument("--compile", action="store_true",
                         help="torch.compile the text model")
     parser.add_argument("--spill-tolerance-gib", type=float, default=0.25,
@@ -294,6 +348,7 @@ def main() -> int:
         "fused_linear_attention_available": bool(fused_linear_attention_available()),
         "fused_kernel_supports_gqa": bool(fused_kernel_supports_gqa()),
         "torch_compile": bool(args.compile),
+        "liger": _module_version("liger_kernel") if args.liger else None,
     }
     print(json.dumps(kernels), flush=True)
 
@@ -336,6 +391,10 @@ def main() -> int:
             model.gradient_checkpointing_enable()
         model.train()
         maybe_install_chunked_loss(model, need_model_loss=True, enabled=True)
+        if args.liger:
+            entry["liger_swapped"] = apply_liger(model, config)
+            print("  liger swapped: %s" % json.dumps(entry["liger_swapped"]),
+                  flush=True)
         if args.compile:
             # Only the decoder stack. The loss paths are chunked or fused already,
             # and compiling across a checkpoint boundary is what an earlier branch
