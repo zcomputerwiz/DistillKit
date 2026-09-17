@@ -1,0 +1,372 @@
+{
+  "device": "NVIDIA GeForce RTX 3090",
+  "length": 1024,
+  "dtype": "bfloat16",
+  "optimizer": "bnb.AdamW8bit",
+  "gradient_checkpointing": true,
+  "chunked_cross_entropy": true,
+  "vram_fraction": 0.9,
+  "total_vram_gib": 23.99951171875,
+  "configurations": {
+    "d1536-L12": {
+      "hidden": 1536,
+      "layers": 12,
+      "vocab": 248320,
+      "parameters": 778834704,
+      "embedding_parameters": 381419520,
+      "core_parameters": 397415184,
+      "runs": [
+        {
+          "batch": 1,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.25966847499876167,
+          "tokens_per_second": 3943.489867242773,
+          "peak_allocated_gib": 5.644340515136719,
+          "peak_reserved_gib": 5.802734375,
+          "reserved_fraction_of_vram": 0.241785518097292,
+          "loss": 0.0016096654580906034,
+          "hours_per_arm_1b": 70.43958197666062,
+          "hours_per_arm_3b": 211.31874592998184
+        },
+        {
+          "batch": 2,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.4442230249987915,
+          "tokens_per_second": 4610.29682107444,
+          "peak_allocated_gib": 6.067683696746826,
+          "peak_reserved_gib": 8.0078125,
+          "reserved_fraction_of_vram": 0.333665642611544,
+          "loss": 0.0038937628269195557,
+          "hours_per_arm_1b": 60.25160386810866,
+          "hours_per_arm_3b": 180.75481160432594
+        },
+        {
+          "batch": 4,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.9123414875029994,
+          "tokens_per_second": 4489.547012939642,
+          "peak_allocated_gib": 9.203479290008545,
+          "peak_reserved_gib": 10.35546875,
+          "reserved_fraction_of_vram": 0.43148664320156255,
+          "loss": 0.011573958210647106,
+          "hours_per_arm_1b": 61.8721169367811,
+          "hours_per_arm_3b": 185.61635081034328
+        },
+        {
+          "batch": 8,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 2.231440837498667,
+          "tokens_per_second": 3671.170600777756,
+          "peak_allocated_gib": 15.479342937469482,
+          "peak_reserved_gib": 18.78125,
+          "reserved_fraction_of_vram": 0.7825680047201481,
+          "loss": 0.04829324781894684,
+          "hours_per_arm_1b": 75.66463343297887,
+          "hours_per_arm_3b": 226.99390029893664
+        },
+        {
+          "batch": 16,
+          "oom": true
+        }
+      ],
+      "best": {
+        "batch": 2,
+        "length": 1024,
+        "steps": 8,
+        "seconds_per_step": 0.4442230249987915,
+        "tokens_per_second": 4610.29682107444,
+        "peak_allocated_gib": 6.067683696746826,
+        "peak_reserved_gib": 8.0078125,
+        "reserved_fraction_of_vram": 0.333665642611544,
+        "loss": 0.0038937628269195557,
+        "hours_per_arm_1b": 60.25160386810866,
+        "hours_per_arm_3b": 180.75481160432594
+      }
+    },
+    "d1280-L18": {
+      "hidden": 1280,
+      "layers": 18,
+      "vocab": 248320,
+      "parameters": 731996788,
+      "embedding_parameters": 317849600,
+      "core_parameters": 414147188,
+      "runs": [
+        {
+          "batch": 1,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.29642491249978775,
+          "tokens_per_second": 3454.50047151733,
+          "peak_allocated_gib": 5.116450309753418,
+          "peak_reserved_gib": 5.37109375,
+          "reserved_fraction_of_vram": 0.22380012614188927,
+          "loss": 0.005827685818076134,
+          "hours_per_arm_1b": 80.41040378140944,
+          "hours_per_arm_3b": 241.23121134422829
+        },
+        {
+          "batch": 2,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.4478329000012309,
+          "tokens_per_second": 4573.134309681962,
+          "peak_allocated_gib": 5.9236979484558105,
+          "peak_reserved_gib": 7.068359375,
+          "reserved_fraction_of_vram": 0.2945209660027263,
+          "loss": 0.01547953113913536,
+          "hours_per_arm_1b": 60.741224501035006,
+          "hours_per_arm_3b": 182.223673503105
+        },
+        {
+          "batch": 4,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.9185026499981177,
+          "tokens_per_second": 4459.431880799031,
+          "peak_allocated_gib": 9.12992811203003,
+          "peak_reserved_gib": 10.38671875,
+          "reserved_fraction_of_vram": 0.4327887530263881,
+          "loss": 0.050164204090833664,
+          "hours_per_arm_1b": 62.28994750963797,
+          "hours_per_arm_3b": 186.8698425289139
+        },
+        {
+          "batch": 8,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 2.236964062500192,
+          "tokens_per_second": 3662.1062167820573,
+          "peak_allocated_gib": 15.531100749969482,
+          "peak_reserved_gib": 19.005859375,
+          "reserved_fraction_of_vram": 0.7919269190860817,
+          "loss": 0.2300529181957245,
+          "hours_per_arm_1b": 75.85191726685223,
+          "hours_per_arm_3b": 227.55575180055664
+        },
+        {
+          "batch": 16,
+          "oom": true
+        }
+      ],
+      "best": {
+        "batch": 2,
+        "length": 1024,
+        "steps": 8,
+        "seconds_per_step": 0.4478329000012309,
+        "tokens_per_second": 4573.134309681962,
+        "peak_allocated_gib": 5.9236979484558105,
+        "peak_reserved_gib": 7.068359375,
+        "reserved_fraction_of_vram": 0.2945209660027263,
+        "loss": 0.01547953113913536,
+        "hours_per_arm_1b": 60.741224501035006,
+        "hours_per_arm_3b": 182.223673503105
+      }
+    },
+    "d768-L12-v32k": {
+      "hidden": 768,
+      "layers": 12,
+      "vocab": 32768,
+      "parameters": 124728264,
+      "embedding_parameters": 25165824,
+      "core_parameters": 99562440,
+      "runs": [
+        {
+          "batch": 1,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.1802570250001736,
+          "tokens_per_second": 5680.777212422172,
+          "peak_allocated_gib": 0.9795403480529785,
+          "peak_reserved_gib": 1.212890625,
+          "reserved_fraction_of_vram": 0.05053813757604118,
+          "loss": 0.62969571352005,
+          "hours_per_arm_1b": 48.89784749353667,
+          "hours_per_arm_3b": 146.69354248061003
+        },
+        {
+          "batch": 2,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.1733888874987315,
+          "tokens_per_second": 11811.598941223861,
+          "peak_allocated_gib": 1.2398815155029297,
+          "peak_reserved_gib": 1.44921875,
+          "reserved_fraction_of_vram": 0.06038534312628431,
+          "loss": 1.370851993560791,
+          "hours_per_arm_1b": 23.517372978886108,
+          "hours_per_arm_3b": 70.55211893665832
+        },
+        {
+          "batch": 4,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.1790727000006882,
+          "tokens_per_second": 22873.391644758016,
+          "peak_allocated_gib": 1.6371521949768066,
+          "peak_reserved_gib": 2.09375,
+          "reserved_fraction_of_vram": 0.08724135826331102,
+          "loss": 2.372976064682007,
+          "hours_per_arm_1b": 12.144144694057088,
+          "hours_per_arm_3b": 36.43243408217126
+        },
+        {
+          "batch": 8,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.3134511999996903,
+          "tokens_per_second": 26134.849699117738,
+          "peak_allocated_gib": 2.616873264312744,
+          "peak_reserved_gib": 3.486328125,
+          "reserved_fraction_of_vram": 0.14526662733209905,
+          "loss": 3.447044849395752,
+          "hours_per_arm_1b": 10.628634982628387,
+          "hours_per_arm_3b": 31.885904947885162
+        },
+        {
+          "batch": 16,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.6084851250016072,
+          "tokens_per_second": 26925.884178280816,
+          "peak_allocated_gib": 4.698568820953369,
+          "peak_reserved_gib": 5.326171875,
+          "reserved_fraction_of_vram": 0.22192834326870256,
+          "loss": 4.470810890197754,
+          "hours_per_arm_1b": 10.31638463340941,
+          "hours_per_arm_3b": 30.94915390022823
+        },
+        {
+          "batch": 32,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 1.312289512501593,
+          "tokens_per_second": 24970.099728629983,
+          "peak_allocated_gib": 8.87184762954712,
+          "peak_reserved_gib": 9.74609375,
+          "reserved_fraction_of_vram": 0.40609550161746455,
+          "loss": 5.440484523773193,
+          "hours_per_arm_1b": 11.124416033440426,
+          "hours_per_arm_3b": 33.37324810032127
+        }
+      ],
+      "best": {
+        "batch": 16,
+        "length": 1024,
+        "steps": 8,
+        "seconds_per_step": 0.6084851250016072,
+        "tokens_per_second": 26925.884178280816,
+        "peak_allocated_gib": 4.698568820953369,
+        "peak_reserved_gib": 5.326171875,
+        "reserved_fraction_of_vram": 0.22192834326870256,
+        "loss": 4.470810890197754,
+        "hours_per_arm_1b": 10.31638463340941,
+        "hours_per_arm_3b": 30.94915390022823
+      }
+    },
+    "d512-L8-v16k": {
+      "hidden": 512,
+      "layers": 8,
+      "vocab": 16384,
+      "parameters": 37950752,
+      "embedding_parameters": 8388608,
+      "core_parameters": 29562144,
+      "runs": [
+        {
+          "batch": 1,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.11718206249861396,
+          "tokens_per_second": 8738.538801637085,
+          "peak_allocated_gib": 0.40416717529296875,
+          "peak_reserved_gib": 0.486328125,
+          "reserved_fraction_of_vram": 0.02026408414884743,
+          "loss": 3.6583127975463867,
+          "hours_per_arm_1b": 31.787668863556302,
+          "hours_per_arm_3b": 95.3630065906689
+        },
+        {
+          "batch": 2,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.10553648750283173,
+          "tokens_per_second": 19405.610784090655,
+          "peak_allocated_gib": 0.6557192802429199,
+          "peak_reserved_gib": 0.70703125,
+          "reserved_fraction_of_vram": 0.029460234786677787,
+          "loss": 4.526168346405029,
+          "hours_per_arm_1b": 14.314302232914459,
+          "hours_per_arm_3b": 42.94290669874337
+        },
+        {
+          "batch": 4,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.09934900000007474,
+          "tokens_per_second": 41228.3968635509,
+          "peak_allocated_gib": 0.9098010063171387,
+          "peak_reserved_gib": 1.1796875,
+          "reserved_fraction_of_vram": 0.04915464588716405,
+          "loss": 5.340725898742676,
+          "hours_per_arm_1b": 6.7375352647620135,
+          "hours_per_arm_3b": 20.21260579428604
+        },
+        {
+          "batch": 8,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.12645288749990868,
+          "tokens_per_second": 64783.02047476706,
+          "peak_allocated_gib": 1.2929649353027344,
+          "peak_reserved_gib": 1.68359375,
+          "reserved_fraction_of_vram": 0.07015116681247584,
+          "loss": 6.079647064208984,
+          "hours_per_arm_1b": 4.287817637122555,
+          "hours_per_arm_3b": 12.863452911367665
+        },
+        {
+          "batch": 16,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.23310742499961634,
+          "tokens_per_second": 70285.19147353186,
+          "peak_allocated_gib": 2.2467918395996094,
+          "peak_reserved_gib": 2.837890625,
+          "reserved_fraction_of_vram": 0.11824784846696913,
+          "loss": 6.771714687347412,
+          "hours_per_arm_1b": 3.9521522521907606,
+          "hours_per_arm_3b": 11.856456756572282
+        },
+        {
+          "batch": 32,
+          "length": 1024,
+          "steps": 8,
+          "seconds_per_step": 0.4705413000010594,
+          "tokens_per_second": 69638.94561418142,
+          "peak_allocated_gib": 4.279445648193359,
+          "peak_reserved_gib": 5.009765625,
+          "reserved_fraction_of_vram": 0.208744481292344,
+          "loss": 7.391913890838623,
+          "hours_per_arm_1b": 3.9888280232837205,
+          "hours_per_arm_3b": 11.966484069851163
+        }
+      ],
+      "best": {
+        "batch": 16,
+        "length": 1024,
+        "steps": 8,
+        "seconds_per_step": 0.23310742499961634,
+        "tokens_per_second": 70285.19147353186,
+        "peak_allocated_gib": 2.2467918395996094,
+        "peak_reserved_gib": 2.837890625,
+        "reserved_fraction_of_vram": 0.11824784846696913,
+        "loss": 6.771714687347412,
+        "hours_per_arm_1b": 3.9521522521907606,
+        "hours_per_arm_3b": 11.856456756572282
+      }
+    }
+  }
+}

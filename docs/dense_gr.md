@@ -141,6 +141,35 @@ routing and memory.
 Note `r = 320` is inherited from Flash-Next at `d = 2560`, where it is `d/8`. Fix the
 ratio, not the constant.
 
+### Measured throughput
+
+`scratch/dense_gr/benchmark.py`, one RTX 3090, sequence 1024, bf16 weights, 8-bit AdamW,
+gradient checkpointing, chunked cross-entropy, real optimizer steps. Best batch per
+configuration; full sweep in `scratch/dense_gr/benchmark.json`.
+
+| configuration | params | core | best batch | tok/s | peak VRAM | 1B tokens | 3B tokens |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| d1536-L12, v248k | 778.8M | 51% | 2 | 4,610 | 33% | 60.3 h | 180.8 h |
+| d1280-L18, v248k | 732.0M | 57% | 2 | 4,573 | 29% | 60.7 h | 182.2 h |
+| d768-L12, v32k | 124.7M | 80% | 16 | 26,926 | 22% | 10.3 h | 30.9 h |
+| d512-L8, v16k | 38.0M | 78% | 16 | 70,285 | 12% | 4.0 h | 11.9 h |
+
+Two things to read off this. Depth versus width at a fixed budget barely matters --
+`d1536-L12` and `d1280-L18` differ by 1% -- so that choice can be made on other grounds.
+And **the 248,320-entry head inverts batch scaling**: the large configurations peak at
+batch 2 and get *slower* by batch 8 (3,671 tok/s), because the logits tensor is
+`batch x 1024 x 248,320`, while the small-vocabulary configurations scale normally to
+batch 16. The head, not the residual streams, is what limits the big models here.
+
+Per experiment arm, multiplied by three arms: 7.5 days at 0.8B against 1.3 days at 125M
+and half a day at 38M, for 1B tokens each.
+
+**Measure with the allocator capped.** `torch.cuda.set_per_process_memory_fraction`, or
+`max_vram_fraction` for a real run. An uncapped first pass of this benchmark reserved
+35.27 GiB on a 24 GiB card and reported 1,714 tok/s against 4,491 at half the batch: on
+Windows WDDM the driver pages to shared system memory rather than raising, and the result
+is a PCIe bandwidth measurement that still reports 100% GPU utilisation.
+
 **Activations bind before parameters do.** Four streams carry 4x the residual state. The
 `_BranchNorm` docstring records that two branches at batch 2 x 4096 held about 670 MB per
 widened layer during backward, the largest single item in the recompute working set; four
