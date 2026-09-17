@@ -291,6 +291,35 @@ def do_distill(config: DistillationRunConfig, config_source: str | None = None,
         ds_train, ds_eval = load_data(config.dataset, tokenizer)
         signal_vocab_size = tokenizer_vocab_size
 
+    if config.high_resolution_timer and os.name == "nt":
+        try:
+            import atexit
+            import ctypes
+            ctypes.windll.winmm.timeBeginPeriod(1)
+            atexit.register(ctypes.windll.winmm.timeEndPeriod, 1)
+            LOG.info("Windows high-resolution timer (1ms) enabled.")
+        except Exception as e:
+            LOG.warning("Could not enable Windows high-resolution timer: %s", e)
+
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = bool(config.allow_tf32)
+        torch.backends.cudnn.allow_tf32 = bool(config.allow_tf32)
+        if hasattr(torch, "set_float32_matmul_precision"):
+            torch.set_float32_matmul_precision("high" if config.allow_tf32 else "highest")
+        LOG.info(
+            "Configured TensorFloat-32 (TF32): matmul=%s, cudnn=%s",
+            torch.backends.cuda.matmul.allow_tf32,
+            torch.backends.cudnn.allow_tf32,
+        )
+
+    if config.cuda_allocator_gc_threshold is not None and torch.cuda.is_available():
+        current_alloc_conf = os.environ.get("PYTORCH_CUDA_ALLOC_CONF", "")
+        if "garbage_collection_threshold" not in current_alloc_conf:
+            gc_setting = f"garbage_collection_threshold:{config.cuda_allocator_gc_threshold}"
+            new_conf = f"{current_alloc_conf},{gc_setting}" if current_alloc_conf else gc_setting
+            os.environ["PYTORCH_CUDA_ALLOC_CONF"] = new_conf
+            LOG.info("Configured PYTORCH_CUDA_ALLOC_CONF=%s", new_conf)
+
     if config.max_vram_fraction is not None and torch.cuda.is_available():
         for index in range(torch.cuda.device_count()):
             torch.cuda.set_per_process_memory_fraction(config.max_vram_fraction, index)

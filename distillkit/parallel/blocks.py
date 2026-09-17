@@ -22,11 +22,30 @@ would exceed the flops saved.
 
 from __future__ import annotations
 
+import functools
 import torch
 from torch import nn
 
 from distillkit.parallel.collectives import all_reduce, replicate
 from distillkit.parallel.linear import ColumnParallelLinear, RowParallelLinear, split_sizes
+
+try:
+    from flash_attn import flash_attn_func, flash_attn_varlen_func
+    from flash_attn.bert_padding import pad_input, unpad_input
+    _HAS_FLASH_ATTN = True
+except (ImportError, OSError):
+    _HAS_FLASH_ATTN = False
+    flash_attn_func = None
+    flash_attn_varlen_func = None
+    pad_input = None
+    unpad_input = None
+
+try:
+    from fla.modules.activations import swiglu as _fla_swiglu
+    _HAS_FLA_SWIGLU = True
+except (ImportError, OSError):
+    _HAS_FLA_SWIGLU = False
+    _fla_swiglu = None
 
 
 class TensorParallelMLP(nn.Module):
@@ -41,6 +60,8 @@ class TensorParallelMLP(nn.Module):
         super().__init__()
         self.devices = [torch.device(d) for d in devices]
         self.act_fn = mlp.act_fn
+        act_name = getattr(self.act_fn, "__name__", "") or self.act_fn.__class__.__name__.lower()
+        self._use_fused_swiglu = _HAS_FLA_SWIGLU and act_name in ("silu", "siluactivation")
         self.gate_proj = ColumnParallelLinear(mlp.gate_proj, self.devices)
         self.up_proj = ColumnParallelLinear(mlp.up_proj, self.devices)
         # reduce_only: the residual stream is on the home card, so producing a
@@ -53,8 +74,30 @@ class TensorParallelMLP(nn.Module):
         copies = replicate(x, self.devices)
         gates = self.gate_proj(x, copies)
         ups = self.up_proj(x, copies)
-        hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
+        if self._use_fused_swiglu and x.is_cuda:
+            hidden = [_fla_swiglu(g, u) for g, u in zip(gates, ups)]
+        else:
+            hidden = [self.act_fn(g) * u for g, u in zip(gates, ups)]
         return self.down_proj(hidden)[0]
+
+
+@functools.lru_cache(maxsize=None)
+def _is_flash_attn_head_dim_supported(head_dim: int, dtype: torch.dtype, device_str: str) -> bool:
+    """Probe whether the installed flash_attn binary was compiled with support for this head_dim.
+
+    Results are cached via lru_cache so the probe executes at most once per
+    (head_dim, dtype, device) across the process lifetime, introducing 0 overhead during training.
+    """
+    if not _HAS_FLASH_ATTN or flash_attn_func is None:
+        return False
+    try:
+        q = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        k = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        v = torch.empty(1, 1, 1, head_dim, dtype=dtype, device=device_str)
+        flash_attn_func(q, k, v)
+        return True
+    except Exception:
+        return False
 
 
 class TensorParallelAttention(nn.Module):
@@ -110,6 +153,33 @@ class TensorParallelAttention(nn.Module):
         """Both per-head norms receive partial gradients from each head shard."""
         return [list(q.parameters()) + list(k.parameters()) for q, k in zip(self.q_norms, self.k_norms)]
 
+    def _can_use_flash_attn(
+        self,
+        device: torch.device,
+        dtype: torch.dtype,
+        attention_mask: torch.Tensor | None,
+    ) -> bool:
+        attn_impl = getattr(self.config, "_attn_implementation", None)
+        if attn_impl in ("eager", "sdpa"):
+            return False
+        if not _HAS_FLASH_ATTN or flash_attn_func is None:
+            return False
+        if device.type != "cuda":
+            return False
+        if dtype not in (torch.float16, torch.bfloat16):
+            return False
+        if self.head_dim not in (64, 128, 256):
+            return False
+        if not _is_flash_attn_head_dim_supported(self.head_dim, dtype, str(device)):
+            return False
+        if attention_mask is not None:
+            if attention_mask.ndim == 2:
+                if not bool((attention_mask == 1).all()) and (flash_attn_varlen_func is None or unpad_input is None):
+                    return False
+            else:
+                return False
+        return True
+
     def forward(self, hidden_states, position_embeddings, attention_mask=None, **kwargs):
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
 
@@ -130,18 +200,64 @@ class TensorParallelAttention(nn.Module):
             k = self.k_norms[index](keys[index].view(shape)).transpose(1, 2)
             v = values[index].view(shape).transpose(1, 2)
             q, k = apply_rotary_pos_emb(q, k, cos.to(device), sin.to(device))
-            # repeat_kv rather than enable_gqa: no fused kernel on this build
-            # broadcasts grouped-query heads, so asking for it selects the math
-            # kernel. See distillkit/gqa_dispatch.py.
-            groups = self.heads_per_rank // self.kv_heads_per_rank
-            attention_output = torch.nn.functional.scaled_dot_product_attention(
-                q, _repeat_kv(k, groups), _repeat_kv(v, groups),
-                attn_mask=None if attention_mask is None else attention_mask.to(device),
-                dropout_p=self.attention_dropout if self.training else 0.0,
-                scale=self.scaling,
-                is_causal=attention_mask is None and q.shape[2] > 1,
-            )
-            attention_output = attention_output.transpose(1, 2).reshape(*input_shape, -1)
+            if self._can_use_flash_attn(device, q.dtype, attention_mask):
+                # FA2 expects non-transposed (batch, seqlen, heads, head_dim).
+                # FA2 natively supports GQA (heads_per_rank % kv_heads_per_rank == 0)
+                # without materializing repeated KV heads in memory, saving ~0.5-4 GiB
+                # of transient activation per card per layer.
+                q_fa = q.transpose(1, 2)
+                k_fa = k.transpose(1, 2)
+                v_fa = v.transpose(1, 2)
+                is_causal = q_fa.shape[1] > 1
+                if attention_mask is None or bool((attention_mask == 1).all()):
+                    attention_output = flash_attn_func(
+                        q_fa,
+                        k_fa,
+                        v_fa,
+                        dropout_p=self.attention_dropout if self.training else 0.0,
+                        softmax_scale=self.scaling,
+                        causal=is_causal,
+                    )
+                else:
+                    batch_size, seq_len = q_fa.shape[:2]
+                    mask_dev = (attention_mask != 0).to(device)
+                    q_unpad, indices_q, cu_seqlens_q, max_seqlen_q, _ = unpad_input(q_fa, mask_dev)
+                    k_unpad, _, cu_seqlens_k, max_seqlen_k, _ = unpad_input(k_fa, mask_dev)
+                    v_unpad, _, _, _, _ = unpad_input(v_fa, mask_dev)
+                    out_unpad = flash_attn_varlen_func(
+                        q_unpad,
+                        k_unpad,
+                        v_unpad,
+                        cu_seqlens_q=cu_seqlens_q,
+                        cu_seqlens_k=cu_seqlens_k,
+                        max_seqlen_q=max_seqlen_q,
+                        max_seqlen_k=max_seqlen_k,
+                        dropout_p=self.attention_dropout if self.training else 0.0,
+                        softmax_scale=self.scaling,
+                        causal=is_causal,
+                    )
+                    attention_output = pad_input(out_unpad, indices_q, batch_size, seq_len)
+                attention_output = attention_output.reshape(*input_shape, -1)
+            else:
+                # repeat_kv rather than enable_gqa: no fused kernel on this build
+                # broadcasts grouped-query heads, so asking for it selects the math
+                # kernel. See distillkit/gqa_dispatch.py.
+                groups = self.heads_per_rank // self.kv_heads_per_rank
+                attn_mask = None
+                if attention_mask is not None:
+                    attn_mask = attention_mask.to(device)
+                    if attn_mask.ndim == 2:
+                        attn_mask = attn_mask[:, None, None, :]
+                attention_output = torch.nn.functional.scaled_dot_product_attention(
+                    q,
+                    _repeat_kv(k, groups),
+                    _repeat_kv(v, groups),
+                    attn_mask=attn_mask,
+                    dropout_p=self.attention_dropout if self.training else 0.0,
+                    scale=self.scaling,
+                    is_causal=q.shape[2] > 1 if attn_mask is None else True,
+                )
+                attention_output = attention_output.transpose(1, 2).reshape(*input_shape, -1)
             outputs.append(attention_output.contiguous() * torch.sigmoid(gate))
         return self.o_proj(outputs)[0], None
 

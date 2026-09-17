@@ -1,0 +1,68 @@
+# Stage-2 sidecar distillation with Flash-Attention 2 enabled.
+#
+# Enables Flash-Attention 2 for the 8 full-attention layers in Qwen 3.5.
+# With FlashAttention 2 compiled for Windows (PyTorch 2.11 + CUDA 12.8):
+# 1. Hugging Face Transformers loads the student model with attn_implementation="flash_attention_2"
+# 2. TensorParallelAttention calls flash_attn_func natively without materializing repeated KV heads
+#    (_repeat_kv is eliminated), saving ~0.5 - 4 GiB transient activation memory per card per layer.
+# 3. Training throughput increases due to SRAM-fused attention kernels and reduced VRAM memory pressure.
+
+model: D:/DeepThought/Projects/HybridModel/student-hf
+output_path: D:/DeepThought/Projects/HybridModel/runs/sidecar-stage2-flash-attn
+project_name: hybridmodel-sidecar
+
+sequence_length: 4096
+
+dataset:
+  seed: 42
+
+teacher:
+  kind: dataset
+  cache_path: D:/DeepThought/Projects/HybridModel/teacher-cache-1m
+  anchor_layers: [8, 64]
+  cache_dtype: float8_e4m3fn
+
+loss_functions:
+  - function: kl
+    weight: 0.5
+    temperature: 1.0
+  - function: hs_cosine
+    weight: 0.5
+    scale: 0.05
+    loss_kwargs:
+      reduction: mean
+      dim: -1
+
+layer_mapping:
+  - [8, 0]
+  - [64, 1]
+
+sidecar:
+  enabled: true
+  freeze_weights: false
+
+optimizer:
+  strategy: adamw
+  freeze_backbone: false
+  unfreeze_at_step: null
+  log_every_n_steps: 1
+
+use_flash_attention: true
+functionary_packing: false
+chunked_cross_entropy: true
+chunked_head: false
+
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 16
+learning_rate: 2.0e-5
+weight_decay: 0.01
+warmup_ratio: 0.03
+lr_scheduler_type: cosine
+max_steps: 1000
+
+training_args:
+  bf16: true
+  gradient_checkpointing: true
+  gradient_checkpointing_kwargs:
+    use_reentrant: false
+  optim: adamw_bnb_8bit
