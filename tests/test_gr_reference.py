@@ -223,9 +223,11 @@ class TestGradientPath:
     def test_one_sublayer_cannot_break_symmetry_in_either_mode(self, asymmetric):
         """Measured, and structural rather than a defect.
 
-        At initialization the gate is a constant 1/2 with no gradient path to the branch
-        states, so the read depends on the gains only through their *mean*; and a mean
-        collapse sends identical gradient to every branch. Both facts force
+        At initialization it is the gate *logits* that lose their input derivative, since
+        they are produced through a zero ``W_up``; the value path still differentiates
+        with respect to every branch state, with the gate held at a constant 1/2. So the
+        read depends on the gains only through their *mean*, and a mean collapse sends
+        identical gradient to every branch. Both facts force
         ``dL/dgamma_i`` and ``dL/dW_write[i]`` to be identical across branches, whatever
         the gains are. The asymmetric perturbation therefore buys nothing here -- a single
         sublayer read out by a mean cannot distinguish its branches at all.

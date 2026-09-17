@@ -63,6 +63,15 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
                                config, "residual_stream_learnable_blend", False))
         self.attn_residual = route(**options)
         self.mlp_residual = route(**options)
+        # A converted checkpoint carries its conversion in the weights; the config only
+        # says which mode produced them. Restoring the provenance here, rather than
+        # re-running `recipient_initialize`, is what keeps a reload from overwriting
+        # trained gains with the initialization they started from.
+        mode = getattr(config, "residual_stream_recipient_mode", None)
+        if mode is not None and routing == "flash_next":
+            for module in (self.attn_residual, self.mlp_residual):
+                module.recipient_initialized = True
+                module.recipient_mode = mode
         self.sidecar = (_build_sidecar(config) if config.residual_stream_sidecar
                         and layer_idx == config.sidecar_layer_index else None)
 
@@ -270,6 +279,48 @@ class Qwen35WidenedForCausalLM(_WidenedWeightInit, Qwen3_5ForCausalLM):
     def disable_sidecar_projection(self):
         sidecar = self.model.layers[self.config.sidecar_layer_index].sidecar
         sidecar.W_side_proj.requires_grad_(False)
+
+    @torch.no_grad()
+    def recipient_initialize(self, asymmetric=False, seed=0, epsilon=None):
+        """Convert every sublayer to the four-stream route without changing the model.
+
+        Each route is initialized against the norm it replaces, so the converted model
+        computes what the recipient computed with the route fully active at ``blend=1``.
+        ``W_down`` is seeded per sublayer rather than once: a single seed would give
+        every sublayer the same bottleneck, which is the one thing the read is supposed
+        to be able to specialize.
+
+        This is a post-construction step on purpose. It is never called from
+        ``__init__``, so loading a converted checkpoint restores trained gains instead
+        of overwriting them -- reload only restores the recorded mode. Converting a
+        model that already records a conversion is refused for the same reason.
+        """
+        config = self.config
+        if getattr(config, "residual_stream_routing", "widened") != "flash_next":
+            raise ValueError("recipient initialization applies to the flash_next route; "
+                             "this model uses %r"
+                             % getattr(config, "residual_stream_routing", "widened"))
+        recorded = getattr(config, "residual_stream_recipient_mode", None)
+        if recorded is not None:
+            raise ValueError(
+                "this model already records a %r conversion. Re-running the "
+                "initialization would overwrite whatever it has learned since."
+                % recorded)
+        records = []
+        for index, layer in enumerate(self.model.layers):
+            for offset, (kind, norm) in enumerate(
+                    (("attn_residual", layer.input_layernorm),
+                     ("mlp_residual", layer.post_attention_layernorm))):
+                records.append(getattr(layer, kind).recipient_initialize(
+                    norm, asymmetric=asymmetric, seed=int(seed) + 2 * index + offset,
+                    epsilon=epsilon))
+        if not records:
+            raise ValueError("model has no layers to convert")
+        config.residual_stream_recipient_mode = records[0]["mode"]
+        config.residual_stream_recipient_seed = int(seed)
+        config.residual_stream_recipient_epsilon = records[0]["epsilon"]
+        config.residual_stream_blend = 1.0
+        return records
 
     @torch.no_grad()
     def gate_report(self, prefix="residual_stream"):

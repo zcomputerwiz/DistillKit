@@ -23,6 +23,11 @@ from distillkit.experimental.widened_residual import _BranchNorm
 DEFAULT_EPSILON = torch.tensor([-3.0, -1.0, 1.0, 3.0]) / 128.0
 
 
+def _at_least_fp32(dtype):
+    """``dtype`` unless it is narrower than fp32, in which case fp32."""
+    return torch.promote_types(dtype, torch.float32)
+
+
 class _GatedMean(torch.autograd.Function):
     """Branchwise gate/product, without full widened gate/product temporaries.
 
@@ -94,6 +99,11 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.W_down = nn.Linear(num_branches * hidden_size, lowrank, bias=False)
         self.W_up = nn.Linear(lowrank, num_branches * hidden_size, bias=False)
         self.W_write = nn.Linear(num_branches * hidden_size, num_branches, bias=False)
+        # Provenance, not state: the converted weights are what a checkpoint carries, and
+        # these are restored from the model config on reload rather than by re-running
+        # the initialization over trained weights. See `widened.recipient_initialize`.
+        self.recipient_initialized = False
+        self.recipient_mode = None
 
     @torch.no_grad()
     def recipient_initialize(self, norm, asymmetric=False, seed=0, epsilon=None):
@@ -138,11 +148,16 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         if abs(float(norm.eps) - float(self.norm_eps)) > 0:
             raise ValueError("norm epsilon %r does not match the route's %r"
                              % (norm.eps, self.norm_eps))
+        # Everything is built on the *recipient norm's* device. A norm that is already
+        # on CUDA against branch scales built on the CPU is not a promotion case -- the
+        # scales are one-dimensional, so the multiply raises rather than broadcasting --
+        # and conversion has to work both before and after the model is placed.
+        device = norm.weight.device
         gamma = 1.0 + norm.weight.detach().to(torch.float32)
-        scale = torch.ones(self.num_branches, dtype=torch.float32)
+        scale = torch.ones(self.num_branches, dtype=torch.float32, device=device)
         if asymmetric:
             values = DEFAULT_EPSILON if epsilon is None else torch.as_tensor(epsilon)
-            values = values.to(torch.float32)
+            values = values.to(device=device, dtype=torch.float32)
             if values.numel() != self.num_branches:
                 raise ValueError("epsilon has %d entries for %d branches"
                                  % (values.numel(), self.num_branches))
@@ -150,8 +165,13 @@ deliberately makes the donor inert; use the warmup callback to activate it.
                 raise ValueError("epsilon must be mean-zero to preserve the initial read")
             scale = 1.0 + values
         effective = 2.0 * gamma.unsqueeze(0) * scale.unsqueeze(-1)
+        # Stored at fp32 or better, never at the route's current dtype: a recipient that
+        # has already been cast to bf16 would otherwise round `1 + 2 * weight` on the
+        # way in, and bf16 spacing near 3 is 1.6e-2 against an AdamW step near the
+        # learning rate, so the gains would arrive rounded and then sit bit-frozen.
         self.branch_gain_delta.data = (effective - 1.0).to(
-            self.branch_gain_delta.dtype).to(self.branch_gain_delta.device)
+            _at_least_fp32(self.branch_gain_delta.dtype)
+        ).to(self.branch_gain_delta.device)
         self.W_up.weight.zero_()
         self.W_write.weight.zero_()
         generator = torch.Generator(device="cpu").manual_seed(int(seed))
@@ -167,7 +187,7 @@ deliberately makes the donor inert; use the warmup callback to activate it.
                 "epsilon": scale.sub(1.0).tolist() if asymmetric else None}
 
     def _apply(self, fn, recurse=True):
-        blend = self.blend
+        blend, gains = self.blend, self.branch_gain_delta.data
         result = super()._apply(fn, recurse)
         # fp32 always. A *scheduled* blend also goes to the CPU, because `read` consumes
         # it as a Python scalar and nothing else ever does, and a CUDA scalar there
@@ -179,6 +199,19 @@ deliberately makes the donor inert; use the warmup callback to activate it.
             self.blend.data = self.blend.data.to(dtype=torch.float32)
         else:
             self.blend = blend.to(device="cpu", dtype=torch.float32)
+        # The branch gains are pinned the same way, for the same reason one step up:
+        # `read` promotes them to fp32 to use them, so bf16 storage buys nothing in the
+        # forward and costs the whole gain update in the backward -- bf16 spacing near
+        # the converted value of 3 is 1.6e-2 against an AdamW step near the learning
+        # rate. A model-wide cast to a *wider* dtype is still honoured; this raises the
+        # floor rather than pinning the gains to fp32 exactly. The pre-cast values are
+        # restored rather than the post-cast ones, because undoing a narrowing cast
+        # recovers the dtype but not the digits it threw away.
+        applied = self.branch_gain_delta.data
+        target = _at_least_fp32(applied.dtype)
+        if applied.dtype != target:
+            source = gains if gains.dtype == _at_least_fp32(gains.dtype) else applied
+            self.branch_gain_delta.data = source.to(device=applied.device, dtype=target)
         return result
 
     @torch.no_grad()
