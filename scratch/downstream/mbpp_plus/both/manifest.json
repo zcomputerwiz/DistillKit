@@ -24,18 +24,15 @@
   },
   "problems": 378,
   "max_new_tokens": 768,
-  "batch_size": 32,
   "decoding": {
     "do_sample": false,
-    "greedy": true,
-    "padding_side": "left",
-    "pad_token": "eos"
+    "greedy": true
   },
   "instruction_template": "Write a Python function for the following task. Respond with a single fenced Python code block and no explanation.\n\n{prompt}\n\nYour function must satisfy this test:\n{test}\n",
-  "mean_generated_tokens": 335.2724867724868,
-  "median_generated_tokens": 252,
-  "truncations": 61,
-  "elapsed_seconds": 851.5470000000059,
-  "tokens_per_second": 148.82678231500918,
-  "peak_allocated_bytes": 7936974336
+  "mean_generated_tokens": 337.9179894179894,
+  "median_generated_tokens": 256,
+  "truncations": 60,
+  "elapsed_seconds": 10545.014999999992,
+  "tokens_per_second": 12.113116956211071,
+  "peak_allocated_bytes": 5810230272
 }
