@@ -254,3 +254,7 @@ scratch/gr_retrofit/checkpoint-*/
 scratch/code_corpus/v2/
 scratch/code_corpus/smoke2/
 scratch/code_corpus/v2-build.log
+
+# The 3B token store and its per-vocabulary remaps: 12 GB of build product,
+# regenerable from scratch/code_corpus/v2 by tokenize.py plus vocab_remap.py.
+/scratch/code_training/tokens-v2/

@@ -339,3 +339,94 @@ tracks.
    contribution is separable.
 4. Only then the compute-amortization curve, which needs several backbones to mean
    anything.
+
+## 7. Baseline qualification: the gate, answered
+
+Everything in section 5 depends on one thing being true, and section 5 does not establish
+it: that `plain` can learn to copy unaided. If it cannot, the decisive cell is
+uninterpretable -- a collapsed ablated probe would mean nothing, because there would be no
+endogenous circuit for the module to have displaced. So `plain` runs first, alone, and the
+question is only whether the function appears and whether it appears reliably.
+
+Two seeds, one pass over the 3B corpus, vocabulary 32,768, 46.3M parameters, the
+configuration from `dense_gr.md`. `baseline-seed*.json`.
+
+| | seed 0 | seed 1 |
+| --- | ---: | ---: |
+| scored tokens | 3,429,957,632 | 3,429,957,632 |
+| tokens per parameter | 74.0 | 74.0 |
+| throughput | 113,539 tok/s | 113,613 tok/s |
+| wall clock | 8.39 h | 8.39 h |
+| final held-out | 1.5684 | 1.5699 |
+| held-out per original token | 1.7911 | 1.7929 |
+| copy probe, gain | 10.758 +- 0.320 | 10.238 +- 0.325 |
+| spill into system RAM | none | none |
+
+**The gate passes.** The second occurrence of a repeated random block falls from 10.5 nats
+to 1.37 and 1.76, against a first occurrence of 12.13 and 12.00. The backbone learns to
+copy, and it learns it at a budget this program can afford.
+
+### Onset
+
+Both seeds cross a gain of one nat at **step 750 -- 49.2M tokens, 1.06 tokens per
+parameter**, and saturate by roughly step 5,000. The identical onset step across two seeds
+is worth more than the endpoint: the phase change is not only present but sharply and
+reproducibly timed, which is what makes a displacement experiment readable at all.
+
+Phase 1 trained at 0.21 tokens per parameter. The onset measured here sits at 1.06, a
+factor of five beyond where that pilot stopped, and saturation is a further factor of
+seven past that. Phase 1 could not have seen this regardless of what it measured.
+
+### Read the probe against the model, not against chance
+
+The first occurrence is not at chance and does not stay put. It **rises** from 11.3 to
+12.13 nats over training, against `ln(32768)` = 10.397. The model gets steadily *worse*
+at uniformly random ids as it sharpens its prior over code, which is correct behavior and
+not a defect in the probe.
+
+That is why the reported quantity is first minus second rather than distance from chance.
+Scoring the second occurrence against `ln(vocab)` would have charged the model about 1.8
+nats for having learned the corpus, and a model that had not learned to copy would have
+read as worse than chance rather than as flat. The within-model difference cancels the
+prior because both halves are drawn from the same distribution and seen by the same model
+at the same moment.
+
+### The decisive cell is the seed-sensitive endpoint
+
+| endpoint | seed 0 | seed 1 | spread |
+| --- | ---: | ---: | ---: |
+| held-out NLL | 1.5684 | 1.5699 | 0.0015 |
+| copy probe gain | 10.758 | 10.238 | 0.52 |
+
+Two seeds cannot estimate a variance, so this is an observation rather than a measurement.
+But the two endpoints disagree by a factor of roughly 350 in how far apart the seeds sit,
+and the direction is unfavorable: **the decisive cell of the copy experiment is the probe,
+not the quality number.** A design powered for the held-out comparison is not thereby
+powered for the one the conclusion rests on.
+
+Within a run the probe is also not steady. Across the plateau the per-checkpoint standard
+deviation is about 0.33 nats, and seed 0 threw a single excursion to 3.93 -- six standard
+deviations above its own mean, recovering immediately. Copying is learned, but it degrades
+and recovers from step to step.
+
+Two consequences for section 5, both to be fixed before the copy arms run rather than
+after:
+
+* **The ablated-probe threshold is read from a mean over checkpoints, not a checkpoint.**
+  A single reading has a spread wide enough to manufacture a collapse on its own. This is
+  the Phase 1e failure in a new costume: a threshold fixed against a baseline that was not
+  what it appeared to be.
+* **Seed count is set by the probe.** Whatever is enough to resolve a difference in
+  held-out NLL is not enough here, and the design should say which endpoint it is powered
+  for.
+
+### What this run is
+
+It is not only a gate. Trained at one pass over the corpus with no module and no
+connector, it *is* the `plain` arm of the copy experiment, and the endpoint matrix needs
+exactly what it produces: plain's copy probe, which is what tells a backbone that stopped
+building the circuit apart from one at a scale where the circuit was never going to work,
+and plain's held-out NLL as the quality reference. The `copy` and `scrambled` arms match
+its compute: 3,429,957,632 scored tokens, 52,338 steps at batch 64 x 1024.
+
+The n-gram table is off in this configuration, as section 5 requires.

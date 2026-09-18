@@ -45,113 +45,14 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
 from benchmark import apply_liger, build, shared_gpu_gib  # noqa: E402
+from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
+from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
+                         byte_token_ids, cached_remap)
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
-STORE = Path("scratch/code_training/tokens")
-
-
-def bytes_to_unicode():
-    """The byte-level BPE alphabet: each of the 256 bytes as a printable character.
-
-    Defined here rather than imported. It is a fixed mapping that every byte-level BPE
-    tokenizer shares, and transformers has moved it twice -- it is currently inside
-    `convert_slow_tokenizer`, which is not an interface to depend on.
-    """
-    printable = (list(range(ord("!"), ord("~") + 1))
-                 + list(range(ord("\xa1"), ord("\xac") + 1))
-                 + list(range(ord("\xae"), ord("\xff") + 1)))
-    mapped = printable[:]
-    spare = 0
-    for value in range(256):
-        if value not in printable:
-            printable.append(value)
-            mapped.append(256 + spare)
-            spare += 1
-    return dict(zip(printable, (chr(point) for point in mapped)))
-
-
-def byte_token_ids(tokenizer):
-    """The id of each of the 256 single-byte tokens, in byte order.
-
-    This is byte-level BPE, so every byte has a token. The alphabet above is the map the
-    tokenizer itself uses to make bytes printable; inverting it turns a token string back
-    into the bytes it stands for.
-    """
-    encoder = bytes_to_unicode()
-    vocabulary = tokenizer.get_vocab()
-    ids = []
-    for value in range(256):
-        token = encoder[value]
-        if token not in vocabulary:
-            raise SystemExit("byte %d has no token; byte fallback would have holes" % value)
-        ids.append(vocabulary[token])
-    return ids
-
-
-def build_vocabulary(counts, tokenizer, target):
-    """Keep the bytes, the specials, then the most frequent ids until `target` is full."""
-    specials = sorted(tokenizer.get_added_vocab().values())
-    bytes_ids = byte_token_ids(tokenizer)
-    forced = list(dict.fromkeys(bytes_ids + specials))
-    if len(forced) > target:
-        raise SystemExit("target %d cannot hold %d forced ids" % (target, len(forced)))
-
-    order = np.argsort(counts)[::-1]
-    kept = list(forced)
-    seen = set(forced)
-    for candidate in order:
-        if len(kept) >= target:
-            break
-        candidate = int(candidate)
-        if candidate not in seen:
-            kept.append(candidate)
-            seen.add(candidate)
-    kept.sort()
-    forward = np.full(counts.shape[0], -1, dtype=np.int32)
-    forward[np.asarray(kept)] = np.arange(len(kept), dtype=np.int32)
-    return kept, forward, bytes_ids
-
-
-def expansion_for(original, tokenizer, forward, bytes_ids):
-    """The compact ids an unkept token becomes: its own bytes."""
-    decoder = {char: value for value, char in bytes_to_unicode().items()}
-    token = tokenizer.convert_ids_to_tokens(int(original))
-    pieces = []
-    for char in token:
-        if char not in decoder:
-            return None
-        pieces.append(int(forward[bytes_ids[decoder[char]]]))
-    return pieces
-
-
-def remap(tokens, tokenizer, forward, bytes_ids, kept):
-    """Original ids to compact ids, expanding anything below the cut into its bytes.
-
-    `uint16` only while the compact space fits in it, which is exactly up to 65,536 --
-    the largest cut that halves the store's width. Above that the store stays `uint32`
-    and the only saving is the embedding.
-    """
-    width = np.uint16 if len(kept) <= 65_536 else np.uint32
-    compact = forward[tokens]
-    missing = np.flatnonzero(compact < 0)
-    if missing.size == 0:
-        return compact.astype(width), 0
-    cache = {}
-    pieces, last = [], 0
-    for index in missing:
-        original = int(tokens[index])
-        if original not in cache:
-            expanded = expansion_for(original, tokenizer, forward, bytes_ids)
-            if expanded is None:
-                raise SystemExit("token %d could not be decomposed into bytes" % original)
-            cache[original] = np.asarray(expanded, dtype=np.int32)
-        pieces.append(compact[last:index])
-        pieces.append(cache[original])
-        last = index + 1
-    pieces.append(compact[last:])
-    return np.concatenate(pieces).astype(width), int(missing.size)
+STORE = Path("scratch/code_training/tokens-v2")
 
 
 def main() -> int:
@@ -172,27 +73,50 @@ def main() -> int:
     parser.add_argument("--evaluate-windows", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--report-every", type=int, default=25)
+    parser.add_argument("--store", type=Path, default=STORE)
+    parser.add_argument("--seed", type=int, default=0,
+                        help="seeds model init and the data order. The probe is seeded "
+                             "separately and identically for every run, so arms and "
+                             "seeds are scored on the same sequences")
+    parser.add_argument("--probe-every", type=int, default=0,
+                        help="steps between copy probes; 0 disables")
+    parser.add_argument("--probe-half", type=int, default=256,
+                        help="tokens in the block that gets repeated")
+    parser.add_argument("--probe-windows", type=int, default=64)
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
+    store = args.store
 
     torch.cuda.set_per_process_memory_fraction(0.90, 0)
     started = time.perf_counter()
     from transformers import AutoTokenizer
     tokenizer = AutoTokenizer.from_pretrained(BASE, local_files_only=True)
 
-    raw = np.memmap(STORE / "train.bin", dtype=np.uint32, mode="r")
+    raw = np.memmap(store / "train.bin", dtype=np.uint32, mode="r")
     print("store: %d tokens" % raw.shape[0], flush=True)
-    counts = np.bincount(np.asarray(raw, dtype=np.int64), minlength=248_320)
+
+    # Counting 3B ids takes a couple of minutes and the answer never changes, so the
+    # corpus ships the ranking beside the tokens.
+    cache = store / "train-counts.npy"
+    if cache.exists():
+        counts = np.load(cache)
+        print("counts: loaded %s" % cache.name, flush=True)
+    else:
+        counts = np.bincount(np.asarray(raw, dtype=np.int64), minlength=248_320)
     kept, forward, bytes_ids = build_vocabulary(counts, tokenizer, args.vocab)
     coverage = float(counts[np.asarray(kept)].sum() / counts.sum())
     print("vocabulary: kept %d ids, %.4f%% coverage" % (len(kept), 100 * coverage),
           flush=True)
 
-    stream, expanded = remap(np.asarray(raw), tokenizer, forward, bytes_ids, kept)
-    print("remap: %d tokens -> %d (%d expanded to bytes, %.4f%%)"
-          % (raw.shape[0], stream.shape[0], expanded,
-             100 * expanded / raw.shape[0]), flush=True)
+    stream, original_tokens, compact_tokens = cached_remap(
+        store, "train", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
+    # Into RAM: the training loop draws random windows, and a cold page cache over a
+    # multi-gigabyte file would pay for that at every step of the first pass.
+    stream = np.asarray(stream)
+    print("remap: %d tokens -> %d, inflation %.4f, %.1f GiB resident"
+          % (original_tokens, compact_tokens, compact_tokens / original_tokens,
+             stream.nbytes / 2 ** 30), flush=True)
 
     # Round trip: the compact stream must decode to what the original ids decode to.
     inverse = np.asarray(kept, dtype=np.int64)
@@ -204,7 +128,7 @@ def main() -> int:
 
     config = build(args.hidden, args.layers, args.vocab,
                    attn_implementation="flash_attention_2")
-    torch.manual_seed(0)
+    torch.manual_seed(args.seed)
     model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
     model.train()
     swapped = apply_liger(model, config)
@@ -222,16 +146,15 @@ def main() -> int:
     # what training loss becomes once a budget spans several passes.
     evaluation = None
     if args.evaluate_every:
-        held = np.memmap(STORE / "calibration.bin", dtype=np.uint32, mode="r")
-        held_stream, held_expanded = remap(np.asarray(held), tokenizer, forward,
-                                           bytes_ids, kept)
+        held_stream, held_original, held_compact = cached_remap(
+            store, "calibration", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
         rng = np.random.default_rng(12345)
         starts = rng.integers(0, held_stream.shape[0] - args.length - 1,
                               size=args.evaluate_windows)
         evaluation = torch.from_numpy(
             np.stack([held_stream[s:s + args.length] for s in starts]).astype(np.int64))
         print("held-out: %d tokens -> %d, %d fixed windows"
-              % (held.shape[0], held_stream.shape[0], args.evaluate_windows), flush=True)
+              % (held_original, held_compact, args.evaluate_windows), flush=True)
 
     @torch.no_grad()
     def evaluate():
@@ -250,13 +173,13 @@ def main() -> int:
 
     # Nats per *original* token, so vocabularies are comparable: a cut that expands more
     # tokens is charged for the expansion rather than rewarded with an easier softmax.
-    inflation = stream.shape[0] / raw.shape[0]
+    inflation = compact_tokens / original_tokens
 
     window = args.batch * args.length
     if args.passes is not None:
         args.tokens = int(args.passes * stream.shape[0])
     steps = max(1, args.tokens // window)
-    generator = np.random.default_rng(0)
+    generator = np.random.default_rng(args.seed)
     history = []
     torch.cuda.synchronize()
     train_started = time.perf_counter()
@@ -285,6 +208,9 @@ def main() -> int:
                                            or step == steps - 1):
                 row["heldout"] = evaluate()
                 row["heldout_per_original_token"] = row["heldout"] * inflation
+            if args.probe_every and (step % args.probe_every == 0 or step == steps - 1):
+                row["copy"] = copy_probe(model, args.vocab, half=args.probe_half,
+                                         windows=args.probe_windows, batch=args.batch)
             history.append(row)
             print("step %5d  %5.2f passes  train %7.4f  held %8s  norm %7.4f  %8.0f tok/s"
                   % (step, row["passes"], row["loss"],
@@ -292,14 +218,29 @@ def main() -> int:
                      row.get("heldout_per_original_token",
                              row["loss_per_original_token"]),
                      row["tokens_per_second"]), flush=True)
+            if "copy" in row:
+                print("            %s" % format_probe(row["copy"]), flush=True)
+            # Windows pages CUDA allocations out to system RAM over PCIe instead of
+            # raising OOM, so a spilled run keeps reporting 100% GPU utilization while
+            # throughput collapses. Stop on it rather than discovering it in the summary
+            # of a run that has already burned hours.
+            drift = shared_gpu_gib() - baseline_shared
+            row["shared_delta_gib"] = drift
+            if drift > 0.25:
+                args.output.write_text(json.dumps(
+                    {"aborted": "spilled to system RAM", "shared_delta_gib": drift,
+                     "step": step, "history": history}, indent=2), encoding="utf-8")
+                raise SystemExit(
+                    "spilled %.2f GiB into system RAM at step %d; stopping" % (drift, step))
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
     spilled = shared_gpu_gib() - baseline_shared
     report = {
         "vocab": args.vocab, "kept_ids": len(kept), "coverage": coverage,
-        "store_tokens": int(raw.shape[0]), "compact_tokens": int(stream.shape[0]),
-        "expanded_tokens": expanded, "round_trip": bool(matches),
+        "store": str(store), "seed": args.seed,
+        "store_tokens": int(original_tokens), "compact_tokens": int(compact_tokens),
+        "round_trip": bool(matches),
         "parameters": int(parameters), "liger": swapped,
         "batch": args.batch, "length": args.length, "steps": steps,
         "scored_tokens": steps * window,
@@ -310,6 +251,7 @@ def main() -> int:
         "final_heldout": history[-1].get("heldout"),
         "final_heldout_per_original_token": history[-1].get(
             "heldout_per_original_token"),
+        "final_copy": history[-1].get("copy"),
         "passes": history[-1]["passes"],
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2 ** 30,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
