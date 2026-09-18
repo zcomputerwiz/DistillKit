@@ -436,3 +436,27 @@ at different vocabularies, or a budget where all arms converge.
 So 32,768 is the right choice *at this scale and budget*, which is what the copy
 experiment will run at. It is not established as the right choice in general, and the
 ranking should be recomputed on the 3B corpus before it is treated as settled.
+
+## Sidecar on code, at tiny-model scale
+
+The structural sidecar was run here in both regimes and both are null. Jointly trained from
+scratch it moves held-out by 0.0003 nats, a fifth of the seed spread, while the content
+delta climbs unconstrained to +0.035. Fitted post hoc to the frozen `plain` checkpoint it
+gives a token-weighted structural aggregate of +0.00016 with content -0.00052.
+
+**The comparator is `0d075d7`, not `ab68bef`.** `ab68bef` was general text; this is code.
+`0d075d7` refitted the same module to Python against a frozen code-trained backbone at full
+scale and got +0.0075 aggregate with newline still regressing, verdict PARTIAL STRUCTURAL
+TRANSFER, and recorded why: "B_code's structural NLLs are already low enough that a
+hash-addressed bias has little to add beyond noise." This result has the same sign and is
+about forty-seven times smaller.
+
+So the finding is: the sidecar again fails to add value on code, now at tiny-model scale,
+consistent with what was already on record. It does not separate model scale from vocabulary
+reduction from code-domain saturation, and it does not test the general-text result at all.
+
+Two checks that the port reads the corpus correctly rather than differently. Control is 0.26%
+of structural targets, exactly the proportion `0d075d7` reports for one EOS per document. And
+the strength selector here is token-weighted, so it avoids the defect `0d075d7` found in the
+canonical one, where control at 0.26% of targets carried the same weight as punctuation at
+60.32% and the selector improved monotonically while the token-weighted NLL worsened.
