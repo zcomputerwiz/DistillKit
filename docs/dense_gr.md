@@ -460,3 +460,53 @@ of structural targets, exactly the proportion `0d075d7` reports for one EOS per 
 the strength selector here is token-weighted, so it avoids the defect `0d075d7` found in the
 canonical one, where control at 0.26% of targets carried the same weight as punctuation at
 60.32% and the selector improved monotonically while the token-weighted NLL worsened.
+
+## Copy module, seed 0, on the corrected implementation
+
+`copy2-copy-s0` and `copy2-scrambled-s0`: 8,000 steps each, 524.3M scored tokens, batch 64 at
+length 1024, on the same 46.3M-parameter backbone with a 264K-parameter connector. About
+80 minutes per arm on one 3090.
+
+This is the rerun. The first attempt was invalidated by an alignment defect -- the connector
+was handed `candidate[t]`, which predicts token `t`, at the position that needed
+`candidate[t+1]` -- and by a `scramble()` that permuted candidates within a sequence, which
+left the right answer available at a different offset. Both are fixed: `align_to_prediction`
+shifts features and candidate together, and `scramble()` now permutes across sequences as a
+derangement.
+
+### The endpoint matrix
+
+Each arm is scored three ways at the end of training. `enabled` is the trained
+configuration. `ablated` zeroes the connector's contribution. `substituted` keeps the
+features and replaces the candidates with uniform draws.
+
+| arm | enabled | ablated | substituted |
+| --- | --- | --- | --- |
+| copy | +11.3546 | +8.3819 | +6.8040 |
+| scrambled | +10.8939 | +10.9078 | +10.8919 |
+
+Gain is chance (10.3972) minus the second occurrence's NLL, so higher is better.
+
+The scrambled control spans 0.016 nats across all three cells. That flatness is the property
+the pre-fix run could not produce: with the defective `scramble()`, `substituted` beat the
+real configuration on first occurrence, 11.823 against 12.121. A control whose module does
+nothing is what a control is for, and this one now has it.
+
+The copy arm spans 4.55 nats. Ablating the module costs 2.97; substituting wrong candidates
+costs 4.55, which is 1.58 nats *worse than removing it*. The model does not merely tolerate
+the candidate, it trusts it -- a wrong candidate is more damaging than no candidate, which is
+only possible if the backbone has learned to lean on the channel.
+
+### It does not improve the language model
+
+Held-out, on general text: copy 1.7969, scrambled 1.7911. The copy arm is 0.0058 nats
+*worse*. Final training loss is 1.6611 against 1.6670, so the ordering reverses between train
+and held-out.
+
+So the benefit is confined to the structure the probe measures. The module lets the model
+reuse a repeated block almost for free -- second-occurrence NLL 0.761 against the control's
+1.339 -- and buys nothing on text that does not repeat. This is the result the earlier
+prediction called for and the doc already records: a training-time mechanism, not a quality
+improvement.
+
+Seeds 1 and 2 have not been run.
