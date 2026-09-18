@@ -258,3 +258,7 @@ scratch/code_corpus/v2-build.log
 # The 3B token store and its per-vocabulary remaps: 12 GB of build product,
 # regenerable from scratch/code_corpus/v2 by tokenize.py plus vocab_remap.py.
 /scratch/code_training/tokens-v2/
+
+# Trained arms of the copy experiment: regenerable from copy_train.py, and the
+# milestone.json beside each one records what produced it.
+/scratch/dense_gr/checkpoints/

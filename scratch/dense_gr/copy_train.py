@@ -12,7 +12,9 @@ function.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -34,6 +36,23 @@ from vocab_remap import build_vocabulary, cached_remap  # noqa: E402
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
+
+
+def write_atomic(path: Path, payload) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def sha256_of_directory(path: Path) -> str:
+    """Digest of a checkpoint's weight files, so an artifact can name what produced it."""
+    hasher = hashlib.sha256()
+    for file in sorted(path.glob("*.safetensors")):
+        with open(file, "rb") as handle:
+            for block in iter(lambda: handle.read(1 << 22), b""):
+                hasher.update(block)
+    return hasher.hexdigest()
 
 
 def main() -> int:
@@ -59,6 +78,12 @@ def main() -> int:
     parser.add_argument("--report-every", type=int, default=250)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--output", type=Path, default=None)
+    parser.add_argument("--checkpoints", type=Path,
+                        default=Path("scratch/dense_gr/checkpoints"),
+                        help="root for saved arms; the baseline run saved nothing, so "
+                             "asking it a question it did not already record means "
+                             "retraining it")
+    parser.add_argument("--no-checkpoint", action="store_true")
     args = parser.parse_args()
     if args.output is None:
         args.output = Path("scratch/dense_gr/copy-%s-s%d.json" % (args.arm, args.seed))
@@ -237,6 +262,35 @@ def main() -> int:
     }
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("wrote %s" % args.output)
+
+    if not args.no_checkpoint:
+        target = args.checkpoints / ("%s-s%d" % (args.arm, args.seed))
+        target.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(target, safe_serialization=True)
+        tokenizer.save_pretrained(target)
+        if connector is not None:
+            # The connector is not part of the backbone and `save_pretrained` will not see
+            # it. Saved beside it with its own provenance, the way `code_gate/train_gate.py`
+            # stores a gate: an arm is only reproducible if the piece bolted on comes back
+            # with it.
+            torch.save({"state_dict": {k: v.cpu() for k, v in
+                                       connector.state_dict().items()},
+                        "arm": args.arm, "seed": args.seed, "hidden": args.hidden,
+                        "order": args.order, "max_length": args.max_length,
+                        "vocab": args.vocab, "steps": args.steps},
+                       target / "connector.pt")
+        write_atomic(target / "milestone.json", {
+            "arm": args.arm, "seed": args.seed,
+            "scored_tokens": args.steps * window, "optimizer_steps": args.steps,
+            "final_loss": report["final_loss"], "final_heldout": report["final_heldout"],
+            "endpoint": endpoint,
+            "elapsed_seconds": elapsed, "tokens_per_second": report["tokens_per_second"],
+            "peak_allocated_bytes": int(torch.cuda.max_memory_allocated()),
+            "sha256": sha256_of_directory(target),
+        })
+        print("CHECKPOINT %s: %d tokens, %d steps, loss %.4f"
+              % (target.name, args.steps * window, args.steps, report["final_loss"]),
+              flush=True)
     return 0
 
 
