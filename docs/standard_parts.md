@@ -233,6 +233,66 @@ Ablation and substitution answer different questions and both are required. If a
 hurts and substitution does not, the dependence is on activation rather than content, and
 the result is void -- the same failure the `wrong_pointer` control caught in Phase 1.
 
+### Scaffolding and displacement differ in exactly one cell
+
+A module can *accelerate* a circuit's formation without replacing it. The backbone builds
+induction heads anyway, just faster for having been shown the answer while it learned. That
+outcome is worth having and it is not the amortization claim, and on every endpoint except
+one it is indistinguishable from displacement: the training curve is better, held-out is
+better, the enabled probe rises sooner.
+
+The ablated cell is the only measurement that separates them, and it separates them because
+it is a *within-arm* comparison -- the same weights with the channel on and zeroed -- so it
+does not require either arm to have converged.
+
+**The enabled probe is a speed measurement with a ceiling, not a quality measurement.**
+Gain cannot exceed the first-occurrence level, about 12.1 nats at the 32,768 cut, and
+`plain` reaches +10.5 to +11 unaided by roughly step 5,000. Any arm compared after both
+have saturated shows no difference, and any arm compared before then is being scored on
+time-to-ceiling. Reading a large enabled-probe gap as "the module improved copying" is
+therefore a category error: it improved *when* copying appeared.
+
+**Stage A cannot separate speed from asymptotic quality, and should not be asked to.** At
+8,000 steps a 46.3M model sees 11.3 tokens per parameter, against Chinchilla's 20 and the
+baseline run's 74. Nothing has plateaued, so a held-out gap means "ahead so far" -- the same
+confound that made the 248,320 arm of the vocabulary sweep partly an undertrained model
+rather than purely a worse vocabulary. Separating the two needs both arms converged, which
+is a full pass, and even then "reaches the same place sooner" *is* the amortization claim
+and counts, provided the arithmetic is shown rather than asserted.
+
+The repository already has both regimes measured, pointing opposite ways. `ab68bef` fitted
+the n-gram prior to a **frozen** backbone -- train normally, freeze, attach afterwards, so
+nothing can co-adapt -- and bought quality a trained model did not have, transferring to an
+independently seeded backbone at 88 to 99%. Phase 1b attached a channel *after* the backbone
+had learned the task and moved the required answer's probability by -0.000110. Post-hoc
+attachment can add what cannot be co-adapted away; mid-training attachment is absorbed or
+ignored. Neither tells us what joint training from step 0 does, which is why this experiment
+exists.
+
+### A defect in the `scrambled` specification, found by running it
+
+`scrambled` permutes the module's output across positions *within a sequence*. That destroys
+position-correspondence and preserves **candidate-set membership**: every candidate it emits
+is still a token drawn from that sequence.
+
+On the copy probe the sequence is a block repeated once, so the permuted candidates are all
+drawn from a 256-token block against a 32,768 vocabulary. Knowing the answer lies in that
+set is worth up to `ln(32768/256) = 4.85` nats, and the measured effect is in that range:
+at step 1,500 of the first seed, `scrambled` sits about 1.5 nats *above* `plain` on the
+probe, consistently at every checkpoint rather than as noise. The same leak exists on real
+code, weaker but not zero, because code is repetitive and "a token from this sequence" is
+genuinely informative.
+
+So `scrambled` is not the zero-information control this document described. It is a
+*position-correspondence* control, which is a narrower and still meaningful thing, and
+`copy` minus `scrambled` is correspondingly a narrower quantity than "what the module's
+content is worth". The decisive cell is unaffected, because ablation zeroes the connector
+output and leaves no channel to leak through.
+
+A tighter arm would draw candidates from the vocabulary at random, or permute across
+sequences in a batch rather than within them. That is a fourth arm rather than a repair to
+this one, and it is not yet run.
+
 ### Predictions, registered before running
 
 This program has been bitten repeatedly by thresholds and readings chosen after seeing
