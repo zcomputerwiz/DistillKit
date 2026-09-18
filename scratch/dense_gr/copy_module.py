@@ -80,6 +80,28 @@ def module_output(tokens, arm, vocab, generator, order=3, max_length=8):
     return features, candidate
 
 
+def randomize_candidates(features, candidate, generator, vocab):
+    """Keep the channel's activation pattern, replace only what it says.
+
+    `scramble` permutes the module's output across positions, which destroys
+    position-correspondence but leaves every candidate a token drawn from this very
+    sequence. On a repeated-random-block probe that leaks the block: knowing the answer
+    lies in a 256-token set out of 32,768 is worth up to ln(128) = 4.85 nats, and the
+    scrambled arm measured within 0.17 nats of the real module on the probe because of it.
+
+    This replaces each matched position's candidate with a uniform draw from the
+    vocabulary and leaves the features untouched, so which positions carry a signal, how
+    far back it points and how long it agreed are all identical -- only the content is
+    wrong. That is the `wrong_pointer` control from Phase 1, and it is what makes
+    "content dependence" a measurement rather than a word.
+    """
+    matched = candidate >= 0
+    replaced = candidate.copy()
+    replaced[matched] = generator.integers(0, vocab, size=int(matched.sum()),
+                                           dtype=np.int64)
+    return features, replaced
+
+
 def scramble(features, candidate, generator):
     """Permute the module's output across positions, independently per sequence.
 

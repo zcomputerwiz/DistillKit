@@ -1,0 +1,50 @@
+{
+  "checkpoint": "scratch\\dense_gr\\checkpoints\\scrambled-s0",
+  "arm": "scrambled",
+  "seed": 0,
+  "sha256": "4a125cb621848645e7de8e498bf8fda7940edb984ec4db1e2f8cea0d2e1cbb08",
+  "scored_tokens": 524288000,
+  "substitution_seed": 7000,
+  "reload_check": {
+    "recorded_gain": 11.369153499603271,
+    "reprobed_gain": 11.362244725227356,
+    "drift": 0.006908774375915527,
+    "tolerance": 0.05,
+    "stochastic_arm": true,
+    "faithful": true
+  },
+  "endpoint": {
+    "enabled": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.241290092468262,
+      "second_occurrence": 0.8790453672409058,
+      "gain": 11.362244725227356,
+      "windows": 64,
+      "half": 256
+    },
+    "ablated": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.398502349853516,
+      "second_occurrence": 3.7971208095550537,
+      "gain": 8.601381540298462,
+      "windows": 64,
+      "half": 256
+    },
+    "substituted": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.241340637207031,
+      "second_occurrence": 0.8823214769363403,
+      "gain": 11.359019160270691,
+      "windows": 64,
+      "half": 256
+    },
+    "randomized": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.24332332611084,
+      "second_occurrence": 0.8788598775863647,
+      "gain": 11.364463448524475,
+      "windows": 64,
+      "half": 256
+    }
+  }
+}
