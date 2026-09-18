@@ -261,14 +261,45 @@ def test_padding_and_gradient_checkpointing_are_refused():
                     use_cache=False)
 
 
+@pytest.mark.parametrize("mla", [False, True])
+@pytest.mark.parametrize("chunk", [1, 4])
+def test_chunked_cache_continuation_matches_the_whole_sequence(mla, chunk):
+    """Feeding a sequence in pieces with a cache must reproduce feeding it at once.
+
+    The trap is the 2D mask's width. `create_causal_mask` documents `attention_mask` as
+    ``(batch, seen_tokens + query_length)``, not query length: hand it a chunk-width mask
+    and every query in a continued chunk sees only the cached keys and not its own chunk,
+    including itself. That is silent -- the shapes all work out -- and it looks exactly
+    like a broken cache.
+    """
+    torch.manual_seed(0)
+    config = tiny_config(mla_enabled=mla)
+    config.layer_types = ["full_attention"] * config.num_hidden_layers
+    config._attn_implementation = "eager"
+    model = Qwen35WidenedForCausalLM(config).double().eval()
+    tokens = torch.randint(1, 64, (1, 8))
+
+    def mask(width):
+        return torch.ones(1, width, dtype=torch.long)
+
+    with torch.no_grad():
+        whole = model.model(input_ids=tokens, attention_mask=mask(8),
+                            use_cache=False).last_hidden_state
+        cache, pieces = None, []
+        for start in range(0, 8, chunk):
+            out = model.model(input_ids=tokens[:, start:start + chunk],
+                              attention_mask=mask(start + chunk),
+                              past_key_values=cache, use_cache=True)
+            cache, _ = out.past_key_values, pieces.append(out.last_hidden_state)
+    assert torch.allclose(whole, torch.cat(pieces, dim=1), atol=1e-12, rtol=1e-12)
+
+
 def test_mla_caches_the_latent_not_the_expanded_heads():
     """The cache holds ``latent + rope_dim``, and replaying it reproduces the dense run.
 
     Handing `update` the assembled per-head keys caches ``2 * num_heads * head_dim``
     instead -- four times the GQA this replaces, while `cached_numbers_per_token` keeps
-    reporting the latent width. Tested on the attention module rather than the stack:
-    the widened model's chunked-cache continuation is separately broken, with or without
-    MLA, so a whole-model comparison would fail for an unrelated reason.
+    reporting the latent width.
     """
     from transformers.cache_utils import DynamicCache
 
