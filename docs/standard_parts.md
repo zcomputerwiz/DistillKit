@@ -1,4 +1,4 @@
-# Standard parts: modules trained once and reused across backbones
+﻿# Standard parts: modules trained once and reused across backbones
 
 A program proposal, not a result. Nothing here has been run.
 
@@ -340,7 +340,7 @@ tracks.
 4. Only then the compute-amortization curve, which needs several backbones to mean
    anything.
 
-## 7. Baseline qualification: the gate, answered
+## 8. Baseline qualification: the gate, answered
 
 Everything in section 5 depends on one thing being true, and section 5 does not establish
 it: that `plain` can learn to copy unaided. If it cannot, the decisive cell is
