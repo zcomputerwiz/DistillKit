@@ -110,24 +110,37 @@ class Qwen35LatentAttention(nn.Module):
         latent, rotary_key = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
         latent = self.kv_a_norm(latent)
 
+        # Rotating the shared slice on its own is equivalent to rotating the assembled
+        # key -- `apply_rotary_pos_emb` touches exactly the first `rope_dim` dimensions
+        # and passes the content half through -- and it is what lets the cache hold the
+        # compressed form: the slice goes in already carrying its position, so replaying
+        # it later needs no position bookkeeping.
+        cos, sin = position_embeddings
+        query_states, rotary_key = apply_rotary_pos_emb(
+            query_states, rotary_key.unsqueeze(1), cos, sin)
+
+        if past_key_values is not None:
+            # The cache holds the latent and the rotary key, not the per-head keys and
+            # values those expand into: `latent + rope_dim` numbers per token against
+            # `2 * num_heads * head_dim`. The up-projection below then runs over the whole
+            # cached sequence each step, which is the trade MLA makes and the reason
+            # DeepSeek folds the up-projection into the query at serving time.
+            latent, rotary_key = past_key_values.update(
+                latent.unsqueeze(1), rotary_key, self.layer_idx)
+            latent = latent.squeeze(1)
+
+        kv_shape = latent.shape[:-1]
         projected = self.kv_b_proj(latent).view(
-            *input_shape, self.num_heads, self.content_dim + self.head_dim)
+            *kv_shape, self.num_heads, self.content_dim + self.head_dim)
         content_key, value_states = torch.split(
             projected, [self.content_dim, self.head_dim], dim=-1)
         content_key = self.k_norm(content_key)
 
         # One rotary key for every head: shared, and the only position-dependent part.
-        shared = rotary_key.unsqueeze(-2).expand(*input_shape, self.num_heads,
-                                                 self.rope_dim)
-        key_states = torch.cat([shared, content_key], dim=-1).transpose(1, 2)
+        shared = rotary_key.expand(*kv_shape[:1], self.num_heads, kv_shape[1],
+                                   self.rope_dim)
+        key_states = torch.cat([shared, content_key.transpose(1, 2)], dim=-1)
         value_states = value_states.transpose(1, 2)
-
-        cos, sin = position_embeddings
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
-
-        if past_key_values is not None:
-            key_states, value_states = past_key_values.update(
-                key_states, value_states, self.layer_idx)
 
         interface = ALL_ATTENTION_FUNCTIONS.get_interface(
             self.config._attn_implementation, eager_attention_forward)
@@ -141,5 +154,11 @@ class Qwen35LatentAttention(nn.Module):
         return self.o_proj(attn_output), attn_weights
 
     def cached_numbers_per_token(self) -> int:
-        """What one token costs in the serving cache, for comparison with GQA."""
+        """What one token costs in the serving cache, for comparison with GQA.
+
+        This is what the cache actually holds, not what it would hold in principle: the
+        forward writes the latent and the rotary key, so handing `update` the expanded
+        per-head keys -- `2 * num_heads * head_dim`, four times the GQA it replaces --
+        would make this number a fiction.
+        """
         return self.latent + self.rope_dim

@@ -85,9 +85,10 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
                 order = [i for i, t in enumerate(config.layer_types)
                          if "linear" not in str(t)]
                 modes = csa2_modes(config, len(order))
+                # The bus is injected by the text model once every layer exists; it is
+                # per-model state and does not belong on a shared, serialized config.
                 self.self_attn = Qwen35SparseLatentAttention(
-                    config, layer_idx, modes[order.index(layer_idx)],
-                    config.csa2_bus)
+                    config, layer_idx, modes[order.index(layer_idx)])
 
     @staticmethod
     def distillation_hidden_state(output):
@@ -128,13 +129,20 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
     def __init__(self, config):
         Qwen3_5PreTrainedModel.__init__(self, config)
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, config.pad_token_id)
-        if getattr(config, "csa2_enabled", False):
-            # One bus for the stack, cleared at the start of every forward so nothing a
-            # Full layer published survives into the next batch.
-            from .csa2 import SparseIndexBus
-            config.csa2_bus = SparseIndexBus()
         self.layers = nn.ModuleList([WidenedDecoderLayer(config, i)
                                      for i in range(config.num_hidden_layers)])
+        if getattr(config, "csa2_enabled", False):
+            # One bus for this stack, cleared at the start of every forward so nothing a
+            # Full layer published survives into the next batch. It lives on the model
+            # rather than the config: a config is serialized to JSON and two models can
+            # be built from the same one, and neither survives a mutable object hung off
+            # it.
+            from .csa2 import SparseIndexBus
+            self.csa2_bus = SparseIndexBus()
+            for layer in self.layers:
+                attn = getattr(layer, "self_attn", None)
+                if hasattr(attn, "bus"):
+                    attn.bus = self.csa2_bus
         self.norm = Qwen3_5RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3_5TextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
@@ -154,9 +162,26 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             raise ValueError("Specify exactly one of input_ids or inputs_embeds")
         if output_attentions:
             raise ValueError("Widened residual model does not expose attention weights")
-        bus = getattr(self.config, "csa2_bus", None)
+        bus = getattr(self, "csa2_bus", None)
         if bus is not None:
             bus.clear()
+            if self.gradient_checkpointing and self.training:
+                # Checkpointing recomputes layers in reverse during backward, so a Reuse
+                # layer would read whatever the *last* Full layer published instead of
+                # the one in front of it -- wrong gradients, silently. Checkpointing a
+                # whole Full-plus-borrowers group as one function with a group-local bus
+                # would be the fix; until then this is refused rather than risked.
+                raise RuntimeError(
+                    "CSA2 shares routing state between layers through a bus written in "
+                    "forward order, which gradient checkpointing breaks. Disable one of "
+                    "the two.")
+            if (isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2
+                    and not bool(attention_mask.all())):
+                # Routing picks whole blocks; there is no way to say that half a block is
+                # padding, so padded positions would be attended to as real context.
+                raise ValueError(
+                    "CSA2 routes over whole blocks and cannot represent padding. Pack or "
+                    "truncate batches to a uniform length before the model.")
         use_cache = self.config.use_cache if use_cache is None else use_cache
         output_hidden_states = (getattr(self.config, "output_hidden_states", False)
                                 if output_hidden_states is None else output_hidden_states)
