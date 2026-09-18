@@ -74,6 +74,20 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
                 module.recipient_mode = mode
         self.sidecar = (_build_sidecar(config) if config.residual_stream_sidecar
                         and layer_idx == config.sidecar_layer_index else None)
+        # Latent attention replaces the key/value side of the full-attention layers only;
+        # the linear-attention layers keep the gated delta rule, which has no KV cache to
+        # compress. The query path is untouched, so an arm comparison isolates the change.
+        if getattr(config, "mla_enabled", False) and self.block_type != "linear_attention":
+            from .mla import Qwen35LatentAttention
+            self.self_attn = Qwen35LatentAttention(config, layer_idx)
+            if getattr(config, "csa2_enabled", False):
+                from .csa2 import Qwen35SparseLatentAttention, csa2_modes
+                order = [i for i, t in enumerate(config.layer_types)
+                         if "linear" not in str(t)]
+                modes = csa2_modes(config, len(order))
+                self.self_attn = Qwen35SparseLatentAttention(
+                    config, layer_idx, modes[order.index(layer_idx)],
+                    config.csa2_bus)
 
     @staticmethod
     def distillation_hidden_state(output):
@@ -114,6 +128,11 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
     def __init__(self, config):
         Qwen3_5PreTrainedModel.__init__(self, config)
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, config.pad_token_id)
+        if getattr(config, "csa2_enabled", False):
+            # One bus for the stack, cleared at the start of every forward so nothing a
+            # Full layer published survives into the next batch.
+            from .csa2 import SparseIndexBus
+            config.csa2_bus = SparseIndexBus()
         self.layers = nn.ModuleList([WidenedDecoderLayer(config, i)
                                      for i in range(config.num_hidden_layers)])
         self.norm = Qwen3_5RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
@@ -135,6 +154,9 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             raise ValueError("Specify exactly one of input_ids or inputs_embeds")
         if output_attentions:
             raise ValueError("Widened residual model does not expose attention weights")
+        bus = getattr(self.config, "csa2_bus", None)
+        if bus is not None:
+            bus.clear()
         use_cache = self.config.use_cache if use_cache is None else use_cache
         output_hidden_states = (getattr(self.config, "output_hidden_states", False)
                                 if output_hidden_states is None else output_hidden_states)
