@@ -1,0 +1,563 @@
+{
+  "arm": "scrambled",
+  "seed": 0,
+  "vocab": 32768,
+  "backbone_parameters": 46339360,
+  "connector_parameters": 264192,
+  "batch": 64,
+  "length": 1024,
+  "steps": 8000,
+  "scored_tokens": 524288000,
+  "inflation": 1.1420366695571345,
+  "order": 3,
+  "max_length": 8,
+  "seconds": 4780.538435299997,
+  "tokens_per_second": 109671.32826055793,
+  "final_loss": 1.6652235984802246,
+  "final_heldout": 1.792904257774353,
+  "final_heldout_per_original_token": 2.0475624073834284,
+  "endpoint": {
+    "enabled": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.244873046875,
+      "second_occurrence": 0.8757195472717285,
+      "gain": 11.369153499603271,
+      "windows": 64,
+      "half": 256
+    },
+    "ablated": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.398670196533203,
+      "second_occurrence": 3.7771477699279785,
+      "gain": 8.621522426605225,
+      "windows": 64,
+      "half": 256
+    },
+    "substituted": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 12.239479064941406,
+      "second_occurrence": 0.8734041452407837,
+      "gain": 11.366074919700623,
+      "windows": 64,
+      "half": 256
+    }
+  },
+  "peak_reserved_gib": 11.671875,
+  "shared_delta_gib": 3.814697265625e-06,
+  "setup_seconds": 3.236472600023262,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "loss": 10.487565040588379,
+      "loss_per_original_token": 11.977183850717386,
+      "tokens_per_second": 31567.237527112782,
+      "heldout": 10.018475532531738,
+      "heldout_per_original_token": 11.441466431212186,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 10.488995552062988,
+        "second_occurrence": 10.489580154418945,
+        "gain": -0.0005846023559570312,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 250,
+      "tokens": 16449536,
+      "loss": 4.30731201171875,
+      "loss_per_original_token": 4.919108264606722,
+      "tokens_per_second": 120974.33180636496,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.347198486328125,
+        "second_occurrence": 11.322982788085938,
+        "gain": 0.0242156982421875,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 500,
+      "tokens": 32833536,
+      "loss": 3.3875741958618164,
+      "loss_per_original_token": 3.8687339525197166,
+      "tokens_per_second": 117616.56656040656,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.170263290405273,
+        "second_occurrence": 10.606977462768555,
+        "gain": 0.5632858276367188,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 750,
+      "tokens": 49217536,
+      "loss": 2.9757070541381836,
+      "loss_per_original_token": 3.3983665736856428,
+      "tokens_per_second": 115454.23730050003,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.39456558227539,
+        "second_occurrence": 8.67790412902832,
+        "gain": 2.7166614532470703,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 1000,
+      "tokens": 65601536,
+      "loss": 2.7485580444335938,
+      "loss_per_original_token": 3.1389540751494116,
+      "tokens_per_second": 114123.05522316867,
+      "heldout": 2.729931116104126,
+      "heldout_per_original_token": 3.117681439955947,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.494470596313477,
+        "second_occurrence": 7.10335636138916,
+        "gain": 4.391114234924316,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 1250,
+      "tokens": 81985536,
+      "loss": 2.515554428100586,
+      "loss_per_original_token": 2.872855401157695,
+      "tokens_per_second": 113177.20873793101,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.79874038696289,
+        "second_occurrence": 6.198843955993652,
+        "gain": 5.599896430969238,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 1500,
+      "tokens": 98369536,
+      "loss": 2.487800121307373,
+      "loss_per_original_token": 2.8411589650617075,
+      "tokens_per_second": 112515.33990675374,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.852953910827637,
+        "second_occurrence": 5.316783905029297,
+        "gain": 6.53617000579834,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 1750,
+      "tokens": 114753536,
+      "loss": 2.3987746238708496,
+      "loss_per_original_token": 2.739488582463633,
+      "tokens_per_second": 112012.39145014486,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.873639106750488,
+        "second_occurrence": 4.444643974304199,
+        "gain": 7.428995132446289,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 2000,
+      "tokens": 131137536,
+      "loss": 2.1754164695739746,
+      "loss_per_original_token": 2.484405379812001,
+      "tokens_per_second": 111640.27606052005,
+      "heldout": 2.270967721939087,
+      "heldout_per_original_token": 2.5935284138350676,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.982440948486328,
+        "second_occurrence": 3.691363573074341,
+        "gain": 8.291077375411987,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 2250,
+      "tokens": 147521536,
+      "loss": 2.1259407997131348,
+      "loss_per_original_token": 2.4279023505800192,
+      "tokens_per_second": 111334.13609964434,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.024114608764648,
+        "second_occurrence": 3.678511381149292,
+        "gain": 8.345603227615356,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 2500,
+      "tokens": 163905536,
+      "loss": 2.1901679039001465,
+      "loss_per_original_token": 2.5012520587410534,
+      "tokens_per_second": 111101.32451537432,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.984262466430664,
+        "second_occurrence": 3.109236717224121,
+        "gain": 8.875025749206543,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 2750,
+      "tokens": 180289536,
+      "loss": 2.078549385070801,
+      "loss_per_original_token": 2.3737796172362873,
+      "tokens_per_second": 110910.19363504472,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.195728302001953,
+        "second_occurrence": 2.9256129264831543,
+        "gain": 9.270115375518799,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 3000,
+      "tokens": 196673536,
+      "loss": 2.031689167022705,
+      "loss_per_original_token": 2.320263529881919,
+      "tokens_per_second": 110742.87751474782,
+      "heldout": 2.087674379348755,
+      "heldout_per_original_token": 2.38420069531121,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.10453987121582,
+        "second_occurrence": 2.3506722450256348,
+        "gain": 9.753867626190186,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 3250,
+      "tokens": 213057536,
+      "loss": 1.8639638423919678,
+      "loss_per_original_token": 2.128715058740242,
+      "tokens_per_second": 110589.88643137361,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.023874282836914,
+        "second_occurrence": 2.162644147872925,
+        "gain": 9.86123013496399,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 3500,
+      "tokens": 229441536,
+      "loss": 1.916881799697876,
+      "loss_per_original_token": 2.1891493064616485,
+      "tokens_per_second": 110477.49303743146,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.090742111206055,
+        "second_occurrence": 2.1657028198242188,
+        "gain": 9.925039291381836,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 3750,
+      "tokens": 245825536,
+      "loss": 1.929092288017273,
+      "loss_per_original_token": 2.203094131875599,
+      "tokens_per_second": 110374.01944381294,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.05741024017334,
+        "second_occurrence": 1.7268657684326172,
+        "gain": 10.330544471740723,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 4000,
+      "tokens": 262209536,
+      "loss": 2.0048627853393555,
+      "loss_per_original_token": 2.2896268182879975,
+      "tokens_per_second": 110290.1653600348,
+      "heldout": 1.9797801971435547,
+      "heldout_per_original_token": 2.2609815828009925,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.166014671325684,
+        "second_occurrence": 1.6279094219207764,
+        "gain": 10.538105249404907,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 4250,
+      "tokens": 278593536,
+      "loss": 1.9117070436477661,
+      "loss_per_original_token": 2.18323954529641,
+      "tokens_per_second": 110213.60506864025,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.074552536010742,
+        "second_occurrence": 1.5010185241699219,
+        "gain": 10.57353401184082,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 4500,
+      "tokens": 294977536,
+      "loss": 1.9721314907073975,
+      "loss_per_original_token": 2.252246479576223,
+      "tokens_per_second": 110153.17052711578,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.125006675720215,
+        "second_occurrence": 1.4297821521759033,
+        "gain": 10.695224523544312,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 4750,
+      "tokens": 311361536,
+      "loss": 1.8308855295181274,
+      "loss_per_original_token": 2.0909384124712327,
+      "tokens_per_second": 110104.7008523756,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.175736427307129,
+        "second_occurrence": 1.323190450668335,
+        "gain": 10.852545976638794,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 5000,
+      "tokens": 327745536,
+      "loss": 1.9430896043777466,
+      "loss_per_original_token": 2.2190795804346517,
+      "tokens_per_second": 110052.54318041433,
+      "heldout": 1.91359543800354,
+      "heldout_per_original_token": 2.1853961608972887,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.994284629821777,
+        "second_occurrence": 1.3330647945404053,
+        "gain": 10.661219835281372,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 5250,
+      "tokens": 344129536,
+      "loss": 1.8569068908691406,
+      "loss_per_original_token": 2.1206557613258865,
+      "tokens_per_second": 110001.65349940705,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.12222957611084,
+        "second_occurrence": 1.1463775634765625,
+        "gain": 10.975852012634277,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 5500,
+      "tokens": 360513536,
+      "loss": 1.916425347328186,
+      "loss_per_original_token": 2.188628021117556,
+      "tokens_per_second": 109963.00686953445,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.045846939086914,
+        "second_occurrence": 0.9636799097061157,
+        "gain": 11.082167029380798,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 5750,
+      "tokens": 376897536,
+      "loss": 1.9834368228912354,
+      "loss_per_original_token": 2.2651575834916904,
+      "tokens_per_second": 109928.18559409314,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.185498237609863,
+        "second_occurrence": 1.120808720588684,
+        "gain": 11.06468951702118,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 6000,
+      "tokens": 393281536,
+      "loss": 1.7899305820465088,
+      "loss_per_original_token": 2.044166360658858,
+      "tokens_per_second": 109896.1171436412,
+      "heldout": 1.8601024150848389,
+      "heldout_per_original_token": 2.124305167158672,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.097993850708008,
+        "second_occurrence": 0.9085996150970459,
+        "gain": 11.189394235610962,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 6250,
+      "tokens": 409665536,
+      "loss": 1.9016927480697632,
+      "loss_per_original_token": 2.171802852526547,
+      "tokens_per_second": 109861.54233383316,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.238785743713379,
+        "second_occurrence": 0.9271194934844971,
+        "gain": 11.311666250228882,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 6500,
+      "tokens": 426049536,
+      "loss": 1.8734928369522095,
+      "loss_per_original_token": 2.1395975199520487,
+      "tokens_per_second": 109837.99614063521,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.25148868560791,
+        "second_occurrence": 0.9631423950195312,
+        "gain": 11.288346290588379,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 6750,
+      "tokens": 442433536,
+      "loss": 1.8050445318222046,
+      "loss_per_original_token": 2.0614270455245474,
+      "tokens_per_second": 109818.15481261794,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.207181930541992,
+        "second_occurrence": 0.8495709896087646,
+        "gain": 11.357610940933228,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 7000,
+      "tokens": 458817536,
+      "loss": 1.7584950923919678,
+      "loss_per_original_token": 2.0082658787478884,
+      "tokens_per_second": 109797.32894983044,
+      "heldout": 1.8234894275665283,
+      "heldout_per_original_token": 2.0824917928307234,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.110544204711914,
+        "second_occurrence": 0.7219433784484863,
+        "gain": 11.388600826263428,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 7250,
+      "tokens": 475201536,
+      "loss": 1.786799669265747,
+      "loss_per_original_token": 2.040590743454043,
+      "tokens_per_second": 109770.83650882958,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.261656761169434,
+        "second_occurrence": 0.8645122051239014,
+        "gain": 11.397144556045532,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 7500,
+      "tokens": 491585536,
+      "loss": 1.8219372034072876,
+      "loss_per_original_token": 2.080719095921498,
+      "tokens_per_second": 109751.97514044876,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.090639114379883,
+        "second_occurrence": 0.7758888006210327,
+        "gain": 11.31475031375885,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 7750,
+      "tokens": 507969536,
+      "loss": 1.808265209197998,
+      "loss_per_original_token": 2.0651051771885167,
+      "tokens_per_second": 109733.45847404521,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.173470497131348,
+        "second_occurrence": 0.7978718876838684,
+        "gain": 11.37559860944748,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 7999,
+      "tokens": 524288000,
+      "loss": 1.6652235984802246,
+      "loss_per_original_token": 1.9017464124763026,
+      "tokens_per_second": 109718.31940696914,
+      "heldout": 1.792904257774353,
+      "heldout_per_original_token": 2.0475624073834284,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 12.237826347351074,
+        "second_occurrence": 0.880582332611084,
+        "gain": 11.35724401473999,
+        "windows": 64,
+        "half": 256
+      }
+    }
+  ]
+}
