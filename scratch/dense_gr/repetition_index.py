@@ -1,4 +1,4 @@
-"""The repetition index: where the current suffix occurred before, computed exactly.
+﻿"""The repetition index: where the current suffix occurred before, computed exactly.
 
 This is the first standard part, and it is deliberately the most boring one available.
 `docs/standard_parts.md` selects it on four criteria -- universal, exactly computable,
@@ -32,6 +32,11 @@ from __future__ import annotations
 import numpy as np
 
 FEATURES = 4  # matched, log distance, length, candidate-agrees-with-previous
+
+#: Distance is normalized by a constant, not by the window length. Dividing by log1p(n)
+#: made the same context yield different features at different window sizes, which broke
+#: prefix-invariance and would break incremental decoding, where n is not known ahead.
+SCALE = float(np.log1p(4096))
 
 
 def repetition_index(tokens, order=3, max_length=8):
@@ -68,7 +73,7 @@ def repetition_index(tokens, order=3, max_length=8):
                     distance = t - following
                     length = _agreement(tokens, t, following, max_length)
                     features[t, 0] = 1.0
-                    features[t, 1] = np.log1p(distance) / np.log1p(n)
+                    features[t, 1] = np.log1p(distance) / SCALE
                     features[t, 2] = length / max_length
                     features[t, 3] = 1.0 if found == previous_candidate else 0.0
             previous_candidate = int(candidate[t])

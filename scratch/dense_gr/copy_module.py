@@ -70,11 +70,34 @@ class Connector(torch.nn.Module):
         return self.project(joined)
 
 
+def align_to_prediction(features, candidate):
+    """Shift the module's output to the position that consumes it.
+
+    `repetition_index` defines ``candidate[t]`` as the continuation of the suffix ending
+    at ``t-1`` -- that is, a prediction of ``tokens[t]``. But the loss uses the hidden
+    state at ``t`` to predict ``tokens[t+1]``, so supplying ``candidate[t]`` at position
+    ``t`` hands the backbone a second copy of the token it already has as input. Measured
+    on a repeated random block: ``candidate[t] == tokens[t]`` at 29 of 29 positions inside
+    the repeat, and ``== tokens[t+1]`` at 0 of 29.
+
+    What position ``t`` needs is ``candidate[t+1]``, built from the suffix ending at ``t``.
+    That is still causal: it reads ``tokens[t+1-order:t+1]`` and a previous occurrence
+    strictly before ``t+1``, so nothing after ``t`` is touched. The last position has no
+    successor and is left blank.
+    """
+    shifted_features = np.zeros_like(features)
+    shifted_candidate = np.full_like(candidate, -1)
+    shifted_features[:, :-1] = features[:, 1:]
+    shifted_candidate[:, :-1] = candidate[:, 1:]
+    return shifted_features, shifted_candidate
+
+
 def module_output(tokens, arm, vocab, generator, order=3, max_length=8):
     """Features and candidate for a batch of token ids, under one arm's treatment."""
     if arm == "plain":
         return None, None
     features, candidate = batch_repetition_index(tokens, order, max_length, vocab=vocab)
+    features, candidate = align_to_prediction(features, candidate)
     if arm == "scrambled":
         features, candidate = scramble(features, candidate, generator)
     return features, candidate
@@ -103,16 +126,29 @@ def randomize_candidates(features, candidate, generator, vocab):
 
 
 def scramble(features, candidate, generator):
-    """Permute the module's output across positions, independently per sequence.
+    """Permute the module's output across *sequences*, at the same position.
 
-    Bandwidth, activation timing, connector capacity and parameter count are all preserved;
-    only the correspondence between a position and its own suffix match is destroyed.
+    An earlier version permuted across positions within a sequence, which is not a
+    control -- it is future leakage. Position 5 could receive the output computed at
+    position 900, which was built from tokens 900 and earlier. The evidence was in the
+    endpoint matrix and went unread: the copy arm scored first-occurrence NLL 11.823
+    under position-scrambling against 12.121 enabled, and the first occurrence contains
+    no prior repeat, so nothing legitimate can make it easier.
+
+    Permuting across batch rows at the same position keeps every treated output causal
+    with respect to its own sequence -- row A's position ``t`` receives row B's position
+    ``t``, built from row B's tokens up to ``t`` and nothing later. Bandwidth, activation
+    timing, connector capacity and parameter count are preserved; the correspondence
+    between a position and its own suffix match is destroyed.
     """
-    rows, n = candidate.shape
-    order = np.argsort(generator.random((rows, n)), axis=1)
-    take = np.take_along_axis
-    return (take(features, order[:, :, None], axis=1),
-            take(candidate, order, axis=1))
+    rows = candidate.shape[0]
+    if rows < 2:
+        raise ValueError("cross-sequence scrambling needs at least two sequences")
+    # A derangement, so no row keeps its own output.
+    order = generator.permutation(rows)
+    while np.any(order == np.arange(rows)):
+        order = generator.permutation(rows)
+    return features[order], candidate[order]
 
 
 def build_inputs(model, tokens, features, candidate, connector, ablate=False):
@@ -151,19 +187,44 @@ def _self_check():
     unmatched = connector(zero_feature, blank, embed)
     assert torch.count_nonzero(unmatched) == 0, "unmatched position leaked an embedding"
 
-    # Scrambling preserves the multiset of positions, and moves them.
+    # Alignment: the module attached at position t must supply tokens[t+1].
     generator = np.random.default_rng(0)
-    f = np.random.default_rng(1).random((4, 64, FEATURES)).astype(np.float32)
-    c = np.arange(4 * 64, dtype=np.int64).reshape(4, 64)
-    sf, sc = scramble(f, c, generator)
-    assert sf.shape == f.shape and sc.shape == c.shape
-    for row in range(4):
-        assert set(sc[row].tolist()) == set(c[row].tolist()), "scramble lost content"
-    assert (sc != c).mean() > 0.9, "scramble barely moved anything"
+    half = 32
+    block = generator.integers(0, 1000, size=(4, half))
+    repeated = np.concatenate([block, block], axis=1)
+    _, aligned = module_output(repeated, "copy", 1000, generator)
+    inside = slice(half + 3, 2 * half - 1)
+    want = repeated[:, 1:][:, inside]
+    got = aligned[:, inside]
+    assert np.array_equal(got, want), (
+        "module at position t must supply tokens[t+1]; %d of %d wrong"
+        % (int((got != want).sum()), want.size))
 
-    print("copy_module self-check: ok (inert at init, gradient present, "
-          "unmatched positions blank, scramble permutes %.0f%% of positions)"
-          % (100 * (sc != c).mean()))
+    # Causality: every treatment must be prefix-invariant. Truncating the batch's
+    # sequences must not change any output that survives, or a position saw its future.
+    for arm in ("copy", "scrambled"):
+        full_f, full_c = module_output(repeated, arm, 1000,
+                                       np.random.default_rng(5))
+        cut = half + 7
+        part_f, part_c = module_output(repeated[:, :cut], arm, 1000,
+                                       np.random.default_rng(5))
+        # The final position of any window is blank by construction, so compare before it.
+        assert np.array_equal(full_c[:, :cut - 1], part_c[:, :cut - 1]), (
+            "%s is not causal: a prefix disagrees with the full sequence" % arm)
+        assert np.allclose(full_f[:, :cut - 1], part_f[:, :cut - 1]), (
+            "%s features are not causal" % arm)
+
+    # Scrambling must move content between sequences and keep each position's own slot.
+    f = np.random.default_rng(1).random((4, 16, FEATURES)).astype(np.float32)
+    c = np.arange(4 * 16, dtype=np.int64).reshape(4, 16)
+    sf, sc = scramble(f, c, np.random.default_rng(0))
+    assert sf.shape == f.shape and sc.shape == c.shape
+    assert not np.any([np.array_equal(sc[r], c[r]) for r in range(4)]), \
+        "a sequence kept its own module output"
+    assert set(sc.ravel().tolist()) == set(c.ravel().tolist()), "scramble lost content"
+
+    print("copy_module self-check: ok (inert at init, gradient present, unmatched "
+          "positions blank, module at t supplies tokens[t+1], every treatment causal)")
 
 
 if __name__ == "__main__":

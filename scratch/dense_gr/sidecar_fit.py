@@ -235,11 +235,19 @@ def main() -> int:
         calibration[strength] = {
             "structural": structural_delta / max(structural_tokens, 1),
             "content": report["content"]["delta"]}
-        print("  strength %.2f  structural %+.4f  content %+.4f"
+        calibration[strength]["guarded"] = (
+            calibration[strength]["structural"]
+            + args.beta * max(0.0, calibration[strength]["content"]))
+        print("  strength %.2f  structural %+.4f  content %+.4f  guarded %+.4f"
               % (strength, calibration[strength]["structural"],
-                 calibration[strength]["content"]), flush=True)
-    chosen = min(grid, key=lambda s: calibration[s]["structural"])
-    print("chosen strength %.2f" % chosen, flush=True)
+                 calibration[strength]["content"],
+                 calibration[strength]["guarded"]), flush=True)
+    # Selected on the same guarded objective the fit optimizes. Picking on structural
+    # alone would let a strength that violates the content constraint win, which is the
+    # trade the guardrail exists to forbid.
+    chosen = min(grid, key=lambda s: calibration[s]["guarded"])
+    print("chosen strength %.2f (guarded %+.4f)"
+          % (chosen, calibration[chosen]["guarded"]), flush=True)
 
     result = per_class("heldout", chosen)
     after = digest(model)
@@ -265,7 +273,24 @@ def main() -> int:
     }, indent=2), encoding="utf-8")
     if before != after:
         raise SystemExit("the backbone moved; this is not a post-hoc fit")
-    print("wrote %s" % args.output)
+
+    # The weights, not just the numbers. A fit that cannot be reloaded has to be redone to
+    # ask it anything new, which is the same mistake the baseline run made by saving no
+    # checkpoint. Everything needed to rebuild the module and place it is stored with it.
+    weights = args.output.with_suffix(".pt")
+    torch.save({"state_dict": {k: v.cpu() for k, v in sidecar.state_dict().items()},
+                "strength": chosen, "rows": args.rows, "padded_rows":
+                    hasher.padded_vocab_size, "code_dim": args.code_dim,
+                "heads": args.heads, "seed": args.seed, "vocab": args.vocab,
+                "hidden": args.hidden, "latent_width": augmented.width,
+                "structural": structural.cpu(), "whitespace": whitespace.cpu(),
+                "hasher": {"vocab_size": args.vocab, "ngram_size": 3,
+                           "heads_per_ngram": 1,
+                           "ngram_vocab_size_base": args.rows // 2,
+                           "seed": 1234, "eos_token_id": eos},
+                "checkpoint": str(args.checkpoint), "backbone_digest": before},
+               weights)
+    print("wrote %s and %s" % (args.output, weights))
     return 0
 
 

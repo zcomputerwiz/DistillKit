@@ -1,4 +1,4 @@
-"""Vectorized repetition index, validated against the reference implementation.
+﻿"""Vectorized repetition index, validated against the reference implementation.
 
 `repetition_index.py` is the readable definition: a dictionary, one position at a time,
 obviously causal. It costs 0.118 s per training step at batch 64 x 1024, which is 21% of a
@@ -22,6 +22,11 @@ from __future__ import annotations
 import numpy as np
 
 FEATURES = 4
+
+#: Distance is normalized by a constant, not by the window length. Dividing by log1p(n)
+#: made the same context yield different features at different window sizes, which broke
+#: prefix-invariance and would break incremental decoding, where n is not known ahead.
+SCALE = float(np.log1p(4096))
 
 
 def batch_repetition_index(batch, order=3, max_length=8, vocab=None):
@@ -55,7 +60,7 @@ def batch_repetition_index(batch, order=3, max_length=8, vocab=None):
 
         candidate[row, here] = batch[row, there]
         features[row, here, 0] = 1.0
-        features[row, here, 1] = np.log1p(here - there) / np.log1p(n)
+        features[row, here, 1] = np.log1p(here - there) / SCALE
         features[row, here, 2] = _agreement(batch[row], here, there, max_length) / max_length
 
     # Feature 3: the candidate agrees with the previous position's candidate. The reference

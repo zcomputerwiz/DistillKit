@@ -1,0 +1,95 @@
+{
+  "checkpoint": "scratch\\dense_gr\\checkpoints\\sc-plain-s0",
+  "strength": 0.25,
+  "lr": 0.003,
+  "beta": 10.0,
+  "epochs": 6,
+  "fit_windows": 2048,
+  "length": 1024,
+  "fit_tokens": 12582912,
+  "sidecar": {
+    "addressed_parameters": 150475,
+    "whitespace_parameters": 124,
+    "gate_parameters": 33,
+    "whitespace_tokens": 124,
+    "total_parameters": 150632
+  },
+  "latent_width": 80,
+  "loss_history": [
+    0.9689241631422192,
+    0.9615496273618191,
+    0.9559900478343479,
+    0.9515735199674964,
+    0.9480109791620634,
+    0.9449840299785137
+  ],
+  "calibration": {
+    "0.0": {
+      "structural": 7.34334544758718e-08,
+      "content": 2.4245480290119303e-06
+    },
+    "0.25": {
+      "structural": -2.865728749899686e-05,
+      "content": -0.0007069578277878463
+    },
+    "0.5": {
+      "structural": 0.0011172763511513837,
+      "content": -0.0011441846145316958
+    },
+    "0.75": {
+      "structural": 0.0033971903632033455,
+      "content": -0.0013391587417572737
+    },
+    "1.0": {
+      "structural": 0.006807042724912234,
+      "content": -0.0012926881900057197
+    },
+    "1.25": {
+      "structural": 0.011341059207503671,
+      "content": -0.0010296247201040387
+    },
+    "1.5": {
+      "structural": 0.017018024068689446,
+      "content": -0.0004958200734108686
+    },
+    "2.0": {
+      "structural": 0.03190813740888933,
+      "content": 0.0012852124636992812
+    }
+  },
+  "heldout": {
+    "content": {
+      "biased": 2.3969199657440186,
+      "plain": 2.397620677947998,
+      "delta": -0.0007005675579421222,
+      "tokens": 154696
+    },
+    "newline": {
+      "biased": 0.78652024269104,
+      "plain": 0.7875936031341553,
+      "delta": -0.0010733717354014516,
+      "tokens": 19600
+    },
+    "whitespace": {
+      "biased": 0.6498273015022278,
+      "plain": 0.6508139371871948,
+      "delta": -0.0009866314940154552,
+      "tokens": 22016
+    },
+    "punctuation": {
+      "biased": 1.1658707857131958,
+      "plain": 1.165061354637146,
+      "delta": 0.0008094602962955832,
+      "tokens": 65302
+    },
+    "control": {
+      "biased": 2.0901377201080322,
+      "plain": 2.0763514041900635,
+      "delta": 0.013786371797323227,
+      "tokens": 274
+    }
+  },
+  "backbone_unchanged": true,
+  "backbone_digest": "94d9945448e268456716f412e9a95c3449520585cc88b5f7eadaecb13b7747d3",
+  "seconds": 102.80171349999728
+}
