@@ -48,17 +48,25 @@ def probe_batches(vocab, half=256, windows=64, seed=1234):
 
 @torch.no_grad()
 def copy_probe(model, vocab, half=256, windows=64, batch=32, seed=1234,
-               device="cuda"):
-    """Mean NLL in nats on each occurrence of a repeated random block."""
+               device="cuda", hidden_fn=None):
+    """Mean NLL in nats on each occurrence of a repeated random block.
+
+    ``hidden_fn`` maps a batch of ids to a hidden state, for arms that feed the backbone
+    something other than bare token ids. The default is the plain forward pass, so a model
+    with no module attached needs nothing extra.
+    """
     sequences = probe_batches(vocab, half, windows, seed)
     was_training = model.training
     model.eval()
     first_total, second_total, counted = 0.0, 0.0, 0
     for start in range(0, sequences.shape[0], batch):
         chunk = sequences[start:start + batch].to(device)
-        state = model.model(input_ids=chunk,
-                            attention_mask=torch.ones_like(chunk),
-                            use_cache=False).last_hidden_state
+        if hidden_fn is not None:
+            state = hidden_fn(chunk)
+        else:
+            state = model.model(input_ids=chunk,
+                                attention_mask=torch.ones_like(chunk),
+                                use_cache=False).last_hidden_state
         losses = linear_cross_entropy(state, model.lm_head.weight, chunk, shift=1,
                                       reduction="none").float()
         # `shift=1` returns `length - 1` entries, where entry i is the loss for predicting

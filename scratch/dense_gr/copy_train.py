@@ -1,0 +1,244 @@
+"""One arm of the copy/induction displacement experiment.
+
+`docs/standard_parts.md` section 5. Three arms -- `plain`, `copy`, `scrambled` -- trained
+at matched compute on the 3B corpus, scored on held-out NLL and on the copy probe under
+three conditions. The decisive cell is `copy` with the module ablated: if that collapses
+toward chance while `plain` performs well, the backbone genuinely stopped building the
+function.
+
+    CUDA_VISIBLE_DEVICES=0 python scratch/dense_gr/copy_train.py --arm copy --seed 0
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import triton_shim  # noqa: F401,E402  resolves triton-windows before CCE reads the version
+
+import numpy as np  # noqa: E402
+import torch  # noqa: E402
+
+from benchmark import apply_liger, build, shared_gpu_gib  # noqa: E402
+from copy_module import ARMS, Connector, build_inputs, module_output  # noqa: E402
+from copy_probe import copy_probe, format_probe  # noqa: E402
+from cut_cross_entropy import linear_cross_entropy  # noqa: E402
+from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
+from vocab_remap import build_vocabulary, cached_remap  # noqa: E402
+
+BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
+STORE = Path("scratch/code_training/tokens-v2")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--arm", choices=ARMS, required=True)
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--vocab", type=int, default=32_768)
+    parser.add_argument("--hidden", type=int, default=512)
+    parser.add_argument("--layers", type=int, default=8)
+    parser.add_argument("--batch", type=int, default=64)
+    parser.add_argument("--length", type=int, default=1024)
+    parser.add_argument("--steps", type=int, default=8_000,
+                        help="the copy probe saturates by ~5,000 steps, so stage A stops "
+                             "shortly after rather than running a full pass")
+    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--order", type=int, default=3)
+    parser.add_argument("--max-length", type=int, default=8)
+    parser.add_argument("--evaluate-every", type=int, default=1_000)
+    parser.add_argument("--evaluate-windows", type=int, default=64)
+    parser.add_argument("--probe-every", type=int, default=250)
+    parser.add_argument("--probe-half", type=int, default=256)
+    parser.add_argument("--probe-windows", type=int, default=64)
+    parser.add_argument("--report-every", type=int, default=250)
+    parser.add_argument("--store", type=Path, default=STORE)
+    parser.add_argument("--output", type=Path, default=None)
+    args = parser.parse_args()
+    if args.output is None:
+        args.output = Path("scratch/dense_gr/copy-%s-s%d.json" % (args.arm, args.seed))
+
+    torch.cuda.set_per_process_memory_fraction(0.90, 0)
+    started = time.perf_counter()
+    from transformers import AutoTokenizer
+    tokenizer = AutoTokenizer.from_pretrained(BASE, local_files_only=True)
+
+    raw = np.memmap(args.store / "train.bin", dtype=np.uint32, mode="r")
+    counts = np.load(args.store / "train-counts.npy")
+    kept, forward, bytes_ids = build_vocabulary(counts, tokenizer, args.vocab)
+    stream, original_tokens, compact_tokens = cached_remap(
+        args.store, "train", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
+    stream = np.asarray(stream)
+    inflation = compact_tokens / original_tokens
+    print("arm %s seed %d | store %d -> %d, inflation %.4f"
+          % (args.arm, args.seed, original_tokens, compact_tokens, inflation), flush=True)
+
+    config = build(args.hidden, args.layers, args.vocab,
+                   attn_implementation="flash_attention_2")
+    torch.manual_seed(args.seed)
+    model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
+    model.train()
+    swapped = apply_liger(model, config)
+
+    connector = None
+    if args.arm != "plain":
+        connector = Connector(args.hidden).to(device="cuda", dtype=torch.bfloat16)
+    backbone_parameters = sum(p.numel() for p in model.parameters())
+    connector_parameters = 0 if connector is None else sum(
+        p.numel() for p in connector.parameters())
+    print("model: %.1fM backbone, %.3fM connector (%.2f%%), liger %s"
+          % (backbone_parameters / 1e6, connector_parameters / 1e6,
+             100 * connector_parameters / backbone_parameters, json.dumps(swapped)),
+          flush=True)
+
+    import bitsandbytes as bnb
+    trainable = list(model.parameters()) + (
+        [] if connector is None else list(connector.parameters()))
+    optimizer = bnb.optim.AdamW8bit(trainable, lr=args.lr, betas=(0.9, 0.95),
+                                    weight_decay=0.1)
+    baseline_shared = shared_gpu_gib()
+
+    module_rng = np.random.default_rng(args.seed + 9_000)
+
+    def hidden_for(tokens, arm=None, ablate=False, substitute=False, ids=None):
+        """Run the backbone on `tokens` under one treatment of the module.
+
+        `ids` is the same batch as a host array where the caller already has one. The
+        training loop does, and reading it back off the device instead would force a
+        synchronize on every step.
+        """
+        arm = args.arm if arm is None else arm
+        if ids is None:
+            ids = tokens.detach().cpu().numpy()
+        features, candidate = module_output(ids, arm, args.vocab, module_rng,
+                                            args.order, args.max_length)
+        if substitute and features is not None:
+            from copy_module import scramble
+            features, candidate = scramble(features, candidate, module_rng)
+        if features is None:
+            inputs = model.model.embed_tokens(tokens)
+        else:
+            inputs = build_inputs(
+                model, tokens,
+                torch.from_numpy(features).to("cuda"),
+                torch.from_numpy(candidate).to("cuda"),
+                connector, ablate=ablate)
+        return model.model(inputs_embeds=inputs,
+                           attention_mask=torch.ones_like(tokens),
+                           use_cache=False).last_hidden_state
+
+    held_stream, _, _ = cached_remap(args.store, "calibration", args.vocab, tokenizer,
+                                     forward, bytes_ids, counts, kept)
+    held_rng = np.random.default_rng(12345)
+    held_starts = held_rng.integers(0, held_stream.shape[0] - args.length - 1,
+                                    size=args.evaluate_windows)
+    evaluation = torch.from_numpy(
+        np.stack([held_stream[s:s + args.length] for s in held_starts]).astype(np.int64))
+
+    @torch.no_grad()
+    def evaluate():
+        model.eval()
+        total, batches = 0.0, 0
+        for start in range(0, evaluation.shape[0], args.batch):
+            chunk = evaluation[start:start + args.batch].to("cuda")
+            state = hidden_for(chunk)
+            total += float(linear_cross_entropy(state, model.lm_head.weight, chunk,
+                                                shift=1, reduction="mean"))
+            batches += 1
+        model.train()
+        return total / max(batches, 1)
+
+    def probe(arm=None, ablate=False, substitute=False):
+        return copy_probe(model, args.vocab, half=args.probe_half,
+                          windows=args.probe_windows, batch=args.batch,
+                          hidden_fn=lambda ids: hidden_for(ids, arm, ablate, substitute))
+
+    window = args.batch * args.length
+    generator = np.random.default_rng(args.seed)
+    history = []
+    torch.cuda.synchronize()
+    train_started = time.perf_counter()
+    for step in range(args.steps):
+        starts = generator.integers(0, stream.shape[0] - args.length - 1, size=args.batch)
+        batch = np.stack([stream[s:s + args.length] for s in starts]).astype(np.int64)
+        tokens = torch.from_numpy(batch).to("cuda", non_blocking=True)
+        optimizer.zero_grad(set_to_none=True)
+        hidden = hidden_for(tokens, ids=batch)
+        loss = linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
+                                    reduction="mean")
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(trainable, 1.0)
+        optimizer.step()
+
+        if step % args.report_every == 0 or step == args.steps - 1:
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - train_started
+            seen = (step + 1) * window
+            scored = float(loss.detach())
+            row = {"step": step, "tokens": seen, "loss": scored,
+                   "loss_per_original_token": scored * inflation,
+                   "tokens_per_second": seen / elapsed}
+            if step % args.evaluate_every == 0 or step == args.steps - 1:
+                row["heldout"] = evaluate()
+                row["heldout_per_original_token"] = row["heldout"] * inflation
+            if args.probe_every and (step % args.probe_every == 0
+                                     or step == args.steps - 1):
+                row["copy"] = probe()
+            history.append(row)
+            print("step %5d  train %7.4f  held %8s  %8.0f tok/s"
+                  % (step, row["loss"],
+                     "%.4f" % row["heldout"] if "heldout" in row else "-",
+                     row["tokens_per_second"]), flush=True)
+            if "copy" in row:
+                print("            %s" % format_probe(row["copy"]), flush=True)
+            drift = shared_gpu_gib() - baseline_shared
+            if drift > 0.25:
+                args.output.write_text(json.dumps(
+                    {"aborted": "spilled to system RAM", "shared_delta_gib": drift,
+                     "arm": args.arm, "seed": args.seed, "step": step,
+                     "history": history}, indent=2), encoding="utf-8")
+                raise SystemExit("spilled %.2f GiB into system RAM at step %d; stopping"
+                                 % (drift, step))
+
+    torch.cuda.synchronize()
+    elapsed = time.perf_counter() - train_started
+
+    # The endpoint matrix. `ablated` is the decisive cell; `substituted` separates
+    # dependence on content from dependence on the channel merely being active.
+    endpoint = {"enabled": probe()}
+    if args.arm != "plain":
+        endpoint["ablated"] = probe(ablate=True)
+        endpoint["substituted"] = probe(substitute=True)
+    for name, result in endpoint.items():
+        print("endpoint %-12s %s" % (name, format_probe(result)), flush=True)
+
+    report = {
+        "arm": args.arm, "seed": args.seed, "vocab": args.vocab,
+        "backbone_parameters": int(backbone_parameters),
+        "connector_parameters": int(connector_parameters),
+        "batch": args.batch, "length": args.length, "steps": args.steps,
+        "scored_tokens": args.steps * window, "inflation": inflation,
+        "order": args.order, "max_length": args.max_length,
+        "seconds": elapsed, "tokens_per_second": args.steps * window / elapsed,
+        "final_loss": history[-1]["loss"],
+        "final_heldout": history[-1].get("heldout"),
+        "final_heldout_per_original_token": history[-1].get(
+            "heldout_per_original_token"),
+        "endpoint": endpoint,
+        "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
+        "shared_delta_gib": shared_gpu_gib() - baseline_shared,
+        "setup_seconds": train_started - started,
+        "history": history,
+    }
+    args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    print("wrote %s" % args.output)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

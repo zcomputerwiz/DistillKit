@@ -1,0 +1,91 @@
+{
+  "arm": "copy",
+  "seed": 0,
+  "vocab": 32768,
+  "backbone_parameters": 46339360,
+  "connector_parameters": 264192,
+  "batch": 64,
+  "length": 1024,
+  "steps": 400,
+  "scored_tokens": 26214400,
+  "inflation": 1.1420366695571345,
+  "order": 3,
+  "max_length": 8,
+  "seconds": 221.32125539996196,
+  "tokens_per_second": 118445.01764020135,
+  "final_loss": 3.8724334239959717,
+  "final_heldout": 3.8288073539733887,
+  "final_heldout_per_original_token": 4.372638398907633,
+  "endpoint": {
+    "enabled": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 11.292335510253906,
+      "second_occurrence": 11.10892105102539,
+      "gain": 0.18341445922851562,
+      "windows": 64,
+      "half": 256
+    },
+    "ablated": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 11.292335510253906,
+      "second_occurrence": 11.20079231262207,
+      "gain": 0.09154319763183594,
+      "windows": 64,
+      "half": 256
+    },
+    "substituted": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 11.254359245300293,
+      "second_occurrence": 11.159048080444336,
+      "gain": 0.09531116485595703,
+      "windows": 64,
+      "half": 256
+    }
+  },
+  "peak_reserved_gib": 11.671875,
+  "shared_delta_gib": -7.62939453125e-06,
+  "setup_seconds": 2.945810300006997,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "loss": 10.487565040588379,
+      "loss_per_original_token": 11.977183850717386,
+      "tokens_per_second": 33730.695988612024,
+      "heldout": 10.019908905029297,
+      "heldout_per_original_token": 11.443103395165531,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 10.488924980163574,
+        "second_occurrence": 10.49005126953125,
+        "gain": -0.0011262893676757812,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 200,
+      "tokens": 13172736,
+      "loss": 4.5512261390686035,
+      "loss_per_original_token": 5.197667142263284,
+      "tokens_per_second": 122382.67312029148
+    },
+    {
+      "step": 399,
+      "tokens": 26214400,
+      "loss": 3.8724334239959717,
+      "loss_per_original_token": 4.42246097062209,
+      "tokens_per_second": 119542.94116480416,
+      "heldout": 3.8288073539733887,
+      "heldout_per_original_token": 4.372638398907633,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.292335510253906,
+        "second_occurrence": 11.108920097351074,
+        "gain": 0.18341541290283203,
+        "windows": 64,
+        "half": 256
+      }
+    }
+  ]
+}

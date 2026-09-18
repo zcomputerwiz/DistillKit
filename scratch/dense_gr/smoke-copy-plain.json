@@ -1,0 +1,75 @@
+{
+  "arm": "plain",
+  "seed": 0,
+  "vocab": 32768,
+  "backbone_parameters": 46339360,
+  "connector_parameters": 0,
+  "batch": 64,
+  "length": 1024,
+  "steps": 400,
+  "scored_tokens": 26214400,
+  "inflation": 1.1420366695571345,
+  "order": 3,
+  "max_length": 8,
+  "seconds": 214.21760699996958,
+  "tokens_per_second": 122372.760890769,
+  "final_loss": 3.9125118255615234,
+  "final_heldout": 3.870884895324707,
+  "final_heldout_per_original_token": 4.420692494095645,
+  "endpoint": {
+    "enabled": {
+      "chance": 10.39720770839918,
+      "first_occurrence": 11.282691955566406,
+      "second_occurrence": 11.200387001037598,
+      "gain": 0.0823049545288086,
+      "windows": 64,
+      "half": 256
+    }
+  },
+  "peak_reserved_gib": 11.591796875,
+  "shared_delta_gib": 0.000499725341796875,
+  "setup_seconds": 2.985984400031157,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "loss": 10.487565040588379,
+      "loss_per_original_token": 11.977183850717386,
+      "tokens_per_second": 33117.512289629994,
+      "heldout": 10.015547752380371,
+      "heldout_per_original_token": 11.438122798918922,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 10.489142417907715,
+        "second_occurrence": 10.489501953125,
+        "gain": -0.00035953521728515625,
+        "windows": 64,
+        "half": 256
+      }
+    },
+    {
+      "step": 200,
+      "tokens": 13172736,
+      "loss": 4.546902656555176,
+      "loss_per_original_token": 5.19272956669276,
+      "tokens_per_second": 126482.3963365592
+    },
+    {
+      "step": 399,
+      "tokens": 26214400,
+      "loss": 3.9125118255615234,
+      "loss_per_original_token": 4.468231974867186,
+      "tokens_per_second": 123532.11344202839,
+      "heldout": 3.870884895324707,
+      "heldout_per_original_token": 4.420692494095645,
+      "copy": {
+        "chance": 10.39720770839918,
+        "first_occurrence": 11.282691955566406,
+        "second_occurrence": 11.200387001037598,
+        "gain": 0.0823049545288086,
+        "windows": 64,
+        "half": 256
+      }
+    }
+  ]
+}
