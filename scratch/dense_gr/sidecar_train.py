@@ -58,7 +58,9 @@ import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 from torch.utils.checkpoint import checkpoint  # noqa: E402
 
+from augmented_head import AugmentedHead  # noqa: E402
 from benchmark import apply_liger, build, shared_gpu_gib  # noqa: E402
+from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.code_classes import HISTORICAL, code_class_of  # noqa: E402
 from distillkit.experimental.structural_sidecar import (  # noqa: E402
     FactorizedSidecar, StructuralSidecar, apply_structural_bias)
@@ -161,7 +163,7 @@ def main() -> int:
     model.train()
     swapped = apply_liger(model, config)
 
-    sidecar, hasher = None, None
+    sidecar, hasher, augmented = None, None, None
     if args.arm == "sidecar":
         from distillkit.experimental.ngram_hash import NGramHashConfig, NGramHasher
         # The configuration `fit.py` used, with the vocabulary and EOS moved into the
@@ -178,7 +180,9 @@ def main() -> int:
                                       mode="fixed", heads=args.heads, seed=20260913)
         sidecar = FactorizedSidecar(addressed, structural.cpu(), whitespace.cpu(),
                                     gated=True).to(device="cuda", dtype=torch.float32)
-        print("sidecar: %s" % json.dumps(sidecar.parameter_report()), flush=True)
+        augmented = AugmentedHead(sidecar, structural, args.vocab, args.hidden).to("cuda")
+        print("sidecar: %s | latent width %d"
+              % (json.dumps(sidecar.parameter_report()), augmented.width), flush=True)
 
     backbone_parameters = sum(p.numel() for p in model.parameters())
     sidecar_parameters = 0 if sidecar is None else sum(
@@ -198,72 +202,39 @@ def main() -> int:
     content_mask[structural] = False
 
     def losses_for(tokens, want_content_delta):
-        """Full LM loss with the bias, and optionally the unbiased content reference.
+        """Full LM loss, and optionally the content cost of the bias.
 
-        The head is applied in chunks so no full-vocabulary tensor is ever alive for the
-        whole sequence. Cut Cross-Entropy cannot be used on this arm: it never
-        materializes logits, and a per-position bias over a subset of columns is exactly
-        the thing it has no way to add.
+        The sidecar's correction rides as extra latent dimensions on a widened head
+        rather than as a bias on materialized logits, so Cut Cross-Entropy still applies
+        -- see `augmented_head.py`, which asserts the two forms agree. The alternative
+        was a chunked head at 59k tok/s against CCE's 113k.
+
+        `S` is cast to the head's bf16 rather than kept in fp32. The head weight is
+        already bf16 and CCE reduces in bf16 with fp32 accumulation, so this is the
+        precision the rest of the head runs at, not a new compromise.
         """
         hidden = model.model(input_ids=tokens,
                              attention_mask=torch.ones_like(tokens),
                              use_cache=False).last_hidden_state
-        shifted = F.pad(tokens, (0, 1), value=-100)[..., 1:].contiguous()
-        rows = None
-        if sidecar is not None:
-            rows = hasher.row_indices(tokens)
+        head = model.lm_head.weight
+        if augmented is not None:
+            code = augmented.code_for(hasher.row_indices(tokens)).to(hidden.dtype)
+            state, head = torch.cat([hidden, code], dim=-1), augmented.wide_head(head)
+        else:
+            state = hidden
 
-        batch, seq_len = tokens.shape
-        chunk = max(1, args.position_budget // max(1, batch))
-        counted = (shifted != -100).sum()
-
-        def contribution(state, ids, rows_chunk):
-            """One slice's summed loss. Checkpointed, so its logits die immediately.
-
-            Without this the head's ``[batch, chunk, vocab]`` fp32 logits stay alive for
-            every chunk at once waiting on backward, which is 1 GB per chunk at batch 64
-            and runs the card out before the second step.
-            """
-            logits = model.lm_head(state).float()
-            if sidecar is not None:
-                biased = apply_structural_bias(logits, sidecar(rows_chunk), structural, 1.0)
-            else:
-                biased = logits
-            flat_ids = ids.reshape(-1)
-            per = F.cross_entropy(biased.view(-1, biased.shape[-1]), flat_ids,
-                                  ignore_index=-100, reduction="none")
-            if not want_content_delta or sidecar is None:
-                zero = per.new_zeros(())
-                return per.sum(), zero, zero, zero
-            valid = flat_ids != -100
-            is_content = torch.zeros_like(valid)
-            is_content[valid] = content_mask[flat_ids[valid]]
-            plain = F.cross_entropy(logits.view(-1, logits.shape[-1]), flat_ids,
-                                    ignore_index=-100, reduction="none")
-            weight = is_content.to(per.dtype)
-            return (per.sum(), (per * weight).sum(), (plain * weight).sum(),
-                    weight.sum())
-
-        total = None
-        content_biased = content_plain = content_counted = None
-        for start in range(0, seq_len, chunk):
-            stop = min(start + chunk, seq_len)
-            pieces = checkpoint(contribution, hidden[:, start:stop],
-                                shifted[:, start:stop],
-                                None if rows is None else rows[:, start:stop],
-                                use_reentrant=False, preserve_rng_state=False)
-            if total is None:
-                total, content_biased, content_plain, content_counted = pieces
-            else:
-                total = total + pieces[0]
-                content_biased = content_biased + pieces[1]
-                content_plain = content_plain + pieces[2]
-                content_counted = content_counted + pieces[3]
-
-        loss = total / counted.clamp(min=1)
+        per = linear_cross_entropy(state, head, tokens, shift=1, reduction="none")
+        loss = per.mean()
         delta = None
-        if want_content_delta and sidecar is not None and float(content_counted) > 0:
-            delta = (content_biased - content_plain) / content_counted
+        if want_content_delta and augmented is not None:
+            # The same positions scored without the bias. Content targets only, because
+            # the sidecar may not move a content logit and the question is whether it
+            # cost content anything through the denominator anyway.
+            plain = linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
+                                         reduction="none")
+            is_content = content_mask[tokens[:, 1:]]
+            if is_content.any():
+                delta = (per[is_content] - plain[is_content]).mean()
         return loss, delta
 
     held_stream, _, _ = cached_remap(args.store, "calibration", args.vocab, tokenizer,
