@@ -130,6 +130,13 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=None)
     parser.add_argument("--checkpoints", type=Path,
                         default=Path("scratch/dense_gr/checkpoints"))
+    parser.add_argument("--resume", type=Path, default=None,
+                        help="continue from a checkpoint directory. Optimizer state is "
+                             "not saved, so Adam restarts without momentum -- a transient "
+                             "that hits both arms equally but is not nothing")
+    parser.add_argument("--resume-steps-done", type=int, default=0,
+                        help="steps already taken, so the data order continues rather "
+                             "than replaying the windows the model has already seen")
     args = parser.parse_args()
     if args.output is None:
         args.output = Path("scratch/dense_gr/sidecar-%s-s%d.json" % (args.arm, args.seed))
@@ -159,7 +166,15 @@ def main() -> int:
     config = build(args.hidden, args.layers, args.vocab,
                    attn_implementation="flash_attention_2")
     torch.manual_seed(args.seed)
-    model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
+    if args.resume is not None:
+        model = Qwen35WidenedForCausalLM.from_pretrained(
+            args.resume, dtype=torch.bfloat16, local_files_only=True).to("cuda")
+        record = json.loads((args.resume / "milestone.json").read_text(encoding="utf-8"))
+        print("resumed %s: %d tokens, loss %.4f, sha256 %s"
+              % (args.resume.name, record["scored_tokens"], record["final_loss"],
+                 record["sha256"][:16]), flush=True)
+    else:
+        model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
     model.train()
     swapped = apply_liger(model, config)
 
@@ -180,6 +195,12 @@ def main() -> int:
                                       mode="fixed", heads=args.heads, seed=20260913)
         sidecar = FactorizedSidecar(addressed, structural.cpu(), whitespace.cpu(),
                                     gated=True).to(device="cuda", dtype=torch.float32)
+        if args.resume is not None and (args.resume / "sidecar.pt").exists():
+            blob = torch.load(args.resume / "sidecar.pt", map_location="cpu",
+                              weights_only=False)
+            sidecar.load_state_dict({k: v.to("cuda") for k, v in
+                                     blob["state_dict"].items()})
+            print("resumed sidecar from %d steps" % blob["steps"], flush=True)
         augmented = AugmentedHead(sidecar, structural, args.vocab, args.hidden).to("cuda")
         print("sidecar: %s | latent width %d"
               % (json.dumps(sidecar.parameter_report()), augmented.width), flush=True)
@@ -259,6 +280,12 @@ def main() -> int:
 
     window = args.batch * args.length
     generator = np.random.default_rng(args.seed)
+    if args.resume_steps_done:
+        # Burn the draws the earlier run made, so the continuation sees new windows rather
+        # than replaying the ones the model already fitted.
+        for _ in range(args.resume_steps_done):
+            generator.integers(0, stream.shape[0] - args.length - 1, size=args.batch)
+        print("advanced the data order past %d steps" % args.resume_steps_done, flush=True)
     history = []
     torch.cuda.synchronize()
     train_started = time.perf_counter()
