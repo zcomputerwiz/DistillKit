@@ -246,6 +246,26 @@ numbers. These are cheap to write down and make the outcome interpretable.
 - The copy probe with the module enabled is near ceiling for `copy`, at whatever `plain`
   reaches for `plain`.
 
+**The `scrambled` prediction has to be split by endpoint, and the split is not symmetric.**
+Registered before the arms ran, because after the fact it would look like fitting a story
+to a number.
+
+On real code the module matches roughly 0.37 of positions, so a scrambled channel there is
+mostly *absence* of signal. On the copy probe it is not. The module solves the probe
+exactly -- match rate 1.000 inside the repeat, measured -- so permuting its output moves
+confidently-correct candidates onto wrong positions. `scrambled` is therefore fed silence
+during training and **active misinformation** at the probe.
+
+| endpoint | prediction for `scrambled` |
+| --- | --- |
+| held-out NLL | within noise of `plain`; materially worse means the connector injects harmful noise |
+| copy probe | may fall **below** `plain`, and that is not evidence the connector is harmful |
+
+The consequence that matters: `scrambled` bounds the connector's cost on *quality* and does
+not bound it on the probe. Reading a low scrambled probe as "the connector hurts" would be
+the same error as Phase 1e's threshold against a baseline that was not what it appeared to
+be -- a number compared against the wrong reference.
+
 ### Outcomes
 
 Read the behavioral cells first and the signature second.
