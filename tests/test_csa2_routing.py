@@ -1,4 +1,4 @@
-"""What CSA2 and MLA have to get right for a training arm to mean anything.
+﻿"""What CSA2 and MLA have to get right for a training arm to mean anything.
 
 Three of these cover failures that a run would not report. A router whose parameters take
 no gradient still produces a loss curve, so "the model trained" says nothing about whether
@@ -13,7 +13,8 @@ import torch
 from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from distillkit.models import Qwen35WidenedForCausalLM
-from distillkit.models.qwen35.csa2 import Qwen35SparseLatentAttention
+from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention,
+                                            SparseIndexBus)
 
 cuda = pytest.mark.skipif(not torch.cuda.is_available(),
                           reason="FlexAttention compiles a Triton kernel")
@@ -92,6 +93,87 @@ def test_indexer_parameters_receive_gradient():
     # Two full layers own queries, keys, weights and a gate; the reindex layer owns
     # everything but the keys.
     assert checked == 11
+
+
+@cuda
+def test_router_learns_which_blocks_to_select():
+    """Gradient is not the claim; better top-k is. So measure the top-k, not the gradient.
+
+    The surrogate that carries the gradient is not the score that makes the selection --
+    selection uses block-pooled per-head ReLU scores under a max, the surrogate a
+    normalized per-token cosine over the head-weighted sum. Nonzero gradient therefore
+    shows the parameters move, not that the decisions improve, and those are different
+    claims.
+
+    The task is a pointer. Every key block carries a signature and every token carries a
+    copy of one block's signature, which is the block it should route to; that block
+    differs per sequence, so it cannot be memorized. A teacher runs the same layer with
+    routing forced there, and the student has everything frozen except the indexer, so
+    where it routes is its only lever.
+    """
+    blocks, batch, seq = 6, 32, 6 * BLOCK
+    torch.manual_seed(0)
+    config = csa2_config(csa2_local_window=BLOCK, csa2_top_k=BLOCK, csa2_index_dim=16,
+                         csa2_index_heads=2)
+    layer = Qwen35SparseLatentAttention(config, 0, "full").cuda().float()
+    layer.bus = SparseIndexBus()
+
+    signature = torch.randn(blocks, config.hidden_size, device="cuda")
+    signature /= signature.norm(dim=-1, keepdim=True)
+    hidden = torch.randn(batch, seq, config.hidden_size, device="cuda")
+    hidden += 4.0 * signature.repeat_interleave(BLOCK, 0).unsqueeze(0)
+    lowest = layer.local_blocks + 1
+    target = torch.randint(0, blocks - lowest, (batch,), device="cuda")
+    hidden += 2.0 * signature[target].unsqueeze(1)
+
+    cos = torch.ones(batch, seq, int(layer.rope_dim), device="cuda")
+    sin = torch.zeros_like(cos)
+    eye = torch.eye(blocks, dtype=torch.bool, device="cuda").unsqueeze(0)
+    rows = torch.arange(batch, device="cuda")
+
+    def forward(force):
+        keys = layer.index_k_proj(hidden)
+        latent, rotary = torch.split(layer.kv_a_proj(hidden),
+                                     [layer.latent, layer.rope_dim], dim=-1)
+        latent = layer.kv_a_norm(latent)
+        allowed, effective = layer.route(hidden, keys)
+        if force:
+            allowed = torch.zeros_like(allowed)
+            allowed[rows, :, target] = True
+            allowed |= eye
+        return layer._attend(hidden, latent, rotary, layer.block_mask(allowed),
+                             effective, keys, (cos, sin))[0]
+
+    def selection_rate():
+        with torch.no_grad():
+            allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
+        return allowed[rows, :, target][:, lowest:].float().mean().item()
+
+    with torch.no_grad():
+        teacher = forward(force=True)
+    indexer = [parameter for name, parameter in layer.named_parameters()
+               if name.startswith(("index_q_proj", "index_k_proj", "index_weight",
+                                   "index_gate"))]
+    for parameter in layer.parameters():
+        parameter.requires_grad_(False)
+    for parameter in indexer:
+        parameter.requires_grad_(True)
+
+    before, opened = selection_rate(), None
+    optimizer = torch.optim.Adam(indexer, lr=1e-2)
+    for _ in range(200):
+        loss = (forward(force=False) - teacher).pow(2).mean()
+        optimizer.zero_grad(set_to_none=True)
+        loss.backward()
+        optimizer.step()
+        opened = loss.item() if opened is None else opened
+
+    after = selection_rate()
+    assert loss.item() < opened, "the student did not fit the teacher at all"
+    assert after > before + 0.2, (
+        "top-k selection of the pointed-at block did not improve: %.3f -> %.3f"
+        % (before, after))
+    assert after > 2.0 / (blocks - lowest), "selection stayed near chance"
 
 
 @pytest.mark.parametrize("window", [1, 8, BLOCK, BLOCK + 1, 3 * BLOCK])
@@ -337,5 +419,8 @@ def test_mla_caches_the_latent_not_the_expanded_heads():
     assert keys.shape[2] == values.shape[2] == seq
     rope_dim = int(HEAD_DIM * 0.25)
     assert width == attention.cached_numbers_per_token() == config.mla_latent_dim + rope_dim
-    # The GQA it replaces caches a key and a value per key/value head.
-    assert width < 2 * config.num_attention_heads * HEAD_DIM
+    # The GQA it replaces caches a key and a value per key/VALUE head, not per query
+    # head: a bound taken from num_attention_heads would be twice as loose here and
+    # would pass a cache that had regressed past the thing it replaces.
+    assert width < 2 * config.num_key_value_heads * HEAD_DIM
+

@@ -1,4 +1,4 @@
-# Dense GR: the reference substrate
+﻿# Dense GR: the reference substrate
 
 The architecture the standard-parts work attaches to. It is not under test. Nothing here
 is compared against a single-stream or MoE alternative, and no result in this program
@@ -485,7 +485,12 @@ features and replaces the candidates with uniform draws.
 | copy | +11.3546 | +8.3819 | +6.8040 |
 | scrambled | +10.8939 | +10.9078 | +10.8919 |
 
-Gain is chance (10.3972) minus the second occurrence's NLL, so higher is better.
+Gain is the **first** occurrence's NLL minus the second's, so higher is better -- not chance
+minus the second. Chance is `ln(vocab)` = 10.3972 and is reported alongside as the value the
+gain would take if the second occurrence carried nothing, but first occurrence sits 1.7-1.8
+nats *above* chance: a block of uniformly drawn ids is harder than uniform for a model
+carrying a learned prior over code. Reading the gain against chance instead of against first
+occurrence understates every cell by that margin.
 
 The scrambled control spans 0.016 nats across all three cells. That flatness is the property
 the pre-fix run could not produce: with the defective `scramble()`, `substituted` beat the
@@ -497,16 +502,22 @@ costs 4.55, which is 1.58 nats *worse than removing it*. The model does not mere
 the candidate, it trusts it -- a wrong candidate is more damaging than no candidate, which is
 only possible if the backbone has learned to lean on the channel.
 
-### It does not improve the language model
+### No held-out improvement at seed 0
 
-Held-out, on general text: copy 1.7969, scrambled 1.7911. The copy arm is 0.0058 nats
-*worse*. Final training loss is 1.6611 against 1.6670, so the ordering reverses between train
-and held-out.
+Held-out on the same Python corpus the arms train on, `scratch/code_training/tokens-v2`, not
+on general text: copy 1.79693, scrambled 1.79108. The copy arm is 0.00585 nats *worse*. Final
+training loss is 1.6611 against 1.6670, so the ordering reverses between train and held-out.
 
-So the benefit is confined to the structure the probe measures. The module lets the model
-reuse a repeated block almost for free -- second-occurrence NLL 0.761 against the control's
-1.339 -- and buys nothing on text that does not repeat. This is the result the earlier
-prediction called for and the doc already records: a training-time mechanism, not a quality
-improvement.
+One seed, so this is an observation rather than a measured absence of effect. 0.00585 nats is
+small enough that a seed spread could produce it in either direction, and two arms at one seed
+cannot separate that from a real difference. What can be said is that no held-out improvement
+appeared.
+
+The benefit that *is* measurable is confined to the structure the probe scores. The module
+lets the model reuse a repeated block almost for free -- second-occurrence NLL 0.761 against
+the control's 1.339 -- and that did not carry into held-out code. This is consistent with the
+earlier prediction the doc records, a training-time mechanism rather than a quality
+improvement, but at one seed it is consistent with it and not evidence for it.
 
 Seeds 1 and 2 have not been run.
+
