@@ -229,33 +229,56 @@ deliberately makes the donor inert; use the warmup callback to activate it.
             # Skip donor arithmetic entirely: even poisoned donor weights cannot
             # spoil identity via 0*NaN. Use the original norm's exact operations.
             return norm(states[..., self.read_index, :]).contiguous(), None
-        normalized = torch.stack([
-            _BranchNorm.apply(branch, 1.0 + gain.to(torch.promote_types(
-                gain.dtype, torch.float32)), self.norm_eps)
-            for branch, gain in zip(states.unbind(-2), self.branch_gain_delta)
-        ], dim=-2)
-        flattened = normalized.flatten(-2)
-        logits = self.W_up(F.silu(self.W_down(flattened) / self.num_branches))
-        donor = _GatedMean.apply(normalized, logits.unflatten(
-            -1, (self.num_branches, self.hidden_size)))
-        weights = 2 * torch.sigmoid(self.W_write(flattened) / self.num_branches)
+        donor, weights = self._route(states)
         if alpha == 1:
             return donor.contiguous(), weights
         original = norm(states[..., self.read_index, :])
         return (original + alpha * (donor - original)).contiguous(), 1 + alpha * (weights - 1)
 
-    def _donor(self, states, norm):
-        """Donor read, donor write weights, and the student's own block input."""
-        normalized = torch.stack([
-            _BranchNorm.apply(branch, 1.0 + gain.to(torch.promote_types(
-                gain.dtype, torch.float32)), self.norm_eps)
-            for branch, gain in zip(states.unbind(-2), self.branch_gain_delta)
-        ], dim=-2)
+    def _route(self, states):
+        """The donor read and the write weights, from one pass over the stream.
+
+        `W_down` and `W_write` are both bias-free and both read the same flattened
+        stream, and both are narrow on the output side -- `lowrank` and `num_branches`
+        against `num_branches * hidden` on the input. So each spends nearly all its time
+        reading the same `[batch, tokens, branches * hidden]` tensor, which is the
+        largest thing in this function. One concatenated weight reads it once.
+
+        The two modules stay, so checkpoints keep their own `W_down.weight` and
+        `W_write.weight` and nothing about the parameterization changes; only the
+        multiply is shared.
+        """
+        normalized = self._normalize(states)
         flattened = normalized.flatten(-2)
-        logits = self.W_up(F.silu(self.W_down(flattened) / self.num_branches))
+        projected = F.linear(flattened, torch.cat(
+            [self.W_down.weight, self.W_write.weight], dim=0))
+        low, write = projected.split(
+            [self.W_down.out_features, self.num_branches], dim=-1)
+        logits = self.W_up(F.silu(low / self.num_branches))
         donor = _GatedMean.apply(normalized, logits.unflatten(
             -1, (self.num_branches, self.hidden_size)))
-        weights = 2 * torch.sigmoid(self.W_write(flattened) / self.num_branches)
+        return donor, 2 * torch.sigmoid(write / self.num_branches)
+
+    def _normalize(self, states):
+        """Every branch normalized and gained, in one kernel over `[..., n, d]`.
+
+        RMSNorm reduces over the last dimension, so the branch axis is just more leading
+        shape, and a `[branches, hidden]` gain broadcasts against it exactly as a
+        `[hidden]` gain broadcasts against one branch. Per-branch calls needed a stack to
+        put the results back together, which is a full-width copy per sublayer on top of
+        one kernel launch per branch.
+
+        This is what `_BranchNorm.backward` reducing over `grad.ndim - gain.ndim` is for:
+        against the old `grad.ndim - 1` the branch axis would be summed away and every
+        branch would receive the same gain gradient.
+        """
+        gain = self.branch_gain_delta.to(
+            torch.promote_types(self.branch_gain_delta.dtype, torch.float32))
+        return _BranchNorm.apply(states, 1.0 + gain, self.norm_eps)
+
+    def _donor(self, states, norm):
+        """Donor read, donor write weights, and the student's own block input."""
+        donor, weights = self._route(states)
         return donor, weights, norm(states[..., self.read_index, :])
 
     def _read_learned(self, states, norm):

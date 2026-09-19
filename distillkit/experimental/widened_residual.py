@@ -106,7 +106,13 @@ class _BranchNorm(torch.autograd.Function):
             # sum(dim=()) reduces everything rather than nothing, so a bare [hidden]
             # input would collapse the gain gradient to a scalar and fail the shape
             # check. With no leading dimensions there is nothing to reduce.
-            leading = tuple(range(grad.ndim - 1))
+            #
+            # Reduced over the dimensions the gain does not have, rather than over all
+            # but the last. Both agree for a `[hidden]` gain, and only this one is right
+            # for a `[branches, hidden]` gain normalising every branch in one call --
+            # `grad.ndim - 1` would sum the branch axis away and hand every branch the
+            # same gradient.
+            leading = tuple(range(grad.ndim - gain.ndim))
             product = grad * x * rstd
             grad_gain = product.sum(dim=leading) if leading else product
         return grad_x.to(x.dtype), grad_gain, None
