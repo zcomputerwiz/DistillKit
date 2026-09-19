@@ -125,9 +125,21 @@ No extra anchor, static gate offset, or pretrained block gain at the donor end.
 Blend is a scheduled FP32 buffer, not an AdamW parameter. Keeping it at zero
 deliberately makes the donor inert; use the warmup callback to activate it.
 """
+    #: How the branch read normalises, cheapest last. Measured at micro-batch 32 over
+    #: `[32, 1024, 4, 512]`, forward and backward together:
+    #:
+    #: * ``exact`` -- 13.134 ms. Bit-identical to ``Qwen3_5RMSNorm``, which
+    #:   ``recipient_initialize`` needs in order to reproduce a donor.
+    #: * ``fast`` -- 11.952 ms. ``vector_norm`` for the variance instead of two fp32
+    #:   copies of the stream. About 1e-7 relative, four orders below bf16's own.
+    #: * ``fused`` -- 8.416 ms. ``F.rms_norm``, which normalises in the input dtype and
+    #:   so rounds once more before the gain: about 5e-3 relative, roughly one bf16 ulp
+    #:   and a real loss of precision rather than a rounding detail.
+    NORM_MODES = ("exact", "fast", "fused")
+
     def __init__(self, hidden_size, num_branches=4, lowrank=320, layer_idx=0,
                  blend=0.0, norm_eps=1e-6, learnable_blend=False,
-                 exact_variance=True):
+                 norm_mode="exact"):
         super().__init__()
         if min(hidden_size, num_branches, lowrank) < 1 or norm_eps <= 0:
             raise ValueError("routing dimensions and norm_eps must be positive")
@@ -135,10 +147,13 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.read_index = layer_idx % num_branches
         self.norm_eps = norm_eps
         self.initial_blend = float(blend)
-        # Exact by default: `recipient_initialize` reproduces a pretrained
-        # sublayer bitwise through this route, and the cheaper variance is off by
-        # about 1e-7. Only a model with no donor to reproduce may turn it off.
-        self.exact_variance = bool(exact_variance)
+        # Exact by default: `recipient_initialize` reproduces a pretrained sublayer
+        # bitwise through this route, so anything cheaper is available only to a model
+        # with no donor to reproduce.
+        if norm_mode not in self.NORM_MODES:
+            raise ValueError("unknown norm_mode %r; expected one of %s"
+                             % (norm_mode, list(self.NORM_MODES)))
+        self.norm_mode = norm_mode
         self.learnable_blend = bool(learnable_blend)
         # fp32 either way. bfloat16 spacing at 0.10 is 2.44e-4 against an AdamW step of
         # roughly `lr`, so a bf16 blend at a useful initialisation is bit-frozen exactly
@@ -329,10 +344,17 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         against the old `grad.ndim - 1` the branch axis would be summed away and every
         branch would receive the same gain gradient.
         """
-        gain = self.branch_gain_delta.to(
+        gain = 1.0 + self.branch_gain_delta.to(
             torch.promote_types(self.branch_gain_delta.dtype, torch.float32))
-        return _BranchNorm.apply(states, 1.0 + gain, self.norm_eps,
-                                 not self.exact_variance)
+        if self.norm_mode == "fused":
+            # One fused kernel over the stream, then the gain. `F.rms_norm` takes a
+            # weight of the normalised shape and this gain is per branch, so it cannot
+            # ride along inside the kernel -- the extra elementwise pass is still well
+            # ahead of the hand-written form.
+            return (F.rms_norm(states, (states.shape[-1],), None, self.norm_eps)
+                    * gain).to(states.dtype)
+        return _BranchNorm.apply(states, gain, self.norm_eps,
+                                 self.norm_mode == "fast")
 
     def _donor(self, states, norm):
         """Donor read, donor write weights, and the student's own block input."""

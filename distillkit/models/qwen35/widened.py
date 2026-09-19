@@ -62,8 +62,8 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
                            norm_eps=config.rms_norm_eps,
                            learnable_blend=getattr(
                                config, "residual_stream_learnable_blend", False),
-                           exact_variance=getattr(
-                               config, "residual_stream_exact_variance", True))
+                           norm_mode=getattr(
+                               config, "residual_stream_norm_mode", "exact"))
         self.attn_residual = route(**options)
         self.mlp_residual = route(**options)
         # A converted checkpoint carries its conversion in the weights; the config only

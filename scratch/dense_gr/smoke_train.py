@@ -68,6 +68,12 @@ def main() -> int:
     parser.add_argument("--blend", type=float, default=0.0,
                         help="gated residual route strength; 0 leaves it inert, "
                              "which is what every arm so far has run")
+    parser.add_argument("--norm-mode", default="exact",
+                        choices=("exact", "fast", "fused"),
+                        help="how the branch read normalises; exact is "
+                             "bit-identical to the stock norm and what a "
+                             "converted model needs, fused is fastest and "
+                             "loses about one bf16 ulp")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--accumulate", type=int, default=1,
@@ -174,6 +180,7 @@ def main() -> int:
     config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
                    blend=args.blend,
                    attn_implementation="flash_attention_2")
+    config.residual_stream_norm_mode = args.norm_mode
     if args.mla:
         config.mla_enabled = True
         config.mla_latent_dim = args.mla_latent_dim
@@ -326,6 +333,7 @@ def main() -> int:
         "store": str(store), "seed": args.seed,
         "architecture": {"ratio": args.ratio, "blend": args.blend,
                          "variant": variant, "hidden": args.hidden,
+                         "norm_mode": args.norm_mode,
                          "layers": args.layers,
                          "full_attention_layers": [
                              index for index, kind in enumerate(config.layer_types)
