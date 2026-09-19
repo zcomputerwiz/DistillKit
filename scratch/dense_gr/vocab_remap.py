@@ -17,6 +17,8 @@ handles ordinary tokens.
 from __future__ import annotations
 
 import json
+import os
+import threading
 from pathlib import Path
 
 import numpy as np
@@ -137,15 +139,32 @@ def cached_remap(store, split, vocab, tokenizer, forward, bytes_ids, counts, kep
                   flush=True)
 
     values, offsets = build_expansion_table(tokenizer, forward, bytes_ids, counts)
-    original, compact = remap_store(store / ("%s.bin" % split), target, values, offsets,
-                                    width, progress=progress)
-
-    meta.write_text(json.dumps({
-        "split": split, "vocab": vocab, "kept_ids": len(kept),
-        "fingerprint": fingerprint, "original_tokens": original,
-        "compact_tokens": compact, "inflation": compact / original,
-        "dtype": np.dtype(width).name,
-    }, indent=2), encoding="utf-8")
+    # Written beside the cache and renamed into place. Two runs at the same vocabulary
+    # name the same file -- which is the point, they want the same bytes -- so without
+    # this they interleave writes into one multi-gigabyte memmap and the loser can leave
+    # a truncated `.bin` with a valid-looking `.json` next to it. The pid keeps the
+    # temporaries apart; rename is atomic on one volume, so a reader sees the old file or
+    # the new one and never a half-written one.
+    stamp = "%d-%d" % (os.getpid(), threading.get_ident())
+    scratch_bin = target.with_suffix(".bin.%s" % stamp)
+    scratch_meta = meta.with_suffix(".json.%s" % stamp)
+    try:
+        original, compact = remap_store(store / ("%s.bin" % split), scratch_bin, values,
+                                        offsets, width, progress=progress)
+        scratch_meta.write_text(json.dumps({
+            "split": split, "vocab": vocab, "kept_ids": len(kept),
+            "fingerprint": fingerprint, "original_tokens": original,
+            "compact_tokens": compact, "inflation": compact / original,
+            "dtype": np.dtype(width).name,
+        }, indent=2), encoding="utf-8")
+        # Tokens first, then the metadata that vouches for them: a reader checks the
+        # json, so publishing it last means it never points at a file not yet in place.
+        os.replace(scratch_bin, target)
+        os.replace(scratch_meta, meta)
+    finally:
+        for leftover in (scratch_bin, scratch_meta):
+            if leftover.exists():
+                leftover.unlink()
     return np.memmap(target, dtype=width, mode="r"), original, compact
 
 

@@ -70,6 +70,10 @@ def main() -> int:
                              "which is what every arm so far has run")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
+    parser.add_argument("--accumulate", type=int, default=1,
+                        help="micro-batches per optimizer step; the effective batch "
+                             "stays --batch, so a blend comparison compares blend "
+                             "and not batch size")
     parser.add_argument("--tokens", type=int, default=30_000_000,
                         help="scored tokens; one pass over the v1 store is 30.7M")
     parser.add_argument("--passes", type=float, default=None,
@@ -235,12 +239,21 @@ def main() -> int:
         batch = np.stack([stream[s:s + args.length] for s in starts]).astype(np.int64)
         tokens = torch.from_numpy(batch).to("cuda", non_blocking=True)
         optimizer.zero_grad(set_to_none=True)
-        hidden = model.model(input_ids=tokens,
-                             attention_mask=torch.ones_like(tokens),
-                             use_cache=False).last_hidden_state
-        loss = linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
-                                    reduction="mean")
-        loss.backward()
+        # One micro-batch is the ordinary path and stays bitwise what it was. More than
+        # one exists because an active gated residual does not fit otherwise: at blend 0
+        # the route short-circuits, and at blend 1 it materializes the four-branch read
+        # and write, which runs out of 24 GiB at batch 64. Accumulating keeps the
+        # *effective* batch identical across arms, so a blend comparison is a comparison
+        # of blend rather than of batch size.
+        loss = 0.0
+        for chunk in tokens.chunk(args.accumulate):
+            hidden = model.model(input_ids=chunk,
+                                 attention_mask=torch.ones_like(chunk),
+                                 use_cache=False).last_hidden_state
+            part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
+                                        reduction="mean") / args.accumulate
+            part.backward()
+            loss = loss + part.detach()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
         if spill.breached():
@@ -321,6 +334,7 @@ def main() -> int:
         "round_trip": bool(matches),
         "parameters": int(parameters), "liger": swapped,
         "batch": args.batch, "length": args.length, "steps": steps,
+        "accumulate": args.accumulate,
         "scored_tokens": steps * window,
         "seconds": elapsed, "tokens_per_second": steps * window / elapsed,
         "first_loss": history[0]["loss"], "final_loss": history[-1]["loss"],

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.utils.checkpoint import checkpoint
 from transformers import initialization as init
 from transformers.cache_utils import DynamicCache
 from transformers.masking_utils import create_causal_mask, create_recurrent_attention_mask
@@ -226,10 +227,20 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
         captured = (inputs_embeds,) if output_hidden_states else None
         with offload_stream_boundaries(self._stream_offload_device()):
             for index, layer in enumerate(self.layers):
-                states = layer(states, position_embeddings=position_embeddings,
+                options = dict(position_embeddings=position_embeddings,
                                attention_mask=masks[self.config.layer_types[index]],
-                               position_ids=text_position_ids, past_key_values=past_key_values,
+                               position_ids=text_position_ids,
+                               past_key_values=past_key_values,
                                use_cache=use_cache, **kwargs)
+                if self.gradient_checkpointing and self.training:
+                    # The flag existed and did nothing: this loop called every layer
+                    # directly, so a run that asked for checkpointing paid none of its
+                    # cost and got none of its saving. Non-reentrant, because the layer
+                    # takes keyword arguments and the reentrant path cannot.
+                    states = checkpoint(layer.__call__, states, use_reentrant=False,
+                                        **options)
+                else:
+                    states = layer(states, **options)
                 if output_hidden_states and index < len(self.layers) - 1:
                     captured += (collapse_residual(states),)
         hidden_states = self.norm(collapse_residual(states).contiguous())
