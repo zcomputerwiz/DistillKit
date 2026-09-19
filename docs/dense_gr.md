@@ -545,3 +545,52 @@ improvement, but at one seed it is consistent with it and not evidence for it.
 
 Seeds 1 and 2 have not been run.
 
+
+
+## MLA and CSA2, one arm against a matched reference
+
+Two arms, 8,000 steps and 524.3M scored tokens each, batch 64 at length 1024, ten layers
+of hidden 512 over the Python store at vocabulary 16,384. Same seed, same data order,
+same probe sequences. The reference is the ordinary GQA stack; the hybrid replaces the
+key/value side of its five full-attention layers with MLA at d_c 128 and routes them
+through CSA2 as ull, reuse, full, reindex, reuse, top-k 256 over 128-token blocks with
+a 128-token local window.
+
+| | plain | hybrid |
+| --- | ---: | ---: |
+| held-out | 1.5296 | 1.5994 |
+| held-out per original token | 2.0433 | 2.1367 |
+| final loss | 1.5077 | 1.5740 |
+| copy probe gain | +11.003 | +10.609 |
+| parameters | 45.34M | 45.91M |
+| tokens/second | 113,842 | 106,617 |
+| peak reserved | 14.16 GiB | 15.95 GiB |
+| serving cache | 1,280/token | 416/token |
+
+**The hybrid trains, and lands 0.0698 nats behind.** The gap narrows monotonically apart
+from one bump -- 0.1178, 0.1029, 0.0917, 0.0882, 0.0838, 0.0858, 0.0736, 0.0698 at each
+held-out point -- so it is still closing at the end of the budget rather than sitting on a
+floor. It did not converge, and nothing here says how far it would go.
+
+**It is behind while carrying 573k more parameters.** MLA's up-projections are per-head
+where the GQA shared two heads' worth, and the indexer adds its own. So the deficit is not
+a capacity trade: it is what reading roughly half the eligible blocks costs.
+
+**Induction converges to near-parity.** The copy probe opens 1.49 nats behind at step
+1,000 and closes to 0.2--0.4, crossing at steps 3,500 and 5,500. Those crossings are noise
+on a metric that swings 0.7 between adjacent probes; the reference stays modestly ahead.
+The slower start is the routing organizing, not a ceiling.
+
+**The router never collapsed.** Density 0.72, selected 0.52, entropy 0.83--0.86 at step
+8,000, unchanged from step 500 across all five layers. selected counts only the blocks
+top-k was free to choose, so this is not the local window flattering the number.
+
+### What this does and does not buy
+
+The serving cache falls 3.1x, 416 numbers per token against 1,280. Training memory rises
+12.6% and throughput falls 6.3%, because the up-projections, the indexer and
+FlexAttention's workspace all cost memory that a KV cache does not.
+
+So the saving is real and it is at inference. The proposal that prompted this arrived as a
+VRAM-reduction pathway for training on two 3090s, and for that it is a regression: the
+memory that limits what can be trained here goes up, not down.
