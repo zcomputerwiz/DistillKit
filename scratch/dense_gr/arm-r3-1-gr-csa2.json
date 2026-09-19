@@ -1,0 +1,4583 @@
+{
+  "vocab": 16384,
+  "kept_ids": 16384,
+  "coverage": 0.932668285307722,
+  "store": "scratch\\code_training\\tokens-v2",
+  "seed": 0,
+  "architecture": {
+    "ratio": "3:1",
+    "blend": 1.0,
+    "variant": "r3-1-gr-csa2",
+    "hidden": 512,
+    "layers": 10,
+    "full_attention_layers": [
+      3,
+      7
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "reuse"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "store_tokens": 3003421492,
+  "compact_tokens": 4012245572,
+  "round_trip": true,
+  "parameters": 44797349,
+  "liger": {
+    "swiglu": 10,
+    "rmsnorm": 26
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 8000,
+  "accumulate": 4,
+  "scored_tokens": 524288000,
+  "seconds": 12021.345530199993,
+  "tokens_per_second": 43613.08795948715,
+  "first_loss": 9.764152526855469,
+  "final_loss": 1.55833101272583,
+  "inflation": 1.3358916098480127,
+  "final_loss_per_original_token": 2.081761325266393,
+  "final_heldout": 1.5851852893829346,
+  "final_heldout_per_original_token": 2.117635728141156,
+  "final_copy": {
+    "chance": 9.704060527839234,
+    "first_occurrence": 11.432658195495605,
+    "second_occurrence": 0.4615097641944885,
+    "gain": 10.971148431301117,
+    "windows": 64,
+    "half": 256
+  },
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "blocks": 8,
+      "density": 0.7222222222222222,
+      "selected": 0.5238095238095238,
+      "entropy": 0.8862740397453308
+    },
+    {
+      "layer": 7,
+      "mode": "reuse",
+      "blocks": 8,
+      "density": 0.7222222222222222,
+      "selected": 0.5238095238095238,
+      "entropy": 0.8862740397453308
+    }
+  ],
+  "passes": 0.13067196177093818,
+  "peak_allocated_gib": 8.005523204803467,
+  "peak_reserved_gib": 10.75390625,
+  "shared_delta_gib": 0.004482269287109375,
+  "spilled": false,
+  "setup_seconds": 2.9994171999860555,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 65536,
+      "passes": 1.6333995221367273e-05,
+      "loss": 9.764152526855469,
+      "loss_per_original_token": 13.043849437902493,
+      "tokens_per_second": 18002.858931827166,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8543213605880737
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8543213605880737
+        }
+      ],
+      "heldout": 9.12469482421875,
+      "heldout_per_original_token": 12.189603258097415,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 9.80768871307373,
+        "second_occurrence": 9.805120468139648,
+        "gain": 0.0025682449340820312,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.0
+    },
+    {
+      "step": 50,
+      "tokens": 3342336,
+      "passes": 0.0008330337562897309,
+      "loss": 5.009246826171875,
+      "loss_per_original_token": 6.691810806740794,
+      "tokens_per_second": 42599.33952424911,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770077228546143
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770077228546143
+        }
+      ],
+      "shared_delta_gib": 3.814697265625e-06
+    },
+    {
+      "step": 100,
+      "tokens": 6619136,
+      "passes": 0.0016497335173580945,
+      "loss": 4.367248058319092,
+      "loss_per_original_token": 5.834170039233499,
+      "tokens_per_second": 43426.97070506042,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8338425755500793
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8338425755500793
+        }
+      ],
+      "shared_delta_gib": 0.0039825439453125
+    },
+    {
+      "step": 150,
+      "tokens": 9895936,
+      "passes": 0.002466433278426458,
+      "loss": 4.1095871925354,
+      "loss_per_original_token": 5.489963050446891,
+      "tokens_per_second": 43632.40334565553,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8615096211433411
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8615096211433411
+        }
+      ],
+      "shared_delta_gib": 0.0039825439453125
+    },
+    {
+      "step": 200,
+      "tokens": 13172736,
+      "passes": 0.0032831330394948216,
+      "loss": 3.7864067554473877,
+      "loss_per_original_token": 5.0582290160740015,
+      "tokens_per_second": 43702.62013774914,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8795321583747864
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8795321583747864
+        }
+      ],
+      "shared_delta_gib": 0.0039825439453125
+    },
+    {
+      "step": 250,
+      "tokens": 16449536,
+      "passes": 0.0040998328005631855,
+      "loss": 3.70326566696167,
+      "loss_per_original_token": 4.9471615335323,
+      "tokens_per_second": 43712.047430708364,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8692348003387451
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8692348003387451
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 300,
+      "tokens": 19726336,
+      "passes": 0.004916532561631549,
+      "loss": 3.4722259044647217,
+      "loss_per_original_token": 4.638517453271349,
+      "tokens_per_second": 43723.54302328585,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8587451577186584
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8587451577186584
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 350,
+      "tokens": 23003136,
+      "passes": 0.005733232322699912,
+      "loss": 3.3071446418762207,
+      "loss_per_original_token": 4.417986779636254,
+      "tokens_per_second": 43705.16477801939,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8704391121864319
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8704391121864319
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 400,
+      "tokens": 26279936,
+      "passes": 0.006549932083768277,
+      "loss": 3.2137179374694824,
+      "loss_per_original_token": 4.2931788290835415,
+      "tokens_per_second": 43687.92391483511,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8068089485168457
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8068089485168457
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 450,
+      "tokens": 29556736,
+      "passes": 0.00736663184483664,
+      "loss": 2.8330047130584717,
+      "loss_per_original_token": 3.784587226834689,
+      "tokens_per_second": 43674.69402083794,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.7980632781982422
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.7980632781982422
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 500,
+      "tokens": 32833536,
+      "passes": 0.008183331605905004,
+      "loss": 2.871584892272949,
+      "loss_per_original_token": 3.8361261645537423,
+      "tokens_per_second": 43663.12417709921,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8286476731300354
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8286476731300354
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 10.405383110046387,
+        "second_occurrence": 9.9763822555542,
+        "gain": 0.4290008544921875,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 550,
+      "tokens": 36110336,
+      "passes": 0.009000031366973367,
+      "loss": 2.731123924255371,
+      "loss_per_original_token": 3.6484855358679296,
+      "tokens_per_second": 43648.82498753203,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.887668788433075
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.887668788433075
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 600,
+      "tokens": 39387136,
+      "passes": 0.00981673112804173,
+      "loss": 2.6362571716308594,
+      "loss_per_original_token": 3.5217538369833172,
+      "tokens_per_second": 43646.55494063733,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8736522197723389
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8736522197723389
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 650,
+      "tokens": 42663936,
+      "passes": 0.010633430889110094,
+      "loss": 2.5261478424072266,
+      "loss_per_original_token": 3.374659707907474,
+      "tokens_per_second": 43643.282665282946,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8522745966911316
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8522745966911316
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 700,
+      "tokens": 45940736,
+      "passes": 0.011450130650178459,
+      "loss": 2.4434564113616943,
+      "loss_per_original_token": 3.2641929189674217,
+      "tokens_per_second": 43640.87692092385,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8725435733795166
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8725435733795166
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 750,
+      "tokens": 49217536,
+      "passes": 0.012266830411246822,
+      "loss": 2.530087471008301,
+      "loss_per_original_token": 3.379922624701566,
+      "tokens_per_second": 43638.65971191188,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8582261204719543
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8582261204719543
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 800,
+      "tokens": 52494336,
+      "passes": 0.013083530172315186,
+      "loss": 2.4397780895233154,
+      "loss_per_original_token": 3.2592790796852107,
+      "tokens_per_second": 43637.22856378241,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8602806329727173
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8602806329727173
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 850,
+      "tokens": 55771136,
+      "passes": 0.01390022993338355,
+      "loss": 2.308842897415161,
+      "loss_per_original_token": 3.0843638551140895,
+      "tokens_per_second": 43631.93565101688,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8766680359840393
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8766680359840393
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 900,
+      "tokens": 59047936,
+      "passes": 0.014716929694451913,
+      "loss": 2.325939178466797,
+      "loss_per_original_token": 3.1072026335305734,
+      "tokens_per_second": 43628.36492252959,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8880376815795898
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8880376815795898
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 950,
+      "tokens": 62324736,
+      "passes": 0.015533629455520276,
+      "loss": 2.1612939834594727,
+      "loss_per_original_token": 2.887254498918499,
+      "tokens_per_second": 43622.59119574494,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8481695055961609
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8481695055961609
+        }
+      ],
+      "shared_delta_gib": 0.003986358642578125
+    },
+    {
+      "step": 1000,
+      "tokens": 65601536,
+      "passes": 0.01635032921658864,
+      "loss": 2.2091541290283203,
+      "loss_per_original_token": 2.951190465830027,
+      "tokens_per_second": 43620.04746282532,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8488402366638184
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8488402366638184
+        }
+      ],
+      "heldout": 2.2468621730804443,
+      "heldout_per_original_token": 3.001564325503039,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.054673194885254,
+        "second_occurrence": 4.979283809661865,
+        "gain": 6.075389385223389,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1050,
+      "tokens": 68878336,
+      "passes": 0.017167028977657005,
+      "loss": 2.1935298442840576,
+      "loss_per_original_token": 2.9303181149302904,
+      "tokens_per_second": 43602.40642941877,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8320067524909973
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8320067524909973
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1100,
+      "tokens": 72155136,
+      "passes": 0.017983728738725367,
+      "loss": 2.102572202682495,
+      "loss_per_original_token": 2.8088085646632006,
+      "tokens_per_second": 43601.99219288299,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8758858442306519
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8758858442306519
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1150,
+      "tokens": 75431936,
+      "passes": 0.01880042849979373,
+      "loss": 2.128772497177124,
+      "loss_per_original_token": 2.8438093182541224,
+      "tokens_per_second": 43603.06907322258,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.869541347026825
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.869541347026825
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1200,
+      "tokens": 78708736,
+      "passes": 0.019617128260862093,
+      "loss": 2.0878443717956543,
+      "loss_per_original_token": 2.7891337789502093,
+      "tokens_per_second": 43602.716514246145,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8703995943069458
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8703995943069458
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1250,
+      "tokens": 81985536,
+      "passes": 0.02043382802193046,
+      "loss": 2.0735268592834473,
+      "loss_per_original_token": 2.770007134111258,
+      "tokens_per_second": 43602.779642292575,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8235568404197693
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8235568404197693
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1300,
+      "tokens": 85262336,
+      "passes": 0.02125052778299882,
+      "loss": 2.1318893432617188,
+      "loss_per_original_token": 2.84797308678772,
+      "tokens_per_second": 43602.54562256649,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8908839821815491
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8908839821815491
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1350,
+      "tokens": 88539136,
+      "passes": 0.022067227544067185,
+      "loss": 2.058926820755005,
+      "loss_per_original_token": 2.750503065137654,
+      "tokens_per_second": 43603.05918498724,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.835391640663147
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.835391640663147
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1400,
+      "tokens": 91815936,
+      "passes": 0.02288392730513555,
+      "loss": 2.178353786468506,
+      "loss_per_original_token": 2.910044546623926,
+      "tokens_per_second": 43602.869648389766,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8535699248313904
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8535699248313904
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1450,
+      "tokens": 95092736,
+      "passes": 0.023700627066203912,
+      "loss": 2.0792689323425293,
+      "loss_per_original_token": 2.77767792133402,
+      "tokens_per_second": 43603.21335141761,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8733928799629211
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8733928799629211
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1500,
+      "tokens": 98369536,
+      "passes": 0.024517326827272277,
+      "loss": 2.036802291870117,
+      "loss_per_original_token": 2.7209470926284927,
+      "tokens_per_second": 43602.38345391825,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8730067610740662
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8730067610740662
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.339544296264648,
+        "second_occurrence": 2.5210862159729004,
+        "gain": 8.818458080291748,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1550,
+      "tokens": 101646336,
+      "passes": 0.02533402658834064,
+      "loss": 2.1004700660705566,
+      "loss_per_original_token": 2.8060003380005574,
+      "tokens_per_second": 43597.97904978204,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8534676432609558
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8534676432609558
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1600,
+      "tokens": 104923136,
+      "passes": 0.026150726349409004,
+      "loss": 2.0037596225738525,
+      "loss_per_original_token": 2.67680566794863,
+      "tokens_per_second": 43598.091939680795,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8576092720031738
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8576092720031738
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1650,
+      "tokens": 108199936,
+      "passes": 0.026967426110477366,
+      "loss": 1.9384877681732178,
+      "loss_per_original_token": 2.589609545295601,
+      "tokens_per_second": 43598.511757360924,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8864460587501526
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8864460587501526
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1700,
+      "tokens": 111476736,
+      "passes": 0.02778412587154573,
+      "loss": 1.9621316194534302,
+      "loss_per_original_token": 2.621195167845331,
+      "tokens_per_second": 43598.95067858762,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8520094156265259
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8520094156265259
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1750,
+      "tokens": 114753536,
+      "passes": 0.028600825632614093,
+      "loss": 1.9609081745147705,
+      "loss_per_original_token": 2.6195607780166648,
+      "tokens_per_second": 43598.908453733435,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8702882528305054
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8702882528305054
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1800,
+      "tokens": 118030336,
+      "passes": 0.029417525393682458,
+      "loss": 1.950722336769104,
+      "loss_per_original_token": 2.6059536028329555,
+      "tokens_per_second": 43597.62574416957,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8746877908706665
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8746877908706665
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1850,
+      "tokens": 121307136,
+      "passes": 0.030234225154750823,
+      "loss": 1.907403588294983,
+      "loss_per_original_token": 2.5480844501972606,
+      "tokens_per_second": 43599.11791096153,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8650695085525513
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8650695085525513
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1900,
+      "tokens": 124583936,
+      "passes": 0.031050924915819185,
+      "loss": 1.9515266418457031,
+      "loss_per_original_token": 2.6070280672365422,
+      "tokens_per_second": 43600.58128016532,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8550368547439575
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8550368547439575
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 1950,
+      "tokens": 127860736,
+      "passes": 0.03186762467688755,
+      "loss": 1.9014723300933838,
+      "loss_per_original_token": 2.5401609321299023,
+      "tokens_per_second": 43599.87722177507,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8612803816795349
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8612803816795349
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2000,
+      "tokens": 131137536,
+      "passes": 0.032684324437955915,
+      "loss": 1.9638158082962036,
+      "loss_per_original_token": 2.6234450615897917,
+      "tokens_per_second": 43600.98900952952,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8656716346740723
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8656716346740723
+        }
+      ],
+      "heldout": 1.9270000457763672,
+      "heldout_per_original_token": 2.574263193329385,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.327897071838379,
+        "second_occurrence": 1.506408929824829,
+        "gain": 9.82148814201355,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2050,
+      "tokens": 134414336,
+      "passes": 0.033501024199024274,
+      "loss": 1.9986743927001953,
+      "loss_per_original_token": 2.670012352026263,
+      "tokens_per_second": 43593.00702211938,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.850803017616272
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.850803017616272
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2100,
+      "tokens": 137691136,
+      "passes": 0.03431772396009264,
+      "loss": 1.8345073461532593,
+      "loss_per_original_token": 2.450702971930683,
+      "tokens_per_second": 43593.213635749125,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8661507964134216
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8661507964134216
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2150,
+      "tokens": 140967936,
+      "passes": 0.035134423721161004,
+      "loss": 1.9226083755493164,
+      "loss_per_original_token": 2.568396397919849,
+      "tokens_per_second": 43593.98696780118,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.851604163646698
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.851604163646698
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2200,
+      "tokens": 144244736,
+      "passes": 0.03595112348222937,
+      "loss": 1.8653422594070435,
+      "loss_per_original_token": 2.4918950738368046,
+      "tokens_per_second": 43594.41545402662,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8663261532783508
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8663261532783508
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2250,
+      "tokens": 147521536,
+      "passes": 0.036767823243297734,
+      "loss": 1.8441190719604492,
+      "loss_per_original_token": 2.463543195792668,
+      "tokens_per_second": 43593.490428236306,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8406421542167664
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8406421542167664
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2300,
+      "tokens": 150798336,
+      "passes": 0.03758452300436609,
+      "loss": 1.8663651943206787,
+      "loss_per_original_token": 2.4932616040053506,
+      "tokens_per_second": 43593.40779849228,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8564609885215759
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8564609885215759
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2350,
+      "tokens": 154075136,
+      "passes": 0.03840122276543446,
+      "loss": 1.8590468168258667,
+      "loss_per_original_token": 2.4834850449123307,
+      "tokens_per_second": 43593.820062565,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8396677374839783
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8396677374839783
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2400,
+      "tokens": 157351936,
+      "passes": 0.03921792252650282,
+      "loss": 1.84104585647583,
+      "loss_per_original_token": 2.45943771301151,
+      "tokens_per_second": 43593.527005273645,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8661863207817078
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8661863207817078
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2450,
+      "tokens": 160628736,
+      "passes": 0.04003462228757119,
+      "loss": 1.7596505880355835,
+      "loss_per_original_token": 2.3507024568208577,
+      "tokens_per_second": 43593.430659332334,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8328575491905212
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8328575491905212
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2500,
+      "tokens": 163905536,
+      "passes": 0.040851322048639546,
+      "loss": 1.8337855339050293,
+      "loss_per_original_token": 2.449738709004387,
+      "tokens_per_second": 43594.11496583956,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770071268081665
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770071268081665
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.442754745483398,
+        "second_occurrence": 1.217827558517456,
+        "gain": 10.224927186965942,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2550,
+      "tokens": 167182336,
+      "passes": 0.04166802180970791,
+      "loss": 1.809009075164795,
+      "loss_per_original_token": 2.4166400456515627,
+      "tokens_per_second": 43592.00878922062,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8534420728683472
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8534420728683472
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2600,
+      "tokens": 170459136,
+      "passes": 0.04248472157077628,
+      "loss": 1.9296813011169434,
+      "loss_per_original_token": 2.5778450598427214,
+      "tokens_per_second": 43591.937938370385,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8598553538322449
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8598553538322449
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2650,
+      "tokens": 173735936,
+      "passes": 0.04330142133184464,
+      "loss": 1.9267828464508057,
+      "loss_per_original_token": 2.573973038572703,
+      "tokens_per_second": 43591.87815275485,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8556998372077942
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8556998372077942
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2700,
+      "tokens": 177012736,
+      "passes": 0.04411812109291301,
+      "loss": 1.716827154159546,
+      "loss_per_original_token": 2.293494990800978,
+      "tokens_per_second": 43592.04081965879,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8653308153152466
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8653308153152466
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2750,
+      "tokens": 180289536,
+      "passes": 0.044934820853981365,
+      "loss": 1.7160968780517578,
+      "loss_per_original_token": 2.2925194210757116,
+      "tokens_per_second": 43592.68265912186,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8784924745559692
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8784924745559692
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2800,
+      "tokens": 183566336,
+      "passes": 0.04575152061504973,
+      "loss": 1.8979761600494385,
+      "loss_per_original_token": 2.535490427901594,
+      "tokens_per_second": 43591.56026926552,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860154390335083
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860154390335083
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2850,
+      "tokens": 186843136,
+      "passes": 0.046568220376118095,
+      "loss": 1.7397922277450562,
+      "loss_per_original_token": 2.3241738399234033,
+      "tokens_per_second": 43592.36700544785,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8400482535362244
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8400482535362244
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2900,
+      "tokens": 190119936,
+      "passes": 0.04738492013718646,
+      "loss": 1.7088623046875,
+      "loss_per_original_token": 2.2828548152175694,
+      "tokens_per_second": 43592.70233496905,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8398895263671875
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8398895263671875
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 2950,
+      "tokens": 193396736,
+      "passes": 0.04820161989825482,
+      "loss": 1.725009799003601,
+      "loss_per_original_token": 2.3044261173945175,
+      "tokens_per_second": 43593.641820127326,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8961800932884216
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8961800932884216
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3000,
+      "tokens": 196673536,
+      "passes": 0.049018319659323184,
+      "loss": 1.6875922679901123,
+      "loss_per_original_token": 2.25444035165237,
+      "tokens_per_second": 43593.867358205614,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8380300998687744
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8380300998687744
+        }
+      ],
+      "heldout": 1.7989448308944702,
+      "heldout_per_original_token": 2.4031953061713747,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.3525972366333,
+        "second_occurrence": 0.8961266875267029,
+        "gain": 10.456470549106598,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3050,
+      "tokens": 199950336,
+      "passes": 0.04983501942039155,
+      "loss": 1.6443486213684082,
+      "loss_per_original_token": 2.196671526951203,
+      "tokens_per_second": 43588.122422301625,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.840127170085907
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.840127170085907
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3100,
+      "tokens": 203227136,
+      "passes": 0.050651719181459914,
+      "loss": 1.6706558465957642,
+      "loss_per_original_token": 2.23181512841081,
+      "tokens_per_second": 43588.41731155441,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8445744514465332
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8445744514465332
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3150,
+      "tokens": 206503936,
+      "passes": 0.05146841894252828,
+      "loss": 1.7907854318618774,
+      "loss_per_original_token": 2.392295233462332,
+      "tokens_per_second": 43588.52364342219,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.866644561290741
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.866644561290741
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3200,
+      "tokens": 209780736,
+      "passes": 0.05228511870359664,
+      "loss": 1.7385361194610596,
+      "loss_per_original_token": 2.322495815405752,
+      "tokens_per_second": 43589.53655245227,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8346191644668579
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8346191644668579
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3250,
+      "tokens": 213057536,
+      "passes": 0.053101818464665,
+      "loss": 1.8666126728057861,
+      "loss_per_original_token": 2.4935922084372235,
+      "tokens_per_second": 43590.285394948914,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.857983410358429
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.857983410358429
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3300,
+      "tokens": 216334336,
+      "passes": 0.05391851822573337,
+      "loss": 1.714298129081726,
+      "loss_per_original_token": 2.290116487418423,
+      "tokens_per_second": 43590.3324773712,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8324213027954102
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8324213027954102
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3350,
+      "tokens": 219611136,
+      "passes": 0.05473521798680173,
+      "loss": 1.7645069360733032,
+      "loss_per_original_token": 2.3571900114189495,
+      "tokens_per_second": 43590.10387815912,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8498708605766296
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8498708605766296
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3400,
+      "tokens": 222887936,
+      "passes": 0.05555191774787009,
+      "loss": 1.799740195274353,
+      "loss_per_original_token": 2.4042578267732324,
+      "tokens_per_second": 43590.73520825643,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8583047986030579
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8583047986030579
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3450,
+      "tokens": 226164736,
+      "passes": 0.05636861750893846,
+      "loss": 1.6734135150909424,
+      "loss_per_original_token": 2.2354990746162606,
+      "tokens_per_second": 43591.338779390935,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8835684657096863
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8835684657096863
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3500,
+      "tokens": 229441536,
+      "passes": 0.05718531727000682,
+      "loss": 1.708318829536438,
+      "loss_per_original_token": 2.282128791323105,
+      "tokens_per_second": 43591.56236649683,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8556504249572754
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8556504249572754
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.329569816589355,
+        "second_occurrence": 0.8059483766555786,
+        "gain": 10.523621439933777,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3550,
+      "tokens": 232718336,
+      "passes": 0.05800201703107519,
+      "loss": 1.6721254587173462,
+      "loss_per_original_token": 2.2337783709137624,
+      "tokens_per_second": 43590.56995962415,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8639840483665466
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8639840483665466
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3600,
+      "tokens": 235995136,
+      "passes": 0.05881871679214355,
+      "loss": 1.758463740348816,
+      "loss_per_original_token": 2.3491169569539374,
+      "tokens_per_second": 43590.80719198159,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8683739900588989
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8683739900588989
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3650,
+      "tokens": 239271936,
+      "passes": 0.05963541655321191,
+      "loss": 1.7676522731781006,
+      "loss_per_original_token": 2.361391840867392,
+      "tokens_per_second": 43590.68869638034,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.891854465007782
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.891854465007782
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3700,
+      "tokens": 242548736,
+      "passes": 0.060452116314280276,
+      "loss": 1.7107865810394287,
+      "loss_per_original_token": 2.28542543985114,
+      "tokens_per_second": 43590.77191484253,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8420474529266357
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8420474529266357
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3750,
+      "tokens": 245825536,
+      "passes": 0.06126881607534864,
+      "loss": 1.7153971195220947,
+      "loss_per_original_token": 2.291584619527015,
+      "tokens_per_second": 43591.186114881406,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8839870691299438
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8839870691299438
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3800,
+      "tokens": 249102336,
+      "passes": 0.062085515836417006,
+      "loss": 1.649100422859192,
+      "loss_per_original_token": 2.2030194186944043,
+      "tokens_per_second": 43591.946270864035,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.875948429107666
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.875948429107666
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3850,
+      "tokens": 252379136,
+      "passes": 0.06290221559748536,
+      "loss": 1.6622473001480103,
+      "loss_per_original_token": 2.220582221760238,
+      "tokens_per_second": 43592.09240729997,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.858131468296051
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.858131468296051
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3900,
+      "tokens": 255655936,
+      "passes": 0.06371891535855373,
+      "loss": 1.6856515407562256,
+      "loss_per_original_token": 2.251847750423617,
+      "tokens_per_second": 43591.69270317224,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8721036314964294
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8721036314964294
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 3950,
+      "tokens": 258932736,
+      "passes": 0.0645356151196221,
+      "loss": 1.6871124505996704,
+      "loss_per_original_token": 2.2537993676262196,
+      "tokens_per_second": 43591.89962696133,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8204374313354492
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8204374313354492
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4000,
+      "tokens": 262209536,
+      "passes": 0.06535231488069046,
+      "loss": 1.6974623203277588,
+      "loss_per_original_token": 2.2676256717589927,
+      "tokens_per_second": 43592.93017318981,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726170063018799
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726170063018799
+        }
+      ],
+      "heldout": 1.7262413501739502,
+      "heldout_per_original_token": 2.3060713362700853,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.307656288146973,
+        "second_occurrence": 0.7273914217948914,
+        "gain": 10.580264866352081,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4050,
+      "tokens": 265486336,
+      "passes": 0.06616901464175882,
+      "loss": 1.7141205072402954,
+      "loss_per_original_token": 2.2898792038907305,
+      "tokens_per_second": 43588.731224773015,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.856011688709259
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.856011688709259
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4100,
+      "tokens": 268763136,
+      "passes": 0.06698571440282719,
+      "loss": 1.725403070449829,
+      "loss_per_original_token": 2.3049514854199264,
+      "tokens_per_second": 43589.645416791114,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8912355899810791
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8912355899810791
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4150,
+      "tokens": 272039936,
+      "passes": 0.06780241416389556,
+      "loss": 1.7134337425231934,
+      "loss_per_original_token": 2.288961760667214,
+      "tokens_per_second": 43589.6567328059,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8368520736694336
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8368520736694336
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4200,
+      "tokens": 275316736,
+      "passes": 0.0686191139249639,
+      "loss": 1.7040832042694092,
+      "loss_per_original_token": 2.2764704550664208,
+      "tokens_per_second": 43590.01843886119,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8533397912979126
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8533397912979126
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4250,
+      "tokens": 278593536,
+      "passes": 0.06943581368603227,
+      "loss": 1.7013185024261475,
+      "loss_per_original_token": 2.2727771130702763,
+      "tokens_per_second": 43589.96515582432,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860260546207428
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860260546207428
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4300,
+      "tokens": 281870336,
+      "passes": 0.07025251344710064,
+      "loss": 1.6942435503005981,
+      "loss_per_original_token": 2.2633257438856784,
+      "tokens_per_second": 43590.16103338051,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8409370183944702
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8409370183944702
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4350,
+      "tokens": 285147136,
+      "passes": 0.071069213208169,
+      "loss": 1.7154178619384766,
+      "loss_per_original_token": 2.2916123291470276,
+      "tokens_per_second": 43590.581890500245,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8502433896064758
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8502433896064758
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4400,
+      "tokens": 288423936,
+      "passes": 0.07188591296923737,
+      "loss": 1.6111314296722412,
+      "loss_per_original_token": 2.1522969592615806,
+      "tokens_per_second": 43590.389821809964,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8851075768470764
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8851075768470764
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4450,
+      "tokens": 291700736,
+      "passes": 0.07270261273030573,
+      "loss": 1.6427643299102783,
+      "loss_per_original_token": 2.1945550852847338,
+      "tokens_per_second": 43590.04197220204,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.9087796807289124
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.9087796807289124
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4500,
+      "tokens": 294977536,
+      "passes": 0.0735193124913741,
+      "loss": 1.605655550956726,
+      "loss_per_original_token": 2.1449817788289787,
+      "tokens_per_second": 43590.09691023532,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8188121914863586
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8188121914863586
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.46945571899414,
+        "second_occurrence": 0.5790291428565979,
+        "gain": 10.890426576137543,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4550,
+      "tokens": 298254336,
+      "passes": 0.07433601225244246,
+      "loss": 1.6204864978790283,
+      "loss_per_original_token": 2.1647943163885834,
+      "tokens_per_second": 43589.46656367866,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8510860204696655
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8510860204696655
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4600,
+      "tokens": 301531136,
+      "passes": 0.07515271201351083,
+      "loss": 1.6716363430023193,
+      "loss_per_original_token": 2.233124965333813,
+      "tokens_per_second": 43590.355698201834,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8839653134346008
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8839653134346008
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4650,
+      "tokens": 304807936,
+      "passes": 0.07596941177457918,
+      "loss": 1.6983332633972168,
+      "loss_per_original_token": 2.268789157298137,
+      "tokens_per_second": 43591.214935285134,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8583582639694214
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8583582639694214
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4700,
+      "tokens": 308084736,
+      "passes": 0.07678611153564754,
+      "loss": 1.6863203048706055,
+      "loss_per_original_token": 2.2527411467929848,
+      "tokens_per_second": 43591.39509767732,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8606947660446167
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8606947660446167
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4750,
+      "tokens": 311361536,
+      "passes": 0.07760281129671591,
+      "loss": 1.6276028156280518,
+      "loss_per_original_token": 2.1743009455625164,
+      "tokens_per_second": 43591.507323194666,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8229269981384277
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8229269981384277
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4800,
+      "tokens": 314638336,
+      "passes": 0.07841951105778427,
+      "loss": 1.7064344882965088,
+      "loss_per_original_token": 2.279611515670593,
+      "tokens_per_second": 43591.851931539284,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8243527412414551
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8243527412414551
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4850,
+      "tokens": 317915136,
+      "passes": 0.07923621081885264,
+      "loss": 1.6547729969024658,
+      "loss_per_original_token": 2.2105973627650557,
+      "tokens_per_second": 43592.18209936825,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.863991379737854
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.863991379737854
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4900,
+      "tokens": 321191936,
+      "passes": 0.080052910579921,
+      "loss": 1.6256370544433594,
+      "loss_per_original_token": 2.1716749016889207,
+      "tokens_per_second": 43592.66089159132,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.841514527797699
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.841514527797699
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 4950,
+      "tokens": 324468736,
+      "passes": 0.08086961034098937,
+      "loss": 1.6707574129104614,
+      "loss_per_original_token": 2.231950809998457,
+      "tokens_per_second": 43592.7943313285,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8767238855361938
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8767238855361938
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5000,
+      "tokens": 327745536,
+      "passes": 0.08168631010205774,
+      "loss": 1.6909565925598145,
+      "loss_per_original_token": 2.2589347246178404,
+      "tokens_per_second": 43592.838686988696,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8693315982818604
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8693315982818604
+        }
+      ],
+      "heldout": 1.6765888929367065,
+      "heldout_per_original_token": 2.2397410352385143,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.358759880065918,
+        "second_occurrence": 0.5653433799743652,
+        "gain": 10.793416500091553,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5050,
+      "tokens": 331022336,
+      "passes": 0.0825030098631261,
+      "loss": 1.6932189464569092,
+      "loss_per_original_token": 2.2619569842074765,
+      "tokens_per_second": 43589.45714465797,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8998113870620728
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8998113870620728
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5100,
+      "tokens": 334299136,
+      "passes": 0.08331970962419445,
+      "loss": 1.5962268114089966,
+      "loss_per_original_token": 2.1323860047757246,
+      "tokens_per_second": 43589.73641086066,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8435596823692322
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8435596823692322
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5150,
+      "tokens": 337575936,
+      "passes": 0.08413640938526282,
+      "loss": 1.5435222387313843,
+      "loss_per_original_token": 2.0619784083350776,
+      "tokens_per_second": 43590.0925822728,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8825392127037048
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8825392127037048
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5200,
+      "tokens": 340852736,
+      "passes": 0.08495310914633118,
+      "loss": 1.6967462301254272,
+      "loss_per_original_token": 2.2666690528658036,
+      "tokens_per_second": 43590.18965859553,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.858264148235321
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.858264148235321
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5250,
+      "tokens": 344129536,
+      "passes": 0.08576980890739955,
+      "loss": 1.6071416139602661,
+      "loss_per_original_token": 2.1469669979271133,
+      "tokens_per_second": 43590.188495158276,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726170063018799
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726170063018799
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5300,
+      "tokens": 347406336,
+      "passes": 0.08658650866846791,
+      "loss": 1.5981359481811523,
+      "loss_per_original_token": 2.1349364045717,
+      "tokens_per_second": 43590.468284132075,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8654793500900269
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8654793500900269
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5350,
+      "tokens": 350683136,
+      "passes": 0.08740320842953628,
+      "loss": 1.6394131183624268,
+      "loss_per_original_token": 2.190078229895133,
+      "tokens_per_second": 43590.56950099145,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8868270516395569
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8868270516395569
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5400,
+      "tokens": 353959936,
+      "passes": 0.08821990819060464,
+      "loss": 1.6096861362457275,
+      "loss_per_original_token": 2.1503662038993325,
+      "tokens_per_second": 43591.013558073544,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8880462050437927
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8880462050437927
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5450,
+      "tokens": 357236736,
+      "passes": 0.08903660795167301,
+      "loss": 1.6259262561798096,
+      "loss_per_original_token": 2.1720612438621982,
+      "tokens_per_second": 43591.20314249172,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8439366817474365
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8439366817474365
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5500,
+      "tokens": 360513536,
+      "passes": 0.08985330771274137,
+      "loss": 1.585365653038025,
+      "loss_per_original_token": 2.117876674434713,
+      "tokens_per_second": 43591.7909760541,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8765006065368652
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8765006065368652
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.409399032592773,
+        "second_occurrence": 0.5713742971420288,
+        "gain": 10.838024735450745,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5550,
+      "tokens": 363790336,
+      "passes": 0.09067000747380972,
+      "loss": 1.6129701137542725,
+      "loss_per_original_token": 2.154753241899927,
+      "tokens_per_second": 43590.80108058394,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.835835874080658
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.835835874080658
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5600,
+      "tokens": 367067136,
+      "passes": 0.09148670723487809,
+      "loss": 1.6075265407562256,
+      "loss_per_original_token": 2.1474812184042413,
+      "tokens_per_second": 43590.31233671931,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8328536152839661
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8328536152839661
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5650,
+      "tokens": 370343936,
+      "passes": 0.09230340699594645,
+      "loss": 1.6447198390960693,
+      "loss_per_original_token": 2.1971674335990126,
+      "tokens_per_second": 43590.45330216514,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8523525595664978
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8523525595664978
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5700,
+      "tokens": 373620736,
+      "passes": 0.09312010675701482,
+      "loss": 1.6401922702789307,
+      "loss_per_original_token": 2.1911190924031874,
+      "tokens_per_second": 43590.65206048716,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8882410526275635
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8882410526275635
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5750,
+      "tokens": 376897536,
+      "passes": 0.09393680651808319,
+      "loss": 1.5832464694976807,
+      "loss_per_original_token": 2.115045674923439,
+      "tokens_per_second": 43591.09069255111,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8252389430999756
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8252389430999756
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5800,
+      "tokens": 380174336,
+      "passes": 0.09475350627915155,
+      "loss": 1.5805062055587769,
+      "loss_per_original_token": 2.1113849793186885,
+      "tokens_per_second": 43591.016195445874,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8561868071556091
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8561868071556091
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5850,
+      "tokens": 383451136,
+      "passes": 0.09557020604021992,
+      "loss": 1.6018199920654297,
+      "loss_per_original_token": 2.139857887887018,
+      "tokens_per_second": 43591.30128651313,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8876685500144958
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8876685500144958
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5900,
+      "tokens": 386727936,
+      "passes": 0.09638690580128828,
+      "loss": 1.6200535297393799,
+      "loss_per_original_token": 2.1642159178834954,
+      "tokens_per_second": 43591.33605911642,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8686835765838623
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8686835765838623
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 5950,
+      "tokens": 390004736,
+      "passes": 0.09720360556235665,
+      "loss": 1.6072168350219727,
+      "loss_per_original_token": 2.147067485112331,
+      "tokens_per_second": 43591.72095953466,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8755203485488892
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8755203485488892
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6000,
+      "tokens": 393281536,
+      "passes": 0.098020305323425,
+      "loss": 1.5586143732070923,
+      "loss_per_original_token": 2.0821398641558737,
+      "tokens_per_second": 43592.01255228026,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8304248452186584
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8304248452186584
+        }
+      ],
+      "heldout": 1.6393829584121704,
+      "heldout_per_original_token": 2.190037939470632,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.319555282592773,
+        "second_occurrence": 0.5153481960296631,
+        "gain": 10.80420708656311,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6050,
+      "tokens": 396558336,
+      "passes": 0.09883700508449336,
+      "loss": 1.6501291990280151,
+      "loss_per_original_token": 2.2043937521467467,
+      "tokens_per_second": 43589.10664868218,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8621196150779724
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8621196150779724
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6100,
+      "tokens": 399835136,
+      "passes": 0.09965370484556173,
+      "loss": 1.6944741010665894,
+      "loss_per_original_token": 2.26363373471961,
+      "tokens_per_second": 43589.515092794245,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8551020622253418
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8551020622253418
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6150,
+      "tokens": 403111936,
+      "passes": 0.10047040460663009,
+      "loss": 1.6825580596923828,
+      "loss_per_original_token": 2.247715195025206,
+      "tokens_per_second": 43589.390811019155,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860901951789856
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.860901951789856
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6200,
+      "tokens": 406388736,
+      "passes": 0.10128710436769846,
+      "loss": 1.6723626852035522,
+      "loss_per_original_token": 2.2340952797863185,
+      "tokens_per_second": 43589.43951604309,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8845293521881104
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8845293521881104
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6250,
+      "tokens": 409665536,
+      "passes": 0.10210380412876682,
+      "loss": 1.5920377969741821,
+      "loss_per_original_token": 2.126789935538724,
+      "tokens_per_second": 43589.73859310222,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726398944854736
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8726398944854736
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6300,
+      "tokens": 412942336,
+      "passes": 0.10292050388983519,
+      "loss": 1.619323968887329,
+      "loss_per_original_token": 2.1632413036623674,
+      "tokens_per_second": 43590.131223703036,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8300655484199524
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8300655484199524
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6350,
+      "tokens": 416219136,
+      "passes": 0.10373720365090355,
+      "loss": 1.697007417678833,
+      "loss_per_original_token": 2.2670179711269953,
+      "tokens_per_second": 43590.203644153204,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8638080954551697
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8638080954551697
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6400,
+      "tokens": 419495936,
+      "passes": 0.10455390341197192,
+      "loss": 1.5441269874572754,
+      "loss_per_original_token": 2.062786287084062,
+      "tokens_per_second": 43590.404329771314,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8525921106338501
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8525921106338501
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6450,
+      "tokens": 422772736,
+      "passes": 0.10537060317304027,
+      "loss": 1.5538747310638428,
+      "loss_per_original_token": 2.0758082159830247,
+      "tokens_per_second": 43590.64928705576,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8503931760787964
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8503931760787964
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6500,
+      "tokens": 426049536,
+      "passes": 0.10618730293410863,
+      "loss": 1.6035099029541016,
+      "loss_per_original_token": 2.1421154256645853,
+      "tokens_per_second": 43590.56002182224,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8448536992073059
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8448536992073059
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.38476276397705,
+        "second_occurrence": 0.5539852380752563,
+        "gain": 10.830777525901794,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6550,
+      "tokens": 429326336,
+      "passes": 0.107004002695177,
+      "loss": 1.5564963817596436,
+      "loss_per_original_token": 2.079310457151497,
+      "tokens_per_second": 43589.95928636905,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8684296011924744
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8684296011924744
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6600,
+      "tokens": 432603136,
+      "passes": 0.10782070245624537,
+      "loss": 1.597566843032837,
+      "loss_per_original_token": 2.1341761417789438,
+      "tokens_per_second": 43590.28341369378,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8441604375839233
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8441604375839233
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6650,
+      "tokens": 435879936,
+      "passes": 0.10863740221731373,
+      "loss": 1.5080013275146484,
+      "loss_per_original_token": 2.014526321066484,
+      "tokens_per_second": 43590.55021933498,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8699582815170288
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8699582815170288
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6700,
+      "tokens": 439156736,
+      "passes": 0.1094541019783821,
+      "loss": 1.5776106119155884,
+      "loss_per_original_token": 2.107516780065224,
+      "tokens_per_second": 43590.233789658094,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8709823489189148
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8709823489189148
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6750,
+      "tokens": 442433536,
+      "passes": 0.11027080173945046,
+      "loss": 1.538316249847412,
+      "loss_per_original_token": 2.055023771464017,
+      "tokens_per_second": 43590.40185119525,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8763136863708496
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8763136863708496
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6800,
+      "tokens": 445710336,
+      "passes": 0.11108750150051883,
+      "loss": 1.5946626663208008,
+      "loss_per_original_token": 2.1302964764758188,
+      "tokens_per_second": 43590.678946713124,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8605896234512329
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8605896234512329
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6850,
+      "tokens": 448987136,
+      "passes": 0.11190420126158719,
+      "loss": 1.6054160594940186,
+      "loss_per_original_token": 2.144661844193317,
+      "tokens_per_second": 43591.44990817688,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8348653316497803
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8348653316497803
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6900,
+      "tokens": 452263936,
+      "passes": 0.11272090102265556,
+      "loss": 1.6602637767791748,
+      "loss_per_original_token": 2.2179324495338735,
+      "tokens_per_second": 43592.80534198286,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.87882399559021
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.87882399559021
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 6950,
+      "tokens": 455540736,
+      "passes": 0.11353760078372391,
+      "loss": 1.563758134841919,
+      "loss_per_original_token": 2.089011372166897,
+      "tokens_per_second": 43593.99113468298,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770856857299805
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8770856857299805
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7000,
+      "tokens": 458817536,
+      "passes": 0.11435430054479227,
+      "loss": 1.568273663520813,
+      "loss_per_original_token": 2.0950436290430594,
+      "tokens_per_second": 43595.33317419445,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8460437655448914
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8460437655448914
+        }
+      ],
+      "heldout": 1.6108235120773315,
+      "heldout_per_original_token": 2.1518856147300163,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.350494384765625,
+        "second_occurrence": 0.47300034761428833,
+        "gain": 10.877494037151337,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7050,
+      "tokens": 462094336,
+      "passes": 0.11517100030586064,
+      "loss": 1.5102801322937012,
+      "loss_per_original_token": 2.017570557251302,
+      "tokens_per_second": 43594.07146266144,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8821862936019897
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8821862936019897
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7100,
+      "tokens": 465371136,
+      "passes": 0.115987700066929,
+      "loss": 1.5466539859771729,
+      "loss_per_original_token": 2.0661620832048913,
+      "tokens_per_second": 43595.302171753276,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8492819666862488
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8492819666862488
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7150,
+      "tokens": 468647936,
+      "passes": 0.11680439982799737,
+      "loss": 1.468592643737793,
+      "loss_per_original_token": 1.9618805910538293,
+      "tokens_per_second": 43596.48939168755,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8420342803001404
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8420342803001404
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7200,
+      "tokens": 471924736,
+      "passes": 0.11762109958906573,
+      "loss": 1.556898832321167,
+      "loss_per_original_token": 2.079848087480015,
+      "tokens_per_second": 43597.82049023263,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8700619339942932
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8700619339942932
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7250,
+      "tokens": 475201536,
+      "passes": 0.1184377993501341,
+      "loss": 1.5528028011322021,
+      "loss_per_original_token": 2.074376233781001,
+      "tokens_per_second": 43598.90754521291,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.890966534614563
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.890966534614563
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7300,
+      "tokens": 478478336,
+      "passes": 0.11925449911120246,
+      "loss": 1.5333307981491089,
+      "loss_per_original_token": 2.0483637483689514,
+      "tokens_per_second": 43600.29205256387,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8522894978523254
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8522894978523254
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7350,
+      "tokens": 481755136,
+      "passes": 0.12007119887227083,
+      "loss": 1.4783964157104492,
+      "loss_per_original_token": 1.9749773677769638,
+      "tokens_per_second": 43601.59679723156,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8509586453437805
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8509586453437805
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7400,
+      "tokens": 485031936,
+      "passes": 0.12088789863333918,
+      "loss": 1.6858474016189575,
+      "loss_per_original_token": 2.252109399306838,
+      "tokens_per_second": 43602.84090857986,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8806583285331726
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8806583285331726
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7450,
+      "tokens": 488308736,
+      "passes": 0.12170459839440755,
+      "loss": 1.5986791849136353,
+      "loss_per_original_token": 2.135662109964785,
+      "tokens_per_second": 43604.062736705266,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8920403718948364
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8920403718948364
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7500,
+      "tokens": 491585536,
+      "passes": 0.12252129815547591,
+      "loss": 1.5672202110290527,
+      "loss_per_original_token": 2.0936363306979433,
+      "tokens_per_second": 43605.281664236776,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8121933341026306
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8121933341026306
+        }
+      ],
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.395140647888184,
+        "second_occurrence": 0.44379597902297974,
+        "gain": 10.951344668865204,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7550,
+      "tokens": 494862336,
+      "passes": 0.12333799791654428,
+      "loss": 1.498872995376587,
+      "loss_per_original_token": 2.0023318587513415,
+      "tokens_per_second": 43605.44220082149,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8605192303657532
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8605192303657532
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7600,
+      "tokens": 498139136,
+      "passes": 0.12415469767761264,
+      "loss": 1.5922341346740723,
+      "loss_per_original_token": 2.127052221424704,
+      "tokens_per_second": 43606.621161296476,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8540877103805542
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8540877103805542
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7650,
+      "tokens": 501415936,
+      "passes": 0.124971397438681,
+      "loss": 1.6380375623703003,
+      "loss_per_original_token": 2.188240636186375,
+      "tokens_per_second": 43607.76031167354,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8533879518508911
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8533879518508911
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7700,
+      "tokens": 504692736,
+      "passes": 0.12578809719974937,
+      "loss": 1.5248396396636963,
+      "loss_per_original_token": 2.0370204809903987,
+      "tokens_per_second": 43608.87741843113,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8733319640159607
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8733319640159607
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7750,
+      "tokens": 507969536,
+      "passes": 0.12660479696081772,
+      "loss": 1.578068733215332,
+      "loss_per_original_token": 2.108128780465844,
+      "tokens_per_second": 43609.97619952762,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8832305669784546
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8832305669784546
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7800,
+      "tokens": 511246336,
+      "passes": 0.1274214967218861,
+      "loss": 1.5266938209533691,
+      "loss_per_original_token": 2.03949746621841,
+      "tokens_per_second": 43611.011459287845,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8462401628494263
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8462401628494263
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7850,
+      "tokens": 514523136,
+      "passes": 0.12823819648295445,
+      "loss": 1.5952733755111694,
+      "loss_per_original_token": 2.1311123177592894,
+      "tokens_per_second": 43612.19871364653,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8444526195526123
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8444526195526123
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7900,
+      "tokens": 517799936,
+      "passes": 0.12905489624402283,
+      "loss": 1.512002944946289,
+      "loss_per_original_token": 2.0198720482192343,
+      "tokens_per_second": 43613.36640266235,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8546503186225891
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8546503186225891
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7950,
+      "tokens": 521076736,
+      "passes": 0.12987159600509118,
+      "loss": 1.60426664352417,
+      "loss_per_original_token": 2.143126349042971,
+      "tokens_per_second": 43614.43274058563,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.840191662311554
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.840191662311554
+        }
+      ],
+      "shared_delta_gib": 0.004482269287109375
+    },
+    {
+      "step": 7999,
+      "tokens": 524288000,
+      "passes": 0.13067196177093818,
+      "loss": 1.55833101272583,
+      "loss_per_original_token": 2.081761325266393,
+      "tokens_per_second": 43615.38363843553,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8862740397453308
+        },
+        {
+          "layer": 7,
+          "mode": "reuse",
+          "blocks": 8,
+          "density": 0.7222222222222222,
+          "selected": 0.5238095238095238,
+          "entropy": 0.8862740397453308
+        }
+      ],
+      "heldout": 1.5851852893829346,
+      "heldout_per_original_token": 2.117635728141156,
+      "copy": {
+        "chance": 9.704060527839234,
+        "first_occurrence": 11.432658195495605,
+        "second_occurrence": 0.4615097641944885,
+        "gain": 10.971148431301117,
+        "windows": 64,
+        "half": 256
+      },
+      "shared_delta_gib": 0.004482269287109375
+    }
+  ]
+}

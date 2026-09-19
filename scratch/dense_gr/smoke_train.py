@@ -124,6 +124,13 @@ def main() -> int:
     if args.output == Path("scratch/dense_gr/smoke-train.json"):
         args.output = Path("scratch/dense_gr/smoke-train-%s.json" % variant)
     args.output.parent.mkdir(parents=True, exist_ok=True)
+    if args.accumulate < 1 or args.batch % args.accumulate:
+        # `chunk` splits unevenly when it does not divide, and the loop divides every
+        # micro-batch's mean by the same `accumulate` -- so an uneven split silently
+        # weights some tokens more than others and the reported loss is not the batch's.
+        raise SystemExit("--batch %d is not divisible by --accumulate %d; the micro-"
+                         "batches would be uneven and the loss would be mis-weighted"
+                         % (args.batch, args.accumulate))
     store = args.store
 
     torch.cuda.set_per_process_memory_fraction(0.90, 0)
