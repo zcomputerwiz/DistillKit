@@ -1,4 +1,4 @@
-﻿# Dense GR: the reference substrate
+# Dense GR: the reference substrate
 
 The architecture the standard-parts work attaches to. It is not under test. Nothing here
 is compared against a single-stream or MoE alternative, and no result in this program
@@ -26,6 +26,21 @@ An MoE expert is roughly 8.4x narrower than the dense FFN it replaces; MoE holds
 FLOPs near dense while multiplying stored parameters. "Full width all the way through"
 means the FFN width, and it means no router, no top-k, no shared expert and no per-expert
 narrowing.
+
+**Every arm on this page ran with the gating inert.** `benchmark.build` sets
+`residual_stream_blend = 0.0`, and at blend 0 `HyperConnection.read` short-circuits the
+donor arithmetic: measured, all 48 routing parameters -- `W_down`, `W_up`, `W_write` and
+`branch_gain_delta` on both sublayers of every layer -- take exactly zero gradient, and
+the forward differs from blend 1 by 3.88 in absolute terms. The four streams exist and
+cost their 4.7% of a step; the *learned* read and write gates never moved. So the
+baseline, copy, scrambled and sidecar arms are plain pre-norm stacks carrying untrained
+routing weights.
+
+That does not undermine any comparison on this page, because both arms of every
+comparison shared the setting. It does mean nothing here is evidence about gated
+residuals, and a run that wants them has to pass `--blend` explicitly. `variant_tag`
+records the choice in result and checkpoint filenames so a GR arm cannot overwrite one
+without it.
 
 The read/write machinery is Hyper-Connections (Zhu et al., arXiv 2409.19606); the shipped
 variant is Qwen's Gated Residual, technical report section 2.2, equations 30--34. Lead

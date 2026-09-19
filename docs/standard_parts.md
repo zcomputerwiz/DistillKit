@@ -1,4 +1,4 @@
-﻿# Standard parts: modules trained once and reused across backbones
+# Standard parts: modules trained once and reused across backbones
 
 A program proposal, not a result. Nothing here has been run.
 

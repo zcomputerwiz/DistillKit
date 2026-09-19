@@ -1,4 +1,4 @@
-﻿"""Vectorized repetition index, validated against the reference implementation.
+"""Vectorized repetition index, validated against the reference implementation.
 
 `repetition_index.py` is the readable definition: a dictionary, one position at a time,
 obviously causal. It costs 0.118 s per training step at batch 64 x 1024, which is 21% of a

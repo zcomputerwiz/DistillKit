@@ -1,4 +1,4 @@
-﻿"""Re-score saved arms, with a substitution control that measures content.
+"""Re-score saved arms, with a substitution control that measures content.
 
 The seed-0 endpoint matrix left two cells uninterpretable. `scrambled` permutes the
 module's output across positions *within a sequence*, so every candidate it emits is still

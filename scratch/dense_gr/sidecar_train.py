@@ -1,4 +1,4 @@
-﻿"""From-scratch training with the hashed structural prior as the fourth branch.
+"""From-scratch training with the hashed structural prior as the fourth branch.
 
 The proposal's fourth branch is an n-gram table offloaded to host RAM. `ab68bef` already
 closed that: a 268.7M-row learned memory was replaced by a seeded code basis and 400K
@@ -59,7 +59,8 @@ import torch.nn.functional as F  # noqa: E402
 from torch.utils.checkpoint import checkpoint  # noqa: E402
 
 from augmented_head import AugmentedHead  # noqa: E402
-from benchmark import ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib  # noqa: E402
+from benchmark import (ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib,
+                       variant_tag)  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.code_classes import HISTORICAL, code_class_of  # noqa: E402
 from distillkit.experimental.structural_sidecar import (  # noqa: E402
@@ -114,6 +115,9 @@ def main() -> int:
     parser.add_argument("--ratio", default="1:1", choices=sorted(ATTENTION_RATIOS),
                         help="gated-delta-net layers per full-attention layer; "
                              "1:1 is what these arms have run, 3:1 is Qwen3-Next's")
+    parser.add_argument("--blend", type=float, default=0.0,
+                        help="gated residual route strength; 0 leaves it inert, "
+                             "which is what every arm so far has run")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=8_000)
@@ -141,8 +145,11 @@ def main() -> int:
                         help="steps already taken, so the data order continues rather "
                              "than replaying the windows the model has already seen")
     args = parser.parse_args()
+    variant = variant_tag(args.ratio, args.blend)
+    stem = "%s-s%d-%s" % (args.arm, args.seed, variant)
     if args.output is None:
-        args.output = Path("scratch/dense_gr/sidecar-%s-s%d.json" % (args.arm, args.seed))
+        args.output = Path("scratch/dense_gr/sidecar-%s.json" % stem)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
 
     torch.cuda.set_per_process_memory_fraction(0.90, 0)
     started = time.perf_counter()
@@ -167,6 +174,7 @@ def main() -> int:
           flush=True)
 
     config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
+                   blend=args.blend,
                    attn_implementation="flash_attention_2")
     torch.manual_seed(args.seed)
     if args.resume is not None:
@@ -336,6 +344,14 @@ def main() -> int:
     elapsed = time.perf_counter() - train_started
     report = {
         "arm": args.arm, "seed": args.seed, "vocab": args.vocab, "beta": args.beta,
+        "architecture": {"ratio": args.ratio, "blend": args.blend,
+                         "variant": variant, "hidden": args.hidden,
+                         "layers": args.layers,
+                         "full_attention_layers": [
+                             index for index, kind in enumerate(config.layer_types)
+                             if "linear" not in str(kind)],
+                         "mla": bool(getattr(config, "mla_enabled", False)),
+                         "csa2": bool(getattr(config, "csa2_enabled", False))},
         "backbone_parameters": int(backbone_parameters),
         "sidecar_parameters": int(sidecar_parameters),
         "sidecar": None if sidecar is None else sidecar.parameter_report(),
@@ -353,7 +369,7 @@ def main() -> int:
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print("wrote %s" % args.output)
 
-    target = args.checkpoints / ("sc-%s-s%d" % (args.arm, args.seed))
+    target = args.checkpoints / ("sc-%s" % stem)
     target.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(target, safe_serialization=True)
     tokenizer.save_pretrained(target)

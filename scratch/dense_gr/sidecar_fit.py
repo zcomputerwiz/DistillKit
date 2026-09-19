@@ -1,4 +1,4 @@
-﻿"""Fit the structural sidecar post hoc to a frozen checkpoint, the regime that worked.
+"""Fit the structural sidecar post hoc to a frozen checkpoint, the regime that worked.
 
 `ab68bef` fitted this module to a frozen backbone and bought newline -0.4684, punctuation
 -0.2101, whitespace -0.1502, control -0.1852, aggregate -0.0811 and content -0.0053 --

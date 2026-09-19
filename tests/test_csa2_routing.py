@@ -1,4 +1,4 @@
-﻿"""What CSA2 and MLA have to get right for a training arm to mean anything.
+"""What CSA2 and MLA have to get right for a training arm to mean anything.
 
 Three of these cover failures that a run would not report. A router whose parameters take
 no gradient still produces a loss curve, so "the model trained" says nothing about whether
@@ -78,6 +78,53 @@ def test_attention_ratio_places_the_layers(ratio, interval, full):
         build(256, 10, 64, ratio="2:1")
     with pytest.raises(ValueError, match="at least"):
         build(256, interval - 1, 64, ratio=ratio)
+
+
+def test_csa2_without_mla_is_refused():
+    """CSA2 installs inside the MLA branch, so the flag alone silently does nothing.
+
+    Without this the run builds ordinary attention, trains, and reports a CSA2
+    architecture it never had.
+    """
+    config = csa2_config()
+    config.mla_enabled = False
+    with pytest.raises(ValueError, match="csa2_enabled requires mla_enabled"):
+        Qwen35WidenedForCausalLM(config)
+
+
+@pytest.mark.parametrize("blend,active", [(0.0, False), (1.0, True)])
+def test_gated_residual_is_inert_until_blend_is_set(blend, active):
+    """`blend` is what decides whether the routing exists, and zero means it does not.
+
+    `HyperConnection.read` short-circuits the donor arithmetic at blend 0, so every
+    routing parameter takes exactly zero gradient and the model is a plain pre-norm stack
+    carrying weights that never move. An arm that means to exercise GR has to say so, and
+    an arm that does not should know it is not.
+    """
+    import sys
+    sys.path.insert(0, "scratch/dense_gr")
+    from benchmark import build, variant_tag
+
+    assert variant_tag("1:1", blend) == ("r1-1-gr" if active else "r1-1-nogr")
+    config = build(128, 4, 256, head_dim=32, ratio="1:1", blend=blend,
+                   attn_implementation="eager")
+    assert config.residual_stream_blend == blend
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(config).float()
+    model.train()
+    tokens = torch.randint(0, 256, (2, 16))
+    model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
+                use_cache=False).last_hidden_state.pow(2).mean().backward()
+
+    routing = [(name, parameter) for name, parameter in model.named_parameters()
+               if any(part in name for part in
+                      ("W_down", "W_up", "W_write", "branch_gain_delta"))]
+    assert routing
+    moved = [name for name, parameter in routing
+             if parameter.grad is not None and bool(parameter.grad.abs().sum() > 0)]
+    assert bool(moved) is active, (
+        "blend %.1f: %d of %d routing parameters took gradient"
+        % (blend, len(moved), len(routing)))
 
 
 def csa2_config(**kwargs):

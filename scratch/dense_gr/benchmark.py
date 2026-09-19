@@ -96,7 +96,17 @@ def full_attention_layers(layers, ratio):
     return [index for index in range(layers) if (index + 1) % interval == 0]
 
 
-def build(hidden, layers, vocab, head_dim=64, branches=4, ratio="1:1",
+def variant_tag(ratio, blend):
+    """A short, filename-safe name for the architecture knobs an arm can vary.
+
+    Results and checkpoints are keyed on arm and seed, which is not enough once the
+    architecture is a choice: two ratios of the same arm and seed would write the same
+    file and the second would silently replace the first.
+    """
+    return "r%s-%s" % (ratio.replace(":", "-"), "gr" if blend else "nogr")
+
+
+def build(hidden, layers, vocab, head_dim=64, branches=4, ratio="1:1", blend=0.0,
           attn_implementation="sdpa"):
     if ratio not in ATTENTION_RATIOS:
         raise ValueError("unknown attention ratio %r; expected one of %s"
@@ -127,7 +137,15 @@ def build(hidden, layers, vocab, head_dim=64, branches=4, ratio="1:1",
     config.residual_stream_num_branches = branches
     config.residual_stream_lowrank = max(8, hidden // 8)
     config.residual_stream_sidecar = False
-    config.residual_stream_blend = 0.0
+    # The gated residual route is inert at blend 0: `HyperConnection.read` short-circuits
+    # the donor arithmetic entirely, and all 48 routing parameters take exactly zero
+    # gradient. Every arm in this project so far has run that way, which makes them plain
+    # pre-norm models carrying untrained routing weights, not four-stream GR models.
+    # It stays the default so those arms remain reproducible; an arm that means to
+    # exercise GR has to say so.
+    if not 0.0 <= blend <= 1.0:
+        raise ValueError("residual stream blend must lie in [0, 1]; got %r" % blend)
+    config.residual_stream_blend = float(blend)
     # Only the full-attention layers consult this; the linear-attention layers go
     # through the gated delta rule and the conv, which fla and causal_conv1d own.
     config._attn_implementation = attn_implementation

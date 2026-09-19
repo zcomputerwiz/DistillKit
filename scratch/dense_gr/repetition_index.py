@@ -1,4 +1,4 @@
-﻿"""The repetition index: where the current suffix occurred before, computed exactly.
+"""The repetition index: where the current suffix occurred before, computed exactly.
 
 This is the first standard part, and it is deliberately the most boring one available.
 `docs/standard_parts.md` selects it on four criteria -- universal, exactly computable,

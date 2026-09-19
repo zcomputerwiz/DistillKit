@@ -27,7 +27,8 @@ import triton_shim  # noqa: F401,E402  resolves triton-windows before CCE reads 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from benchmark import ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib  # noqa: E402
+from benchmark import (ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib,
+                       variant_tag)  # noqa: E402
 from copy_module import ARMS, Connector, build_inputs, module_output  # noqa: E402
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
@@ -65,6 +66,9 @@ def main() -> int:
     parser.add_argument("--ratio", default="1:1", choices=sorted(ATTENTION_RATIOS),
                         help="gated-delta-net layers per full-attention layer; "
                              "1:1 is what these arms have run, 3:1 is Qwen3-Next's")
+    parser.add_argument("--blend", type=float, default=0.0,
+                        help="gated residual route strength; 0 leaves it inert, "
+                             "which is what every arm so far has run")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=8_000,
@@ -88,8 +92,11 @@ def main() -> int:
                              "retraining it")
     parser.add_argument("--no-checkpoint", action="store_true")
     args = parser.parse_args()
+    variant = variant_tag(args.ratio, args.blend)
+    stem = "%s-s%d-%s" % (args.arm, args.seed, variant)
     if args.output is None:
-        args.output = Path("scratch/dense_gr/copy-%s-s%d.json" % (args.arm, args.seed))
+        args.output = Path("scratch/dense_gr/copy-%s.json" % stem)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
 
     torch.cuda.set_per_process_memory_fraction(0.90, 0)
     started = time.perf_counter()
@@ -107,6 +114,7 @@ def main() -> int:
           % (args.arm, args.seed, original_tokens, compact_tokens, inflation), flush=True)
 
     config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
+                   blend=args.blend,
                    attn_implementation="flash_attention_2")
     torch.manual_seed(args.seed)
     model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
@@ -247,6 +255,14 @@ def main() -> int:
 
     report = {
         "arm": args.arm, "seed": args.seed, "vocab": args.vocab,
+        "architecture": {"ratio": args.ratio, "blend": args.blend,
+                         "variant": variant, "hidden": args.hidden,
+                         "layers": args.layers,
+                         "full_attention_layers": [
+                             index for index, kind in enumerate(config.layer_types)
+                             if "linear" not in str(kind)],
+                         "mla": bool(getattr(config, "mla_enabled", False)),
+                         "csa2": bool(getattr(config, "csa2_enabled", False))},
         "backbone_parameters": int(backbone_parameters),
         "connector_parameters": int(connector_parameters),
         "batch": args.batch, "length": args.length, "steps": args.steps,
@@ -267,7 +283,7 @@ def main() -> int:
     print("wrote %s" % args.output)
 
     if not args.no_checkpoint:
-        target = args.checkpoints / ("%s-s%d" % (args.arm, args.seed))
+        target = args.checkpoints / stem
         target.mkdir(parents=True, exist_ok=True)
         model.save_pretrained(target, safe_serialization=True)
         tokenizer.save_pretrained(target)

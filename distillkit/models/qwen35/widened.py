@@ -128,6 +128,16 @@ class WidenedDecoderLayer(Qwen3_5DecoderLayer):
 class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
     def __init__(self, config):
         Qwen3_5PreTrainedModel.__init__(self, config)
+        if getattr(config, "csa2_enabled", False) and not getattr(config, "mla_enabled",
+                                                                 False):
+            # CSA2 is installed inside the MLA branch below, because its three modes
+            # share a *latent* KV that only MLA produces. Without this the flag is
+            # accepted, ordinary attention is installed, and the run reports a CSA2
+            # architecture it does not have.
+            raise ValueError(
+                "csa2_enabled requires mla_enabled: CSA2 routes over the compressed "
+                "latent that MLA produces, and there is nothing for it to share "
+                "otherwise.")
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, config.pad_token_id)
         self.layers = nn.ModuleList([WidenedDecoderLayer(config, i)
                                      for i in range(config.num_hidden_layers)])
