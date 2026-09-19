@@ -41,6 +41,14 @@ Position ``t`` always keeps itself and enough preceding blocks to cover
 own immediate context produces gradients that say more about the router's initialization
 than about the architecture.
 
+**Routing is causal at token granularity, not only at block granularity.** One routing
+decision serves a whole block of queries, so it may use only what the earliest query in
+that block can see -- otherwise a token's history depends on tokens that follow it, and
+the causal mask cannot undo that, because the mask constrains what is read and not what
+chose it. Two things follow: the decision is scored from the block's leading query rather
+than pooled over all of them, and only blocks lying wholly in the past compete, which
+keeps the diagonal block's own key summary out of the decision.
+
 **Training only.** Routing is defined over whole blocks of a sequence that is present all
 at once, and nothing here writes to or reads from a KV cache, so incremental decoding is
 refused rather than silently mis-routed. Padding is refused for the same reason: a block
@@ -213,9 +221,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         arbitrary per-token mask is precisely what no fused attention kernel can exploit --
         measured here at 17.39 ms against 5.51 ms for the block-sparse form.
 
-        Scoring is against block summaries, not against every key. Pooling the index keys
-        per block first makes this ``O(seq * blocks)`` instead of ``O(seq^2)``, so the
-        router costs a fraction of the attention it is deciding for.
+        Scoring is against block summaries, not against every key, and from one leading
+        query per block rather than every query. That makes this ``O(blocks^2)`` instead
+        of ``O(seq^2)``, so the router costs a fraction of the attention it is deciding
+        for -- but the reason it takes the leading query is causality, not cost. See the
+        note at the pooling step.
         """
         batch, seq, _ = hidden_states.shape
         blocks = seq // self.block_size
@@ -226,27 +236,41 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         with torch.no_grad():
             summary = index_keys.view(
                 batch, blocks, self.block_size, self.index_dim).mean(2)
-            scores = torch.einsum("bqhd,bnd->bhqn", queries.float(), summary.float())
+            # One decision serves every token in the block, so it may only use what the
+            # *earliest* of them can see. Pooling the block's queries -- an amax over all
+            # of them, as this did -- lets the block's last token change what its first
+            # token is allowed to read: measured at 18 of 200 random single-token
+            # mutations, and 191 of 200 at larger ones. Taking the leading query instead
+            # is the most informative choice that stays causal, because position
+            # `i * block_size` precedes every other position in block `i`.
+            leaders = queries.view(
+                batch, blocks, self.block_size, self.index_heads, self.index_dim)[:, :, 0]
+            scores = torch.einsum("bqhd,bnd->bhqn", leaders.float(), summary.float())
             scores = (torch.relu(scores) * weights.view(1, -1, 1, 1)).sum(dim=1)
-            # A query block reads a key block if any of its queries wants it.
-            scores = scores.view(batch, blocks, self.block_size, blocks).amax(dim=2)
 
             rows = torch.arange(blocks, device=hidden_states.device)
-            causal = rows.view(-1, 1) >= rows.view(1, -1)
-            scores = scores.masked_fill(~causal.unsqueeze(0), float("-inf"))
+            offsets = rows.view(-1, 1) - rows.view(1, -1)
+            # The recent blocks always survive routing: a query that cannot see its own
+            # immediate context produces gradients about the router, not the
+            # architecture.
+            local = (offsets >= 0) & (offsets <= self.local_blocks)
+            # Only blocks that are complete in the past compete. This keeps a top-k slot
+            # from being spent on a block that is forced open anyway, and it keeps the
+            # diagonal block's summary -- the one place a key pool holds tokens from the
+            # query's own future -- out of the decision entirely.
+            eligible = offsets > self.local_blocks
+            scores = scores.masked_fill(~eligible.unsqueeze(0), float("-inf"))
 
             keep = max(1, min(self.top_k // self.block_size, blocks))
             chosen = scores.topk(keep, dim=-1).indices
             allowed = torch.zeros(batch, blocks, blocks, dtype=torch.bool,
                                   device=hidden_states.device)
             allowed.scatter_(-1, chosen, True)
-            # The recent blocks always survive routing: a query that cannot see its own
-            # immediate context produces gradients about the router, not the
-            # architecture.
-            offsets = rows.view(-1, 1) - rows.view(1, -1)
-            local = (offsets >= 0) & (offsets <= self.local_blocks)
+            # An early block has no eligible candidates, so its top-k over an all -inf
+            # row returns arbitrary indices; this drops them.
+            allowed &= eligible.unsqueeze(0)
             allowed |= local.unsqueeze(0)
-            allowed &= causal.unsqueeze(0)
+            allowed &= (offsets >= 0).unsqueeze(0)
 
         # The heads collapse here. Summing head scores through a ReLU is what makes them
         # distinct, and the ReLU cannot be folded into a dot product; the linear part can,
@@ -270,6 +294,12 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         from torch.nn.attention.flex_attention import BlockMask
 
         batch, blocks, _ = allowed.shape
+        rows = torch.arange(blocks, device=allowed.device)
+        # A block above the diagonal passed as `full` is attended with no mask evaluated
+        # at all, so the kernel would read the future outright. `route` already returns a
+        # causal `allowed`; this is here because the class is easy to drive directly and
+        # that mistake is silent.
+        allowed = allowed & (rows.view(-1, 1) >= rows.view(1, -1)).unsqueeze(0)
         diagonal = torch.eye(blocks, dtype=torch.bool, device=allowed.device)
         below = allowed & ~diagonal.unsqueeze(0)
 

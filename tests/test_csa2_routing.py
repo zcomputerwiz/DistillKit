@@ -106,51 +106,69 @@ def test_router_learns_which_blocks_to_select():
     claims.
 
     The task is a pointer. Every key block carries a signature and every token carries a
-    copy of one block's signature, which is the block it should route to; that block
-    differs per sequence, so it cannot be memorized. A teacher runs the same layer with
-    routing forced there, and the student has everything frozen except the indexer, so
-    where it routes is its only lever.
+    copy of one block's signature, which is the block it should route to. Only the last
+    query block is scored, its target is drawn strictly outside the blocks it gets for
+    free, teacher and student are given identical local access so the target is the only
+    difference between them, and the rate is measured on batches never trained on -- so
+    the number cannot be inflated by forced blocks, impossible future targets, or
+    memorizing a fixed batch.
     """
-    blocks, batch, seq = 6, 32, 6 * BLOCK
+    blocks, batch = 8, 32
+    seq = blocks * BLOCK
     torch.manual_seed(0)
     config = csa2_config(csa2_local_window=BLOCK, csa2_top_k=BLOCK, csa2_index_dim=16,
                          csa2_index_heads=2)
     layer = Qwen35SparseLatentAttention(config, 0, "full").cuda().float()
     layer.bus = SparseIndexBus()
 
+    last = blocks - 1
+    # Candidates the last block must actually route to: strictly in its past, and outside
+    # the window it is handed regardless of score.
+    choices = last - layer.local_blocks
     signature = torch.randn(blocks, config.hidden_size, device="cuda")
     signature /= signature.norm(dim=-1, keepdim=True)
-    hidden = torch.randn(batch, seq, config.hidden_size, device="cuda")
-    hidden += 4.0 * signature.repeat_interleave(BLOCK, 0).unsqueeze(0)
-    lowest = layer.local_blocks + 1
-    target = torch.randint(0, blocks - lowest, (batch,), device="cuda")
-    hidden += 2.0 * signature[target].unsqueeze(1)
+    rows = torch.arange(batch, device="cuda")
+
+    def sample(seed):
+        generator = torch.Generator(device="cuda").manual_seed(seed)
+        hidden = torch.randn(batch, seq, config.hidden_size, device="cuda",
+                             generator=generator)
+        hidden += 4.0 * signature.repeat_interleave(BLOCK, 0).unsqueeze(0)
+        target = torch.randint(0, choices, (batch,), device="cuda", generator=generator)
+        # The pointer rides on the last block only, which is the block being scored.
+        hidden[:, last * BLOCK:] += 2.0 * signature[target].unsqueeze(1)
+        return hidden, target
 
     cos = torch.ones(batch, seq, int(layer.rope_dim), device="cuda")
     sin = torch.zeros_like(cos)
-    eye = torch.eye(blocks, dtype=torch.bool, device="cuda").unsqueeze(0)
-    rows = torch.arange(batch, device="cuda")
 
-    def forward(force):
+    def forward(hidden, target, force):
         keys = layer.index_k_proj(hidden)
         latent, rotary = torch.split(layer.kv_a_proj(hidden),
                                      [layer.latent, layer.rope_dim], dim=-1)
         latent = layer.kv_a_norm(latent)
         allowed, effective = layer.route(hidden, keys)
         if force:
-            allowed = torch.zeros_like(allowed)
-            allowed[rows, :, target] = True
-            allowed |= eye
+            # Same local access as the student; the target is the only thing added, so
+            # matching the teacher means routing there and nowhere else.
+            offsets = torch.arange(blocks, device="cuda")
+            offsets = offsets.view(-1, 1) - offsets.view(1, -1)
+            allowed = ((offsets >= 0) & (offsets <= layer.local_blocks)).unsqueeze(0)
+            allowed = allowed.expand(batch, blocks, blocks).clone()
+            allowed[rows, last, target] = True
         return layer._attend(hidden, latent, rotary, layer.block_mask(allowed),
                              effective, keys, (cos, sin))[0]
 
-    def selection_rate():
-        with torch.no_grad():
-            allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
-        return allowed[rows, :, target][:, lowest:].float().mean().item()
+    def selection_rate(seeds):
+        """How often the last block's top-k finds the pointed-at block, on fresh data."""
+        hits = []
+        for seed in seeds:
+            hidden, target = sample(seed)
+            with torch.no_grad():
+                allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
+            hits.append(allowed[rows, last, target].float().mean().item())
+        return sum(hits) / len(hits)
 
-    with torch.no_grad():
-        teacher = forward(force=True)
     indexer = [parameter for name, parameter in layer.named_parameters()
                if name.startswith(("index_q_proj", "index_k_proj", "index_weight",
                                    "index_gate"))]
@@ -159,21 +177,27 @@ def test_router_learns_which_blocks_to_select():
     for parameter in indexer:
         parameter.requires_grad_(True)
 
-    before, opened = selection_rate(), None
+    held_out = [101, 102, 103, 104]
+    before, opened = selection_rate(held_out), None
     optimizer = torch.optim.Adam(indexer, lr=1e-2)
-    for _ in range(200):
-        loss = (forward(force=False) - teacher).pow(2).mean()
+    for step in range(300):
+        hidden, target = sample(step)
+        with torch.no_grad():
+            teacher = forward(hidden, target, force=True)
+        loss = (forward(hidden, target, force=False) - teacher)[:, last * BLOCK:]
+        loss = loss.pow(2).mean()
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
         opened = loss.item() if opened is None else opened
 
-    after = selection_rate()
-    assert loss.item() < opened, "the student did not fit the teacher at all"
-    assert after > before + 0.2, (
-        "top-k selection of the pointed-at block did not improve: %.3f -> %.3f"
-        % (before, after))
-    assert after > 2.0 / (blocks - lowest), "selection stayed near chance"
+    after = selection_rate(held_out)
+    chance = 1.0 / choices
+    assert after > before + 0.15, (
+        "top-k selection of the pointed-at block did not improve on held-out batches: "
+        "%.3f -> %.3f (chance %.3f)" % (before, after, chance))
+    assert after > 2.0 * chance, (
+        "selection stayed near chance: %.3f against %.3f" % (after, chance))
 
 
 @pytest.mark.parametrize("window", [1, 8, BLOCK, BLOCK + 1, 3 * BLOCK])
@@ -196,6 +220,52 @@ def test_local_window_is_always_routed(window):
                 assert bool(allowed[:, query_block, key_block].all()), (
                     "window %d: query block %d lost key block %d"
                     % (window, query_block, key_block))
+
+
+@pytest.mark.parametrize("scale", [1.0, 8.0])
+@pytest.mark.parametrize("window", [0, 8])
+def test_routing_does_not_depend_on_a_token_s_own_future(window, scale):
+    """Mutating a block's last token must not change what its earlier tokens may read.
+
+    One routing decision serves a whole block, so pooling the block's queries to make it
+    -- an amax over all of them -- lets a token's history depend on tokens that follow
+    it. The causal mask cannot undo that: it constrains what is read, not what chose it.
+
+    The mutation has to land *inside* a block. A cut at a block boundary, which is what
+    the original prefix-invariance check did, cannot see this at all. Before the fix this
+    fired on 18 of 200 mutations at ``scale`` 1.0 and 191 of 200 at 8.0.
+    """
+    torch.manual_seed(0)
+    blocks = 10
+    layer = bare_layer(csa2_local_window=window, csa2_top_k=2 * BLOCK)
+    width = layer.config.hidden_size
+    block = blocks - 1
+    victim = block * BLOCK + BLOCK - 1
+
+    for _ in range(25):
+        hidden = torch.randn(1, blocks * BLOCK, width)
+        before, _ = layer.route(hidden, layer.index_k_proj(hidden))
+        changed = hidden.clone()
+        changed[:, victim] += scale * torch.randn(width)
+        after, _ = layer.route(changed, layer.index_k_proj(changed))
+        assert torch.equal(before[0, block], after[0, block]), (
+            "block %d read %s before the mutation and %s after, but every token in it "
+            "below offset %d has an unchanged prefix"
+            % (block, before[0, block].nonzero().flatten().tolist(),
+               after[0, block].nonzero().flatten().tolist(), BLOCK - 1))
+
+
+def test_block_mask_refuses_to_read_the_future():
+    """A future block passed as `full` would be attended with no mask evaluated at all."""
+    layer = bare_layer()
+    blocks = 4
+    allowed = torch.ones(1, blocks, blocks, dtype=torch.bool)
+    # `to_dense` is block-level, so the diagonal is present either way; what must not
+    # survive is any block strictly above it.
+    dense = layer.block_mask(allowed).to_dense().bool()[0, 0]
+    rows = torch.arange(blocks)
+    assert not bool(dense[rows.view(-1, 1) < rows.view(1, -1)].any())
+    assert bool(dense[rows.view(-1, 1) >= rows.view(1, -1)].all())
 
 
 def test_routing_stays_causal_and_sparse():
@@ -423,4 +493,5 @@ def test_mla_caches_the_latent_not_the_expanded_heads():
     # head: a bound taken from num_attention_heads would be twice as loose here and
     # would pass a cache that had regressed past the thing it replaces.
     assert width < 2 * config.num_key_value_heads * HEAD_DIM
+
 

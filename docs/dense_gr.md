@@ -477,8 +477,11 @@ derangement.
 ### The endpoint matrix
 
 Each arm is scored three ways at the end of training. `enabled` is the trained
-configuration. `ablated` zeroes the connector's contribution. `substituted` keeps the
-features and replaces the candidates with uniform draws.
+configuration. `ablated` zeroes the connector's contribution. `substituted` hands the module
+another sequence's output at the same position -- the cross-sequence `scramble()`, applied to
+features and candidates together, which is what `copy_train.py` calls. `copy_module.py` also
+has `randomize_candidates`, which keeps the features and replaces only the candidates; it is
+not what the endpoint matrix runs.
 
 | arm | enabled | ablated | substituted |
 | --- | --- | --- | --- |
@@ -486,11 +489,17 @@ features and replaces the candidates with uniform draws.
 | scrambled | +10.8939 | +10.9078 | +10.8919 |
 
 Gain is the **first** occurrence's NLL minus the second's, so higher is better -- not chance
-minus the second. Chance is `ln(vocab)` = 10.3972 and is reported alongside as the value the
-gain would take if the second occurrence carried nothing, but first occurrence sits 1.7-1.8
-nats *above* chance: a block of uniformly drawn ids is harder than uniform for a model
-carrying a learned prior over code. Reading the gain against chance instead of against first
-occurrence understates every cell by that margin.
+minus the second. If repetition supplies nothing, the second occurrence equals the first and
+the gain is zero; chance is not that floor.
+
+Chance is `ln(vocab)` = 10.3972, the NLL a uniform predictor pays, and `copy_probe.py`
+expects the first occurrence to sit there because the ids are drawn uniformly. It does not:
+first occurrence is 12.23, which is 1.84 nats *above* chance. That direction is expected for
+any model with a learned prior -- uniform ids are out of distribution, so it prices them
+worse than 1/V -- so the probe's docstring is wrong to treat a deviation as evidence the
+sampling is off. It does not affect the gain, which is a difference between two numbers that
+both carry that offset. It does mean reading a cell against chance rather than against first
+occurrence understates it by 1.84 nats.
 
 The scrambled control spans 0.016 nats across all three cells. That flatness is the property
 the pre-fix run could not produce: with the defective `scramble()`, `substituted` beat the
