@@ -97,14 +97,25 @@ def full_attention_layers(layers, ratio):
     return [index for index in range(layers) if (index + 1) % interval == 0]
 
 
-def variant_tag(ratio, blend):
-    """A short, filename-safe name for the architecture knobs an arm can vary.
+def variant_tag(ratio, blend, norm_mode="exact", seed=None):
+    """A short, filename-safe name for everything an arm can vary underneath its name.
 
-    Results and checkpoints are keyed on arm and seed, which is not enough once the
-    architecture is a choice: two ratios of the same arm and seed would write the same
-    file and the second would silently replace the first.
+    Results and checkpoints were keyed on arm and seed, which is not enough once the
+    architecture is a choice: two ratios of the same arm and seed wrote the same file and
+    the second silently replaced the first.
+
+    Every knob that changes what trains belongs here. `gr` alone collapsed blend 1.0 and
+    blend 0.5 onto one name, and a norm-mode sweep -- three runs that differ in nothing
+    else -- would have overwritten itself three times over.
     """
-    return "r%s-%s" % (ratio.replace(":", "-"), "gr" if blend else "nogr")
+    parts = ["r%s" % ratio.replace(":", "-")]
+    parts.append("nogr" if not blend else
+                 "gr" if blend == 1.0 else "gr%g" % blend)
+    if blend and norm_mode != "exact":
+        parts.append(norm_mode)
+    if seed is not None:
+        parts.append("s%d" % seed)
+    return "-".join(parts)
 
 
 def build(hidden, layers, vocab, head_dim=64, branches=4, ratio="1:1", blend=0.0,

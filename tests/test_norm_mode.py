@@ -171,3 +171,35 @@ def test_a_from_scratch_run_trains_in_every_cheap_mode(mode):
     assert routing
     assert all(p.grad is not None and torch.isfinite(p.grad).all() for p in routing)
     assert any(p.grad.abs().sum() > 0 for p in routing)
+
+
+def test_recipient_conversion_refuses_an_approximate_norm():
+    """The conversion's only claim is that the read *is* the recipient's sublayer."""
+    from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5RMSNorm
+
+    norm = Qwen3_5RMSNorm(HIDDEN, eps=1e-6)
+    for mode in ("fast", "fused"):
+        route = HyperConnection(hidden_size=HIDDEN, num_branches=BRANCHES, lowrank=8,
+                                blend=1.0, norm_mode=mode)
+        with pytest.raises(ValueError, match="norm_mode='exact'"):
+            route.recipient_initialize(norm)
+    exact = HyperConnection(hidden_size=HIDDEN, num_branches=BRANCHES, lowrank=8,
+                            blend=1.0, norm_mode="exact")
+    exact.recipient_initialize(norm)
+    assert exact.recipient_initialized
+
+
+def test_the_run_identity_separates_everything_that_changes_training():
+    import sys
+    sys.path.insert(0, "scratch/dense_gr")
+    from benchmark import variant_tag
+
+    seen = {variant_tag(*args) for args in (
+        ("3:1", 0.0, "exact", 0), ("3:1", 1.0, "exact", 0), ("3:1", 0.5, "exact", 0),
+        ("3:1", 1.0, "fused", 0), ("3:1", 1.0, "fast", 0), ("3:1", 1.0, "exact", 1),
+        ("1:1", 1.0, "exact", 0))}
+    # Seven configurations that differ in what trains must have seven names; the old tag
+    # collapsed blend 1.0 with 0.5, and every norm mode with every other.
+    assert len(seen) == 7, sorted(seen)
+    assert variant_tag("3:1", 0.0) == "r3-1-nogr"
+    assert variant_tag("3:1", 1.0) == "r3-1-gr"

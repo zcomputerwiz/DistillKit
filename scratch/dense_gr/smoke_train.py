@@ -124,7 +124,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
-    variant = variant_tag(args.ratio, args.blend)
+    variant = variant_tag(args.ratio, args.blend, args.norm_mode, args.seed)
     if args.mla:
         variant += "-csa2" if args.csa2 else "-mla"
     if args.output == Path("scratch/dense_gr/smoke-train.json"):
@@ -374,6 +374,13 @@ def main() -> int:
         # records what produced them, so the checkpoint can answer questions the
         # report did not think to ask.
         target = args.checkpoints / ("smoke-%s" % variant)
+        if target.exists() and any(target.iterdir()):
+            # The identity above should make this unreachable; if it is reached, two runs
+            # differ in something the name does not carry, and overwriting would destroy
+            # the earlier one's weights rather than its report.
+            raise SystemExit(
+                "%s already holds a checkpoint; move it aside or pass --checkpoints, "
+                "rather than overwriting an arm that is not this one" % target)
         target.mkdir(parents=True, exist_ok=True)
         model.save_pretrained(target, safe_serialization=True)
         tokenizer.save_pretrained(target)

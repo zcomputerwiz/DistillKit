@@ -148,7 +148,7 @@ def main() -> int:
                         help="steps already taken, so the data order continues rather "
                              "than replaying the windows the model has already seen")
     args = parser.parse_args()
-    variant = variant_tag(args.ratio, args.blend)
+    variant = variant_tag(args.ratio, args.blend, seed=args.seed)
     stem = "%s-s%d-%s" % (args.arm, args.seed, variant)
     if args.output is None:
         args.output = Path("scratch/dense_gr/sidecar-%s.json" % stem)

@@ -64,6 +64,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hidden", type=int, default=768)
     parser.add_argument("--layers", type=int, default=12)
+    parser.add_argument("--blend", type=float, default=0.0,
+                        help="gated residual strength. The route is inert at 0, so\n"
+                             "a profile taken there says nothing about active GR")
+    parser.add_argument("--norm-mode", default="exact",
+                        choices=("exact", "fast", "fused"))
+    parser.add_argument("--accumulate", type=int, default=1)
     parser.add_argument("--vocab", type=int, default=32_768)
     parser.add_argument("--batch", type=int, default=32)
     parser.add_argument("--length", type=int, default=1024)
@@ -75,7 +81,12 @@ def main() -> int:
 
     torch.cuda.set_per_process_memory_fraction(0.90, 0)
     config = build(args.hidden, args.layers, args.vocab, branches=args.branches,
+                   blend=args.blend,
                    attn_implementation="flash_attention_2")
+    config.residual_stream_norm_mode = args.norm_mode
+    print("profiling blend %.2f, norm mode %s, %d micro-batches of %d"
+          % (args.blend, args.norm_mode, args.accumulate,
+             args.batch // max(1, args.accumulate)), flush=True)
     torch.manual_seed(0)
     model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
     if args.checkpointing:

@@ -95,22 +95,26 @@ class _GatedProjectMean(torch.autograd.Function):
         compute = _at_least_fp32(normalized.dtype)
         branches, width = normalized.shape[-2], normalized.shape[-1]
         grad = grad_output.to(compute) / branches
+        # Backward runs outside whatever autocast the forward ran under, so the cast
+        # autocast applied to `weight` is gone and a saved fp32 parameter would meet a
+        # bf16 activation in the recomputed matmul. `code` carries the dtype the forward
+        # actually multiplied in, so the recompute follows it rather than the parameter.
+        work = code.dtype
         flat_code = code.flatten(0, -2)
 
         grad_normalized = torch.empty_like(normalized)
         grad_code = torch.zeros_like(code, dtype=compute)
         grad_weight = torch.empty_like(weight)
         for index in range(branches):
-            rows = weight[index * width:(index + 1) * width]
+            rows = weight[index * width:(index + 1) * width].to(work)
             gate = F.linear(code, rows).sigmoid().to(compute)
             grad_normalized[..., index, :] = (grad * gate).to(normalized.dtype)
-            # d/d(logit) of `x * sigmoid(logit)`, rounded to the parameter dtype exactly
-            # where autograd would have rounded it.
-            grad_logit = (grad * normalized[..., index, :] * gate * (1 - gate)
-                          ).to(weight.dtype)
+            # d/d(logit) of `x * sigmoid(logit)`, rounded where autograd would have
+            # rounded it on the way into the projection.
+            grad_logit = (grad * normalized[..., index, :] * gate * (1 - gate)).to(work)
             grad_code += F.linear(grad_logit, rows.t()).to(compute)
             grad_weight[index * width:(index + 1) * width] = (
-                grad_logit.flatten(0, -2).t() @ flat_code)
+                grad_logit.flatten(0, -2).t() @ flat_code).to(weight.dtype)
         return grad_normalized, grad_code.to(code.dtype), grad_weight
 
 
@@ -218,6 +222,15 @@ deliberately makes the donor inert; use the warmup callback to activate it.
                 "recipient initialization supports Qwen3_5RMSNorm, which applies "
                 "1 + weight; got %s. Refusing rather than guessing the gain convention."
                 % type(norm).__name__)
+        if self.norm_mode != "exact":
+            # The whole promise of this conversion is that the read *is* the recipient's
+            # sublayer, bitwise. `fused` misses it by 0.015625 in bf16 -- one ulp, and
+            # enough that the converted model is not the model it was converted from.
+            # Refusing beats converting and reporting success.
+            raise ValueError(
+                "recipient initialization needs norm_mode='exact'; %r reproduces the "
+                "recipient only approximately, and the conversion's only claim is that "
+                "it does so exactly" % self.norm_mode)
         if abs(float(norm.eps) - float(self.norm_eps)) > 0:
             raise ValueError("norm epsilon %r does not match the route's %r"
                              % (norm.eps, self.norm_eps))

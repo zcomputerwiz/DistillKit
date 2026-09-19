@@ -95,7 +95,7 @@ def main() -> int:
                              "retraining it")
     parser.add_argument("--no-checkpoint", action="store_true")
     args = parser.parse_args()
-    variant = variant_tag(args.ratio, args.blend)
+    variant = variant_tag(args.ratio, args.blend, seed=args.seed)
     stem = "%s-s%d-%s" % (args.arm, args.seed, variant)
     if args.output is None:
         args.output = Path("scratch/dense_gr/copy-%s.json" % stem)
