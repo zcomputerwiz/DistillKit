@@ -28,6 +28,36 @@ def _at_least_fp32(dtype):
     return torch.promote_types(dtype, torch.float32)
 
 
+def _normalize_and_gain(x, gain, eps):
+    """RMS-normalize over the last dimension and apply the per-branch gain.
+
+    Written as one expression of plain operations so that inductor sees the reduction,
+    the normalize and the gain together and fuses them, forward and backward. Compiled it
+    beats every hand-rolled variant here on all three axes at once -- 5.114 ms against the
+    exact form's 13.135 and `F.rms_norm`'s 8.410, 128 MiB less peak than either, and the
+    accuracy of the cheap variance rather than the fused kernel's, because AOTAutograd
+    saves the input and the reciprocal standard deviation and recomputes the rest instead
+    of storing a normalized copy.
+    """
+    variance = x.float().pow(2).mean(-1, keepdim=True)
+    return ((x * torch.rsqrt(variance + eps)) * gain).to(x.dtype)
+
+
+_COMPILED_NORM = None
+
+
+def _compiled_normalize():
+    """`_normalize_and_gain` compiled once for the process.
+
+    One function object, so Dynamo guards on one code object and a second layer's call at
+    the same shapes is a cache hit rather than a recompile.
+    """
+    global _COMPILED_NORM
+    if _COMPILED_NORM is None:
+        _COMPILED_NORM = torch.compile(_normalize_and_gain, dynamic=False)
+    return _COMPILED_NORM
+
+
 class _GatedMean(torch.autograd.Function):
     """Branchwise gate/product, without full widened gate/product temporaries.
 
@@ -139,7 +169,13 @@ deliberately makes the donor inert; use the warmup callback to activate it.
     #: * ``fused`` -- 8.416 ms. ``F.rms_norm``, which normalises in the input dtype and
     #:   so rounds once more before the gain: about 5e-3 relative, roughly one bf16 ulp
     #:   and a real loss of precision rather than a rounding detail.
-    NORM_MODES = ("exact", "fast", "fused")
+    #: * ``compiled`` -- 5.114 ms, and 128 MiB less peak than any of the others. Plain
+    #:   operations through inductor, which fuses the reduction, the normalize and the
+    #:   gain in both directions and keeps the input and the reciprocal standard
+    #:   deviation rather than a normalized copy. Its error is ``fast``'s, not
+    #:   ``fused``'s, so it dominates ``fused`` on speed, memory and accuracy at once.
+    #:   ``fused`` stays because a 2,000-step arm was validated on it.
+    NORM_MODES = ("exact", "fast", "fused", "compiled")
 
     def __init__(self, hidden_size, num_branches=4, lowrank=320, layer_idx=0,
                  blend=0.0, norm_eps=1e-6, learnable_blend=False,
@@ -359,6 +395,14 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         """
         gain = 1.0 + self.branch_gain_delta.to(
             torch.promote_types(self.branch_gain_delta.dtype, torch.float32))
+        if self.norm_mode == "compiled":
+            if states.device.type != "cuda":
+                # Inductor's CPU backend wants a host C++ compiler, which is not part of
+                # this environment and is not what the mode is for. The eager expression
+                # is the same arithmetic, so a CPU caller gets the same answer slowly
+                # rather than an InductorError.
+                return _normalize_and_gain(states, gain, self.norm_eps)
+            return _compiled_normalize()(states, gain, self.norm_eps)
         if self.norm_mode == "fused":
             # One fused kernel over the stream, then the gain. `F.rms_norm` takes a
             # weight of the normalised shape and this gain is per branch, so it cannot
@@ -396,7 +440,7 @@ deliberately makes the donor inert; use the warmup callback to activate it.
     def write(self, states, output, weights):
         if weights is None:
             return states + output.unsqueeze(-2)
-        if self.norm_mode == "fused":
+        if self.norm_mode in ("fused", "compiled"):
             # One broadcast multiply-add over the whole stream instead of a multiply, an
             # add and a stack per branch. `addcmul` may contract the pair into a fused
             # multiply-add, which rounds once where the branchwise form rounds twice --

@@ -69,7 +69,7 @@ def main() -> int:
                         help="gated residual route strength; 0 leaves it inert, "
                              "which is what every arm so far has run")
     parser.add_argument("--norm-mode", default="exact",
-                        choices=("exact", "fast", "fused"),
+                        choices=("exact", "fast", "fused", "compiled"),
                         help="how the branch read normalises; exact is "
                              "bit-identical to the stock norm and what a "
                              "converted model needs, fused is fastest and "

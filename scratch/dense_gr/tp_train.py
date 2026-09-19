@@ -170,8 +170,8 @@ def main() -> int:
     parser.add_argument("--blend", type=float, default=1.0,
                         help="gated residual strength; this trainer exists for the "
                              "active route, so it defaults on")
-    parser.add_argument("--norm-mode", default="fused",
-                        choices=("exact", "fast", "fused"),
+    parser.add_argument("--norm-mode", default="compiled",
+                        choices=("exact", "fast", "fused", "compiled"),
                         help="fused is 15.5%% faster and 0.0012 nats from exact over "
                              "2,000 steps; exact is required to convert a donor")
     parser.add_argument("--batch", type=int, default=64)

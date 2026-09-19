@@ -146,6 +146,32 @@ def test_every_mode_is_identical_while_the_gain_is_still_zero():
     assert set(relative.values()) == {0.0}, relative
 
 
+def test_compiled_matches_the_arithmetic_it_compiles():
+    """Inductor rewrites the schedule, not the expression."""
+    from distillkit.experimental.hyper_connection import _normalize_and_gain
+
+    torch.manual_seed(0)
+    states = torch.randn(2, 16, BRANCHES, HIDDEN)
+    gain = 1.0 + torch.randn(BRANCHES, HIDDEN) * 0.1
+    eager = _normalize_and_gain(states, gain, 1e-6)
+    exact = _BranchNorm.apply(states, gain, 1e-6, False)
+    # The eager form of the compiled expression is the exact form's arithmetic written
+    # differently, so in fp32 they agree to rounding.
+    assert torch.allclose(eager, exact, atol=1e-6, rtol=1e-6)
+
+
+def test_compiled_dominates_fused_on_accuracy():
+    """It is faster and lighter than `fused`; it is also closer to `exact` than `fused`.
+
+    `F.rms_norm` normalises in the input dtype and rounds before the gain. The compiled
+    expression keeps the product in fp32 until the end, like the exact form, so it lands
+    at the cheap variance's error rather than the fused kernel's.
+    """
+    torch.manual_seed(0)
+    relative = _modes_on(torch.randn(2, 16, BRANCHES, HIDDEN).bfloat16())
+    assert relative["compiled"] <= relative["fused"], relative
+
+
 def test_an_unknown_mode_is_refused():
     with pytest.raises(ValueError, match="unknown norm_mode"):
         HyperConnection(hidden_size=HIDDEN, num_branches=BRANCHES, lowrank=8,
