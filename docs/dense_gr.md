@@ -597,3 +597,115 @@ FlexAttention's workspace all cost memory that a KV cache does not.
 So the saving is real and it is at inference. The proposal that prompted this arrived as a
 VRAM-reduction pathway for training on two 3090s, and for that it is a regression: the
 memory that limits what can be trained here goes up, not down.
+
+
+## The gated residual, measured at last
+
+Every arm before this one ran with `residual_stream_blend = 0.0`, where
+`HyperConnection.read` short-circuits the donor arithmetic and all 48 routing parameters
+take exactly zero gradient. So the four streams were being carried and never routed, and
+nothing on this page was evidence about gated residuals. These arms turn it on.
+
+Two arms at 3:1, ten layers, 8,000 steps and 524.3M scored tokens, same seed and data
+order, `--accumulate 4`, identical in every respect but blend.
+
+| | blend off | blend on |
+| --- | ---: | ---: |
+| held-out | 1.5738 | 1.5329 |
+| held-out per original token | 2.1024 | 2.0478 |
+| final loss | 1.5509 | 1.5102 |
+| copy probe gain | +10.824 | +11.110 |
+| parameters | 44,576,064 | 44,576,064 |
+| tokens/second | 105,648 | 43,941 |
+| peak reserved | 5.33 GiB | 9.57 GiB |
+
+**0.0409 nats at a byte-identical parameter count.** The routing weights exist in both
+arms; in one they train and in the other they sit at initialization. The advantage is a
+level shift rather than a head start being repaid -- 0.1190, 0.0713, 0.0519, 0.0436,
+0.0433, 0.0434, 0.0405, 0.0409 at successive held-out points, settling by step 4,000 and
+holding for the remaining 4,000.
+
+It also nearly recovers what the ratio cost. 3:1 with blend reaches 1.5329 against 1:1
+without it at 1.5296, using two full-attention layers instead of five.
+
+### Where the five arms landed
+
+| arm | held-out | copy gain | tokens/s | peak | parameters |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 1:1 plain | 1.5296 | +11.003 | 113,842 | 14.16 GiB | 45.3M |
+| 1:1 MLA + CSA2 | 1.5994 | +10.609 | 106,617 | 15.95 GiB | 45.9M |
+| 3:1 plain | 1.5738 | +10.824 | 105,648 | 5.33 GiB | 44.6M |
+| **3:1 blend** | **1.5329** | **+11.110** | 43,941 | 9.57 GiB | 44.6M |
+| 3:1 everything | 1.5852 | +10.971 | 43,613 | 10.75 GiB | 44.8M |
+
+The two mechanisms are roughly equal and opposite: blend earns 0.0409 and CSA2 costs
+0.0523 on top of it, so everything-on lands slightly behind 3:1 plain having paid 2.4x in
+throughput for it. One seed each, and the whole spread is 0.056 nats, so this ranks the
+mechanisms rather than settling them.
+
+Do not read 3:1's 5.33 GiB as a ratio result: those arms ran `--accumulate 4` where the
+1:1 arms ran 1, and the difference is the accumulation.
+
+## Making an active route affordable
+
+Blend cost 2.38x the step time when first measured, which is what a mechanism worth 0.04
+nats has to be weighed against. Five changes, each measured:
+
+| change | effect |
+| --- | --- |
+| gradient checkpointing, which was declared and never wired | 20.65 GiB to 5.16 for 26% time |
+| branches normalized in one call rather than four and a stack | folded into the 6% below |
+| `W_down` and `W_write` sharing one pass over the stream | 6.1% of the active route |
+| the up-projection folded into the gated mean | 12.2% memory, gate logits never formed |
+| `norm_mode`, and the residual write fused under it | 15.4% and a further 4.4% |
+
+At micro-batch 32 with an effective batch of 64, on free cards:
+
+| | tokens/second | peak |
+| --- | ---: | ---: |
+| blend 0 | 104,520 | 10.51 GiB |
+| blend 1, `exact` | 46,687 | 14.19 GiB |
+| blend 1, `fast` | 48,328 | 14.19 GiB |
+| blend 1, `fused` | 56,254 | 16.20 GiB |
+| blend 1, `fused`, checkpointed, micro 64 | 45,717 | 6.19 GiB |
+
+Against the 43,941 the arm actually ran at, that is **+28.0%**, and the blend tax falls
+from 2.38x to **1.86x**. The last row is the one that matters for a larger model: 6.19 GiB
+is less than blend 0 uses uncheckpointed, at 45,717 tokens per second.
+
+Micro-batch is worth sweeping and the ratio is not. Throughput rises with it for both
+settings -- 86,848, 98,280, 104,467, 107,831 at blend 0 -- while the blend tax stays near
+2.1x at every size, so there is no shape where routing becomes cheap. Micro 64 spills at
+blend 1 even after the memory work, 28.05 GiB against a 24 GiB card.
+
+### The norm modes, and what the cheapest one costs
+
+`exact` is bit-identical to `Qwen3_5RMSNorm`, which `recipient_initialize` needs to
+reproduce a donor and which it now refuses to convert without. `fast` replaces two fp32
+copies of the stream with `vector_norm`, about 1e-7 relative. `fused` uses `F.rms_norm`
+and the fused residual write, about 5e-3 in bf16 -- roughly one ulp.
+
+Two facts about that 5e-3 are easy to get backwards. It is a bf16 artifact: in fp32 the
+fused path matches `exact` outright. And it is zero while `branch_gain_delta` is still
+zero, because the gain is then exactly 1.0 and multiplying by it rounds nothing -- the
+modes separate only as the gain trains, so a short run understates the difference.
+
+Validated against it directly. Two arms at 3:1 with blend on, 2,000 steps and 131M tokens,
+differing only in norm mode:
+
+| step | `exact` | `fused` | delta |
+| ---: | ---: | ---: | ---: |
+| 0 | 9.1287 | 9.1286 | -0.0000 |
+| 500 | 2.6359 | 2.6348 | -0.0012 |
+| 1000 | 2.1640 | 2.1633 | -0.0007 |
+| 1500 | 1.9676 | 1.9675 | -0.0002 |
+| 1999 | 1.8555 | 1.8567 | +0.0012 |
+
+0.0012 nats apart at the end, with the sign changing across the run and `fused` ahead at
+three of five points. That is a thirty-fourth of what blend itself is worth, for 15.5%
+more throughput -- 51,621 against 44,731 tokens per second, against a predicted 15.4%.
+Copy gain matches to 0.003.
+
+Two limits on that result. Both arms used the branchwise write, because they launched
+before it was fused, so this validates the norm and not the write. And 2,000 steps is
+short for a difference that only appears as the gain trains.
