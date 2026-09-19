@@ -231,7 +231,34 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         return -(-self.local_window // self.block_size)
 
-    def route(self, hidden_states, index_keys):
+    def _project(self, hidden_states):
+        """Every projection that reads the stream, in one multiply.
+
+        A Full layer runs four of them -- the query, the latent, the index keys and the
+        index queries -- and three are narrow: 144, 64 and 256 outputs against the
+        query's 1024, on a 512-wide input. Each therefore spends most of its time reading
+        the same `[batch, tokens, hidden]` tensor, so reading it once and splitting the
+        result is strictly less work.
+
+        The modules stay and keep their own weights, so checkpoints and the
+        parameterization are unchanged; only the multiply is shared. Concatenating the
+        weights costs a copy of the weights, which are four orders of magnitude smaller
+        than the activations they are multiplied against.
+        """
+        modules = [self.q_proj]
+        if self.mode == "full":
+            modules += [self.kv_a_proj, self.index_k_proj]
+        if self.mode in ("full", "reindex"):
+            modules.append(self.index_q_proj)
+        if len(modules) == 1:
+            return (self.q_proj(hidden_states),)
+        weight = torch.cat([module.weight for module in modules], dim=0)
+        bias = (torch.cat([module.bias for module in modules], dim=0)
+                if modules[0].bias is not None else None)
+        fused = torch.nn.functional.linear(hidden_states, weight, bias)
+        return fused.split([module.out_features for module in modules], dim=-1)
+
+    def route(self, hidden_states, index_keys, queries=None):
         """``(allowed, effective)``: the hard block selection, and the query behind it.
 
         ``allowed`` is ``[batch, q_blocks, kv_blocks]`` booleans -- what the kernel skips
@@ -253,8 +280,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         batch, seq, _ = hidden_states.shape
         blocks = seq // self.block_size
-        queries = self.index_q_proj(hidden_states).view(
-            batch, seq, self.index_heads, self.index_dim)
+        if queries is None:
+            queries = self.index_q_proj(hidden_states)
+        queries = queries.view(batch, seq, self.index_heads, self.index_dim)
         weights = torch.nn.functional.softplus(self.index_weight)
 
         with torch.no_grad():
@@ -374,21 +402,22 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 "builds its layers" % self.layer_idx)
 
         if self.mode == "full":
-            index_keys = self.index_k_proj(hidden_states)
-            compressed = self.kv_a_proj(hidden_states)
+            query, compressed, index_keys, queries = self._project(hidden_states)
             latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
             latent = self.kv_a_norm(latent)
-            allowed, effective = self.route(hidden_states, index_keys)
+            allowed, effective = self.route(hidden_states, index_keys, queries)
             self.bus.index_keys, self.bus.latent = index_keys, latent
             self.bus.rotary, self.bus.topk = rotary, allowed
         elif self.mode == "reindex":
+            query, queries = self._project(hidden_states)
             index_keys = self.bus.require("index_keys", self.layer_idx)
             latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
             rotary = self.bus.require("rotary", self.layer_idx)
             # New routing over borrowed keys: this layer's own view of what matters.
-            allowed, effective = self.route(hidden_states, index_keys)
+            allowed, effective = self.route(hidden_states, index_keys, queries)
             self.bus.topk = allowed
         else:
+            query, = self._project(hidden_states)
             latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
             rotary = self.bus.require("rotary", self.layer_idx)
             allowed = self.bus.require("topk", self.layer_idx)
@@ -396,7 +425,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
 
         self.last_allowed = allowed.detach()
         return self._attend(hidden_states, latent, rotary, self.block_mask(allowed),
-                            effective, index_keys, position_embeddings)
+                            effective, index_keys, position_embeddings, query)
 
     def router_columns(self, effective, index_keys):
         """Extra query and key columns carrying the router's score into the logits.
@@ -419,12 +448,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 normalize(index_keys.float(), dim=-1).to(index_keys.dtype).unsqueeze(1))
 
     def _attend(self, hidden_states, latent, rotary, mask, effective, index_keys,
-                position_embeddings):
+                position_embeddings, projected_query=None):
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self.head_dim)
 
+        if projected_query is None:
+            projected_query = self.q_proj(hidden_states)
         query_states, gate = torch.chunk(
-            self.q_proj(hidden_states).view(*input_shape, -1, self.head_dim * 2), 2, dim=-1)
+            projected_query.view(*input_shape, -1, self.head_dim * 2), 2, dim=-1)
         gate = gate.reshape(*input_shape, -1)
         query_states = self.q_norm(query_states.view(hidden_shape)).transpose(1, 2)
 

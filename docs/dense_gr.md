@@ -549,6 +549,9 @@ Seeds 1 and 2 have not been run.
 
 ## MLA and CSA2, one arm against a matched reference
 
+Both arms ran under `4d2fc4a`, recorded in `a256697`. Later commits fuse projections
+in this path, so a rerun will not reproduce these numbers bit for bit.
+
 Two arms, 8,000 steps and 524.3M scored tokens each, batch 64 at length 1024, ten layers
 of hidden 512 over the Python store at vocabulary 16,384. Same seed, same data order,
 same probe sequences. The reference is the ordinary GQA stack; the hybrid replaces the

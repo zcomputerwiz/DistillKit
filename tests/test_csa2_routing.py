@@ -387,6 +387,34 @@ def test_routing_report_describes_the_last_forward():
     assert collapsed["entropy"] == pytest.approx(0.0), collapsed
 
 
+@pytest.mark.parametrize("mode,pieces", [("full", 4), ("reindex", 2), ("reuse", 1)])
+def test_fused_projection_matches_separate_ones(mode, pieces):
+    """One multiply over the stream must give what four multiplies over it gave.
+
+    A Full layer projects the query, the latent, the index keys and the index queries
+    from the same `[batch, tokens, hidden]` tensor, and three of the four are narrow
+    enough that reading that tensor dominates. Sharing the multiply is only worth doing
+    if the split puts every piece back exactly where it was -- a wrong order or width
+    would train perfectly well and mean something else.
+    """
+    torch.manual_seed(0)
+    layer = bare_layer(mode) if mode != "full" else bare_layer()
+    if mode != "full":
+        layer = Qwen35SparseLatentAttention(csa2_config(), 0, mode)
+    hidden = torch.randn(2, 4 * BLOCK, layer.config.hidden_size)
+
+    projected = layer._project(hidden)
+    assert len(projected) == pieces
+    expected = [layer.q_proj]
+    if mode == "full":
+        expected += [layer.kv_a_proj, layer.index_k_proj]
+    if mode in ("full", "reindex"):
+        expected.append(layer.index_q_proj)
+    for part, module in zip(projected, expected):
+        assert torch.allclose(part, module(hidden), atol=1e-6, rtol=1e-6)
+        assert part.shape[-1] == module.out_features
+
+
 def test_routing_stays_causal_and_sparse():
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=0, csa2_top_k=BLOCK)
