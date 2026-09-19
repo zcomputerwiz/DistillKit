@@ -51,6 +51,35 @@ def tiny_config(**kwargs):
     return config
 
 
+@pytest.mark.parametrize("ratio,interval,full", [("1:1", 2, 5), ("3:1", 4, 2)])
+def test_attention_ratio_places_the_layers(ratio, interval, full):
+    """Both ratios are selectable, and depth buys a different number of full layers.
+
+    `full_attention_interval` counts layers, not attention layers, so the same ten-layer
+    stack has five full-attention layers at 1:1 and two at 3:1. A CSA2 mode list is one
+    entry per full-attention layer, so a pattern written for one ratio needs a different
+    depth at the other.
+    """
+    import sys
+    sys.path.insert(0, "scratch/dense_gr")
+    from benchmark import ATTENTION_RATIOS, build, full_attention_layers
+
+    assert ATTENTION_RATIOS[ratio] == interval
+    config = build(256, 10, 64, ratio=ratio)
+    placed = [i for i, kind in enumerate(config.layer_types) if "linear" not in str(kind)]
+    assert placed == full_attention_layers(10, ratio)
+    assert len(placed) == full
+    # The pattern this project runs needs one entry per full-attention layer, so keeping
+    # five of them at 3:1 means twenty layers rather than ten.
+    assert len(build(256, len(MODES) * interval, 64, ratio=ratio).layer_types) \
+        == len(MODES) * interval
+
+    with pytest.raises(ValueError, match="unknown attention ratio"):
+        build(256, 10, 64, ratio="2:1")
+    with pytest.raises(ValueError, match="at least"):
+        build(256, interval - 1, 64, ratio=ratio)
+
+
 def csa2_config(**kwargs):
     defaults = dict(csa2_enabled=True, csa2_modes=MODES, csa2_top_k=BLOCK,
                     csa2_local_window=8, csa2_block_size=BLOCK, csa2_index_dim=16,

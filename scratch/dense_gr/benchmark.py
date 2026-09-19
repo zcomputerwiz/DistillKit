@@ -77,8 +77,34 @@ CONFIGURATIONS = [
 ]
 
 
-def build(hidden, layers, vocab, head_dim=64, branches=4, interval=2,
+#: Gated-delta-net layers per full-attention layer, as `full_attention_interval`.
+#:
+#: Qwen3-Next ships 3:1 -- three linear layers then one full-attention layer. The arms in
+#: this project have run 1:1 throughout, which buys more attention layers at a given depth
+#: and is why the copy and sidecar numbers are what they are.
+#:
+#: Depth interacts with this. `full_attention_interval` counts *layers*, not attention
+#: layers, so a 10-layer stack has five full-attention layers at 1:1 and two at 3:1. A
+#: CSA2 mode list is one entry per full-attention layer, so the same five-mode pattern
+#: needs 20 layers at 3:1 rather than 10: `layers = len(modes) * ATTENTION_RATIOS[ratio]`.
+ATTENTION_RATIOS = {"1:1": 2, "3:1": 4}
+
+
+def full_attention_layers(layers, ratio):
+    """Which layer indices are full attention, without building the model."""
+    interval = ATTENTION_RATIOS[ratio]
+    return [index for index in range(layers) if (index + 1) % interval == 0]
+
+
+def build(hidden, layers, vocab, head_dim=64, branches=4, ratio="1:1",
           attn_implementation="sdpa"):
+    if ratio not in ATTENTION_RATIOS:
+        raise ValueError("unknown attention ratio %r; expected one of %s"
+                         % (ratio, sorted(ATTENTION_RATIOS)))
+    interval = ATTENTION_RATIOS[ratio]
+    if layers < interval:
+        raise ValueError("ratio %s needs at least %d layers to place one full-attention "
+                         "layer; got %d" % (ratio, interval, layers))
     heads = max(2, hidden // head_dim)
     pairs = int(head_dim * 0.25) // 2
     section = [pairs - 2 * (pairs // 3), pairs // 3, pairs // 3]
@@ -304,6 +330,9 @@ def main() -> int:
     parser.add_argument("--position-budget", type=int, default=4096)
     parser.add_argument("--attn", default="sdpa",
                         choices=("sdpa", "flash_attention_2", "eager"))
+    parser.add_argument("--ratio", default="1:1", choices=sorted(ATTENTION_RATIOS),
+                        help="gated-delta-net layers per full-attention layer; "
+                             "1:1 is what these arms have run, 3:1 is Qwen3-Next's")
     parser.add_argument("--liger", action="store_true",
                         help="swap SwiGLU and RMSNorm for Liger fused kernels")
     parser.add_argument("--compile", action="store_true",
@@ -370,7 +399,8 @@ def main() -> int:
     for label, hidden, layers, vocab in CONFIGURATIONS:
         if args.only and label not in args.only:
             continue
-        config = build(hidden, layers, vocab, attn_implementation=args.attn)
+        config = build(hidden, layers, vocab, ratio=args.ratio,
+                   attn_implementation=args.attn)
         with torch.device("meta"):
             counted = Qwen35WidenedForCausalLM(config)
         total = sum(p.numel() for p in counted.parameters())

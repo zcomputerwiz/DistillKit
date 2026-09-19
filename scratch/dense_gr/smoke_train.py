@@ -44,7 +44,7 @@ metadata.version = _version
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from benchmark import apply_liger, build, shared_gpu_gib  # noqa: E402
+from benchmark import ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib  # noqa: E402
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
@@ -60,6 +60,9 @@ def main() -> int:
     parser.add_argument("--vocab", type=int, default=16_384)
     parser.add_argument("--hidden", type=int, default=512)
     parser.add_argument("--layers", type=int, default=8)
+    parser.add_argument("--ratio", default="1:1", choices=sorted(ATTENTION_RATIOS),
+                        help="gated-delta-net layers per full-attention layer; "
+                             "1:1 is what these arms have run, 3:1 is Qwen3-Next's")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--tokens", type=int, default=30_000_000,
@@ -126,7 +129,7 @@ def main() -> int:
     matches = round_tripped[:2000] == reference[:2000]
     print("round trip on the first 4096 compact tokens: %s" % matches, flush=True)
 
-    config = build(args.hidden, args.layers, args.vocab,
+    config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
                    attn_implementation="flash_attention_2")
     torch.manual_seed(args.seed)
     model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)

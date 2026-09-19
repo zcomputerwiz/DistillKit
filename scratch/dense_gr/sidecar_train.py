@@ -59,7 +59,7 @@ import torch.nn.functional as F  # noqa: E402
 from torch.utils.checkpoint import checkpoint  # noqa: E402
 
 from augmented_head import AugmentedHead  # noqa: E402
-from benchmark import apply_liger, build, shared_gpu_gib  # noqa: E402
+from benchmark import ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.code_classes import HISTORICAL, code_class_of  # noqa: E402
 from distillkit.experimental.structural_sidecar import (  # noqa: E402
@@ -111,6 +111,9 @@ def main() -> int:
     parser.add_argument("--vocab", type=int, default=32_768)
     parser.add_argument("--hidden", type=int, default=512)
     parser.add_argument("--layers", type=int, default=8)
+    parser.add_argument("--ratio", default="1:1", choices=sorted(ATTENTION_RATIOS),
+                        help="gated-delta-net layers per full-attention layer; "
+                             "1:1 is what these arms have run, 3:1 is Qwen3-Next's")
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--steps", type=int, default=8_000)
@@ -163,7 +166,7 @@ def main() -> int:
           % (args.arm, args.seed, json.dumps(tally), structural.numel(), args.vocab),
           flush=True)
 
-    config = build(args.hidden, args.layers, args.vocab,
+    config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
                    attn_implementation="flash_attention_2")
     torch.manual_seed(args.seed)
     if args.resume is not None:
