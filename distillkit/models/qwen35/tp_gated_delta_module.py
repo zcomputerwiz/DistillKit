@@ -114,6 +114,40 @@ class TensorParallelGatedDeltaNet(nn.Module):
         """
         return [list(norm.parameters()) for norm in self.norm]
 
+    def _project(self, rank, local):
+        """Every projection that reads the block input, in one multiply.
+
+        Four of them read the same `[batch, tokens, hidden]` tensor, and two are extreme:
+        `in_proj_b` and `in_proj_a` each read all of it to produce one column per value
+        head -- eight columns at hidden 1024. Sharing the multiply reads it once.
+
+        Measured over 32,768 tokens, forward and backward, with the outputs halved the
+        way column-parallel leaves them: 12.7% at hidden 512, 11.9% at 1024, 8.6% at
+        2048, 5.4% at 4096. The gain shrinks as the model widens, because the read it
+        saves is O(tokens * hidden) against a multiply of O(tokens * hidden * outputs) --
+        so this is worth most exactly where tensor parallelism puts it, on a narrowed
+        GEMM, and worth least on the wide ones. Packing the MLP's two projections
+        measured nothing at any width and is deliberately not done.
+
+        `in_proj_qkv` stays out of it. Its output is the conv's input, and `split` returns
+        a view whose row stride is the packed width, which `causal_conv1d_fn` rejects:
+        "channel last layout requires strides to be multiples of 8". Making it contiguous
+        would copy the widest output here to save a read of a narrower tensor. So the
+        packing is the three whose outputs nothing else constrains, which is two of the
+        three redundant reads.
+
+        The Linears stay the parameters. Concatenating their weights per forward copies a
+        few megabytes a layer against the hundreds it stops re-reading, and it keeps
+        `in_proj_z`, `in_proj_b` and `in_proj_a` exactly where `checkpoint.py` looks for
+        them -- packed parameters would be faster still and would change the checkpoint
+        format for a fraction of a small gain.
+        """
+        parts = (self.in_proj_z[rank], self.in_proj_b[rank], self.in_proj_a[rank])
+        weight = torch.cat([part.weight for part in parts], dim=0)
+        widths = [part.weight.shape[0] for part in parts]
+        return (self.in_proj_qkv[rank](local),
+                *F.linear(local, weight).split(widths, dim=-1))
+
     def forward(self, hidden_states, cache_params=None, attention_mask=None, **kwargs):
         from transformers.models.qwen3_5.modeling_qwen3_5 import (
             apply_mask_to_padding_states,
@@ -134,7 +168,8 @@ class TensorParallelGatedDeltaNet(nn.Module):
         groups = self.num_v_heads // self.num_k_heads
         for rank, device in enumerate(self.devices):
             local = copies[rank]
-            mixed = self.in_proj_qkv[rank](local).transpose(1, 2)
+            mixed, z_all, beta_all, a_all = self._project(rank, local)
+            mixed = mixed.transpose(1, 2)
             mixed = causal_conv1d_fn(
                 mixed,
                 self.conv1d[rank].weight.squeeze(1),
@@ -148,9 +183,9 @@ class TensorParallelGatedDeltaNet(nn.Module):
             key = key.reshape(batch_size, seq_len, -1, self.head_k_dim)
             value = value.reshape(batch_size, seq_len, -1, self.head_v_dim)
 
-            beta = self.in_proj_b[rank](local).sigmoid()
+            beta = beta_all.sigmoid()
             g = -self.A_log[rank].float().exp() * F.softplus(
-                self.in_proj_a[rank](local).float() + self.dt_bias[rank]
+                a_all.float() + self.dt_bias[rank]
             )
             if groups > 1:
                 # After this each rank hands the kernel num_v_heads Q/K/V heads,
@@ -164,7 +199,7 @@ class TensorParallelGatedDeltaNet(nn.Module):
                 initial_state=None, output_final_state=False,
                 use_qk_l2norm_in_kernel=True, cu_seqlens=None,
             )
-            z = self.in_proj_z[rank](local).reshape(-1, self.head_v_dim)
+            z = z_all.reshape(-1, self.head_v_dim)
             core = self.norm[rank](core.reshape(-1, self.head_v_dim), z)
             outputs.append(core.reshape(batch_size, seq_len, -1))
         return self.out_proj(outputs)[0]
