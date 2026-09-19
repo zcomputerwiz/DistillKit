@@ -199,7 +199,9 @@ class TensorParallelAttention(nn.Module):
             q = self.q_norms[index](query.reshape(shape)).transpose(1, 2)
             k = self.k_norms[index](keys[index].view(shape)).transpose(1, 2)
             v = values[index].view(shape).transpose(1, 2)
-            q, k = apply_rotary_pos_emb(q, k, cos.to(device), sin.to(device))
+            q, k = apply_rotary_pos_emb(
+                q, k, cos.to(device, non_blocking=True), sin.to(device, non_blocking=True)
+            )
             if self._can_use_flash_attn(device, q.dtype, attention_mask):
                 # FA2 expects non-transposed (batch, seqlen, heads, head_dim).
                 # FA2 natively supports GQA (heads_per_rank % kv_heads_per_rank == 0)
@@ -220,7 +222,7 @@ class TensorParallelAttention(nn.Module):
                     )
                 else:
                     batch_size, seq_len = q_fa.shape[:2]
-                    mask_dev = (attention_mask != 0).to(device)
+                    mask_dev = (attention_mask != 0).to(device, non_blocking=True)
                     q_unpad, indices_q, cu_seqlens_q, max_seqlen_q, _ = unpad_input(q_fa, mask_dev)
                     k_unpad, _, cu_seqlens_k, max_seqlen_k, _ = unpad_input(k_fa, mask_dev)
                     v_unpad, _, _, _, _ = unpad_input(v_fa, mask_dev)
@@ -245,7 +247,7 @@ class TensorParallelAttention(nn.Module):
                 groups = self.heads_per_rank // self.kv_heads_per_rank
                 attn_mask = None
                 if attention_mask is not None:
-                    attn_mask = attention_mask.to(device)
+                    attn_mask = attention_mask.to(device, non_blocking=True)
                     if attn_mask.ndim == 2:
                         attn_mask = attn_mask[:, None, None, :]
                 attention_output = torch.nn.functional.scaled_dot_product_attention(

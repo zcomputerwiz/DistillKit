@@ -25,6 +25,20 @@ is not there to borrow.
 
 The sharding *specification* is borrowed, from transformers' own ``base_model_tp_plan``
 for this architecture (colwise on q/k/v/gate/up, rowwise on o_proj/down_proj).
+
+**What this costs, before anyone optimizes it.** Measured on the 10-layer 3:1 stack at
+micro-batch 32 and sequence 1024, one micro-step sends 640 MiB across the link at hidden
+512 and 1280 MiB at hidden 1024. At the 46.8 GB/s the link delivers, that is 2.5% and
+2.3% of the step. Deleting the *arithmetic* of every reduction -- keeping the transfers,
+dropping the adds, which is numerically wrong and timing-valid -- moves the step 1.63% at
+hidden 512 and 0.34% at hidden 1024.
+
+So the whole collective is about 4% of a step at hidden 512 and 2.6% at hidden 1024, and
+it shrinks as the model widens, because the payload grows with the hidden size while the
+compute grows with its square. A kernel that read the peer operand over NVLink instead of
+staging it would save one local read of the payload -- a third of the add -- which is the
+0.1-0.5% range, and it would trade the copy engine for the SMs to get it. Optimizing this
+is not where a wider model's time is.
 """
 
 from __future__ import annotations

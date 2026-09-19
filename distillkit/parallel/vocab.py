@@ -62,13 +62,16 @@ class Collect(torch.autograd.Function):
     def forward(ctx, home, *parts):
         ctx.devices = [part.device for part in parts]
         _save_recompute_barrier(ctx, parts[0])
-        return tuple(part if part.device == home else part.to(home) for part in parts)
+        return tuple(
+            part if part.device == home else part.to(home, non_blocking=True)
+            for part in parts
+        )
 
     @staticmethod
     def backward(ctx, *grads):
         _ = ctx.saved_tensors  # Recompute before releasing per-device branches.
         return (None,) + tuple(
-            grad if grad.device == device else grad.to(device)
+            grad if grad.device == device else grad.to(device, non_blocking=True)
             for grad, device in zip(grads, ctx.devices)
         )
 
@@ -127,7 +130,7 @@ class VocabShardedLogits:
             logits = shard.to(torch.float32)
             if scale is not None:
                 logits = logits * scale
-            local = target_ids.to(logits.device) - start
+            local = target_ids.to(logits.device, non_blocking=True) - start
             inside = (local >= 0) & (local < logits.shape[-1])
             pieces.append(torch.logsumexp(logits, dim=-1, keepdim=True))
             pieces.append(logits.gather(-1, local.masked_fill(~inside, 0)) * inside)
@@ -172,7 +175,7 @@ class VocabParallelEmbedding(nn.Module):
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
         parts = []
         for shard, start in zip(self.shards, self.starts):
-            local = input_ids.to(shard.device) - start
+            local = input_ids.to(shard.device, non_blocking=True) - start
             inside = (local >= 0) & (local < shard.shape[0])
             rows = F.embedding(
                 local.masked_fill(~inside, 0), shard,

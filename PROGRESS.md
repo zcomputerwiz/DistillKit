@@ -5435,3 +5435,60 @@ which makes it the most valuable artefact this line has produced.
 .\.venv\Scripts\python.exe -u scratch/native_table/smoke.py --output scratch/native_table/memory-2b.json
 .\.venv\Scripts\python.exe -u scratch/native_table/hash_survey.py --base 131072 --embed-dim 2048 --output scratch/native_table/survey-2b.json
 ```
+
+
+## What the two-card collectives cost
+
+A review proposed replacing the peer copy and add in `distillkit/parallel/collectives.py`
+with a Triton kernel that dereferences the other card's memory directly, on the grounds
+that it would halve the home card's VRAM traffic. The premise is right -- the link is
+NVLink, `nvidia-smi topo -m` reports NV4, four bonded links at 14.062 GB/s each -- and the
+conclusion still does not follow, because VRAM is not what the reduction is waiting on.
+
+Measured at 128 MiB, the size of one layer's payload at hidden 1024 and micro-batch 32:
+
+| | ms | GB/s |
+| --- | ---: | ---: |
+| peer copy alone | 2.672 | 46.8 |
+| local add alone | 0.427 | 900 (VRAM) |
+| copy then add, as the code does it | 3.134 | |
+
+The transfer is 85% of the reduction. A fused kernel cannot remove it; it can only drop
+one local read of the payload, about 0.14 ms, or 4.5% of the reduction.
+
+And the reduction is a small part of a step. Deleting the arithmetic of every reduction --
+transfers kept, adds removed, numerically wrong and timing-valid -- moves the whole step:
+
+| hidden | keep | drop | link payload per micro-step |
+| ---: | ---: | ---: | ---: |
+| 512 | 528.07 ms | 519.47 ms | 640 MiB |
+| 1024 | 1137.73 ms | 1133.87 ms | 1280 MiB |
+
+1.63% and 0.34%, and those are upper bounds on the proposal rather than estimates of it.
+Adding the transfer time at the measured link rate puts the entire collective at 4.1% of a
+step at hidden 512 and 2.6% at hidden 1024 -- falling with width, for the same reason the
+projection packing fell with width: the payload is O(hidden) against compute O(hidden^2).
+
+Two other claims in the review did not survive either. The caching allocator is not
+churning: a copy into a kept buffer and a copy into a fresh allocation measure the same at
+16 and 128 MiB, and an in-place add measures the same as an out-of-place one (0.428 against
+0.427). And `Reduce.forward` cannot accumulate into `shards[0]` in place regardless, since
+that tensor belongs to the caller's graph.
+
+**The one real finding** was the missing `non_blocking=True` on the cross-device copies in
+`vocab.py`, `linear.py`, `blocks.py` and `sync.py` -- the collectives themselves already
+passed it. The stated reason, a host stall, is wrong: host issue time is 0.047 ms either
+way. The actual cost is that the blocking form will not pipeline back-to-back copies, which
+is exactly the shape of `Collect` and of the column-parallel gather:
+
+| payload | blocking | non-blocking |
+| ---: | ---: | ---: |
+| 8 MiB | 0.917 ms | 0.361 ms |
+| 128 MiB | 5.090 ms | 2.638 ms |
+
+Roughly 2x in isolation, and **not measurable end to end** in this model: hidden 1024 moved
+0.06% across four runs whose spread was 0.06%, and hidden 512 moved +2.15% in one pair and
+-4.5% in the next, which is the bench's own spread at that width. The flag is kept because
+it is free and because the collectives were already written that way, not because it showed
+up. It will matter where a payload is large enough to see, which on present evidence is not
+here.

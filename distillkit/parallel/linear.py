@@ -90,7 +90,9 @@ class ColumnParallelLinear(nn.Module):
         if not self.gather_output:
             return outputs
         home = outputs[0].device
-        return torch.cat([out.to(home) for out in outputs], dim=-1)
+        return torch.cat(
+            [out.to(home, non_blocking=True) for out in outputs], dim=-1
+        )
 
 
 class RowParallelLinear(nn.Module):
@@ -129,7 +131,7 @@ class RowParallelLinear(nn.Module):
     def forward(self, parts):
         if isinstance(parts, torch.Tensor):
             parts = list(torch.split(parts, [w.shape[1] for w in self.shards], dim=-1))
-            parts = [p.to(d) for p, d in zip(parts, self.devices)]
+            parts = [p.to(d, non_blocking=True) for p, d in zip(parts, self.devices)]
         partials = [
             nn.functional.linear(part, weight)
             for part, weight in zip(parts, self.shards)
@@ -142,7 +144,7 @@ class RowParallelLinear(nn.Module):
             # Added after the reduction, once: each device holds the same total, so
             # adding it per shard would multiply it by the device count.
             reduced = [
-                out + self.bias.to(out.device) if index else out + self.bias
+                out + self.bias.to(out.device, non_blocking=True) if index else out + self.bias
                 for index, out in enumerate(reduced)
             ]
         return reduced

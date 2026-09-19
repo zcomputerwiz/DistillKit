@@ -64,5 +64,7 @@ def clip_grad_norm(module: nn.Module, max_norm: float):
     for group in groups:
         if group[0].grad is not None:
             for replica in group[1:]:
-                replica.grad.copy_(group[0].grad.to(replica.device))
+                replica.grad.copy_(
+                    group[0].grad.to(replica.device, non_blocking=True)
+                )
     return norm
