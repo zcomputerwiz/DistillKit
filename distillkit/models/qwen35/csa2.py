@@ -57,12 +57,15 @@ is routed as a unit and has no way to represent half of it being absent.
 
 from __future__ import annotations
 
+import math
+
 import torch
 from torch import nn
 
 from .mla import Qwen35LatentAttention
 
-__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes"]
+__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes",
+           "routing_report"]
 
 MODES = ("full", "reindex", "reuse")
 
@@ -108,6 +111,23 @@ def csa2_modes(config, full_attention_layers: int) -> list[str]:
         raise ValueError("the first full-attention layer must be 'full'; it has nothing "
                          "to borrow from")
     return modes
+
+
+def routing_report(model):
+    """Per-layer routing statistics for every CSA2 layer in a model, in layer order.
+
+    Returns an empty list for a model without CSA2, so a caller can record it
+    unconditionally. A run that reports only its loss cannot tell a router that learned
+    to route from one that quietly collapsed onto the blocks it gets for free.
+    """
+    rows = []
+    for module in model.modules():
+        if not isinstance(module, Qwen35SparseLatentAttention):
+            continue
+        statistics = module.routing_statistics()
+        if statistics is not None:
+            rows.append(dict(layer=module.layer_idx, **statistics))
+    return rows
 
 
 class SparseIndexBus:
@@ -157,6 +177,10 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             raise ValueError("unknown csa2 mode %r" % mode)
         self.mode = mode
         self.bus = bus
+        # The last forward's block selection, kept so a run can report whether its router
+        # is still choosing anything. Bool at [batch, blocks, blocks] -- a few kilobytes,
+        # detached, out of the graph.
+        self.last_allowed = None
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -370,6 +394,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             allowed = self.bus.require("topk", self.layer_idx)
             index_keys, effective = None, None
 
+        self.last_allowed = allowed.detach()
         return self._attend(hidden_states, latent, rotary, self.block_mask(allowed),
                             effective, index_keys, position_embeddings)
 
@@ -438,6 +463,51 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1).contiguous()
         attn_output = attn_output * torch.sigmoid(gate)
         return self.o_proj(attn_output), None
+
+    def routing_statistics(self):
+        """What the last forward's routing looked like, or ``None`` if none has run.
+
+        Three numbers, because raw density cannot tell a working router from a dead one:
+        the local window and the diagonal are open regardless of score, so a router that
+        has collapsed onto them still reports a healthy-looking density.
+
+        * ``density`` -- allowed blocks over causally reachable blocks, the sparsity the
+          kernel actually sees.
+        * ``selected`` -- of the blocks top-k was free to choose, the share it chose. Its
+          floor is ``keep / eligible``, and it moves only if different query blocks pick
+          different keys.
+        * ``entropy`` -- Shannon entropy of which key blocks got chosen, over log of the
+          number of eligible keys, so 1.0 is spread evenly and 0.0 is every query block
+          choosing the same key block. This is the collapse detector.
+        """
+        allowed = self.last_allowed
+        if allowed is None:
+            return None
+        blocks = allowed.shape[-1]
+        rows = torch.arange(blocks, device=allowed.device)
+        offsets = rows.view(-1, 1) - rows.view(1, -1)
+        reachable = (offsets >= 0).unsqueeze(0)
+        eligible = (offsets > self.local_blocks).unsqueeze(0)
+
+        chosen = (allowed & eligible).float()
+        histogram = chosen.sum(dim=(0, 1))
+        total = histogram.sum()
+        # Normalized against the key blocks top-k *could* have reached, not against the
+        # ones it did: dividing by the latter scores an even split over two blocks as a
+        # perfect 1.0, which is the collapse this is meant to catch.
+        available = max(2, blocks - self.local_blocks - 1)
+        entropy = 0.0
+        if total > 0:
+            share = histogram[histogram > 0] / total
+            entropy = float(-(share * share.log()).sum() / math.log(available))
+        eligible_total = float(eligible.expand_as(allowed).sum())
+        return {
+            "mode": self.mode,
+            "blocks": blocks,
+            "density": float(allowed.sum()) / float(reachable.expand_as(allowed).sum()),
+            "selected": (float(chosen.sum()) / eligible_total) if eligible_total else 0.0,
+            "entropy": entropy,
+        }
 
     def cached_numbers_per_token(self) -> int:
         """What this layer *would* add to a compressed serving cache.

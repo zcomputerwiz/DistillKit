@@ -344,6 +344,49 @@ def test_block_mask_refuses_to_read_the_future():
     assert bool(dense[rows.view(-1, 1) >= rows.view(1, -1)].all())
 
 
+@cuda
+def test_routing_report_describes_the_last_forward():
+    """Density alone cannot spot a collapsed router, and the entropy has to be honest.
+
+    Two traps this covers. A router that has fallen back onto the local window still
+    reports a healthy density, because the window is open regardless of score -- so
+    `selected` measures only the blocks top-k was free to choose. And entropy normalized
+    by the blocks actually used would score an even split over two blocks as a perfect
+    1.0, which is the collapse it exists to catch, so it is normalized by the blocks
+    available instead.
+    """
+    from distillkit.models.qwen35.csa2 import routing_report
+
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config(csa2_top_k=2 * BLOCK)).cuda()
+    model.eval()
+    assert routing_report(model) == [], "nothing has run yet"
+
+    tokens = torch.randint(0, 64, (4, 8 * BLOCK), device="cuda")
+    with torch.no_grad():
+        model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
+                    use_cache=False)
+    rows = routing_report(model)
+    assert [r["mode"] for r in rows] == MODES
+    for row in rows:
+        assert row["blocks"] == 8
+        assert 0.0 < row["density"] < 1.0, row
+        assert 0.0 < row["selected"] < 1.0, row
+        assert 0.0 < row["entropy"] <= 1.0, row
+
+    # A router pinned to one key block must read as collapsed, not as healthy density.
+    layer = next(m for m in model.modules()
+                 if isinstance(m, Qwen35SparseLatentAttention))
+    pinned = torch.zeros_like(layer.last_allowed)
+    rows_index = torch.arange(pinned.shape[1], device=pinned.device)
+    pinned[:, :, 0] = True
+    pinned |= (rows_index.view(-1, 1) == rows_index.view(1, -1)).unsqueeze(0)
+    layer.last_allowed = pinned & (rows_index.view(-1, 1)
+                                   >= rows_index.view(1, -1)).unsqueeze(0)
+    collapsed = layer.routing_statistics()
+    assert collapsed["entropy"] == pytest.approx(0.0), collapsed
+
+
 def test_routing_stays_causal_and_sparse():
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=0, csa2_top_k=BLOCK)

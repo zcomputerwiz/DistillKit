@@ -49,6 +49,7 @@ from benchmark import (ATTENTION_RATIOS, SpillWatch, apply_liger, build,  # noqa
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
+from distillkit.models.qwen35.csa2 import routing_report  # noqa: E402
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
 
@@ -106,6 +107,10 @@ def main() -> int:
     parser.add_argument("--csa2-local-window", type=int, default=128)
     parser.add_argument("--csa2-block-size", type=int, default=128)
     parser.add_argument("--mla-latent-dim", type=int, default=128)
+    parser.add_argument("--checkpoints", type=Path,
+                        default=Path("scratch/dense_gr/checkpoints-smoke"),
+                        help="root for the end-of-run checkpoint")
+    parser.add_argument("--no-checkpoint", action="store_true")
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
@@ -255,6 +260,14 @@ def main() -> int:
             row = {"step": step, "tokens": seen, "passes": seen / stream.shape[0],
                    "loss": float(loss), "loss_per_original_token": float(loss) * inflation,
                    "tokens_per_second": seen / elapsed}
+            # Read before the probe and the held-out pass. Both run their own forward at
+            # their own sequence length, and the layers keep only the last routing they
+            # computed -- reading after them reports the probe's 512-token routing, where
+            # every block is reachable and the density is trivially 1.00, instead of the
+            # training batch's.
+            routing = routing_report(model)
+            if routing:
+                row["routing"] = routing
             if evaluation is not None and (step % args.evaluate_every == 0
                                            or step == steps - 1):
                 row["heldout"] = evaluate()
@@ -276,6 +289,14 @@ def main() -> int:
             # throughput collapses. Stop on it rather than discovering it in the summary
             # of a run that has already burned hours.
             row["shared_delta_gib"] = spill.drift()
+            # Loss alone cannot tell a router that learned to route from one that
+            # collapsed onto the blocks the local window opens for free.
+            if routing:
+                print("            routing " + "  ".join(
+                    "L%d %s d%.2f s%.2f h%.2f" % (r["layer"], r["mode"][:3],
+                                                  r["density"], r["selected"],
+                                                  r["entropy"]) for r in routing),
+                      flush=True)
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
@@ -283,6 +304,19 @@ def main() -> int:
     report = {
         "vocab": args.vocab, "kept_ids": len(kept), "coverage": coverage,
         "store": str(store), "seed": args.seed,
+        "architecture": {"ratio": args.ratio, "blend": args.blend,
+                         "variant": variant, "hidden": args.hidden,
+                         "layers": args.layers,
+                         "full_attention_layers": [
+                             index for index, kind in enumerate(config.layer_types)
+                             if "linear" not in str(kind)],
+                         "mla": bool(getattr(config, "mla_enabled", False)),
+                         "csa2": bool(getattr(config, "csa2_enabled", False)),
+                         "csa2_modes": list(args.csa2_modes) if args.csa2 else None,
+                         "csa2_top_k": args.csa2_top_k if args.csa2 else None,
+                         "csa2_local_window": (args.csa2_local_window if args.csa2
+                                               else None),
+                         "csa2_block_size": args.csa2_block_size if args.csa2 else None},
         "store_tokens": int(original_tokens), "compact_tokens": int(compact_tokens),
         "round_trip": bool(matches),
         "parameters": int(parameters), "liger": swapped,
@@ -296,6 +330,7 @@ def main() -> int:
         "final_heldout_per_original_token": history[-1].get(
             "heldout_per_original_token"),
         "final_copy": history[-1].get("copy"),
+        "final_routing": history[-1].get("routing"),
         "passes": history[-1]["passes"],
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2 ** 30,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
@@ -304,6 +339,29 @@ def main() -> int:
         "history": history,
     }
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    if not args.no_checkpoint:
+        # Same convention as copy_train: weights, tokenizer and a milestone that
+        # records what produced them, so the checkpoint can answer questions the
+        # report did not think to ask.
+        target = args.checkpoints / ("smoke-%s" % variant)
+        target.mkdir(parents=True, exist_ok=True)
+        model.save_pretrained(target, safe_serialization=True)
+        tokenizer.save_pretrained(target)
+        (target / "milestone.json").write_text(json.dumps({
+            "variant": variant, "seed": args.seed,
+            "architecture": report["architecture"],
+            "scored_tokens": steps * window, "optimizer_steps": steps,
+            "final_loss": report["final_loss"],
+            "final_heldout": report["final_heldout"],
+            "final_copy": report["final_copy"],
+            "final_routing": report["final_routing"],
+            "tokens_per_second": report["tokens_per_second"],
+            "peak_reserved_gib": report["peak_reserved_gib"],
+        }, indent=2), encoding="utf-8")
+        print("CHECKPOINT %s: %d tokens, %d steps, loss %.4f"
+              % (target.name, steps * window, steps, report["final_loss"]),
+              flush=True)
     print("\nloss %.4f -> %.4f over %d tokens at %.0f tok/s, peak %.2f GiB, spill %+.2f GiB"
           % (report["first_loss"], report["final_loss"], report["scored_tokens"],
              report["tokens_per_second"], report["peak_reserved_gib"], spilled),
