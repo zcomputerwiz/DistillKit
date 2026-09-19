@@ -173,6 +173,47 @@ def test_a_from_scratch_run_trains_in_every_cheap_mode(mode):
     assert any(p.grad.abs().sum() > 0 for p in routing)
 
 
+def _written(mode, dtype=torch.float32):
+    torch.manual_seed(1)
+    route = HyperConnection(hidden_size=HIDDEN, num_branches=BRANCHES, lowrank=8,
+                            blend=1.0, norm_mode=mode).to(dtype)
+    generator = torch.Generator().manual_seed(5)
+    states = torch.randn(2, 6, BRANCHES, HIDDEN, generator=generator).to(dtype)
+    output = torch.randn(2, 6, HIDDEN, generator=generator).to(dtype)
+    weights = torch.rand(2, 6, BRANCHES, generator=generator).to(dtype) * 2
+    with torch.no_grad():
+        return route.write(states, output, weights)
+
+
+@pytest.mark.parametrize("mode", ["exact", "fast"])
+def test_the_write_keeps_the_donor_rounding_outside_fused(mode):
+    """Only `fused` gives up the branchwise multiply and add."""
+    assert torch.equal(_written(mode), _written("exact"))
+
+
+def test_the_fused_write_is_the_same_value_to_a_rounding():
+    """`addcmul` may contract to a fused multiply-add, rounding once instead of twice."""
+    for dtype, bound in ((torch.float32, 1e-6), (torch.bfloat16, 1e-2)):
+        reference = _written("exact", dtype).float()
+        fused = _written("fused", dtype).float()
+        relative = ((reference - fused).abs().max() / reference.abs().max()).item()
+        assert relative < bound, (dtype, relative)
+
+
+def test_a_write_with_no_weights_is_untouched_by_the_mode():
+    """blend 0 returns `weights=None`, and that path must not move at all."""
+    torch.manual_seed(0)
+    states = torch.randn(2, 4, BRANCHES, HIDDEN)
+    output = torch.randn(2, 4, HIDDEN)
+    written = set()
+    for mode in HyperConnection.NORM_MODES:
+        route = HyperConnection(hidden_size=HIDDEN, num_branches=BRANCHES, lowrank=8,
+                                norm_mode=mode)
+        with torch.no_grad():
+            written.add(route.write(states, output, None).sum().item())
+    assert len(written) == 1, written
+
+
 def test_recipient_conversion_refuses_an_approximate_norm():
     """The conversion's only claim is that the read *is* the recipient's sublayer."""
     from transformers.models.qwen3_5.modeling_qwen3_5 import Qwen3_5RMSNorm

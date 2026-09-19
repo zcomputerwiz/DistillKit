@@ -396,6 +396,14 @@ deliberately makes the donor inert; use the warmup callback to activate it.
     def write(self, states, output, weights):
         if weights is None:
             return states + output.unsqueeze(-2)
+        if self.norm_mode == "fused":
+            # One broadcast multiply-add over the whole stream instead of a multiply, an
+            # add and a stack per branch. `addcmul` may contract the pair into a fused
+            # multiply-add, which rounds once where the branchwise form rounds twice --
+            # that is the donor's rounding given up, and it is given up only in the mode
+            # that has already given up bit-identity everywhere else. `recipient_initialize`
+            # refuses every mode but `exact`, so no conversion can reach this.
+            return torch.addcmul(states, weights.unsqueeze(-1), output.unsqueeze(-2))
         # Branchwise separate mul/add matches the donor's rounding (addcmul fuses).
         # Only the returned widened stream is materialized, not the product.
         return torch.stack([branch + weight.unsqueeze(-1) * output
