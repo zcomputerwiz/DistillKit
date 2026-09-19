@@ -78,11 +78,25 @@ class _BranchNorm(torch.autograd.Function):
     """
 
     @staticmethod
-    def forward(ctx, x, gain, eps):
+    def forward(ctx, x, gain, eps, fast_variance=False):
         # fp32 is a floor, not the compute type: .float() on a float64 input would
         # silently discard half its mantissa, which gradcheck is entitled to notice.
         compute = torch.promote_types(x.dtype, torch.float32)
-        variance = x.to(compute).pow(2).mean(-1, keepdim=True)
+        if fast_variance:
+            # `x.to(compute).pow(2)` writes two fp32 copies of the input to produce one
+            # reduction -- four times the stream, measured at 256 MiB of transients for a
+            # 64 MiB input, 2.196 ms against 0.277. `vector_norm` accumulates in
+            # `compute` and writes neither copy.
+            #
+            # Off unless asked for, because it is not bit-identical to `Qwen3_5RMSNorm`:
+            # the square root and its undoing cost about 1e-7 relative, four orders below
+            # bf16's own 8e-3. That is irrelevant to a loss and fatal to a conversion --
+            # `recipient_initialize` reproduces a pretrained sublayer *bitwise* through
+            # this same path, so only a model with no donor to reproduce may turn it on.
+            variance = torch.linalg.vector_norm(
+                x, dim=-1, keepdim=True, dtype=compute).pow(2) / x.shape[-1]
+        else:
+            variance = x.to(compute).pow(2).mean(-1, keepdim=True)
         rstd = torch.rsqrt(variance + eps)
         ctx.save_for_backward(x, gain, rstd)
         # bf16 * fp32 promotes inside the multiply kernel, so the cast copy of x that
@@ -115,7 +129,9 @@ class _BranchNorm(torch.autograd.Function):
             leading = tuple(range(grad.ndim - gain.ndim))
             product = grad * x * rstd
             grad_gain = product.sum(dim=leading) if leading else product
-        return grad_x.to(x.dtype), grad_gain, None
+        # Backward reads `rstd` and never the variance, so which way it was computed
+        # reaches here only through the value itself.
+        return grad_x.to(x.dtype), grad_gain, None, None
 
 
 def branch_norm(x, norm, gain_delta):

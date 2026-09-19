@@ -61,6 +61,59 @@ Backward uses FP32 intermediate arithmetic, like our existing branch norm.
         return dx, dz
 
 
+class _GatedProjectMean(torch.autograd.Function):
+    """`_GatedMean` with the up-projection folded in, so its output is never written.
+
+    The gate logits are `W_up(code)`, one `[batch, tokens, branches * hidden]` tensor --
+    268 MB at batch 64 by 1024 -- produced only to be split per branch, consumed
+    immediately, and then held until backward. Projecting one branch at a time inside the
+    loop never forms it: each `[batch, tokens, hidden]` slice is used and dropped, and
+    backward recomputes the slice it needs from `code`, which is `lowrank` wide rather
+    than `branches * hidden`. Across twenty sublayers that is the difference between
+    holding five gigabytes of gate logits and holding none.
+
+    The arithmetic is the same arithmetic. Forward accumulates the bf16 product in fp32,
+    as `_GatedMean` does; backward rounds the logit gradient to the parameter dtype
+    before its matmuls, which is what autograd did to it on the way into `W_up`.
+    """
+
+    @staticmethod
+    def forward(ctx, normalized, code, weight):
+        ctx.save_for_backward(normalized, code, weight)
+        compute = _at_least_fp32(normalized.dtype)
+        width = normalized.shape[-1]
+        result = torch.zeros_like(normalized[..., 0, :], dtype=compute)
+        for index, x in enumerate(normalized.unbind(-2)):
+            rows = weight[index * width:(index + 1) * width]
+            result.add_(x * F.linear(code, rows).sigmoid())
+        return (result / normalized.shape[-2]).to(normalized.dtype)
+
+    @staticmethod
+    @once_differentiable
+    def backward(ctx, grad_output):
+        normalized, code, weight = ctx.saved_tensors
+        compute = _at_least_fp32(normalized.dtype)
+        branches, width = normalized.shape[-2], normalized.shape[-1]
+        grad = grad_output.to(compute) / branches
+        flat_code = code.flatten(0, -2)
+
+        grad_normalized = torch.empty_like(normalized)
+        grad_code = torch.zeros_like(code, dtype=compute)
+        grad_weight = torch.empty_like(weight)
+        for index in range(branches):
+            rows = weight[index * width:(index + 1) * width]
+            gate = F.linear(code, rows).sigmoid().to(compute)
+            grad_normalized[..., index, :] = (grad * gate).to(normalized.dtype)
+            # d/d(logit) of `x * sigmoid(logit)`, rounded to the parameter dtype exactly
+            # where autograd would have rounded it.
+            grad_logit = (grad * normalized[..., index, :] * gate * (1 - gate)
+                          ).to(weight.dtype)
+            grad_code += F.linear(grad_logit, rows.t()).to(compute)
+            grad_weight[index * width:(index + 1) * width] = (
+                grad_logit.flatten(0, -2).t() @ flat_code)
+        return grad_normalized, grad_code.to(code.dtype), grad_weight
+
+
 class HyperConnection(nn.Module):
     """Donor endpoint at blend=1; exact original pre-norm route at blend=0.
 
@@ -73,7 +126,8 @@ Blend is a scheduled FP32 buffer, not an AdamW parameter. Keeping it at zero
 deliberately makes the donor inert; use the warmup callback to activate it.
 """
     def __init__(self, hidden_size, num_branches=4, lowrank=320, layer_idx=0,
-                 blend=0.0, norm_eps=1e-6, learnable_blend=False):
+                 blend=0.0, norm_eps=1e-6, learnable_blend=False,
+                 exact_variance=True):
         super().__init__()
         if min(hidden_size, num_branches, lowrank) < 1 or norm_eps <= 0:
             raise ValueError("routing dimensions and norm_eps must be positive")
@@ -81,6 +135,10 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         self.read_index = layer_idx % num_branches
         self.norm_eps = norm_eps
         self.initial_blend = float(blend)
+        # Exact by default: `recipient_initialize` reproduces a pretrained
+        # sublayer bitwise through this route, and the cheaper variance is off by
+        # about 1e-7. Only a model with no donor to reproduce may turn it off.
+        self.exact_variance = bool(exact_variance)
         self.learnable_blend = bool(learnable_blend)
         # fp32 either way. bfloat16 spacing at 0.10 is 2.44e-4 against an AdamW step of
         # roughly `lr`, so a bf16 blend at a useful initialisation is bit-frozen exactly
@@ -254,9 +312,8 @@ deliberately makes the donor inert; use the warmup callback to activate it.
             [self.W_down.weight, self.W_write.weight], dim=0))
         low, write = projected.split(
             [self.W_down.out_features, self.num_branches], dim=-1)
-        logits = self.W_up(F.silu(low / self.num_branches))
-        donor = _GatedMean.apply(normalized, logits.unflatten(
-            -1, (self.num_branches, self.hidden_size)))
+        code = F.silu(low / self.num_branches)
+        donor = _GatedProjectMean.apply(normalized, code, self.W_up.weight)
         return donor, 2 * torch.sigmoid(write / self.num_branches)
 
     def _normalize(self, states):
@@ -274,7 +331,8 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         """
         gain = self.branch_gain_delta.to(
             torch.promote_types(self.branch_gain_delta.dtype, torch.float32))
-        return _BranchNorm.apply(states, 1.0 + gain, self.norm_eps)
+        return _BranchNorm.apply(states, 1.0 + gain, self.norm_eps,
+                                 not self.exact_variance)
 
     def _donor(self, states, norm):
         """Donor read, donor write weights, and the student's own block input."""
