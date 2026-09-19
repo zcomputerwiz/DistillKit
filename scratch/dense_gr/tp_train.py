@@ -34,15 +34,15 @@ The split is also not free at every shape. Checkpointed at micro-batch 8 it *los
 the launch and the reduction dominating, and checkpointing doubles the forward that pays
 them. Split when the micro-batch is large; do not split a small one.
 
-**A boundary worth knowing before planning around this.** Above hidden 512, sharding the
-gated delta rule across two cards trips an autotuner failure inside `fla`:
-`TypeError: 'NoneType' object is not a mapping`, raised from Triton's `check_disk_cache`
-when a benchmark round records no timings at all. One card at the same size is fine, and
-two cards at hidden 512 are fine, so it is neither the model nor the split as such.
-Setting `TRITON_CACHE_DIR` aside and disabling the autotuning cache do not avoid it.
-Until that is understood, this trainer is proven at hidden 512 and unproven above it --
-which is the opposite of where tensor parallelism is supposed to earn its keep, so it is
-the next thing to fix rather than a footnote.
+**The autotuner race, and why the warm-up step exists.** Sharding used to fail with
+`TypeError: 'NoneType' object is not a mapping` out of Triton's `check_disk_cache`. It is
+not a cache problem and not a size problem, though it impersonated both: Triton's
+`Autotuner` holds the arguments it is benchmarking on the instance, in `self.nargs`, and
+autograd gives each device its own backward thread, so a sharded model puts two threads
+through one module-level autotuner and one clears `nargs` while the other is still
+benchmarking. It only fires on a cold autotune, which is why running the same shape twice
+appeared to cure it. `warm_autotune` runs one step with the extra threads off, and after
+that there is nothing left to race over.
 
     CUDA_VISIBLE_DEVICES=0,1 python scratch/dense_gr/tp_train.py --blend 1.0
 """
@@ -90,6 +90,38 @@ from vocab_remap import build_vocabulary, cached_remap  # noqa: E402
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
+
+
+def warm_autotune(model, home, length, micro):
+    """Run one step single-threaded so Triton's autotuner never races itself.
+
+    `triton.runtime.Autotuner` keeps the arguments it is benchmarking in `self.nargs`, on
+    the instance, and clears them when its `run` returns. Autograd gives each device its
+    own backward thread, so sharding puts two threads through the same module-level
+    autotuner at once: one clears `nargs` while the other is still inside `benchmark()`,
+    which then reads `None` and raises `TypeError: 'NoneType' object is not a mapping`
+    out of Triton's own `check_disk_cache`.
+
+    It only bites on a cold autotune, because a cached config never benchmarks -- which
+    is why it looked intermittent, looked size-dependent, and disappeared whenever the
+    same shape had been run before. Nothing about it is ours to fix upstream from here.
+
+    Turning the extra threads off for exactly one step is enough: after that every kernel
+    this configuration uses has a config in the autotuner's own dictionary, and the
+    threads have nothing left to race over. The alternative, a lock around every launch,
+    would serialize the two cards for the whole run to protect a few seconds of warm-up.
+    """
+    tokens = torch.randint(0, model.config.vocab_size, (micro, length), device=home)
+    torch.autograd.set_multithreading_enabled(False)
+    try:
+        hidden = model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
+                             use_cache=False).last_hidden_state
+        linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
+                             reduction="mean").backward()
+    finally:
+        torch.autograd.set_multithreading_enabled(True)
+        model.zero_grad(set_to_none=True)
+        torch.cuda.synchronize()
 
 
 def shard_bodies(model, devices):
@@ -217,6 +249,9 @@ def main() -> int:
                                     size=args.evaluate_windows)
     evaluation = torch.from_numpy(
         np.stack([held_stream[s:s + args.length] for s in held_starts]).astype(np.int64))
+
+    warm_autotune(model, home, args.length, args.batch // args.accumulate)
+    print("autotune warmed on one thread", flush=True)
 
     parameters = [p for p in model.parameters() if p.requires_grad]
     try:
