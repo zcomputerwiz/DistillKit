@@ -20,6 +20,7 @@ import argparse
 import json
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -210,6 +211,79 @@ def _module_version(name):
         return getattr(importlib.import_module(name), "__version__", "present")
     except Exception:
         return None
+
+
+class SpillWatch:
+    """The spill check, polled off the training thread.
+
+    `shared_gpu_gib` costs 1.81 s per call because it starts a PowerShell process to read
+    a WDDM performance counter. Called from the training loop it lands right after a
+    `torch.cuda.synchronize()`, so nothing is queued for the whole 1.81 s and the GPU
+    sits at exactly 0%: measured at four dips per minute on a 13.5 s report cadence, a
+    tenth of throughput spent reading the same number over and over.
+
+    Here a daemon thread polls it and the loop reads whatever the last poll saw. The
+    reported drift is the *worst* value since the baseline rather than the latest, so a
+    spill that grows and recedes between two reads still trips the guard -- a latest-only
+    reading could miss exactly the excursion the check exists for.
+
+    The thread also owns the verdict, not just the number. It holds the tolerance and
+    sets a flag the moment a poll exceeds it, so the training loop asks a boolean rather
+    than a threshold it has to know -- one definition of "spilled" instead of one per
+    runner, and a breach is recorded when it happens rather than at whatever step the
+    next report falls on. Checking the flag is free, so the loop can ask every step.
+    """
+
+    def __init__(self, interval=30.0, tolerance=0.25):
+        self.interval = float(interval)
+        self.tolerance = float(tolerance)
+        self.baseline = float("nan")
+        self.peak = float("nan")
+        self.latest = float("nan")
+        self.polls = 0
+        self.tripped_at = None
+        self._tripped = threading.Event()
+        self._stop = threading.Event()
+        self._thread = None
+
+    def start(self):
+        """Read the baseline synchronously, then poll in the background."""
+        self.baseline = self.peak = self.latest = shared_gpu_gib()
+        self.polls = 1
+        self._thread = threading.Thread(target=self._poll, name="spill-watch",
+                                        daemon=True)
+        self._thread.start()
+        return self
+
+    def _poll(self):
+        while not self._stop.wait(self.interval):
+            value = shared_gpu_gib()
+            if value != value:  # a failed counter read is not evidence of a spill
+                continue
+            self.latest = value
+            self.polls += 1
+            if not self.peak >= value:
+                self.peak = value
+            if value - self.baseline > self.tolerance and not self._tripped.is_set():
+                # Recorded when it happens. The loop finds out at its next check, but
+                # the value it reports is the breach, not whatever the counter has
+                # settled back to by then.
+                self.tripped_at = value - self.baseline
+                self._tripped.set()
+
+    def breached(self):
+        """Has any poll exceeded the tolerance? Free to call, so call it every step."""
+        return self._tripped.is_set()
+
+    def drift(self):
+        """Worst growth over the baseline seen so far, without blocking."""
+        return self.peak - self.baseline
+
+    def stop(self):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=5.0)
+        return self.drift()
 
 
 def shared_gpu_gib():

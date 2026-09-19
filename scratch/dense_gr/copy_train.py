@@ -27,8 +27,8 @@ import triton_shim  # noqa: F401,E402  resolves triton-windows before CCE reads 
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from benchmark import (ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib,
-                       variant_tag)  # noqa: E402
+from benchmark import (ATTENTION_RATIOS, SpillWatch, apply_liger, build,  # noqa: E402
+                       variant_tag)
 from copy_module import ARMS, Connector, build_inputs, module_output  # noqa: E402
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
@@ -59,6 +59,9 @@ def sha256_of_directory(path: Path) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arm", choices=ARMS, required=True)
+    parser.add_argument("--spill-every", type=float, default=30.0,
+                        help="seconds between background spill checks; the counter\n"
+                             "read costs 1.8 s, so it is polled off the training thread")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--vocab", type=int, default=32_768)
     parser.add_argument("--hidden", type=int, default=512)
@@ -137,7 +140,9 @@ def main() -> int:
         [] if connector is None else list(connector.parameters()))
     optimizer = bnb.optim.AdamW8bit(trainable, lr=args.lr, betas=(0.9, 0.95),
                                     weight_decay=0.1)
-    baseline_shared = shared_gpu_gib()
+    # Polled on a daemon thread: reading it inline costs 1.81 s per report and
+    # leaves the GPU with nothing queued for all of it.
+    spill = SpillWatch(interval=args.spill_every).start()
 
     module_rng = np.random.default_rng(args.seed + 9_000)
 
@@ -210,6 +215,16 @@ def main() -> int:
         loss.backward()
         torch.nn.utils.clip_grad_norm_(trainable, 1.0)
         optimizer.step()
+        if spill.breached():
+            # Set by the watcher thread the moment a poll exceeded the tolerance, so the
+            # step this stops on is the first one after the breach rather than the next
+            # multiple of report_every.
+            args.output.write_text(json.dumps(
+                {"aborted": "spilled to system RAM",
+                 "shared_delta_gib": spill.tripped_at, "arm": args.arm, "seed": args.seed,
+                 "step": step, "history": history}, indent=2), encoding="utf-8")
+            raise SystemExit("spilled %.2f GiB into system RAM at step %d; stopping"
+                             % (spill.tripped_at, step))
 
         if step % args.report_every == 0 or step == args.steps - 1:
             torch.cuda.synchronize()
@@ -232,14 +247,7 @@ def main() -> int:
                      row["tokens_per_second"]), flush=True)
             if "copy" in row:
                 print("            %s" % format_probe(row["copy"]), flush=True)
-            drift = shared_gpu_gib() - baseline_shared
-            if drift > 0.25:
-                args.output.write_text(json.dumps(
-                    {"aborted": "spilled to system RAM", "shared_delta_gib": drift,
-                     "arm": args.arm, "seed": args.seed, "step": step,
-                     "history": history}, indent=2), encoding="utf-8")
-                raise SystemExit("spilled %.2f GiB into system RAM at step %d; stopping"
-                                 % (drift, step))
+            row["shared_delta_gib"] = spill.drift()
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
@@ -275,7 +283,7 @@ def main() -> int:
             "heldout_per_original_token"),
         "endpoint": endpoint,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
-        "shared_delta_gib": shared_gpu_gib() - baseline_shared,
+        "shared_delta_gib": spill.stop(),
         "setup_seconds": train_started - started,
         "history": history,
     }

@@ -44,8 +44,8 @@ metadata.version = _version
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from benchmark import (ATTENTION_RATIOS, apply_liger, build, shared_gpu_gib,
-                       variant_tag)  # noqa: E402
+from benchmark import (ATTENTION_RATIOS, SpillWatch, apply_liger, build,  # noqa: E402
+                       variant_tag)
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
@@ -81,6 +81,9 @@ def main() -> int:
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--report-every", type=int, default=25)
     parser.add_argument("--store", type=Path, default=STORE)
+    parser.add_argument("--spill-every", type=float, default=30.0,
+                        help="seconds between background spill checks; the counter\n"
+                             "read costs 1.8 s, so it is polled off the training thread")
     parser.add_argument("--seed", type=int, default=0,
                         help="seeds model init and the data order. The probe is seeded "
                              "separately and identically for every run, so arms and "
@@ -90,10 +93,25 @@ def main() -> int:
     parser.add_argument("--probe-half", type=int, default=256,
                         help="tokens in the block that gets repeated")
     parser.add_argument("--probe-windows", type=int, default=64)
+    parser.add_argument("--mla", action="store_true",
+                        help="replace the full-attention layers' key/value side with a "
+                             "compressed latent")
+    parser.add_argument("--csa2", action="store_true",
+                        help="route the latent attention through Full/Reindex/Reuse "
+                             "modes; requires --mla")
+    parser.add_argument("--csa2-modes", nargs="+",
+                        default=["full", "reuse", "full", "reindex", "reuse"],
+                        help="one mode per full-attention layer")
+    parser.add_argument("--csa2-top-k", type=int, default=256)
+    parser.add_argument("--csa2-local-window", type=int, default=128)
+    parser.add_argument("--csa2-block-size", type=int, default=128)
+    parser.add_argument("--mla-latent-dim", type=int, default=128)
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
     variant = variant_tag(args.ratio, args.blend)
+    if args.mla:
+        variant += "-csa2" if args.csa2 else "-mla"
     if args.output == Path("scratch/dense_gr/smoke-train.json"):
         args.output = Path("scratch/dense_gr/smoke-train-%s.json" % variant)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -140,6 +158,15 @@ def main() -> int:
     config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
                    blend=args.blend,
                    attn_implementation="flash_attention_2")
+    if args.mla:
+        config.mla_enabled = True
+        config.mla_latent_dim = args.mla_latent_dim
+    if args.csa2:
+        config.csa2_enabled = True
+        config.csa2_modes = list(args.csa2_modes)
+        config.csa2_top_k = args.csa2_top_k
+        config.csa2_local_window = args.csa2_local_window
+        config.csa2_block_size = args.csa2_block_size
     torch.manual_seed(args.seed)
     model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
     model.train()
@@ -151,7 +178,9 @@ def main() -> int:
     import bitsandbytes as bnb
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=args.lr, betas=(0.9, 0.95),
                                     weight_decay=0.1)
-    baseline_shared = shared_gpu_gib()
+    # Polled on a daemon thread: reading it inline costs 1.81 s per report and
+    # leaves the GPU with nothing queued for all of it.
+    spill = SpillWatch(interval=args.spill_every).start()
 
     # Held-out: the calibration split shares no repository with train, so this measures
     # generalization rather than how much of the corpus has been memorized -- which is
@@ -209,6 +238,16 @@ def main() -> int:
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
+        if spill.breached():
+            # Set by the watcher thread the moment a poll exceeded the tolerance, so the
+            # step this stops on is the first one after the breach rather than the next
+            # multiple of report_every.
+            args.output.write_text(json.dumps(
+                {"aborted": "spilled to system RAM",
+                 "shared_delta_gib": spill.tripped_at, 
+                 "step": step, "history": history}, indent=2), encoding="utf-8")
+            raise SystemExit("spilled %.2f GiB into system RAM at step %d; stopping"
+                             % (spill.tripped_at, step))
         if step % args.report_every == 0 or step == steps - 1:
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - train_started
@@ -236,18 +275,11 @@ def main() -> int:
             # raising OOM, so a spilled run keeps reporting 100% GPU utilization while
             # throughput collapses. Stop on it rather than discovering it in the summary
             # of a run that has already burned hours.
-            drift = shared_gpu_gib() - baseline_shared
-            row["shared_delta_gib"] = drift
-            if drift > 0.25:
-                args.output.write_text(json.dumps(
-                    {"aborted": "spilled to system RAM", "shared_delta_gib": drift,
-                     "step": step, "history": history}, indent=2), encoding="utf-8")
-                raise SystemExit(
-                    "spilled %.2f GiB into system RAM at step %d; stopping" % (drift, step))
+            row["shared_delta_gib"] = spill.drift()
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
-    spilled = shared_gpu_gib() - baseline_shared
+    spilled = spill.stop()
     report = {
         "vocab": args.vocab, "kept_ids": len(kept), "coverage": coverage,
         "store": str(store), "seed": args.seed,
