@@ -342,11 +342,30 @@ deliberately makes the donor inert; use the warmup callback to activate it.
         if not math.isfinite(value) or not 0 <= value <= 1:
             raise ValueError("hyper-connection blend must be finite and in [0, 1]")
         self.blend.fill_(value)
+        self._blend = value
+
+    def _load_from_state_dict(self, state_dict, prefix, *args, **kwargs):
+        super()._load_from_state_dict(state_dict, prefix, *args, **kwargs)
+        if not self.learnable_blend:
+            self._blend = float(self.blend)
 
     def read(self, states, norm):
         if self.learnable_blend:
             return self._read_learned(states, norm)
-        alpha = float(self.blend)
+        # Reading the buffer is a `Tensor.item()`, which Dynamo cannot trace, so every
+        # read broke the graph -- two per layer, forty-eight in this stack, enough to stop
+        # a decode step being captured at all. A fixed blend picks between three shapes of
+        # arithmetic rather than scaling one, so it has to be a Python value.
+        #
+        # Outside a trace the buffer is still the truth and is read every time, so nothing
+        # that writes it can go unnoticed -- `set_blend`, a state dict load, and the
+        # consolidated loader that copies buffers directly all stay exact. Inside a trace
+        # the copy stands in, and Dynamo guards on it. The gap is a direct write to the
+        # buffer followed by a compiled call with no eager call between them, which no
+        # path here does.
+        if not torch.compiler.is_compiling():
+            self._blend = float(self.blend)
+        alpha = self._blend
         if alpha == 0:
             # Skip donor arithmetic entirely: even poisoned donor weights cannot
             # spoil identity via 0*NaN. Use the original norm's exact operations.

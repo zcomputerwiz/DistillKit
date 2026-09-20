@@ -767,6 +767,23 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             cos, sin = position_embeddings
             query_states, _ = apply_rotary_pos_emb(query_states, query_states, cos, sin)
 
+        # Read the latent where it stands rather than expanding it. The up-projection is
+        # linear, so `q . (W_k c) = (W_k^T q) . c` and `sum_s a_s (W_v c_s) = W_v sum_s
+        # a_s c_s`: the query moves into latent space once and the aggregate expands once,
+        # and the cached history is never widened at all. A content key norm would put a
+        # per-token scale between the two and there would be no such identity, which is
+        # the other reason that norm is gone.
+        #
+        # It is a decode trade, not a free one. Expanding costs `kv * latent * heads *
+        # (content + head_dim)` once; absorbing costs `heads * seq * content * latent` and
+        # then carries `latent` rather than `head_dim` through the score. Past roughly 670
+        # query tokens at this geometry the expansion is cheaper, and a prefill reads
+        # exactly as many keys as it has queries -- so `seq < kv_len` is both the test and
+        # the meaning: some of this history was written by an earlier call.
+        if self.k_norm is None and seq < kv_len:
+            return self._attend_absorbed(latent, rotary, query_states, gate, allowed,
+                                         effective, index_keys, batch, seq, kv_len)
+
         projected = self.kv_b_proj(latent).view(
             batch, kv_len, self.num_heads, self.content_dim + self.head_dim)
         content_key, value_states = torch.split(
@@ -789,6 +806,44 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         mask = mask.masked_fill(~allowed, float("-inf")).unsqueeze(1)
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states, key_states, value_states, attn_mask=mask, scale=self.scaling)
+        attn_output = attn_output.transpose(1, 2).reshape(batch, seq, -1).contiguous()
+        return self.o_proj(attn_output * torch.sigmoid(gate)), None
+
+    def _attend_absorbed(self, latent, rotary, query_states, gate, allowed, effective,
+                         index_keys, batch, seq, kv_len):
+        """Attention read against the cached latent, with the up-projection folded in.
+
+        The same function as the expanding path, by an identity rather than by
+        approximation, so the two agree to arithmetic noise. The score splits the way the
+        key does -- a rotary slice shared by every head and a content half that reaches
+        the latent through `W_k` -- and the aggregate comes back out through `W_v`.
+
+        This is what makes the measured cache saving a serving saving. Without it the
+        up-projection runs over the whole cached history at every step: at 32K that is a
+        384 to 3584 matrix multiply over 32,768 tokens per layer per token generated, and
+        it costs more than the memory the compression saved.
+        """
+        weight = self.kv_b_proj.weight.view(
+            self.num_heads, self.content_dim + self.head_dim, self.latent)
+        w_key, w_value = weight[:, :self.content_dim], weight[:, self.content_dim:]
+
+        query_rope = query_states[..., :self.rope_dim]
+        query_content = query_states[..., self.rope_dim:]
+        absorbed = torch.einsum("bhqc,hcl->bhql", query_content.float(), w_key.float())
+        scores = (torch.einsum("bhql,bkl->bhqk", absorbed, latent.float())
+                  + torch.einsum("bhqr,bkr->bhqk", query_rope.float(), rotary.float()))
+        if effective is not None:
+            # The router's columns are a rank-`index_dim` term in the same logits, and
+            # they carry their own 1/scaling, so they join before the scale like the rest.
+            query_extra, key_extra = self.router_columns(effective, index_keys)
+            scores = scores + torch.einsum(
+                "bxqi,bxki->bqk", query_extra.float(), key_extra.float()).unsqueeze(1)
+        scores = scores * self.scaling
+        scores = scores.masked_fill(~allowed.unsqueeze(1), float("-inf"))
+
+        probabilities = scores.softmax(-1).to(latent.dtype)
+        aggregate = torch.einsum("bhqk,bkl->bhql", probabilities, latent)
+        attn_output = torch.einsum("bhql,hvl->bhqv", aggregate, w_value)
         attn_output = attn_output.transpose(1, 2).reshape(batch, seq, -1).contiguous()
         return self.o_proj(attn_output * torch.sigmoid(gate)), None
 

@@ -672,6 +672,52 @@ def test_decoding_through_the_cache_matches_one_whole_forward():
         "worst position differs by %.5f" % (decoded - reference).abs().max()
 
 
+def test_absorbing_the_up_projection_computes_the_same_attention():
+    """`q . (W_k c) = (W_k^T q) . c` is an identity, so the two paths must agree.
+
+    Not approximately: the expanding path and the absorbed one are the same function
+    written twice, and anything that breaks the identity -- a norm between the latent and
+    the key, the router's columns dropped, the scale applied in the wrong place -- shows
+    up here and nowhere else, because absorption only runs when a cache is being read and
+    every other test runs whole sequences.
+    """
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).eval()
+    model.config.use_cache = True
+    length = BLOCK + 1
+    tokens = torch.randint(1, 64, (1, length))
+
+    layers = [l.self_attn for l in model.model.layers
+              if isinstance(getattr(l, "self_attn", None), Qwen35SparseLatentAttention)]
+    assert all(a.k_norm is None for a in layers), "absorption needs the key norm gone"
+
+    with torch.no_grad():
+        out = model(input_ids=tokens[:, :-1], use_cache=True)
+        cache = out.past_key_values
+        step = tokens[:, -1:]
+        absorbed = model(input_ids=step, past_key_values=cache,
+                         use_cache=True).logits[:, -1]
+
+    # The same step with absorption refused, by giving the layers a key norm that is the
+    # identity: it changes nothing arithmetically and sends the forward down the other
+    # branch.
+    torch.manual_seed(0)
+    plain = Qwen35WidenedForCausalLM(csa2_config()).eval()
+    plain.load_state_dict(model.state_dict())
+    plain.config.use_cache = True
+    for attention in plain.model.layers:
+        inner = getattr(attention, "self_attn", None)
+        if isinstance(inner, Qwen35SparseLatentAttention):
+            inner.k_norm = torch.nn.Identity()
+    with torch.no_grad():
+        out = plain(input_ids=tokens[:, :-1], use_cache=True)
+        expanded = plain(input_ids=step, past_key_values=out.past_key_values,
+                         use_cache=True).logits[:, -1]
+
+    gap = (absorbed - expanded).abs().max()
+    assert gap < 2e-2, "absorbed and expanded attention differ by %.4g" % gap
+
+
 def test_a_borrowing_layer_writes_no_cache_and_a_full_one_holds_the_index_keys():
     """Where the second halving comes from, asserted on the cache rather than a formula."""
     model = Qwen35WidenedForCausalLM(csa2_config()).eval()
