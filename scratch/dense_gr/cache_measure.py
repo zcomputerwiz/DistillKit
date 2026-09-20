@@ -90,7 +90,11 @@ def main() -> int:
     parser.add_argument("--steps", type=int, default=8)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--dtype", default="bfloat16", choices=["bfloat16", "float32"],
+                        help="a gap that collapses in float32 was precision; one that "
+                             "does not is the cached path disagreeing with the whole one")
     args = parser.parse_args()
+    dtype = getattr(torch, args.dtype)
 
     device = torch.device(args.device)
     stream = open_split(args.store, "heldout", 248320)
@@ -105,7 +109,7 @@ def main() -> int:
     rows = []
     for tag, path in (("source", args.source), ("converted", args.converted)):
         model = Qwen35WidenedForCausalLM.from_pretrained(
-            path, dtype=torch.bfloat16).to(device).eval()
+            path, dtype=dtype).to(device).eval()
         model.config.use_cache = True
         attention = [i for i, k in enumerate(model.config.layer_types)
                      if "linear" not in str(k)]

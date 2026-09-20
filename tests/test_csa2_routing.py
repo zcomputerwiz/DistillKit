@@ -453,6 +453,27 @@ def test_router_columns_carry_a_bounded_cosine():
     assert contributed.abs().max() <= 0.7 + 1e-5
 
 
+def test_the_tile_follows_bytes_rather_than_the_head_alone():
+    """float32 doubles every tile, so the same head that fits in bfloat16 may not.
+
+    The 2B's dense width asked 149568 of 101376 in float32 while the bfloat16 tile for the
+    same shape fit, and nothing in the rule saw it: shared memory holds bytes and the rule
+    was reading elements. The indexer's teacher runs float32, and a self-distillation runs
+    the student's own attention as that teacher, so those layers reach this path.
+    """
+    layer = bare_layer()
+    assert layer._kernel_options(256, 2)["num_stages"] == 3
+    # Same head, twice the bytes: it has to land where the wider bfloat16 head lands.
+    assert layer._kernel_options(256, 4) == layer._kernel_options(320, 2)
+    # And the widest case steps down again rather than reusing a tile that cannot fit.
+    assert layer._kernel_options(320, 4)["BLOCK_N"] == 16
+    for element_size in (2, 4):
+        for width in (256, 320):
+            options = layer._kernel_options(width, element_size)
+            assert layer.block_size % options["BLOCK_M"] == 0
+            assert layer.block_size % options["BLOCK_N"] == 0
+
+
 @pytest.mark.parametrize("width,stages", [(256, 3), (320, 1)])
 def test_kernel_tiles_are_chosen_rather_than_left_to_inductor(width, stages):
     """Inductor will not pick a tile that fits, so the tile has to be picked here.
@@ -566,19 +587,89 @@ def test_bus_lives_on_the_model_not_the_config():
     config.to_json_string()
 
 
-def test_ragged_length_and_cache_are_refused():
-    """Both mis-route in silence: a short tail is dropped, a decode step routes nothing."""
+@pytest.mark.parametrize("length", [1, BLOCK + 1, BLOCK])
+def test_shapes_the_block_kernel_cannot_take_route_per_token(length):
+    """A ragged length and a decode step are ordinary cases, not refusals.
+
+    They used to raise, because a ``BlockMask`` groups queries as well as keys: a
+    one-token step computes zero query blocks and a ragged one loses its tail. The
+    reference groups only the key axis and takes its top-k per query token, so both are
+    shapes it simply routes. `_blocked` picks the path, and the kernel keeps the whole
+    query blocks it needs.
+    """
     layer = bare_layer()
-    layer.bus = object()
-    hidden = torch.randn(1, BLOCK + 1, layer.config.hidden_size)
-    with pytest.raises(ValueError, match="multiple of csa2_block_size"):
-        layer.forward(hidden, position_embeddings=None)
-    with pytest.raises(ValueError, match="multiple of csa2_block_size"):
-        layer.forward(torch.randn(1, 1, layer.config.hidden_size),
-                      position_embeddings=None)
-    with pytest.raises(RuntimeError, match="training-only"):
-        layer.forward(torch.randn(1, BLOCK, layer.config.hidden_size),
-                      position_embeddings=None, past_key_values=object())
+    layer.bus = SparseIndexBus()
+    hidden = torch.randn(1, length, layer.config.hidden_size)
+    width = int(layer.head_dim * 0.25)
+    position = (torch.ones(1, length, width), torch.zeros(1, length, width))
+    assert layer._blocked(length, None) is (length == BLOCK)
+    if length == BLOCK:
+        # The blocked path is what already had coverage; running it here would only be
+        # asking CPU Inductor to build a Triton kernel, which needs a compiler this
+        # environment does not have. Which path the shape takes is the claim.
+        return
+    with torch.no_grad():
+        out, _ = layer.forward(hidden, position_embeddings=position)
+    assert out.shape == hidden.shape
+    assert layer.last_token_routed
+    # Selected positions, not blocks: the granularity is the whole point of the path.
+    assert layer.last_allowed.shape == (1, length, length)
+
+
+def test_decoding_through_the_cache_matches_one_whole_forward():
+    """The property the decode path exists for, and the only one that makes it useful.
+
+    A cache that is the right size and the wrong contents shows up nowhere else: every
+    evaluation runs ``use_cache=False``, so nothing else exercises this. The router's
+    logit bias is the easiest thing to drop here -- it is carried by extra query and key
+    columns rather than by the mask -- and dropping it would leave a decoded token quietly
+    disagreeing with the same token read whole.
+    """
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).eval()
+    model.config.use_cache = True
+    # A length the block kernel would not take, so both sides of the comparison run the
+    # gathered path and the cache is the only thing that differs. The blocked path needs
+    # a compiler for CPU Inductor, which is a property of the environment, not the claim.
+    length = BLOCK + 1
+    tokens = torch.randint(1, 64, (1, length))
+
+    with torch.no_grad():
+        whole = model(input_ids=tokens, use_cache=False).logits
+        out = model(input_ids=tokens[:, :-4], use_cache=True)
+        cache, step = out.past_key_values, [out.logits[:, -1]]
+        for index in range(length - 4, length - 1):
+            out = model(input_ids=tokens[:, index:index + 1],
+                        past_key_values=cache, use_cache=True)
+            cache, _ = out.past_key_values, step.append(out.logits[:, -1])
+
+    decoded = torch.cat(step)
+    reference = whole[0, -5:-1]
+    assert decoded.shape == reference.shape
+    assert torch.allclose(decoded, reference, atol=2e-3), \
+        "worst position differs by %.5f" % (decoded - reference).abs().max()
+
+
+def test_a_borrowing_layer_writes_no_cache_and_a_full_one_holds_the_index_keys():
+    """Where the second halving comes from, asserted on the cache rather than a formula."""
+    model = Qwen35WidenedForCausalLM(csa2_config()).eval()
+    model.config.use_cache = True
+    with torch.no_grad():
+        out = model(input_ids=torch.randint(1, 64, (1, BLOCK + 1)), use_cache=True)
+
+    layers = {i: layer.self_attn for i, layer in enumerate(model.model.layers)
+              if isinstance(getattr(layer, "self_attn", None), Qwen35SparseLatentAttention)}
+    full = [i for i, a in layers.items() if a.mode == "full"]
+    borrowing = [i for i, a in layers.items() if a.mode != "full"]
+    assert full and borrowing
+
+    for index in borrowing:
+        assert layers[index].cached_numbers_per_token() == 0
+    owner = layers[full[0]]
+    # The latent and the index keys share the key slot; the rotary slice is the value.
+    keys = out.past_key_values.layers[full[0]].keys
+    assert keys.shape[-1] == owner.latent + owner.index_dim
+    assert owner.cached_numbers_per_token() == owner.latent + owner.rope_dim + owner.index_dim
 
 
 def test_padding_and_gradient_checkpointing_are_refused():

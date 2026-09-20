@@ -222,6 +222,10 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         self.last_allowed = None
         self.last_candidates = None
         self.last_candidate_index = None
+        # Whether the last forward selected positions or blocks. The two paths report the
+        # same three numbers over different units, and reading one as the other would make
+        # a decode step look like a collapsed router.
+        self.last_token_routed = False
         self.dense_routing = False
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
@@ -274,6 +278,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         if mode in ("reindex", "reuse"):
             self.kv_adapt = nn.Linear(self.latent_dim, self.latent_dim, bias=False)
             nn.init.eye_(self.kv_adapt.weight)
+            # `post_init` walks the tree after every module is built and re-initializes
+            # anything it is not told to leave alone, so without this the identity above
+            # is overwritten by a normal draw at `initializer_range` -- diagonal mean
+            # 0.000 where it should be 1.000. The adapter exists to start as "read the
+            # donor's latent unchanged" and learn to differ; starting it random instead
+            # makes the up-projection fitted against it undo a random matrix, which costs
+            # conditioning the fit has no reason to spend.
+            self.kv_adapt.weight._is_hf_initialized = True
             # A borrowing layer never projects its own latent, so the inherited down
             # projection is dead weight -- 73,728 parameters per layer that would ship in
             # every checkpoint and take no gradient.
@@ -581,34 +593,206 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             partial_counts, partial_indices, full_counts, full_indices,
             BLOCK_SIZE=self.block_size, mask_mod=mask_mod)
 
-    def _check_shapes(self, seq, past_key_values):
-        """Refuse the shapes this routing cannot represent, rather than mis-routing them.
+    def _blocked(self, seq, past_key_values):
+        """Whether the block-sparse kernel can take this shape.
 
-        Both are silent otherwise: a sequence that does not divide drops its tail block,
-        and a one-token decode step computes zero blocks and picks nothing at all. Padding
-        is refused one level up, where the raw mask is still visible.
+        FlexAttention's ``BlockMask`` groups queries as well as keys, so it needs whole
+        query blocks: a one-token step computes zero of them and a sequence that does not
+        divide loses its tail. The reference groups only the key axis -- `ggml_pool_2d`
+        over positions with the token count untouched -- and takes its top-k per query
+        token, which is why the same code serves a decode step there. `_forward_gathered`
+        is that shape, and it takes every case this one cannot.
         """
-        if past_key_values is not None:
-            raise RuntimeError(
-                "CSA2 is training-only: routing is defined over blocks of a sequence "
-                "that is present at once, and no layer writes the KV cache. Run with "
-                "use_cache=False; incremental decoding needs a compressed cache and a "
-                "decode-time router that do not exist yet.")
-        if seq < self.block_size or seq % self.block_size:
-            raise ValueError(
-                "CSA2 needs a sequence length that is a positive multiple of "
-                "csa2_block_size %d; got %d. Pad the batch to a multiple before the "
-                "model, not inside it -- padding is not routable here."
-                % (self.block_size, seq))
+        return (past_key_values is None and seq >= self.block_size
+                and seq % self.block_size == 0)
+
+    def _rope_shared(self, rotary, position_embeddings):
+        """Rotate the shared rotary key on its own, so the cache can hold it roped.
+
+        MLA already stores its rotary slice this way: the slice goes in carrying its own
+        position, and replaying it later needs no position bookkeeping. The gathered path
+        relies on that, because at a decode step the only positions it is handed are the
+        new token's.
+        """
+        from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+
+        if position_embeddings is None:
+            return rotary
+        cos, sin = position_embeddings
+        head = rotary.unsqueeze(1)
+        _, rotated = apply_rotary_pos_emb(head, head, cos, sin)
+        return rotated.squeeze(1)
+
+    def _select_tokens(self, index_queries, index_keys, weights, q_positions,
+                       kv_positions):
+        """Which cached positions each query token may read: one decision per token.
+
+        This is the reference's shape and the reason it decodes. `build_lid_top_k` scores
+        `[n_kv, n_tokens]` and takes `ggml_top_k` over *positions*, per query token; the
+        block level is a pre-filter on the key axis that pools with the token count
+        untouched, and it is skipped outright once it cannot bite. Nothing groups the
+        queries, so a step with one of them is an ordinary case.
+
+        ``top_k`` counts tokens here, which is what it says it is. The blocked path floors
+        it to ``top_k // block_size`` blocks because a block is the finest thing a
+        ``BlockMask`` can express -- 2 blocks of 8 for a budget of 256 over a 1024-token
+        window. Selecting positions spends the same budget at the granularity the
+        reference uses.
+        """
+        scores = torch.einsum("bqhd,bkd->bhqk", index_queries.float(), index_keys.float())
+        gain = weights.permute(0, 2, 1).unsqueeze(-1).float()
+        scores = (torch.relu(scores) * gain).sum(dim=1)
+
+        causal = kv_positions.view(1, 1, -1) <= q_positions.view(1, -1, 1)
+        scores = scores.masked_fill(~causal, float("-inf"))
+        keep = max(1, min(self.top_k, index_keys.shape[1]))
+        allowed = torch.zeros_like(scores, dtype=torch.bool)
+        allowed.scatter_(-1, scores.topk(keep, dim=-1).indices, True)
+        # The recent window is not spent out of the top-k budget, the same way the blocked
+        # path forces its local blocks open: a query that cannot see its own immediate
+        # context produces gradients about the router rather than about the architecture.
+        offsets = q_positions.view(1, -1, 1) - kv_positions.view(1, 1, -1)
+        allowed |= (offsets >= 0) & (offsets < max(self.local_window, 1))
+        return allowed & causal
+
+    def _attend_gathered(self, hidden_states, latent, rotary, allowed, effective,
+                         index_keys, position_embeddings, projected_query=None):
+        """Masked attention over the whole cached history, mask decided per query token.
+
+        Every term matches ``_attend``, the router's logit bias included. Leaving that out
+        would make a token read through the cache disagree with the same token read in a
+        whole-sequence forward, which is the one property this path exists to keep.
+
+        The rotary slice and the index keys arrive already rotated, because they come from
+        a cache that was written at their own positions. Only the query is rotated here.
+        """
+        from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+
+        batch, seq, _ = hidden_states.shape
+        kv_len = latent.shape[1]
+        if projected_query is None:
+            projected_query = self.q_proj(hidden_states)
+        query_states, gate = torch.chunk(
+            projected_query.view(batch, seq, -1, self.head_dim * 2), 2, dim=-1)
+        gate = gate.reshape(batch, seq, -1)
+        query_states = self.q_norm(
+            query_states.view(batch, seq, -1, self.head_dim)).transpose(1, 2)
+        if position_embeddings is not None:
+            cos, sin = position_embeddings
+            query_states, _ = apply_rotary_pos_emb(query_states, query_states, cos, sin)
+
+        projected = self.kv_b_proj(latent).view(
+            batch, kv_len, self.num_heads, self.content_dim + self.head_dim)
+        content_key, value_states = torch.split(
+            projected, [self.content_dim, self.head_dim], dim=-1)
+        if self.k_norm is not None:
+            content_key = self.k_norm(content_key)
+        shared = rotary.unsqueeze(1).expand(batch, self.num_heads, kv_len, self.rope_dim)
+        key_states = torch.cat([shared, content_key.transpose(1, 2)], dim=-1)
+        value_states = value_states.transpose(1, 2)
+
+        if effective is not None:
+            query_extra, key_extra = self.router_columns(effective, index_keys)
+            query_states = torch.cat(
+                [query_states, query_extra.expand(-1, self.num_heads, seq, -1)], dim=-1)
+            key_states = torch.cat(
+                [key_states, key_extra.expand(-1, self.num_heads, kv_len, -1)], dim=-1)
+
+        mask = torch.zeros(allowed.shape, dtype=query_states.dtype,
+                           device=query_states.device)
+        mask = mask.masked_fill(~allowed, float("-inf")).unsqueeze(1)
+        attn_output = torch.nn.functional.scaled_dot_product_attention(
+            query_states, key_states, value_states, attn_mask=mask, scale=self.scaling)
+        attn_output = attn_output.transpose(1, 2).reshape(batch, seq, -1).contiguous()
+        return self.o_proj(attn_output * torch.sigmoid(gate)), None
+
+    def _index_queries(self, hidden_states, queries, position_embeddings):
+        """Roped index queries and their per-head weights, for the gathered path."""
+        batch, seq, _ = hidden_states.shape
+        index_queries = queries.view(batch, seq, self.index_heads, self.index_dim)
+        if self.rope_index and position_embeddings is not None:
+            index_queries = self._rope_index(
+                index_queries.transpose(1, 2), position_embeddings).transpose(1, 2)
+        if self.token_head_weights:
+            weights = torch.nn.functional.softplus(self.indexer_proj(hidden_states))
+        else:
+            weights = torch.nn.functional.softplus(self.index_weight)
+            weights = weights.view(1, 1, -1).expand(batch, seq, -1)
+        return index_queries, weights
+
+    def _forward_gathered(self, hidden_states, position_embeddings, past_key_values,
+                          cache_position):
+        """The path that takes a decode step, and any length the block kernel refuses."""
+        batch, seq, _ = hidden_states.shape
+        if self.mode == "full":
+            query, compressed, index_keys, queries = self._project(hidden_states)
+            latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
+            latent = self.kv_a_norm(latent)
+            rotary = self._rope_shared(rotary, position_embeddings)
+            if self.rope_index and position_embeddings is not None:
+                index_keys = self._rope_index(index_keys, position_embeddings)
+            if past_key_values is not None:
+                # One slot holds the latent and the index keys together. They are written
+                # and read at the same positions and cropped by the same rules, and a
+                # second cache beside this one would only be another thing to keep in
+                # step. `cached_numbers_per_token` already counts both.
+                stored, rotary = past_key_values.update(
+                    torch.cat([latent, index_keys], dim=-1).unsqueeze(1),
+                    rotary.unsqueeze(1), self.layer_idx)
+                stored, rotary = stored.squeeze(1), rotary.squeeze(1)
+                latent, index_keys = torch.split(
+                    stored, [self.latent, self.index_dim], dim=-1)
+            self.bus.index_keys, self.bus.latent = index_keys, latent
+            self.bus.rotary = rotary
+        elif self.mode == "reindex":
+            query, queries = self._project(hidden_states)
+            index_keys = self.bus.require("index_keys", self.layer_idx)
+            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
+            rotary = self.bus.require("rotary", self.layer_idx)
+        else:
+            query, = self._project(hidden_states)
+            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
+            rotary = self.bus.require("rotary", self.layer_idx)
+            index_keys, queries = None, None
+
+        kv_len = latent.shape[1]
+        if cache_position is None:
+            cache_position = torch.arange(kv_len - seq, kv_len, device=latent.device)
+        kv_positions = torch.arange(kv_len, device=latent.device)
+
+        if self.mode == "reuse":
+            allowed, effective = self.bus.require("topk", self.layer_idx), None
+        else:
+            index_queries, weights = self._index_queries(
+                hidden_states, queries, position_embeddings)
+            if self.dense_routing:
+                allowed = (kv_positions.view(1, 1, -1)
+                           <= cache_position.view(1, -1, 1)).expand(batch, seq, kv_len)
+                effective = None
+            else:
+                with torch.no_grad():
+                    allowed = self._select_tokens(
+                        index_queries, index_keys, weights, cache_position, kv_positions)
+                effective = (index_queries * weights.unsqueeze(-1)).sum(dim=2)
+            self.bus.topk = allowed
+
+        self.last_allowed = allowed.detach()
+        self.last_token_routed = True
+        self.last_candidates = None
+        return self._attend_gathered(hidden_states, latent, rotary, allowed, effective,
+                                     index_keys, position_embeddings, query)
 
     def forward(self, hidden_states, position_embeddings, attention_mask=None,
                 past_key_values=None, **kwargs):
         batch, seq, _ = hidden_states.shape
-        self._check_shapes(seq, past_key_values)
         if self.bus is None:
             raise RuntimeError(
                 "layer %d has no SparseIndexBus; the text model injects one after it "
                 "builds its layers" % self.layer_idx)
+        if not self._blocked(seq, past_key_values):
+            return self._forward_gathered(hidden_states, position_embeddings,
+                                          past_key_values, kwargs.get("cache_position"))
+        self.last_token_routed = False
 
         if self.mode == "full":
             query, compressed, index_keys, queries = self._project(hidden_states)
@@ -715,15 +899,16 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             key_states = torch.cat(
                 [key_states, key_extra.expand(-1, heads, length, -1)], dim=-1)
 
-        attn_output = _flex()(query_states, key_states, value_states,
-                              block_mask=mask, scale=self.scaling,
-                              kernel_options=self._kernel_options(query_states.shape[-1]))
+        attn_output = _flex()(
+            query_states, key_states, value_states, block_mask=mask, scale=self.scaling,
+            kernel_options=self._kernel_options(query_states.shape[-1],
+                                                query_states.element_size()))
 
         attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1).contiguous()
         attn_output = attn_output * torch.sigmoid(gate)
         return self.o_proj(attn_output), None
 
-    def _kernel_options(self, width):
+    def _kernel_options(self, width, element_size=2):
         """Tile sizes that fit this card's shared memory at this head width.
 
         FlexAttention rounds the key/query head up to a power of two before it allocates
@@ -748,13 +933,28 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         Both defaults are over the limit, including the one at 256, which is the dense
         path and carries no router columns at all. Re-measure the surface with
         `scratch/dense_gr/flex_tiles.py` if the head or the index width changes.
+
+        A tile holds elements and shared memory holds bytes, so float32 doubles every one
+        of these and the same shape that fits in bfloat16 asks 149568. What decides a tile
+        is therefore the rounded head in *bytes*, and `element_size` is a parameter rather
+        than an assumption about the arm's dtype because the indexer's teacher runs
+        float32 -- and a self-distillation runs the student's own attention as that
+        teacher, so those layers reach this in float32 too.
+
+        The bfloat16 rows below are measured. The float32 ones are the same rule read at
+        twice the span, which the byte formula says fits and `flex_tiles.py --dtype
+        float32` is what would confirm.
         """
         # The toy widths land on the tuned entries of that table and fit as they stand.
         # Leaving them alone keeps their timings comparable to what is already measured.
-        if width <= 128:
+        span = (1 << (width - 1).bit_length()) * element_size
+        if span <= 256:
             return None
-        rounded = 1 << (width - 1).bit_length()
-        return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 3 if rounded <= 256 else 1}
+        if span <= 512:
+            return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 3}
+        if span <= 1024:
+            return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 1}
+        return {"BLOCK_M": 16, "BLOCK_N": 16, "num_stages": 1}
 
     def routing_statistics(self):
         """What the last forward's routing looked like, or ``None`` if none has run.
@@ -776,10 +976,17 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         if allowed is None:
             return None
         blocks = allowed.shape[-1]
-        rows = torch.arange(blocks, device=allowed.device)
-        offsets = rows.view(-1, 1) - rows.view(1, -1)
+        # The gathered path selects positions rather than blocks, so the unit the window
+        # is measured in changes with it. Everything below is the same arithmetic over
+        # whichever unit the last forward routed in.
+        near = self.local_window if self.last_token_routed else self.local_blocks
+        columns = torch.arange(blocks, device=allowed.device)
+        query_rows = (columns if not self.last_token_routed
+                      else torch.arange(blocks - allowed.shape[-2], blocks,
+                                        device=allowed.device))
+        offsets = query_rows.view(-1, 1) - columns.view(1, -1)
         reachable = (offsets >= 0).unsqueeze(0)
-        eligible = (offsets > self.local_blocks).unsqueeze(0)
+        eligible = (offsets > near).unsqueeze(0)
 
         chosen = (allowed & eligible).float()
         histogram = chosen.sum(dim=(0, 1))
@@ -787,7 +994,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # Normalized against the key blocks top-k *could* have reached, not against the
         # ones it did: dividing by the latter scores an even split over two blocks as a
         # perfect 1.0, which is the collapse this is meant to catch.
-        available = max(2, blocks - self.local_blocks - 1)
+        available = max(2, blocks - near - 1)
         entropy = 0.0
         if total > 0:
             share = histogram[histogram > 0] / total
@@ -795,6 +1002,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         eligible_total = float(eligible.expand_as(allowed).sum())
         return {
             "mode": self.mode,
+            "unit": "positions" if self.last_token_routed else "blocks",
             "blocks": blocks,
             "density": float(allowed.sum()) / float(reachable.expand_as(allowed).sum()),
             "selected": (float(chosen.sum()) / eligible_total) if eligible_total else 0.0,
@@ -802,11 +1010,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         }
 
     def cached_numbers_per_token(self) -> int:
-        """What this layer *would* add to a compressed serving cache.
+        """What this layer adds to the compressed cache per token.
 
-        Aspirational for this class: CSA2 refuses `past_key_values` outright, so nothing
-        here is cached at all today. The number is what the latent form costs, for
-        comparison against GQA's 256, not a measurement of a cache that exists.
+        A full layer writes the latent and its index keys into one slot and the rotary
+        slice into the other, so it holds all three. A borrowing layer writes nothing: it
+        reads the donor's, which is where the second halving comes from.
         """
         if self.mode != "full":
             return 0

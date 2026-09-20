@@ -5901,3 +5901,79 @@ This applies to MLA alone. CSA2 still refuses past_key_values, so the 4.57x that
 borrowing reaches remains arithmetic. uild_target_config used to force
 use_cache = False on every conversion; it now does so only when CSA2 is present, which
 is what made this measurable.
+
+## CSA2 decodes, and the cache saving is measured
+
+CSA2 refused `past_key_values` outright and refused any length that did not divide
+`csa2_block_size`. Both came from one compromise, and it was FlexAttention's rather than
+the toy's: a `BlockMask` groups queries as well as keys, so a one-token step computes
+zero query blocks and a ragged sequence loses its tail.
+
+The reference does not group queries. In llama.cpp's V4.1 port, `build_lid_top_k` scores
+`[n_kv, n_tokens]` and takes `ggml_top_k` over *positions*, per query token.
+`build_candidate_mask` pools with `ggml_pool_2d(..., block, 1, block, 1, ...)` -- the
+key axis only, token count untouched -- and applies the result as an additive bias before
+the position top-k, not as the selection. The block level is skipped entirely once
+`n_kv % cand_block` or `n_kv/cand_block > cand_topk` fails, which during decode is
+most steps. Their `topk_carry` is this fork's reuse mode and their `cand_carry` is its
+candidate hierarchy; only the query axis differed.
+
+So `_blocked` now picks the path and `_forward_gathered` takes everything the kernel
+cannot. `_select_tokens` selects positions per query token, which also lets `top_k`
+mean tokens as it says it does -- the blocked path floors it to `top_k // block_size`,
+two blocks of eight for a budget of 256 over a 1024-token window, because a block is the
+finest thing a `BlockMask` can express. `_attend_gathered` keeps the router's logit
+bias, since dropping it would leave a decoded token disagreeing with the same token read
+whole. The rotary slice and the index keys are rotated on the way into the cache, the way
+MLA already stored its rotary key, so a decode step needs no position bookkeeping. The
+latent and the index keys share the key slot and the rotary slice takes the value slot.
+
+| model | per token | vs stock | at 262,144 tokens |
+| --- | --- | --- | --- |
+| student-2b-hf | 12.000 KiB | 1.00x | 3.02 GiB |
+| MLA latent 384 | 5.250 KiB | 2.29x | 1.33 GiB |
+| CSA2 all-full | 6.000 KiB | 2.00x | 1.52 GiB |
+| CSA2 full full reuse full reuse reuse | 3.000 KiB | 4.00x | 0.77 GiB |
+
+All measured off the cache object rather than computed. CSA2 all-full is *worse* than MLA
+alone, because a full layer caches its index keys as well as its latent; CSA2 only pays
+for itself through borrowing, where half the layers stop caching at all. The conversion
+used to print `latent + rope` for every mode alike, which is why 2.29x and 4.57x were
+reported here before against a true 2.00x and 4.00x.
+
+The cached path agrees with a whole-sequence forward. In float32 the worst logit differs
+by 0.0067 against the source's own 0.0074; in bfloat16 it is 0.5625 against 0.1875, which
+is accumulation over the borrowed chain rather than a disagreement -- the gap collapses
+with the precision.
+
+Two things this does not do. The gathered path is a masked product, so a ragged prefill
+gives up the block-sparse kernel and pays dense cost; padding to a block multiple keeps
+the fast path. And position selection measures slightly *worse* than block selection at
+the same budget, +0.0199 all-full and +0.0294 borrowing, so serving a model trained on
+blocks costs a little -- the finer instrument is not the better one here.
+
+## Three faults found while measuring it
+
+**A conversion did not reproduce its own checkpoint.** A borrowing model reported 1.6709
+and read back 6.7439. It was not the conversion: 23 of 569 tensors differed from a fresh
+identical run, all inside layers 8 and 9 -- linear-attention layers with no CSA2 in them --
+which is a contiguous region of a file whose tail never reached disk before the machine
+crashed. `convert_full.py` now reloads and rescores every checkpoint it writes, because
+every measurement downstream is taken on the file rather than the object. That does not
+catch damage after the write, which is what happened here.
+
+**`kv_adapt` was random rather than the identity.** `nn.init.eye_` runs in the
+constructor and `post_init` walks the tree afterwards and overwrites it: diagonal mean
+0.000 where identity needs 1.000, off-diagonal standard deviation exactly
+`initializer_range`. Marked `_is_hf_initialized`. It is worth nothing at conversion --
++0.3714 against +0.3680, the wrong way by noise -- because `kv_adapt` and `kv_b_proj`
+compose into one linear map and the fit absorbs whichever adapter it is given. It should
+matter for training, where the adapter is supposed to start at "read the donor unchanged"
+and learn to differ, and that is untested.
+
+**The tile rule counted elements where shared memory counts bytes.** float32 doubles every
+tile, so the 2B's dense width asked 149568 of 101376 while the same shape fit in bfloat16.
+Nothing had hit it because every arm runs bfloat16, but `distill_indexer --self-teacher`
+runs the student's own attention in float32 as its teacher. `_kernel_options` now keys
+on the rounded head in bytes. The bfloat16 rows are measured; the float32 rows are the
+same rule read at twice the span.

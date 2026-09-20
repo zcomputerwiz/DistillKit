@@ -156,12 +156,10 @@ def _record_latent(attention):
 
 def build_target_config(source_config, args):
     config = copy.deepcopy(source_config)
-    # CSA2 routes over blocks of a sequence that is present at once and writes no cache,
-    # so a model carrying it cannot carry a config that asks for one. MLA on its own does
-    # cache -- it stores the latent and the rotary slice, which is the whole point -- so
-    # an MLA-only conversion keeps whatever the source asked for and stays able to decode.
-    if args.csa2_modes:
-        config.use_cache = False
+    # Both stacks cache now. MLA stores the latent and the rotary slice; a CSA2 full layer
+    # adds its index keys and a borrowing one stores nothing at all, reading its donor's.
+    # The conversion used to force `use_cache = False` here because CSA2 refused a cache
+    # outright, which is no longer true of either.
     # A checkpoint trained in this project already names the four-stream route, because
     # its arm was built with one. A stock one does not, and `residual_stream_routing`
     # falls back to "widened" -- which `recipient_initialize` refuses, since there is no
@@ -361,18 +359,37 @@ def main() -> int:
 
     model.eval()
     after = heldout(model, args.store, vocab, args.evaluate, args.length, device)
-    latent_cache = args.mla_latent_dim + rope
-    print("\ncache %d -> %d per token per layer (%.2fx), and a borrowing layer caches none"
+    # Ask the layer rather than reassembling MLA's formula here: a CSA2 full layer also has
+    # to cache its index keys, so it holds `latent + rope + index_dim` and not the
+    # `latent + rope` this used to print for every mode alike.
+    caching = [model.model.layers[i].self_attn.cached_numbers_per_token() for i in full]
+    latent_cache = max(caching)
+    print("\ncache %d -> %d per token per layer (%.2fx); %d of %d layers cache anything"
           % (kv_heads * head_dim * 2, latent_cache,
-             kv_heads * head_dim * 2 / latent_cache))
+             kv_heads * head_dim * 2 / latent_cache,
+             sum(1 for c in caching if c), len(caching)))
     print("heldout  source %.4f  converted %.4f  cost %+.4f"
           % (before, after, after - before))
 
     args.output.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(args.output, safe_serialization=True)
+
+    # Read the model back and score it again. A conversion that reports a number its own
+    # saved checkpoint does not reproduce is worse than one that fails, because every
+    # measurement downstream is taken on the file rather than on the object in memory.
+    del model
+    torch.cuda.empty_cache()
+    reloaded = Qwen35WidenedForCausalLM.from_pretrained(
+        args.output, dtype=torch.bfloat16).to(device).eval()
+    restored = heldout(reloaded, args.store, vocab, args.evaluate, args.length, device)
+    print("reloaded %.4f  %s" % (restored,
+          "matches" if abs(restored - after) < 0.01 else
+          "DOES NOT MATCH the converted model, by %+.4f" % (restored - after)))
+
     (args.output / "conversion.json").write_text(json.dumps({
         "source": str(args.source), "heldout_source": before,
-        "heldout_converted": after, "mla_latent_dim": args.mla_latent_dim,
+        "heldout_converted": after, "heldout_reloaded": restored,
+        "mla_latent_dim": args.mla_latent_dim,
         "csa2_modes": args.csa2_modes, "calibration_tokens": tokens,
         "fits": [{"layer": i, "mode": m, "key_r2": k, "value_r2": v, "rope_r2": r}
                  for i, m, k, v, r in fits],

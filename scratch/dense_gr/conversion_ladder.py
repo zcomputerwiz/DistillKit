@@ -31,7 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import triton_shim  # noqa: F401,E402
 
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
-from distillkit.models.qwen35.csa2 import dense_routing  # noqa: E402
+from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention,  # noqa: E402
+                                           dense_routing)
 
 from convert_full import STORE, heldout  # noqa: E402
 
@@ -58,10 +59,25 @@ def main() -> int:
              model.config.csa2_local_window))
 
     routed = heldout(model, args.store, vocab, args.evaluate, args.length, device)
-    print("\n  routed  %.4f" % routed, flush=True)
+    print("\n  routed   %.4f  blocks, the granularity training saw" % routed, flush=True)
+
+    # The same model read the way it is served. Training selects whole blocks because a
+    # BlockMask cannot express anything finer; a decode step selects positions. Same
+    # budget, finer instrument, different function -- so whether the finer one is actually
+    # better is a measurement rather than an assumption.
+    layers = [l.self_attn for l in model.model.layers
+              if isinstance(getattr(l, "self_attn", None), Qwen35SparseLatentAttention)]
+    for layer in layers:
+        layer._blocked = lambda seq, past, _l=layer: False
+    gathered = heldout(model, args.store, vocab, args.evaluate, args.length, device)
+    print("  gathered %.4f  positions, the granularity serving uses  %+.4f"
+          % (gathered, gathered - routed), flush=True)
+    for layer in layers:
+        del layer._blocked
+
     with dense_routing(model):
         dense = heldout(model, args.store, vocab, args.evaluate, args.length, device)
-    print("  dense   %.4f" % dense, flush=True)
+    print("  dense    %.4f" % dense, flush=True)
     del model
     torch.cuda.empty_cache()
 
