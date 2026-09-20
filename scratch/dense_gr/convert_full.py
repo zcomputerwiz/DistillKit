@@ -156,9 +156,12 @@ def _record_latent(attention):
 
 def build_target_config(source_config, args):
     config = copy.deepcopy(source_config)
-    # CSA2 routes over a whole sequence and writes no cache, so a converted model
-    # cannot carry a config that asks for one.
-    config.use_cache = False
+    # CSA2 routes over blocks of a sequence that is present at once and writes no cache,
+    # so a model carrying it cannot carry a config that asks for one. MLA on its own does
+    # cache -- it stores the latent and the rotary slice, which is the whole point -- so
+    # an MLA-only conversion keeps whatever the source asked for and stays able to decode.
+    if args.csa2_modes:
+        config.use_cache = False
     # A checkpoint trained in this project already names the four-stream route, because
     # its arm was built with one. A stock one does not, and `residual_stream_routing`
     # falls back to "widened" -- which `recipient_initialize` refuses, since there is no

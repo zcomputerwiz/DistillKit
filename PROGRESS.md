@@ -5873,3 +5873,31 @@ readers' halves go in as captured and only `kv_b_proj` needs the per-head interl
 Borrowing now costs +0.1737 over all-full rather than +0.2869, and both gains are had at
 conversion time with nothing trained. The standing choice on this checkpoint is +0.1943 at
 2.29x without borrowing, or +0.3680 at 4.57x with it.
+
+## The cache saving, measured instead of computed
+
+cached_numbers_per_token calls itself aspirational, and every ratio in this document
+came from it. cache_measure.py reads the cache object instead, at two context lengths so
+the slope separates what grows per token from the recurrent state that does not.
+
+| model | per token | fixed state | logit gap |
+| --- | --- | --- | --- |
+| student-2b-hf | 12.000 KiB | 18.84 MiB | 0.2188 |
+| MLA latent 384 | 5.250 KiB | 18.84 MiB | 0.1875 |
+
+2.29x measured, which is what the arithmetic said. 3.02 GiB against 1.33 GiB at the
+architecture's full 262,144-token context, 0.39 against 0.18 at 32,768.
+
+The logit gap is the cached incremental path against one whole-sequence forward over the
+same tokens. The converted model's 0.1875 sits inside the source's own 0.2188, so this is
+bf16 noise rather than a cache that holds the wrong thing -- which was the failure worth
+checking, because every evaluation so far ran with use_cache=False and never exercised
+this path at all.
+
+The fixed state is identical between them, as it has to be: MLA replaces the key and value
+path of the 6 attention layers and does not touch the 18 linear ones.
+
+This applies to MLA alone. CSA2 still refuses past_key_values, so the 4.57x that
+borrowing reaches remains arithmetic. uild_target_config used to force
+use_cache = False on every conversion; it now does so only when CSA2 is present, which
+is what made this measurable.
