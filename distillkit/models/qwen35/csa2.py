@@ -66,7 +66,8 @@ from torch import nn
 from .mla import Qwen35LatentAttention
 
 __all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes", "dense_routing",
-           "isolated_indexer", "router_parameters", "routing_report"]
+           "isolated_indexer", "recorded_attention", "router_parameters",
+           "routing_report"]
 
 MODES = ("full", "reindex", "reuse")
 
@@ -144,6 +145,31 @@ def dense_routing(model):
     finally:
         for module in layers:
             module.dense_routing = False
+
+
+@contextlib.contextmanager
+def recorded_attention(model):
+    """Keep each routing layer's attention distribution, which is the indexer's target.
+
+    DeepSeek trains the indexer to imitate the attention it sits in front of: "to align
+    the indexer outputs with the main attention distribution", by a KL against the
+    per-query distribution summed over heads and normalized to one. That target is the
+    model's own attention, so it costs a forward and no teacher.
+
+    Recording it is not free -- the distribution is `[query, key]` per layer, which is the
+    thing sparse attention exists to avoid materializing -- so it is a context rather than
+    a flag left on. Open it with `dense_routing` to get the distribution the indexer is
+    supposed to predict rather than the one its own selection already shaped.
+    """
+    layers = [m for m in model.modules() if isinstance(m, Qwen35SparseLatentAttention)]
+    for module in layers:
+        module.record_attention = True
+    try:
+        yield model
+    finally:
+        for module in layers:
+            module.record_attention = False
+            module.last_attention = None
 
 
 @contextlib.contextmanager
@@ -306,6 +332,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # DeepSeek's sparse stage trains the indexer from its own KL alone and the model
         # from the language-modeling loss alone. See `isolated_indexer`.
         self.isolated_indexer = False
+        # Set inside `recorded_attention`, which is how the indexer gets its target.
+        self.record_attention = False
+        self.last_attention = None
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -317,6 +346,18 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             raise ValueError("csa2_local_window must not be negative; got %d"
                              % self.local_window)
         self.rope_index = bool(getattr(config, "csa2_rope_index", True))
+        # Whether the index score is added to the attention logits as well as deciding the
+        # selection. It exists because a discrete top-k carries no gradient and the
+        # indexer would otherwise never learn; the reference instead gives the indexer its
+        # own KL against the attention distribution, and adds nothing to the logits.
+        #
+        # Keeping both is worse than either. Measured on the 2B: the warm-up drives the
+        # indexer's cross entropy from 162.3 to 32.3 and the model's held-out loss *up*,
+        # 1.4948 to 1.5117, because every improvement in what the router predicts is also
+        # a change to the logits it is predicting about. The default stays on for
+        # checkpoints trained with it; a model that means to follow the reference's recipe
+        # turns it off and trains the indexer by `indexer_kl.py` instead.
+        self.router_bias = bool(getattr(config, "csa2_router_bias", True))
         # Level one of the hierarchy. The named layer publishes a candidate block set and
         # the layers after it choose positions inside it. -1 leaves the hierarchy off, and
         # a layer only publishes if it routes at all -- a reuse layer has no scores.
@@ -650,6 +691,12 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # Kept beside `last_allowed` rather than returned: every caller of `route` wants
         # the selection and the query, and only the publishing layer has a third thing.
         self.last_candidates = published
+        if not self.router_bias:
+            # Selection only, which is what the reference does. `_attend` appends no
+            # columns for a `None`, so the head stays at `head_dim` -- a power of two,
+            # which Triton does not pad, and the tile that follows from that is measurably
+            # cheaper on both halves.
+            return allowed, None
         effective = (queries * weights.unsqueeze(-1)).sum(dim=2)
         return allowed, effective
 
@@ -721,8 +768,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         token, which is why the same code serves a decode step there. `_forward_gathered`
         is that shape, and it takes every case this one cannot.
         """
-        return (past_key_values is None and seq >= self.block_size
-                and seq % self.block_size == 0)
+        # Recording the attention distribution needs the path that has one. FlexAttention
+        # fuses the softmax away by design -- that is what makes it worth using -- so a
+        # forward that has to hand the indexer its target takes the gathered path instead.
+        return (past_key_values is None and not self.record_attention
+                and seq >= self.block_size and seq % self.block_size == 0)
 
     def _rope_shared(self, rotary, position_embeddings):
         """Rotate the shared rotary key on its own, so the cache can hold it roped.
@@ -836,10 +886,61 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         mask = torch.zeros(allowed.shape, dtype=query_states.dtype,
                            device=query_states.device)
         mask = mask.masked_fill(~allowed, float("-inf")).unsqueeze(1)
+        if self.record_attention:
+            self._record(query_states, key_states, allowed)
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states, key_states, value_states, attn_mask=mask, scale=self.scaling)
         attn_output = attn_output.transpose(1, 2).reshape(batch, seq, -1).contiguous()
         return self.o_proj(attn_output * torch.sigmoid(gate)), None
+
+    def _record(self, query_states, key_states, allowed):
+        """The attention distribution the indexer is asked to predict.
+
+        DeepSeek's target: the per-query distribution over preceding tokens, summed over
+        heads and normalized to one. Summed rather than averaged and then normalized,
+        because what the indexer has to rank is where the attention went in total, not how
+        any single head split it.
+
+        Under `no_grad` and detached. It is a target, and the backward it would otherwise
+        carry would run through the very attention whose selection is being trained.
+        """
+        with torch.no_grad():
+            scores = torch.einsum("bhqd,bhkd->bhqk", query_states.float(),
+                                  key_states.float()) * self.scaling
+            scores = scores.masked_fill(~allowed.unsqueeze(1), float("-inf"))
+            pooled = scores.softmax(-1).sum(1)
+            self.last_attention = (
+                pooled / pooled.sum(-1, keepdim=True).clamp_min(1e-9)).detach()
+
+    def token_scores(self, hidden_states, index_keys, queries=None,
+                     position_embeddings=None, cache_position=None):
+        """The indexer's own scores over positions, with gradient, for its KL.
+
+        `route` reads these under `no_grad` because a selection carries none. Training the
+        indexer reads them directly: the score *is* the thing being fitted, against an
+        attention distribution over the same positions.
+        """
+        batch, seq, _ = hidden_states.shape
+        kv_len = index_keys.shape[1]
+        index_queries, weights = self._index_queries(
+            hidden_states, queries, position_embeddings)
+        scores = torch.einsum("bqhd,bkd->bhqk", index_queries.float(),
+                              index_keys.float())
+        gain = weights.permute(0, 2, 1).unsqueeze(-1).float()
+        # Scaled the way attention scales, and for the same reason: a raw dot product over
+        # this width reaches 123 with a standard deviation of 12, and a softmax over that
+        # is a one-hot on an arbitrary position. The KL then measures the scale rather
+        # than the ranking -- it settled at 21 to 32 nats where a prediction that knows
+        # nothing scores 5.94. Selection is invariant to a positive scale, so this changes
+        # what the objective sees and nothing about what the router does.
+        scores = (torch.relu(scores) * gain).sum(dim=1) * self.index_width ** -0.5
+
+        if cache_position is None:
+            cache_position = torch.arange(kv_len - seq, kv_len,
+                                          device=hidden_states.device)
+        positions = torch.arange(kv_len, device=hidden_states.device)
+        causal = positions.view(1, 1, -1) <= cache_position.view(1, -1, 1)
+        return scores, causal
 
     def _attend_absorbed(self, latent, rotary, query_states, gate, allowed, effective,
                          index_keys, batch, seq, kv_len):
@@ -883,7 +984,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """Roped index queries and their per-head weights, for the gathered path."""
         batch, seq, _ = hidden_states.shape
         if self.isolated_indexer:
-            hidden_states, queries = hidden_states.detach(), queries.detach()
+            hidden_states = hidden_states.detach()
+            queries = None if queries is None else queries.detach()
+        if queries is None:
+            # The fused projection hands these down in a forward. A caller that wants the
+            # scores on their own -- the warm-up's KL, which never runs the attention --
+            # has only the hidden state, and projecting here is what lets `index_q_proj`
+            # take a gradient from that objective.
+            queries = self.index_q_proj(hidden_states)
         index_queries = queries.view(batch, seq, self.index_heads, self.index_width)
         if self.rope_index and position_embeddings is not None:
             # Only the query is rotated now. `_rope_index` turns the trailing slice, which
@@ -948,7 +1056,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 with torch.no_grad():
                     allowed = self._select_tokens(
                         index_queries, index_keys, weights, cache_position, kv_positions)
-                effective = (index_queries * weights.unsqueeze(-1)).sum(dim=2)
+                effective = ((index_queries * weights.unsqueeze(-1)).sum(dim=2)
+                             if self.router_bias else None)
             self.bus.select(self.layer_idx, allowed)
 
         self.last_allowed = allowed.detach()

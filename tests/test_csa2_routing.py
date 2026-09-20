@@ -14,7 +14,8 @@ from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from distillkit.models import Qwen35WidenedForCausalLM
 from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention,
-                                            SparseIndexBus, isolated_indexer,
+                                            SparseIndexBus, dense_routing,
+                                            isolated_indexer, recorded_attention,
                                             router_parameters)
 
 cuda = pytest.mark.skipif(not torch.cuda.is_available(),
@@ -807,6 +808,64 @@ def test_without_isolation_the_indexer_still_takes_the_loss_gradient():
     assert moved, "the router takes no loss gradient even unisolated; the contrast is void"
 
 
+def test_the_attention_target_is_a_distribution_over_reachable_positions():
+    """What `recorded_attention` hands the indexer has to be the thing it can predict.
+
+    DeepSeek aligns the indexer to "the main attention distribution", summed over heads
+    and normalized. If it were not normalized, or leaked onto positions the query cannot
+    reach, the KL would be pulling the router toward something no selection could match.
+    """
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).eval()
+    tokens = torch.randint(1, 64, (1, BLOCK + 1))
+    layers = [l.self_attn for l in model.model.layers
+              if isinstance(getattr(l, "self_attn", None), Qwen35SparseLatentAttention)
+              and l.self_attn.mode != "reuse"]
+
+    with torch.no_grad(), dense_routing(model), recorded_attention(model):
+        model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
+                    use_cache=False)
+        recorded = [attention.last_attention for attention in layers]
+
+    assert all(r is not None for r in recorded), "no layer recorded its attention"
+    for target in recorded:
+        rows = target.sum(-1)
+        assert torch.allclose(rows, torch.ones_like(rows), atol=1e-4)
+        length = target.shape[-1]
+        positions = torch.arange(length)
+        future = positions.view(1, -1) > positions.view(-1, 1)
+        assert float(target.squeeze(0)[future].abs().max()) == 0.0, \
+            "the target puts weight on positions the query cannot reach"
+
+
+@cuda
+def test_the_warm_up_objective_reaches_every_indexer_parameter():
+    """The point of the whole stage: a signal that does not need the logit bias.
+
+    A discrete top-k carries no gradient, which is why this fork folds the index score
+    into the attention logits at all. If the KL cannot move every indexer tensor on its
+    own then removing those columns would leave a router that cannot train, and the
+    reference's two-stage recipe would not port.
+    """
+    import sys
+    sys.path.insert(0, "scratch/dense_gr")
+    from indexer_kl import routing_layers, step
+
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).cuda().float()
+    tokens = torch.randint(1, 64, (1, 2 * BLOCK)).cuda()
+    trained = dict(router_parameters(model))
+    assert trained
+
+    step(model, routing_layers(model), tokens).backward()
+    missing = [name for name, parameter in trained.items()
+               if parameter.grad is None or parameter.grad.abs().sum() == 0]
+    # `index_gate` scales the logit bias and appears in no score, so the KL cannot reach
+    # it -- and does not need to, since the reference has no such scalar.
+    missing = [name for name in missing if "index_gate" not in name]
+    assert not missing, "the KL never reached %s" % missing
+
+
 def test_padding_is_refused():
     """Padding is not representable per block, so it is refused rather than attended.
 
@@ -902,6 +961,7 @@ def test_mla_caches_the_latent_not_the_expanded_heads():
     # head: a bound taken from num_attention_heads would be twice as loose here and
     # would pass a cache that had regressed past the thing it replaces.
     assert width < 2 * config.num_key_value_heads * HEAD_DIM
+
 
 
 

@@ -6157,3 +6157,71 @@ These two are the same lesson pointing opposite ways. A reconstruction share is 
 loss: it said a configuration was best when converting put it fourth, and here it calls a
 collapse catastrophic that costs almost nothing. It is worth computing and never worth
 believing on its own.
+
+## The warm-up works once its loss stops measuring the scale
+
+indexer_kl.py is DeepSeek's dense warm-up: dense attention, everything frozen but the
+indexer, and a KL against the model's own attention distribution summed over heads and
+normalized. ecorded_attention produces that target and 	oken_scores the prediction,
+and the KL reaches every indexer tensor on its own -- which is what makes the reference's
+recipe portable here, since a discrete top-k carries no gradient and the logit fold is the
+only reason this fork's router could ever learn.
+
+It made the model worse. Cross entropy fell from 162 to 32 and held-out rose 1.4948 to
+1.5117 with the router bias on, and 1.4961 to 1.5090 with it off -- so the bias was not
+the conflict, which was worth finding out and was not the answer.
+
+A prediction cannot be much worse than knowing nothing unless something is wrong. Measured
+per layer at initialization:
+
+| layer | target sums to | target entropy | uniform scores | this scored | score max | score std |
+| --- | --- | --- | --- | --- | --- | --- |
+| 3 | 1.0000 | 4.726 | 5.936 | 32.142 | 123.38 | 11.91 |
+| 7 | 1.0000 | 3.325 | 5.936 | 21.628 | 94.34 | 7.11 |
+| 23 | 1.0000 | 3.908 | 5.936 | 26.454 | 102.49 | 9.94 |
+
+The target was right -- it sums to one, it is causal, and its entropy is that of an
+ordinary attention distribution. The scores were the problem: a raw dot product over 128
+dimensions reaching 123 with a standard deviation of 12, fed to a softmax, is a one-hot on
+an arbitrary position, and the loss then measures magnitude rather than ranking. Scaling
+by index_width ** -0.5, the way attention scales, puts initialization at 6.02 to 6.41
+against uniform's 5.936 -- barely worse than knowing nothing, which is what a random
+indexer should score -- and leaves room to descend.
+
+With that fixed the stage does what the reference says it does:
+
+    per-layer cross entropy   6.27 -> 4.15      uniform 5.94, target entropy 3.3 to 4.7
+    heldout                 1.4961 -> 1.4847
+
+Selection is invariant to a positive scale, so this changed what the objective sees and
+nothing about what the router does.
+
+## Selection-only routing is faster, and now it is also better
+
+csa2_router_bias turns off the fold of the index score into the attention logits, which
+is what the reference does -- its indexer selects and nothing else. The fold exists here
+because top-k is discrete; with the warm-up supplying a gradient it is no longer needed.
+
+Decode, compiled, against the same model with the bias on:
+
+| context | selection only | with the bias |
+| --- | --- | --- |
+| 4096 | 8.74 ms | 11.68 ms |
+| 16384 | 10.00 ms | 17.85 ms |
+
+The head is 256 without the columns and 320 with them, and 320 is not a power of two, so
+Triton rounds it to 512 and every tile doubles. That plus the per-layer outer_columns
+work at every step is worth 1.79x at 16K.
+
+Against the unconverted source, converted and warmed:
+
+| context | converted | source |
+| --- | --- | --- |
+| 1024 | 8.30 ms | 8.35 ms |
+| 4096 | 8.69 ms | 10.80 ms |
+| 16384 | 10.16 ms | 20.05 ms |
+
+From 1K to 16K the converted model costs 22% more a token and the source 140% more, at
+2.29x the cache. Held-out is 1.4847 converted and warmed against 1.3029, and the 30M-token
+run took the earlier variant from 1.4972 to 1.3465, so what remains looks like training
+rather than structure -- which is the next experiment and not yet a result.

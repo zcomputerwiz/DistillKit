@@ -183,6 +183,7 @@ def build_target_config(source_config, args):
         config.csa2_top_k = args.csa2_top_k
         config.csa2_local_window = args.csa2_local_window
         config.csa2_block_size = args.csa2_block_size
+        config.csa2_router_bias = not args.no_router_bias
     return config
 
 
@@ -205,6 +206,12 @@ def main() -> int:
                         help="where the teacher and its captured activations live. "
                              "Defaults to --device; a second card keeps the two models "
                              "and the calibration off each other.")
+    parser.add_argument("--no-router-bias", action="store_true",
+                        help="let the indexer decide the selection and nothing else, as "
+                             "the reference does, instead of also adding its score to the "
+                             "attention logits. The logit fold is what gives a discrete "
+                             "top-k a gradient at all, so a model converted this way has "
+                             "to be warmed up by indexer_kl.py or its router never moves.")
     parser.add_argument("--residual-branches", type=int, default=4,
                         help="streams in the gated residual. Every toy arm ran 4; the 2B "
                              "conversions before this flag existed ran 2, because the "
