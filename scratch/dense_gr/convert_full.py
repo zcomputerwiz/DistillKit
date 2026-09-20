@@ -260,6 +260,20 @@ def main() -> int:
     del stock
     torch.cuda.empty_cache()
 
+    # Which layers will read each donor's latent. A borrowing layer reads the most recent
+    # full layer, so a donor's encoder has to summarize its readers' keys and values as
+    # well as its own. Spending the whole rank budget on itself is what leaves a borrower
+    # at 0.93 of its target where a joint fit reaches 0.97, measured by borrow_sweep.py.
+    readers, donor = {}, None
+    for index in full:
+        if getattr(model.model.layers[index].self_attn, "mode", "full") == "full":
+            donor, readers[index] = index, []
+        elif donor is not None:
+            readers[donor].append(index)
+    if any(readers.values()):
+        print("\ndonors and their readers: %s"
+              % ", ".join("%d serves %s" % (d, r) for d, r in readers.items() if r))
+
     print("\n%-7s %-9s %9s %9s %9s"
           % ("layer", "mode", "key r2", "value r2", "rope r2"))
     fits = []
@@ -279,10 +293,18 @@ def main() -> int:
 
         if hasattr(attention, "kv_a_proj"):
             # The encoder is the best rank-`latent` linear summary of everything this
-            # layer's readers want; the rotary rows are a plain least-squares fit.
+            # layer's readers want -- its own keys and values and theirs. Their halves go
+            # in as captured rather than interleaved, because permuting a target's columns
+            # permutes rows of `target.T @ inputs` and leaves the right singular vectors
+            # alone. The rotary rows are a plain least-squares fit.
+            wanted = [target] + [torch.cat(targets[reader][1:3], dim=-1).to(device)
+                                 for reader in readers.get(index, ())]
+            stacked = torch.cat(wanted, dim=-1) if len(wanted) > 1 else target
             whitener = whiten(inputs.T @ inputs)
-            _, _, right = torch.linalg.svd((target.T @ inputs) @ whitener,
+            _, _, right = torch.linalg.svd((stacked.T @ inputs) @ whitener,
                                            full_matrices=False)
+            del wanted, stacked
+            torch.cuda.empty_cache()
             rotary_rows = solve(inputs, rotary)
             with torch.no_grad():
                 attention.kv_a_proj.weight.copy_(torch.cat([

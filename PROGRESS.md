@@ -5818,3 +5818,58 @@ Nothing here is trained. The conversion lands +0.194 above baseline at 2.29x, or
 4.57x, and the goal is to be as good as baseline. Whether the three-phase pipeline recovers
 that is the question these numbers finally make askable.
 
+
+## Where the borrowing layers go, measured rather than profiled
+
+orrow_sweep.py --assign scores a mode assignment by how much of each borrower's target
+it reproduces from its donor's latent. It ranked `full full full reuse reuse reuse`
+first by a wide margin, worst borrower 0.9668 against 0.9332 for the alternating default,
+and reported every donor keeping at least 0.9819 of its own.
+
+Converting all ten three-full assignments says otherwise. Joint encoder throughout, latent
+384, against a source at 1.3029:
+
+| modes | borrowers | donors serve | cost |
+| --- | --- | --- | --- |
+| full full reuse full reuse reuse | 11, 19, 23 | 7:[11], 15:[19,23] | +0.3680 |
+| full reuse full full reuse reuse | 7, 19, 23 | 3:[7], 15:[19,23] | +0.3706 |
+| full reuse full reuse full reuse | 7, 15, 23 | one each | +0.3971 |
+| full full full reuse reuse reuse | 15, 19, 23 | 11:[15,19,23] | +0.4163 |
+| full reuse full reuse reuse full | 7, 15, 19 | 3:[7], 11:[15,19] | +0.4291 |
+| full reuse reuse full full reuse | 7, 11, 23 | 3:[7,11], 19:[23] | +0.4292 |
+| full full reuse reuse full reuse | 11, 15, 23 | 7:[11,15], 19:[23] | +0.4529 |
+| full reuse reuse full reuse full | 7, 11, 19 | 3:[7,11], 15:[19] | +0.4611 |
+| full full reuse reuse reuse full | 11, 15, 19 | 7:[11,15,19] | +0.4794 |
+| full reuse reuse reuse full full | 7, 11, 15 | 3:[7,11,15] | +0.5683 |
+
+Two effects, and the profile could only see one. Deeper borrowers are cheaper, which it
+measured. No donor should serve three readers, which it could not: it scored each borrower
+alone, from the source's own hidden states, so a donor spread three ways and error
+compounding through consecutive borrowing layers are both invisible to it. The winner it
+picked pairs the best borrower depth with the worst donor load, and the two cancel to
+fourth place. It did rank the worst assignment last.
+
+The donor starvation is visible in the plain reconstruction and not in the weighted one.
+Under `full full full reuse reuse reuse`, donor 11 serving three readers falls to key r2
+0.8821 and value 0.7800, from 0.9270 and 0.8596 serving one, while the assignment script
+reported it keeping 0.9819. This is the third proxy in this document to point the wrong
+way, after `key_r2` against the scrambled fit and the router-against-structure split.
+They share a shape: a quantity computed one layer at a time from correct inputs cannot
+represent what the assembled model does.
+
+## Fitting a donor to its readers is worth more than placing them
+
+| conversion | cost | change |
+| --- | --- | --- |
+| alternating, donor fitted to itself alone | +0.4812 | -- |
+| alternating, donor fitted to its readers | +0.3971 | -0.0841 |
+| full full reuse full reuse reuse, joint | +0.3680 | -0.0291 |
+
+convert_full.py now stacks each donor's readers' keys and values into the encoder's
+target. Column order does not reach the result -- permuting a target's columns permutes
+rows of `target.T @ inputs` and leaves the right singular vectors alone -- so the
+readers' halves go in as captured and only `kv_b_proj` needs the per-head interleave.
+
+Borrowing now costs +0.1737 over all-full rather than +0.2869, and both gains are had at
+conversion time with nothing trained. The standing choice on this checkpoint is +0.1943 at
+2.29x without borrowing, or +0.3680 at 4.57x with it.
