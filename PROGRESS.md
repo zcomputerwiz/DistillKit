@@ -6052,3 +6052,108 @@ difference under 1e-4. At 4096 it holds 6.13 GiB against 15.58 for 19% of the th
 which is the trade that buys the regime this architecture is for: at 8192 with block 64
 and a top-k of 64, the router picks 1 block in 128, or 0.78% -- past DeepSeek's 1.56%,
 where at 1024 and block 128 it picks 2 in 8 and has almost nothing to decide.
+
+## Decode was launch-bound, and one .item() was most of it
+
+A decode step took about 100 ms for a 1.9B model in bfloat16 and barely changed between a
+1K and a 16K cache, so nothing that scales with context was dominating. Profiling put
+95 ms of host time against 90 ms of wall across ~11,800 operator dispatches per token. The
+unconverted source measured the same, so it was inherited rather than introduced.
+
+`HyperConnection.read` read its blend with `float(self.blend)`, a `Tensor.item()`
+Dynamo cannot trace, twice per layer and forty-eight times per forward. Every one broke
+the graph. Outside a trace the buffer is still read each time, so `set_blend`, a state
+dict load and the consolidated loader that writes buffers directly all stay exact; inside
+a trace a Python copy stands in and Dynamo guards on it.
+
+With `StaticCache` and `torch.compile(mode="reduce-overhead")`:
+
+| | eager | compiled |
+| --- | --- | --- |
+| converted | 107.56 ms | 9.12 ms |
+| source | 102.99 ms | 10.99 ms |
+
+| context | converted | source |
+| --- | --- | --- |
+| 1024 | 8.49 ms | 8.69 ms |
+| 16384 | 9.35 ms | 20.19 ms |
+
+The converted model spends 10% more per token from 1K to 16K where the source spends
+132% more. That is the first end-to-end serving result here; until now the cache ratios
+were a memory claim only, because both models generated tokens at the same rate and that
+rate was set by dispatch overhead.
+
+Between the break and its fix the same benchmark read 53.69 ms against the source's 11.20
+and looked like a 4.8x architectural regression. It was the fork's own graph break.
+
+## Absorption is what makes decode context-independent
+
+Folding the up-projection into the query -- `q . (W_k c) = (W_k^T q) . c`, and the value
+side the same way -- was measured first against an eager step that was 90% idle and looked
+worthless at 0.86 to 1.09x. Measured against a compiled step:
+
+| context | absorbed | expanded |
+| --- | --- | --- |
+| 4096 | 8.47 ms | 12.56 ms |
+| 16384 | 9.49 ms | 30.07 ms |
+
+Absorbed grows 12% from 4K to 16K; expanded grows 139%. Without absorption the converted
+model is *slower* than its source at 16K, 30.07 against 20.19. It is not a marginal
+optimization, it is the thing that turns the architecture from a regression into a win,
+and the first measurement could not have detected it.
+
+## The indexer reads the latent, and stops being cached
+
+Index keys were a projection of the hidden state, roped on the way in and cached beside
+the latent, which is what made a CSA2 layer hold 512 numbers a token where plain MLA holds
+448 -- more cache for the mechanism that exists to need less. They are now
+`[W_I c ; rotary]`: the content half a projection of the cached latent, the position
+half the decoupled rotary key already there. Nothing extra is stored, only the query is
+rotated, and `index_k_proj` reads 384 wide instead of 2048 and leaves the fused
+projection, which exists to read the hidden state once.
+
+| config | hidden-sourced | latent-sourced | cache |
+| --- | --- | --- | --- |
+| all-full | 1.4972 | 1.4943 | 512 -> 448, 2.00x -> 2.29x |
+| full full reuse full reuse reuse | 1.6743 | 1.6769 | 512 -> 448, 4.00x -> 4.57x |
+
+Both moves are inside noise, so this is the same quality for 12.5% less cache and fewer
+parameters.
+
+## Two proposals tested on the fit, and they disagree
+
+**A borrower's own narrow channel is worth building.** Reading keys and values from the
+donor's latent *and* a width-e encoding of the borrower's own input, against the hardest
+assignment where every borrower reads the first Full layer:
+
+| borrower | e=0 | e=32 | e=64 | e=128 |
+| --- | --- | --- | --- | --- |
+| 7 | 0.6345 | 0.7718 | 0.8402 | 0.9128 |
+| 11 | 0.5297 | 0.7207 | 0.8019 | 0.8941 |
+| 15 | 0.5878 | 0.7192 | 0.7846 | 0.8624 |
+| 19 | 0.7091 | 0.7695 | 0.8116 | 0.8753 |
+| 23 | 0.9257 | 0.9475 | 0.9594 | 0.9756 |
+
+Width 64 lifts the worst borrower from 0.53 to 0.78 and costs 4.57x against 4.00x. Whether
+that reaches the loss is a separate question -- trained borrowing is already only 0.0154
+behind all-full -- but the reconstruction it is supposed to fix does move.
+
+**Preserving both key heads' rotary slices is not.** One shared slice keeps 34% to 63% of
+what two keep, and a best-fit shared vector is no better than the plain mean, so the heads
+are near-orthogonal and there is no single-vector recovery:
+
+| layer | mean | best fitted single | per-head |
+| --- | --- | --- | --- |
+| 3 | 0.5159 | 0.5147 | 0.9975 |
+| 7 | 0.4567 | 0.4557 | 0.9979 |
+| 23 | 0.3375 | 0.3362 | 0.9972 |
+
+Keeping both costs 448 against 512 a token, 1.31 GiB against 1.50 at 262,144. And the
+collapse it repairs measures +0.0361 nats on the source and less than that once trained --
+the whole structure costs +0.0249 after 30M tokens, below the figure the collapse alone
+was supposed to impose. The model loses half of its rotary information and does not care.
+
+These two are the same lesson pointing opposite ways. A reconstruction share is not a
+loss: it said a configuration was best when converting put it fourth, and here it calls a
+collapse catastrophic that costs almost nothing. It is worth computing and never worth
+believing on its own.

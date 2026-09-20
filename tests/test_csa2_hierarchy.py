@@ -11,7 +11,7 @@ pull Inductor into a test that has nothing to say about it.
 import pytest
 import torch
 
-from test_csa2_routing import BLOCK, bare_layer, csa2_config
+from test_csa2_routing import BLOCK, bare_layer, csa2_config, index_keys_for
 
 BLOCKS, BATCH = 6, 1
 SEQ = BLOCKS * BLOCK
@@ -22,7 +22,7 @@ def inputs(layer, seed=0):
     hidden = torch.randn(BATCH, SEQ, layer.config.hidden_size)
     width = int(layer.rope_dim)
     position = (torch.ones(BATCH, SEQ, width), torch.zeros(BATCH, SEQ, width))
-    return hidden, layer.index_k_proj(hidden), layer.index_q_proj(hidden), position
+    return (hidden, index_keys_for(layer, hidden), layer.index_q_proj(hidden), position)
 
 
 def eligible_of(layer):

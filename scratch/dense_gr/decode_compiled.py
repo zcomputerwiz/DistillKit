@@ -38,10 +38,20 @@ from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
 from convert_full import STORE, open_split  # noqa: E402
 
 
-def build(path, device):
+def build(path, device, expand=False):
     model = Qwen35WidenedForCausalLM.from_pretrained(
         path, dtype=torch.bfloat16).to(device).eval()
     model.config.use_cache = True
+    if expand:
+        # Force the expanding path by giving the layers an identity key norm: it changes
+        # no number and absorption refuses to run with a norm between the latent and the
+        # key, because there is no identity to exploit through one.
+        from distillkit.models.qwen35.csa2 import Qwen35SparseLatentAttention
+
+        for layer in model.model.layers:
+            inner = getattr(layer, "self_attn", None)
+            if isinstance(inner, Qwen35SparseLatentAttention):
+                inner.k_norm = torch.nn.Identity()
     return model
 
 
@@ -89,6 +99,11 @@ def main() -> int:
     parser.add_argument("--source", type=Path, default=None,
                         help="a second model measured the same way, to tell an inherited "
                              "cost from an introduced one")
+    parser.add_argument("--absorption", action="store_true",
+                        help="also measure the same model with the up-projection expanded "
+                             "rather than folded into the query. Worth asking again now "
+                             "that a step is compute-bound: measured against an eager "
+                             "step that was 90%% idle, absorption looked worthless.")
     parser.add_argument("--context", type=int, default=4096)
     parser.add_argument("--steps", type=int, default=16)
     parser.add_argument("--store", type=Path, default=STORE)
@@ -100,16 +115,18 @@ def main() -> int:
     span = args.context + args.steps + 8
     ids = torch.from_numpy(np.array(stream[:span], dtype=np.int64).reshape(1, span))
 
-    paths = [("converted", args.model)]
+    paths = [("converted", args.model, False)]
+    if args.absorption:
+        paths.append(("expanded", args.model, True))
     if args.source is not None:
-        paths.append(("source", args.source))
+        paths.append(("source", args.source, False))
 
     print("%-12s %13s %13s %9s" % ("model", "eager", "compiled", "speedup"))
     print("-" * 52)
-    for label, path in paths:
+    for label, path, expand in paths:
         timings = {}
         for mode in (False, True):
-            model = build(path, device)
+            model = build(path, device, expand=expand)
             try:
                 timings[mode] = run(model, ids, args.context, args.steps, device, mode,
                                     span)

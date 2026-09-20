@@ -329,13 +329,20 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 % (self.candidate_k, self.top_k))
 
         bias = config.attention_bias
-        # Index keys are published by Full layers and borrowed by everyone else.
+        # Index keys are published by Full layers and borrowed by everyone else. They are
+        # read off the latent rather than off the hidden state, which is the reference's
+        # V4.1 shape and costs less on three counts: a 384-wide input instead of a
+        # 2048-wide one, nothing extra in the cache because the latent is already there,
+        # and a score computed from the same summary the attention will actually read.
+        # The 64 numbers a token used to spend on its own index key are what made CSA2's
+        # cache larger than plain MLA's -- 512 against 448 -- for a mechanism that is
+        # supposed to make it smaller.
         if mode == "full":
-            self.index_k_proj = nn.Linear(config.hidden_size, self.index_dim, bias=bias)
+            self.index_k_proj = nn.Linear(self.latent_dim, self.index_dim, bias=bias)
         # Reuse computes no routing at all, so it needs no index queries either.
         if mode in ("full", "reindex"):
             self.index_q_proj = nn.Linear(
-                config.hidden_size, self.index_heads * self.index_dim, bias=bias)
+                config.hidden_size, self.index_heads * self.index_width, bias=bias)
             # DeepSeek weights the per-head scores with a projection of the token --
             # `indexer_proj` in llama.cpp's V4/V4.1 graph, one weight per head per token.
             # This fork used a single learned vector shared by every token, which cannot
@@ -376,6 +383,29 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         return self.latent
 
     @property
+    def index_width(self) -> int:
+        """How wide an index vector is once its position half is attached.
+
+        The content half comes off the latent and carries no position; the other half is
+        the decoupled rotary key MLA already caches, reused rather than duplicated. That
+        is the whole reason nothing extra is stored: a historical index key would
+        otherwise need its own rotary table to be rebuilt, which is exactly why it used
+        to be roped on the way in and cached.
+        """
+        return self.index_dim + self.rope_dim
+
+    def index_keys_from(self, latent, rotary):
+        """The index keys for a whole history, rebuilt from what the cache already holds.
+
+        `latent` is the compressed key/value summary and `rotary` the shared decoupled
+        key, both roped and cached by the owning layer. Neither is widened and nothing
+        else is read, so a Full layer's cache is the latent and the rotary slice and no
+        more -- 448 numbers a token where it used to be 512, which is what stopped CSA2
+        costing more to cache than the plain MLA it is built on.
+        """
+        return torch.cat([self.index_k_proj(latent), rotary], dim=-1)
+
+    @property
     def local_blocks(self) -> int:
         """Preceding blocks forced open so ``local_window`` tokens are always visible.
 
@@ -402,7 +432,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         modules = [self.q_proj]
         if self.mode == "full":
-            modules += [self.kv_a_proj, self.index_k_proj]
+            modules.append(self.kv_a_proj)
         if self.mode in ("full", "reindex"):
             modules.append(self.index_q_proj)
         if len(modules) == 1:
@@ -475,9 +505,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         batch = queries.shape[0]
         summary = index_keys.view(
-            batch, blocks, self.block_size, self.index_dim).mean(2)
+            batch, blocks, self.block_size, self.index_width).mean(2)
         leaders = queries.view(
-            batch, blocks, self.block_size, self.index_heads, self.index_dim)[:, :, 0]
+            batch, blocks, self.block_size, self.index_heads, self.index_width)[:, :, 0]
         leader_weights = weights.view(
             batch, blocks, self.block_size, self.index_heads)[:, :, 0]
         gain = leader_weights.permute(0, 2, 1).unsqueeze(-1).float()
@@ -495,7 +525,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             wide = candidate_index.shape[-1]
             gathered = torch.gather(
                 summary.unsqueeze(1).expand(-1, blocks, -1, -1), 2,
-                candidate_index.unsqueeze(-1).expand(-1, -1, -1, self.index_dim))
+                candidate_index.unsqueeze(-1).expand(-1, -1, -1, self.index_width))
             narrow = torch.einsum("bqhd,bqwd->bhqw", leaders.float(), gathered.float())
             narrow = (torch.relu(narrow) * gain).sum(dim=1)
             scores = torch.full((batch, blocks, blocks), float("-inf"),
@@ -519,11 +549,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             index_keys = index_keys.detach()
         if queries is None:
             queries = self.index_q_proj(hidden_states)
-        queries = queries.view(batch, seq, self.index_heads, self.index_dim)
+        queries = queries.view(batch, seq, self.index_heads, self.index_width)
         if self.rope_index and position_embeddings is not None:
+            # Only the query turns. Its trailing slice is the half that meets the cached
+            # rotary key, which was turned at the position it was written; the leading
+            # half meets a content key off the latent, which carries no position at all.
             queries = self._rope_index(
                 queries.transpose(1, 2), position_embeddings).transpose(1, 2)
-            index_keys = self._rope_index(index_keys, position_embeddings)
         if self.token_head_weights:
             # Softplus rather than the reference's raw projection: the head scores pass a
             # ReLU and are summed, and a negative weight would turn that sum into a
@@ -852,8 +884,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         batch, seq, _ = hidden_states.shape
         if self.isolated_indexer:
             hidden_states, queries = hidden_states.detach(), queries.detach()
-        index_queries = queries.view(batch, seq, self.index_heads, self.index_dim)
+        index_queries = queries.view(batch, seq, self.index_heads, self.index_width)
         if self.rope_index and position_embeddings is not None:
+            # Only the query is rotated now. `_rope_index` turns the trailing slice, which
+            # is exactly the half that meets the cached rotary key; the leading half meets
+            # a content key that carries no position and must not be turned.
             index_queries = self._rope_index(
                 index_queries.transpose(1, 2), position_embeddings).transpose(1, 2)
         if self.token_head_weights:
@@ -868,23 +903,19 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """The path that takes a decode step, and any length the block kernel refuses."""
         batch, seq, _ = hidden_states.shape
         if self.mode == "full":
-            query, compressed, index_keys, queries = self._project(hidden_states)
+            query, compressed, queries = self._project(hidden_states)
             latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
             latent = self.kv_a_norm(latent)
             rotary = self._rope_shared(rotary, position_embeddings)
-            if self.rope_index and position_embeddings is not None:
-                index_keys = self._rope_index(index_keys, position_embeddings)
             if past_key_values is not None:
-                # One slot holds the latent and the index keys together. They are written
-                # and read at the same positions and cropped by the same rules, and a
-                # second cache beside this one would only be another thing to keep in
-                # step. `cached_numbers_per_token` already counts both.
-                stored, rotary = past_key_values.update(
-                    torch.cat([latent, index_keys], dim=-1).unsqueeze(1),
-                    rotary.unsqueeze(1), self.layer_idx)
-                stored, rotary = stored.squeeze(1), rotary.squeeze(1)
-                latent, index_keys = torch.split(
-                    stored, [self.latent, self.index_dim], dim=-1)
+                # The latent and the rotary slice, and nothing else. The index keys used
+                # to ride in this slot because they had been roped on the way in and could
+                # not be rebuilt without their own rotary table; taking their position half
+                # from the rotary key that is already here removes the need to store them.
+                latent, rotary = past_key_values.update(
+                    latent.unsqueeze(1), rotary.unsqueeze(1), self.layer_idx)
+                latent, rotary = latent.squeeze(1), rotary.squeeze(1)
+            index_keys = self.index_keys_from(latent, rotary)
             self.bus.publish(self.layer_idx, index_keys, latent, rotary)
         elif self.mode == "reindex":
             query, queries = self._project(hidden_states)
@@ -939,9 +970,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         self.last_token_routed = False
 
         if self.mode == "full":
-            query, compressed, index_keys, queries = self._project(hidden_states)
+            query, compressed, queries = self._project(hidden_states)
             latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
             latent = self.kv_a_norm(latent)
+            rotary = self._rope_shared(rotary, position_embeddings)
+            index_keys = self.index_keys_from(latent, rotary)
             allowed, effective = self.route(
                 hidden_states, index_keys, queries, position_embeddings,
                 self._inherited_candidates())
@@ -1029,11 +1062,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
 
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
         cos, sin = position_embeddings
-        # Only the shared slice is position-dependent, so it is the only thing rotated.
-        query_states, rotary = apply_rotary_pos_emb(
-            query_states, rotary.unsqueeze(1), cos, sin)
-        shared = rotary.expand(input_shape[0], self.num_heads, input_shape[1],
-                               self.rope_dim)
+        # The query only. The shared slice arrives already turned, because the index keys
+        # are built from it before this and both paths have to agree about when it
+        # happens -- the gathered one turns it on the way into the cache, so this one
+        # turns it on the way in too.
+        query_states, _ = apply_rotary_pos_emb(query_states, query_states, cos, sin)
+        shared = rotary.unsqueeze(1).expand(input_shape[0], self.num_heads,
+                                            input_shape[1], self.rope_dim)
         key_states = torch.cat([shared, content_key.transpose(1, 2)], dim=-1)
         value_states = value_states.transpose(1, 2)
 
@@ -1190,10 +1225,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
     def cached_numbers_per_token(self) -> int:
         """What this layer adds to the compressed cache per token.
 
-        A full layer writes the latent and its index keys into one slot and the rotary
-        slice into the other, so it holds all three. A borrowing layer writes nothing: it
-        reads the donor's, which is where the second halving comes from.
+        A full layer writes the latent and the decoupled rotary key. The index keys are
+        rebuilt from both rather than stored -- their content half is a projection of the
+        latent and their position half *is* the rotary key -- so they cost nothing here.
+        Storing them is what used to make this 512 against plain MLA's 448, so CSA2 cost
+        more to cache than the thing it compresses. A borrowing layer writes nothing at
+        all: it reads its donor's, which is where the second halving comes from.
         """
         if self.mode != "full":
             return 0
-        return self.latent + self.rope_dim + self.index_dim
+        return self.latent + self.rope_dim

@@ -1,4 +1,4 @@
-"""What CSA2 and MLA have to get right for a training arm to mean anything.
+﻿"""What CSA2 and MLA have to get right for a training arm to mean anything.
 
 Three of these cover failures that a run would not report. A router whose parameters take
 no gradient still produces a loss curve, so "the model trained" says nothing about whether
@@ -143,6 +143,21 @@ def bare_layer(mode="full", **kwargs):
     return layer
 
 
+def index_keys_for(layer, hidden):
+    """Index keys the way the model builds them: off the latent and the rotary key.
+
+    They used to be a projection of the hidden state and cached beside the latent. They
+    are a projection of the *latent* now, with the decoupled rotary key as their position
+    half, so a test that wants them has to go through the layer's own compression rather
+    than reach for the hidden state directly. Standing in a random latent instead would
+    cut the keys loose from the content they are supposed to describe, and a router asked
+    to find something in that content could not.
+    """
+    compressed = layer.kv_a_proj(hidden)
+    latent, rotary = torch.split(compressed, [layer.latent, layer.rope_dim], dim=-1)
+    return layer.index_keys_from(layer.kv_a_norm(latent), rotary)
+
+
 @cuda
 def test_indexer_parameters_receive_gradient():
     """Top-k is discrete; without the score bias the indexer never learns anything.
@@ -222,7 +237,7 @@ def test_router_learns_which_blocks_to_select():
     sin = torch.zeros_like(cos)
 
     def forward(hidden, target, force):
-        keys = layer.index_k_proj(hidden)
+        keys = index_keys_for(layer, hidden)
         latent, rotary = torch.split(layer.kv_a_proj(hidden),
                                      [layer.latent, layer.rope_dim], dim=-1)
         latent = layer.kv_a_norm(latent)
@@ -244,7 +259,7 @@ def test_router_learns_which_blocks_to_select():
         for seed in seeds:
             hidden, target = sample(seed)
             with torch.no_grad():
-                allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
+                allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
             hits.append(allowed[rows, last, target].float().mean().item())
         return sum(hits) / len(hits)
 
@@ -289,7 +304,7 @@ def test_local_window_is_always_routed(window):
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=window)
     hidden = torch.randn(2, 6 * BLOCK, layer.config.hidden_size)
-    allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
+    allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
 
     blocks = allowed.shape[-1]
     for query_block in range(blocks):
@@ -323,10 +338,10 @@ def test_routing_does_not_depend_on_a_token_s_own_future(window, scale):
 
     for _ in range(25):
         hidden = torch.randn(1, blocks * BLOCK, width)
-        before, _ = layer.route(hidden, layer.index_k_proj(hidden))
+        before, _ = layer.route(hidden, index_keys_for(layer, hidden))
         changed = hidden.clone()
         changed[:, victim] += scale * torch.randn(width)
-        after, _ = layer.route(changed, layer.index_k_proj(changed))
+        after, _ = layer.route(changed, index_keys_for(layer, changed))
         assert torch.equal(before[0, block], after[0, block]), (
             "block %d read %s before the mutation and %s after, but every token in it "
             "below offset %d has an unchanged prefix"
@@ -390,15 +405,19 @@ def test_routing_report_describes_the_last_forward():
     assert collapsed["entropy"] == pytest.approx(0.0), collapsed
 
 
-@pytest.mark.parametrize("mode,pieces", [("full", 4), ("reindex", 2), ("reuse", 1)])
+@pytest.mark.parametrize("mode,pieces", [("full", 3), ("reindex", 2), ("reuse", 1)])
 def test_fused_projection_matches_separate_ones(mode, pieces):
-    """One multiply over the stream must give what four multiplies over it gave.
+    """One multiply over the stream must give what the separate multiplies gave.
 
-    A Full layer projects the query, the latent, the index keys and the index queries
-    from the same `[batch, tokens, hidden]` tensor, and three of the four are narrow
-    enough that reading that tensor dominates. Sharing the multiply is only worth doing
-    if the split puts every piece back exactly where it was -- a wrong order or width
-    would train perfectly well and mean something else.
+    A Full layer projects the query, the latent and the index queries from the same
+    `[batch, tokens, hidden]` tensor, and two of the three are narrow enough that reading
+    that tensor dominates. Sharing the multiply is only worth doing if the split puts
+    every piece back exactly where it was -- a wrong order or width would train perfectly
+    well and mean something else.
+
+    The index *keys* used to be a fourth piece here. They come off the latent now, which
+    is 384 wide against the hidden state's 2048, so they are no longer reading the tensor
+    this fusion exists to read once.
     """
     torch.manual_seed(0)
     layer = bare_layer(mode) if mode != "full" else bare_layer()
@@ -410,7 +429,7 @@ def test_fused_projection_matches_separate_ones(mode, pieces):
     assert len(projected) == pieces
     expected = [layer.q_proj]
     if mode == "full":
-        expected += [layer.kv_a_proj, layer.index_k_proj]
+        expected.append(layer.kv_a_proj)
     if mode in ("full", "reindex"):
         expected.append(layer.index_q_proj)
     for part, module in zip(projected, expected):
@@ -422,7 +441,7 @@ def test_routing_stays_causal_and_sparse():
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=0, csa2_top_k=BLOCK)
     hidden = torch.randn(2, 8 * BLOCK, layer.config.hidden_size)
-    allowed, _ = layer.route(hidden, layer.index_k_proj(hidden))
+    allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
 
     blocks = allowed.shape[-1]
     rows = torch.arange(blocks)
@@ -443,7 +462,7 @@ def test_router_columns_carry_a_bounded_cosine():
     with torch.no_grad():
         layer.index_gate.fill_(0.7)
     hidden = torch.randn(2, 2 * BLOCK, layer.config.hidden_size)
-    keys = layer.index_k_proj(hidden)
+    keys = index_keys_for(layer, hidden)
     _, effective = layer.route(hidden, keys)
 
     query_extra, key_extra = layer.router_columns(effective, keys)
@@ -734,10 +753,13 @@ def test_a_borrowing_layer_writes_no_cache_and_a_full_one_holds_the_index_keys()
     for index in borrowing:
         assert layers[index].cached_numbers_per_token() == 0
     owner = layers[full[0]]
-    # The latent and the index keys share the key slot; the rotary slice is the value.
-    keys = out.past_key_values.layers[full[0]].keys
-    assert keys.shape[-1] == owner.latent + owner.index_dim
-    assert owner.cached_numbers_per_token() == owner.latent + owner.rope_dim + owner.index_dim
+    # The latent alone in the key slot, the rotary slice in the value. The index keys are
+    # rebuilt from the two rather than stored, which is what stopped a CSA2 layer caching
+    # more than the plain MLA it compresses.
+    entry = out.past_key_values.layers[full[0]]
+    assert entry.keys.shape[-1] == owner.latent
+    assert entry.values.shape[-1] == owner.rope_dim
+    assert owner.cached_numbers_per_token() == owner.latent + owner.rope_dim
 
 
 @cuda
@@ -880,5 +902,6 @@ def test_mla_caches_the_latent_not_the_expanded_heads():
     # head: a bound taken from num_attention_heads would be twice as loose here and
     # would pass a cache that had regressed past the thing it replaces.
     assert width < 2 * config.num_key_value_heads * HEAD_DIM
+
 
 
