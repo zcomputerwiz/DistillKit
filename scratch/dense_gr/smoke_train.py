@@ -49,7 +49,8 @@ from benchmark import (ATTENTION_RATIOS, SpillWatch, apply_liger, build,  # noqa
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
-from distillkit.models.qwen35.csa2 import routing_report  # noqa: E402
+from distillkit.models.qwen35.csa2 import (routing_report,  # noqa: E402
+                                           router_parameters)
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
 
@@ -76,6 +77,15 @@ _ARCHITECTURE_KEYS = (
 _PROVENANCE_KEYS = ("residual_stream_recipient_mode", "residual_stream_recipient_seed",
                     "residual_stream_recipient_epsilon")
 
+# Settings that decide which tensors a checkpoint *has*, rather than how big they are.
+# They are carried from the checkpoint rather than guarded, because the flags that build
+# a run do not set them and a resume would otherwise rebuild the model with this
+# version's defaults: a learned shared head vector replaced by a fresh projection, the
+# hierarchy switched off, or a legacy key norm dropped -- none of which the shape check
+# can see, since the shapes still line up.
+_INHERITED_KEYS = ("csa2_token_head_weights", "csa2_rope_index", "csa2_candidate_layer",
+                   "csa2_candidate_k", "mla_content_key_norm")
+
 
 def _refuse_mismatched_architecture(source: Path, config) -> None:
     """Refuse to load a checkpoint whose shape disagrees with the requested config.
@@ -87,6 +97,12 @@ def _refuse_mismatched_architecture(source: Path, config) -> None:
     """
     stored = json.loads((source / "config.json").read_text(encoding="utf-8"))
     for key in _PROVENANCE_KEYS:
+        if key in stored:
+            setattr(config, key, stored[key])
+    for key in _INHERITED_KEYS:
+        if key in stored and stored[key] != getattr(config, key, None):
+            print("init: %s = %r, taken from the checkpoint" % (key, stored[key]),
+                  flush=True)
         if key in stored:
             setattr(config, key, stored[key])
     for key in _ARCHITECTURE_KEYS:
@@ -282,14 +298,13 @@ def main() -> int:
     if args.freeze_router:
         if not args.csa2:
             raise SystemExit("--freeze-router needs --csa2: there is no router otherwise")
-        held = [name for name, parameter in model.named_parameters()
-                if ".index_" in name]
-        for name, parameter in model.named_parameters():
-            if ".index_" in name:
-                parameter.requires_grad_(False)
+        held = router_parameters(model)
         if not held:
             raise SystemExit("--freeze-router found no indexer parameters to freeze")
-        print("router: froze %d indexer tensors" % len(held), flush=True)
+        for _, parameter in held:
+            parameter.requires_grad_(False)
+        print("router: froze %d indexer tensors, %d parameters"
+              % (len(held), sum(p.numel() for _, p in held)), flush=True)
     model.train()
     swapped = apply_liger(model, config)
     parameters = sum(p.numel() for p in model.parameters())

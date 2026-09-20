@@ -64,7 +64,7 @@ from torch import nn
 
 from .mla import Qwen35LatentAttention
 
-__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes",
+__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes", "router_parameters",
            "routing_report"]
 
 MODES = ("full", "reindex", "reuse")
@@ -113,6 +113,19 @@ def csa2_modes(config, full_attention_layers: int) -> list[str]:
     return modes
 
 
+#: Every parameter the router owns. One list, because the same filter written twice
+#: drifts: `".index_"` reads as "the indexer's" and silently misses `indexer_proj`, which
+#: is how `--freeze-router` came to leave the token-dependent head weights training.
+ROUTER_PARAMETER_PARTS = ("index_q_proj", "index_k_proj", "index_weight",
+                          "indexer_proj", "index_gate")
+
+
+def router_parameters(module):
+    """``(name, parameter)`` for every router parameter under ``module``."""
+    return [(name, parameter) for name, parameter in module.named_parameters()
+            if any(part in name for part in ROUTER_PARAMETER_PARTS)]
+
+
 def routing_report(model):
     """Per-layer routing statistics for every CSA2 layer in a model, in layer order.
 
@@ -144,7 +157,8 @@ class SparseIndexBus:
     instead of producing quietly wrong gradients.
     """
 
-    __slots__ = ("index_keys", "latent", "rotary", "topk", "candidates")
+    __slots__ = ("index_keys", "latent", "rotary", "topk", "candidates",
+                 "candidate_index")
 
     def __init__(self) -> None:
         self.clear()
@@ -156,7 +170,9 @@ class SparseIndexBus:
         self.topk = None
         # Level one of the hierarchy, published by at most one layer and read by the
         # layers after it. Stays None when the hierarchy is off, which is the default.
+        # The indices are what a reader gathers; the mask is what a report reads.
         self.candidates = None
+        self.candidate_index = None
 
     def require(self, field: str, layer_idx: int):
         value = getattr(self, field)
@@ -185,6 +201,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # detached, out of the graph.
         self.last_allowed = None
         self.last_candidates = None
+        self.last_candidate_index = None
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -299,7 +316,11 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
 
         cos, sin = position_embeddings
+        # The index head can be narrower than the model's rotary width, so the tables are
+        # cut to the slice as well. Cutting only the slice leaves the two disagreeing and
+        # the rotary raises.
         width = min(cos.shape[-1], tensor.shape[-1])
+        cos, sin = cos[..., :width], sin[..., :width]
         head = tensor if tensor.ndim == 4 else tensor.unsqueeze(1)
         nope, rotated = head[..., :-width], head[..., -width:]
         rotated, _ = apply_rotary_pos_emb(rotated, rotated, cos, sin)
@@ -324,7 +345,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         return self._score_blocks(*self._index_inputs(
             hidden_states, index_keys, queries, position_embeddings), blocks)
 
-    def _score_blocks(self, queries, index_keys, weights, blocks):
+    def _score_blocks(self, queries, index_keys, weights, blocks, candidate_index=None):
         """Leading-query scores against pooled key summaries, and which pairs compete.
 
         One decision serves every token in the block, so it may only use what the
@@ -345,11 +366,30 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             batch, blocks, self.block_size, self.index_dim).mean(2)
         leaders = queries.view(
             batch, blocks, self.block_size, self.index_heads, self.index_dim)[:, :, 0]
-        scores = torch.einsum("bqhd,bnd->bhqn", leaders.float(), summary.float())
         leader_weights = weights.view(
             batch, blocks, self.block_size, self.index_heads)[:, :, 0]
-        scores = (torch.relu(scores)
-                  * leader_weights.permute(0, 2, 1).unsqueeze(-1).float()).sum(dim=1)
+        gain = leader_weights.permute(0, 2, 1).unsqueeze(-1).float()
+
+        if candidate_index is None:
+            scores = torch.einsum("bqhd,bnd->bhqn", leaders.float(), summary.float())
+            scores = (torch.relu(scores) * gain).sum(dim=1)
+        else:
+            # Level one narrowed the field, so score the narrowed field. Masking a full
+            # `[q_blocks, kv_blocks]` product afterwards constrains the selection without
+            # saving any of the work; gathering the candidate summaries first turns the
+            # product from O(q * kv) into O(q * candidates), which is what the hierarchy
+            # is for. Results scatter back to full width so everything downstream --
+            # eligibility, the local window, top-k -- is unchanged.
+            wide = candidate_index.shape[-1]
+            gathered = torch.gather(
+                summary.unsqueeze(1).expand(-1, blocks, -1, -1), 2,
+                candidate_index.unsqueeze(-1).expand(-1, -1, -1, self.index_dim))
+            narrow = torch.einsum("bqhd,bqwd->bhqw", leaders.float(), gathered.float())
+            narrow = (torch.relu(narrow) * gain).sum(dim=1)
+            scores = torch.full((batch, blocks, blocks), float("-inf"),
+                                dtype=narrow.dtype, device=narrow.device)
+            scores.scatter_(-1, candidate_index, narrow)
+            del gathered, narrow, wide
 
         rows = torch.arange(blocks, device=queries.device)
         offsets = rows.view(-1, 1) - rows.view(1, -1)
@@ -402,39 +442,42 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             hidden_states, index_keys, queries, position_embeddings)
 
         with torch.no_grad():
-            scores, eligible = self._score_blocks(queries, index_keys, weights, blocks)
+            scores, eligible = self._score_blocks(
+                queries, index_keys, weights, blocks, candidates)
             rows = torch.arange(blocks, device=hidden_states.device)
             offsets = rows.view(-1, 1) - rows.view(1, -1)
             # The recent blocks always survive routing: a query that cannot see its own
             # immediate context produces gradients about the router, not the
             # architecture.
             local = (offsets >= 0) & (offsets <= self.local_blocks)
+            # Level one already restricted the score to the candidate blocks, so
+            # everything outside them is -inf here and needs no second mask.
             scores = scores.masked_fill(~eligible.unsqueeze(0), float("-inf"))
-            # Level one of the hierarchy: an earlier layer narrowed the field to candidate
-            # blocks, and this layer picks positions inside them rather than over
-            # everything. The publisher itself routes unfiltered, so the candidates are
-            # chosen by a layer that saw the whole row.
-            if candidates is not None:
-                scores = scores.masked_fill(~candidates, float("-inf"))
 
             keep = max(1, min(self.top_k // self.block_size, blocks))
             published = None
             if self.publishes_candidates:
                 wide = max(keep, min(self.candidate_k // self.block_size, blocks))
+                # The indices are the useful half: a later layer gathers those summaries
+                # instead of scoring every block. The mask is kept beside them because it
+                # is what a report or a test can read.
+                self.last_candidate_index = scores.topk(wide, dim=-1).indices
                 published = torch.zeros(batch, blocks, blocks, dtype=torch.bool,
                                         device=hidden_states.device)
-                published.scatter_(-1, scores.topk(wide, dim=-1).indices, True)
+                published.scatter_(-1, self.last_candidate_index, True)
                 published |= ~eligible.unsqueeze(0)
             chosen = scores.topk(keep, dim=-1).indices
             allowed = torch.zeros(batch, blocks, blocks, dtype=torch.bool,
                                   device=hidden_states.device)
             allowed.scatter_(-1, chosen, True)
             # An early block has no eligible candidates, so its top-k over an all -inf
-            # row returns arbitrary indices; this drops them. A row that level one left
-            # empty is the same case, so it is dropped the same way.
+            # row returns arbitrary indices; this drops them. A row level one left short
+            # is the same case and is dropped the same way.
             allowed &= eligible.unsqueeze(0)
             if candidates is not None:
-                allowed &= candidates
+                inside = torch.zeros_like(allowed)
+                inside.scatter_(-1, candidates, True)
+                allowed &= inside
             allowed |= local.unsqueeze(0)
             allowed &= (offsets >= 0).unsqueeze(0)
 
@@ -461,7 +504,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         if self.candidate_k <= 0 or self.layer_idx <= self.candidate_layer:
             return None
-        return self.bus.candidates
+        return self.bus.candidate_index
 
     def block_mask(self, allowed):
         """`allowed` as a `BlockMask`, built from the indices rather than scanned.
@@ -545,6 +588,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             self.bus.rotary, self.bus.topk = rotary, allowed
             if self.last_candidates is not None:
                 self.bus.candidates = self.last_candidates
+                self.bus.candidate_index = self.last_candidate_index
         elif self.mode == "reindex":
             query, queries = self._project(hidden_states)
             index_keys = self.bus.require("index_keys", self.layer_idx)
@@ -557,6 +601,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             self.bus.topk = allowed
             if self.last_candidates is not None:
                 self.bus.candidates = self.last_candidates
+                self.bus.candidate_index = self.last_candidate_index
         else:
             query, = self._project(hidden_states)
             latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
@@ -624,6 +669,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # dense SDPA, 17.39 ms for SDPA with a token-level boolean mask.
         if effective is not None:
             heads, length = self.num_heads, input_shape[1]
+            # `effective` came out of `route` built from *roped* index queries, so the key
+            # it is paired with has to be roped too. The rotation is orthogonal: applied
+            # to both sides it leaves the dot product alone, applied to one side it
+            # silently changes the bias the router is trained through into something the
+            # selection never used.
+            if self.rope_index and position_embeddings is not None:
+                index_keys = self._rope_index(index_keys, position_embeddings)
             query_extra, key_extra = self.router_columns(effective, index_keys)
             query_states = torch.cat(
                 [query_states, query_extra.expand(-1, heads, length, -1)], dim=-1)

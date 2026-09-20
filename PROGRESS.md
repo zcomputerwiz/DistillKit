@@ -5583,16 +5583,40 @@ A learned router against a frozen random one, same converted checkpoint, 131M to
 | 1000 | 1.7030 | 1.7092 | -0.0062 |
 | 1999 | 1.6603 | 1.6654 | **-0.0051** |
 
-`selected` is identical to four decimals between the two, on every layer -- the learned
-router's choices are no more diverse than random ones -- and the gap shrinks with
-training. Distilling the indexer against the source model's own block-pooled attention
-(1.05M tokens, 464,899 indexer parameters, backbone frozen) drops its cross entropy
-3.3509 -> 3.3010 and moves held-out loss by **-0.0014**.
+The gap shrinks with training. Distilling the indexer against the source model's own
+block-pooled attention (1.05M tokens, 464,899 indexer parameters, backbone frozen) drops
+its cross entropy 3.3509 -> 3.3010 and moves held-out loss by **-0.0014** at 8 blocks and
+**+0.0002** at 16.
 
-All three measurements agree, and the geometry explains them. At sequence 1024 with block
-128 there are 8 blocks, the local window and diagonal open regardless of score, density
-sits at 0.72, and the router picks about one discretionary block in three. Independently:
-picking the 4 most recent blocks already agrees with the real attention 76% of the time.
+An earlier draft of this section read `selected` being equal between the learned and
+frozen runs as the two making equally undiscriminating choices. That was wrong:
+`selected` is `chosen / eligible` with a fixed top-k, so it is a constant of the geometry
+and two routers with entirely different choices report the same number. It was also
+attributed to the wrong geometry -- the learned/frozen runs are 2,048 tokens and 16
+blocks at density 0.331, not 1,024 tokens and 8 blocks at 0.72.
+
+The measure that does say something is how much of the teacher's attention mass the
+selected blocks cover, against opening the k most recent eligible blocks (recency) and
+the k highest-mass ones (oracle). Held out, 16 windows of 2,048 tokens:
+
+| layer | router | distilled | recency | oracle |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 0.2410 | **0.3768** | 0.2687 | 0.3945 |
+| 3 | 0.2497 | **0.3799** | 0.3157 | 0.4020 |
+| 5 | 0.2292 | **0.3067** | 0.2967 | 0.3429 |
+| 7 | 0.2190 | **0.3773** | 0.2931 | 0.4142 |
+| 9 | 0.2211 | **0.3514** | 0.2901 | 0.3880 |
+
+So the router is not inert and distillation is not ineffective. Before it, the router
+captured *less* attention mass than simply opening the most recent blocks; after it, it
+beats recency on four layers of five and reaches 91% of the oracle on layer 7. The
+indexer learns its job well.
+
+It is the job that does not pay. Moving mass capture from 0.22 to 0.38 -- most of the
+distance to the ceiling any router could reach at this k -- is worth about zero nats of
+held-out loss. The blocks a better router adds are not blocks the model needed, which is
+a statement about what 16 blocks of 2,048 tokens have to offer rather than about the
+indexer.
 
 ## Reconciling against llama.cpp
 
