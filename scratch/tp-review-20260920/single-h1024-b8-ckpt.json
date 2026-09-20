@@ -1,0 +1,39 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 1024,
+    "layers": 10,
+    "batch": 8,
+    "length": 1024,
+    "cards": 1,
+    "norm": "compiled",
+    "checkpointing": true,
+    "no_mask": false,
+    "profile": false,
+    "compile_gated_mean": false,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\single-h1024-b8-ckpt.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 2.713611299986951,
+  "timing": {
+    "median_ms": 468.3834500028752,
+    "minimum_ms": 466.4403999922797,
+    "maximum_ms": 471.21819999301806,
+    "samples_ms": [
+      467.137300001923,
+      467.83049998339266,
+      468.9508000155911,
+      468.9364000223577,
+      466.4403999922797,
+      471.21819999301806,
+      469.94929999345914,
+      467.6150000304915
+    ]
+  },
+  "peak_allocated_gib": [
+    1.9740095138549805,
+    0.0
+  ],
+  "tokens_per_second": 17489.943335849533
+}

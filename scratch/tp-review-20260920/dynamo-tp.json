@@ -1,0 +1,55 @@
+{
+  "cards": 2,
+  "graph_count": 15,
+  "graph_break_count": 14,
+  "op_count": 1859,
+  "break_reasons": [
+    {
+      "reason": "step_unsupported",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\models\\qwen35\\widened.py, line 230 in forward>"
+      ]
+    },
+    {
+      "reason": "Unsupported Tensor.item() call with capture_scalar_outputs=False\n  Explanation: Dynamo does not support tracing `Tensor.item()` with config.capture_scalar_outputs=False.\n  Hint: Set `torch._dynamo.config.capture_scalar_outputs = True` or `export TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1` to include these operations in the captured graph.\n\n  Developer debug context: call_method TensorVariable() item () {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0124.html",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\models\\qwen35\\widened.py, line 126 in forward>",
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\experimental\\hyper_connection.py, line 349 in read>"
+      ]
+    },
+    {
+      "reason": "comprehension_graph_break",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\parallel\\blocks.py, line 78 in forward>"
+      ]
+    },
+    {
+      "reason": "Skip calling `torch.compiler.disable()`d function\n  Explanation: Skip calling function `<function swiglu_fwd at 0x000002598B098CC0>` since it was wrapped with `torch.compiler.disable` (reason: None)\n  Hint: Remove the `torch.compiler.disable` call\n\n  Developer debug context: <function swiglu_fwd at 0x000002598B098CC0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0098.html",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\.venv\\Lib\\site-packages\\fla\\utils\\_decorators.py, line 152 in wrapper>",
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\.venv\\Lib\\site-packages\\fla\\modules\\activations.py, line 708 in forward>"
+      ]
+    },
+    {
+      "reason": "Skip calling `torch.compiler.disable()`d function\n  Explanation: Skip calling function `<function swiglu_fwd at 0x000002598B098CC0>` since it was wrapped with `torch.compiler.disable` (reason: None)\n  Hint: Remove the `torch.compiler.disable` call\n\n  Developer debug context: <function swiglu_fwd at 0x000002598B098CC0>\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0098.html",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\.venv\\Lib\\site-packages\\fla\\utils\\_decorators.py, line 152 in wrapper>",
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\.venv\\Lib\\site-packages\\fla\\modules\\activations.py, line 708 in forward>"
+      ]
+    },
+    {
+      "reason": "Unsupported Tensor.item() call with capture_scalar_outputs=False\n  Explanation: Dynamo does not support tracing `Tensor.item()` with config.capture_scalar_outputs=False.\n  Hint: Set `torch._dynamo.config.capture_scalar_outputs = True` or `export TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1` to include these operations in the captured graph.\n\n  Developer debug context: call_method TensorVariable() item () {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0124.html",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\models\\qwen35\\widened.py, line 126 in forward>",
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\experimental\\hyper_connection.py, line 349 in read>"
+      ]
+    },
+    {
+      "reason": "Unsupported Tensor.item() call with capture_scalar_outputs=False\n  Explanation: Dynamo does not support tracing `Tensor.item()` with config.capture_scalar_outputs=False.\n  Hint: Set `torch._dynamo.config.capture_scalar_outputs = True` or `export TORCHDYNAMO_CAPTURE_SCALAR_OUTPUTS=1` to include these operations in the captured graph.\n\n  Developer debug context: call_method TensorVariable() item () {}\n\n For more details about this graph break, please visit: https://meta-pytorch.github.io/compile-graph-break-site/gb/gb0124.html",
+      "stack": [
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\models\\qwen35\\widened.py, line 126 in forward>",
+        "<FrameSummary file D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\distillkit\\experimental\\hyper_connection.py, line 349 in read>"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 512,
+    "layers": 10,
+    "batch": 32,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": false,
+    "no_mask": false,
+    "profile": true,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h512-b32.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 3.276979200018104,
+  "timing": {
+    "median_ms": 637.2830999898724,
+    "minimum_ms": 564.3857000395656,
+    "maximum_ms": 651.700799993705,
+    "samples_ms": [
+      564.3857000395656,
+      580.5823999689892,
+      620.0869999593124,
+      634.624199999962,
+      646.6472999891266,
+      639.9419999797828,
+      644.4283000309952,
+      651.700799993705
+    ]
+  },
+  "peak_allocated_gib": [
+    9.623730659484863,
+    3.430354118347168
+  ],
+  "tokens_per_second": 51418.27862769426,
+  "profile": {
+    "trace": "scratch\\tp-review-20260920\\tp-h512-b32.trace.json",
+    "body_collective_traffic": {
+      "Replicate.forward": {
+        "copies": 20,
+        "bytes": 671088640
+      },
+      "Reduce.forward": {
+        "copies": 20,
+        "bytes": 671088640
+      },
+      "Reduce.backward": {
+        "copies": 20,
+        "bytes": 671088640
+      },
+      "Replicate.backward": {
+        "copies": 20,
+        "bytes": 671088640
+      }
+    },
+    "body_transfer_mib": 2560.0,
+    "gpu_activity": {},
+    "top_kernels_ms": [],
+    "cuda_runtime": {},
+    "note": "GPU event sums can overlap and are not fractions of wall time."
+  }
+}

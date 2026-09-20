@@ -1,0 +1,99 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 1024,
+    "layers": 10,
+    "batch": 8,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": true,
+    "no_mask": false,
+    "profile": true,
+    "compile_gated_mean": false,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h1024-b8-ckpt.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 4.12267160002375,
+  "timing": {
+    "median_ms": 506.2288500193972,
+    "minimum_ms": 478.8958999561146,
+    "maximum_ms": 514.267300022766,
+    "samples_ms": [
+      478.8958999561146,
+      486.91560002043843,
+      495.9136000252329,
+      514.267300022766,
+      513.5300999972969,
+      505.8588000247255,
+      506.59890001406893,
+      512.4405000242405
+    ]
+  },
+  "peak_allocated_gib": [
+    1.570448875427246,
+    0.7889165878295898
+  ],
+  "tokens_per_second": 16182.404459339105,
+  "profile": {
+    "trace": "scratch\\tp-review-20260920\\tp-h1024-b8-ckpt.trace.json",
+    "body_collective_traffic": {
+      "Replicate.forward": {
+        "copies": 40,
+        "bytes": 671088640
+      },
+      "Reduce.forward": {
+        "copies": 40,
+        "bytes": 671088640
+      },
+      "Reduce.backward": {
+        "copies": 20,
+        "bytes": 335544320
+      },
+      "Replicate.backward": {
+        "copies": 20,
+        "bytes": 335544320
+      }
+    },
+    "body_transfer_mib": 1920.0,
+    "gpu_activity": {},
+    "top_kernels_ms": [],
+    "cuda_runtime": {},
+    "note": "GPU event sums can overlap and are not fractions of wall time."
+  },
+  "scoped_cuda_events": {
+    "_GatedProjectMean.forward": {
+      "calls": 40,
+      "sum_gpu0_elapsed_ms": 47.175681471824646
+    },
+    "HyperConnection._route": {
+      "calls": 40,
+      "sum_gpu0_elapsed_ms": 72.46227133274078
+    },
+    "Replicate.forward": {
+      "calls": 40,
+      "sum_gpu0_elapsed_ms": 14.716447979211807
+    },
+    "Reduce.forward": {
+      "calls": 40,
+      "sum_gpu0_elapsed_ms": 42.76326406002045
+    },
+    "HyperConnection.write": {
+      "calls": 30,
+      "sum_gpu0_elapsed_ms": 6.757375970482826
+    },
+    "Reduce.backward": {
+      "calls": 20,
+      "sum_gpu0_elapsed_ms": 7.27894401550293
+    },
+    "Replicate.backward": {
+      "calls": 20,
+      "sum_gpu0_elapsed_ms": 10.599391967058182
+    },
+    "_GatedProjectMean.backward": {
+      "calls": 20,
+      "sum_gpu0_elapsed_ms": 81.22060823440552
+    }
+  }
+}

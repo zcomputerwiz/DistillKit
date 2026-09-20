@@ -18,6 +18,7 @@ tokens the fallback has holes and the "lossless" claim is false.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import importlib.metadata as metadata
 import json
 import sys
@@ -49,8 +50,8 @@ from benchmark import (ATTENTION_RATIOS, SpillWatch, apply_liger, build,  # noqa
 from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
-from distillkit.models.qwen35.csa2 import (routing_report,  # noqa: E402
-                                           router_parameters)
+from distillkit.models.qwen35.csa2 import (dense_routing,  # noqa: E402
+                                           routing_report, router_parameters)
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
 
@@ -187,6 +188,13 @@ def main() -> int:
                              "other flags describe; a mismatch is refused rather than "
                              "loaded, because a partial load trains something nobody "
                              "asked for.")
+    parser.add_argument("--dense-routing", action="store_true",
+                        help="run the CSA2 layers with every causal block open and the "
+                             "router's bias off the logits. This is DeepSeek's dense "
+                             "stage: the backbone settles on its converted key/value "
+                             "path before the indexer is asked to imitate what it "
+                             "attends to. The indexer takes no gradient here, because "
+                             "the bias that carries it is exactly what is switched off.")
     parser.add_argument("--freeze-router", action="store_true",
                         help="hold the CSA2 indexer at its initialization. Routing still "
                              "happens and still reaches the attention logits; only the "
@@ -210,6 +218,10 @@ def main() -> int:
         variant += "-csa2" if args.csa2 else "-mla"
     if args.freeze_router:
         variant += "-frozen"
+    if args.dense_routing:
+        if not args.csa2:
+            raise SystemExit("--dense-routing needs --csa2: there is no routing to open")
+        variant += "-dense"
     if args.convert:
         if args.init_from is None:
             raise SystemExit("--convert needs --init-from: there is nothing to convert")
@@ -360,6 +372,10 @@ def main() -> int:
     history = []
     torch.cuda.synchronize()
     train_started = time.perf_counter()
+    # The dense stage runs the whole loop with routing open; nothing inside the loop has
+    # to know, and the evaluation inherits it so the reported loss is the stage's.
+    stage = dense_routing(model) if args.dense_routing else contextlib.nullcontext()
+    stage.__enter__()
     for step in range(steps):
         starts = generator.integers(0, stream.shape[0] - args.length - 1,
                                     size=args.batch)
@@ -438,6 +454,7 @@ def main() -> int:
                                                   r["entropy"]) for r in routing),
                       flush=True)
 
+    stage.__exit__(None, None, None)
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
     spilled = spill.stop()
@@ -450,6 +467,7 @@ def main() -> int:
                          else str(args.init_from),
                          "converted": bool(args.convert),
                          "frozen_router": bool(args.freeze_router),
+                         "dense_routing": bool(args.dense_routing),
                          "asymmetric": bool(args.asymmetric),
                          "variant": variant, "hidden": args.hidden,
                          "norm_mode": args.norm_mode,

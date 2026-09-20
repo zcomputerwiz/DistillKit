@@ -1,0 +1,38 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 512,
+    "layers": 10,
+    "batch": 32,
+    "length": 1024,
+    "cards": 1,
+    "norm": "compiled",
+    "checkpointing": false,
+    "no_mask": false,
+    "profile": false,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\single-h512-b32.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 2.521850600023754,
+  "timing": {
+    "median_ms": 553.9213000156451,
+    "minimum_ms": 552.8084000106901,
+    "maximum_ms": 560.1135000470094,
+    "samples_ms": [
+      553.4361000172794,
+      552.8947000275366,
+      552.8084000106901,
+      554.050000035204,
+      557.7881999779493,
+      553.7925999960862,
+      557.830500009004,
+      560.1135000470094
+    ]
+  },
+  "peak_allocated_gib": [
+    12.211209297180176,
+    0.0
+  ],
+  "tokens_per_second": 59156.41806710537
+}

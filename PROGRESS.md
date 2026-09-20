@@ -5666,3 +5666,155 @@ not the model size, so a larger model does not amortize it.
 Two things are also not measured: no inference-time saving has been benchmarked at all,
 and CSA2 refuses `past_key_values` outright, so it cannot decode. MLA does cache correctly
 but does not fold the up-projection, which llama.cpp's `wk_b`/`wv_b` absorption does.
+
+# The conversion was scrambling attention heads, and every converted number was wrong (2026-09-20)
+
+## What was actually measured before this
+
+Every conversion recorded in this document went through `convert_full.py`, and
+`convert_full.py` was writing each head's value where the next head's key gets read. The
+numbers it produced are void: the 1.5383-against-1.5464 comparison, the conversion arms of
+the three-way decomposition, both indexer distillation runs, and the latent-rank sweep
+quoted as +0.023 / +0.037 / +0.135. Training runs that never called `convert_full.py` --
+every from-scratch arm -- are unaffected.
+
+The figures quoted as a rank sweep were not conversions at all. They were probes that
+applied one approximation to the source model in place, and they are reproduced below
+under their real meaning.
+
+## The bug, and why nothing caught it
+
+`kv_b_proj` maps the latent to every head's content key and value at once. The forward
+reads it per head:
+
+```python
+projected = self.kv_b_proj(latent).view(*kv_shape, self.num_heads,
+                                        self.content_dim + self.head_dim)
+content_key, value_states = torch.split(projected, [self.content_dim, self.head_dim],
+                                        dim=-1)
+```
+
+so the columns run `[h0 key, h0 value, h1 key, h1 value, ...]`. The fit built its target as
+`torch.cat([keys, values], dim=-1)`, which runs `[h0 key ... h7 key, h0 value ... h7 value]`.
+Head 0 read its own key by luck and then read head 1's key as its value, and so on down the
+stack.
+
+Least squares does not care. The fit solved against its own target and reported `key_r2`
+0.97 while the model it produced was 6.38 nats above its source. Every metric the
+conversion computed was order blind, so the mistake was invisible from inside:
+
+| where it was read | layer 3, before | layer 3, after |
+| --- | --- | --- |
+| `key_r2` as the fit reported it | 0.9698 | 0.9698 |
+| key content against the source's own | -0.3674 | 0.9550 |
+| value against the source's own | -1.3615 | 0.8181 |
+| attention output | -1.8355 | -- |
+
+The fit's own r2 is identical across the fix. Only a comparison against the tensors the
+forward assembles could tell the difference, which is what `qkv_probe.py` does.
+
+Two smaller faults fell out of the same place. `key_r2` scored the content half only, so
+the rotary slice -- the half that carries position -- was never scored at all; it is now.
+And the deeper layers' fits were themselves being computed against hidden states corrupted
+by the scrambled layers above them, so fixing layer 3 lifted layer 11's key fit from 0.5207
+to 0.9270 without touching its own algebra.
+
+`tests/test_mla_layout.py` pins the layout from the model's side, and includes the
+two-block layout failing on purpose. Without that second test the mistake is
+unfalsifiable: both layouts hold identical numbers in a different order.
+
+## What the conversion costs now
+
+Source heldout 1.3029, 64 windows of 1024 tokens, calibrated on 32,768 tokens per layer.
+Cache is arithmetic over the 6 full-attention layers, not a measured serving saving --
+CSA2 still refuses `past_key_values`.
+
+| config | KiB/token | vs stock | heldout | cost |
+| --- | --- | --- | --- | --- |
+| stock | 12.00 | 1.00x | 1.3029 | -- |
+| MLA 256 | 3.75 | 3.20x | 1.5366 | +0.2337 |
+| MLA 384 | 5.25 | 2.29x | 1.4686 | +0.1657 |
+| MLA 512 | 6.75 | 1.78x | 1.4446 | +0.1417 |
+| MLA 768 | 9.75 | 1.23x | 1.4371 | +0.1342 |
+| blend + MLA 384 + CSA2 all-full | 5.25 | 2.29x | 1.4972 | +0.1943 |
+| blend + MLA 512 + CSA2 all-full | 6.75 | 1.78x | 1.4721 | +0.1692 |
+| blend + MLA 384 + CSA2 reuse | 2.63 | 4.57x | 1.7841 | +0.4812 |
+| blend + MLA 384 + CSA2 reindex | 2.63 | 4.57x | 1.7885 | +0.4855 |
+
+The blend converts exactly, confirmed twice: the no-blend and blend arms agree to four
+decimals at 1.4686.
+
+## Three terms, and only one of them is the rank
+
+**Rank saturates.** 512 to 768 buys 0.0075 for a 44% larger cache. The usable range is
+384 to 512 and there is no reason to go wider.
+
+**The rotary collapse is a floor.** MLA carries one decoupled rotary key; this source has
+two key/value heads with two different rotary slices, and the conversion averages them.
+Applying that collapse to the source alone costs +0.0361. The conversion reconstructs the
+collapsed slice at r2 0.995-0.998, and the assembled slice lands at r2 ~0.5 with norm ratio
+0.73 -- which is what averaging two uncorrelated vectors gives, 1/sqrt(2) = 0.707. The fit
+is at its design limit, not failing.
+
+**CSA2's routing machinery is nearly free to convert.** +0.0286 at rank 384, +0.0275 at
+512. This is the opposite of the from-scratch decomposition, where routing was the
+expensive term at +0.0442 and borrowing the cheap one.
+
+**Borrowing is the expensive term.** Reuse costs +0.2869 on top of all-full and halves the
+cache again, because a borrowing layer caches nothing. The two findings do not conflict:
+trained from scratch, a model learns into borrowing; converted, a layer is handed a donor's
+latent cold and r2 0.60-0.82 is the ceiling of the linear fit against it. Borrowing is
+cheap to learn and expensive to convert.
+
+**Reindex does not help, yet.** Reindex and reuse both borrow the donor's KV latent, so
+they share that ceiling exactly -- layer 7 fits at key r2 0.6037 against 0.6040, value
+0.6402 against 0.6413. They also cache identically, because `cached_numbers_per_token`
+returns 0 for any mode but full. The only difference is that reindex scores its own queries
+for a fresh top-k, and at conversion time its indexer is randomly initialized, so it selects
+its own random blocks instead of the donor's random blocks: +0.4855 against +0.4812, very
+slightly worse, for an extra `index_q_proj` per borrowing layer. Reindex is a
+post-distillation question, not a conversion-time one.
+
+## FlexAttention could not launch at this head width, for reasons upstream of us
+
+Inductor rounds the key/query head to a power of two before it allocates
+(`QK_HEAD_DIM_ROUNDED = next_power_of_two(...)`). The routed width here is 320 -- head 256
+plus the router's 64 index columns -- which rounds to 512, so every query and key tile
+doubles to carry 64 columns of content. It then picks a tile from a table keyed on the
+*unrounded* width, and past that table's last entry at 256 it drops to a fixed 64x32x3.
+Neither path compares the result to the device, and there is no fallback: the config that
+does not fit is dropped, the choice list empties, and the compile ends in "No valid triton
+configs".
+
+Measured against SM86's 101376 bytes, both defaults are over:
+
+| width | default | asks | this fork | ms |
+| --- | --- | --- | --- | --- |
+| 256 (dense path) | 32x64x3 | 151552 | 16x32x3 | 0.703 |
+| 320 (routed path) | 64x32x3 | 167936 | 16x32x1 | 0.821 |
+
+The 256 row is the dense path and carries no router columns at all, so the dense warm-up
+stage would have failed here too. 14 of 36 tile shapes launch at width 320; the sweep is
+`scratch/dense_gr/flex_tiles.py`.
+
+This is widely hit and not solved upstream -- pytorch#133254, k2-fsa/OmniVoice#83 on this
+exact card class, unslothai/unsloth-zoo#1165. The one documented technique that avoids the
+padding rather than working around it is ROCm/aiter#2672, which splits a non-power-of-two
+head into two dot products, `Q[:d] @ K[:d].T + Q[d:] @ K[d:].T`, each over a power-of-two
+width. That is exactly this case and cleaner here than there -- 320 is 256 + 64 and both
+halves are already powers of two, and they are separate tensors one line before the
+concatenation that creates the 320. FlexAttention cannot express it: its template takes one
+Q, one K and one `QK_HEAD_DIM`, and `score_mod` indexes scalar-wise, so a dot-product bias
+through it would need a materialized `[B, Q, KV]` tensor -- 2 MB at 1024 context and ~2 GB
+at 32K, failing exactly where it is needed.
+
+Since 320 pads to 512 regardless, the tile already carries 192 columns of zeros through
+every dot. `csa2_index_dim` could go from 64 to 256 at no extra shared memory and no extra
+FLOPs.
+
+## What is still open
+
+Nothing here is trained. The conversion lands +0.194 above baseline at 2.29x, or +0.481 at
+4.57x, and the goal is to be as good as baseline. Whether the three-phase pipeline recovers
+that is the question these numbers finally make askable.
+

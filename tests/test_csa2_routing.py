@@ -453,6 +453,41 @@ def test_router_columns_carry_a_bounded_cosine():
     assert contributed.abs().max() <= 0.7 + 1e-5
 
 
+@pytest.mark.parametrize("width,stages", [(256, 3), (320, 1)])
+def test_kernel_tiles_are_chosen_rather_than_left_to_inductor(width, stages):
+    """Inductor will not pick a tile that fits, so the tile has to be picked here.
+
+    It rounds the key/query head to a power of two, then reads its tile from a table keyed
+    on the *unrounded* width without comparing the result to the device, and when the
+    result does not fit it drops the config instead of shrinking it -- the choice list
+    empties and the compile ends in "No valid triton configs". Measured against SM86's
+    101376 bytes at the real student's two widths, its defaults ask 151552 at 256 and
+    167936 at 320. The 256 case is the dense path, carrying no router columns at all.
+    """
+    layer = bare_layer()
+    options = layer._kernel_options(width)
+    assert options["num_stages"] == stages
+    # Inductor refuses outright when these do not divide the mask's block size.
+    assert layer.block_size % options["BLOCK_M"] == 0
+    assert layer.block_size % options["BLOCK_N"] == 0
+
+
+def test_the_router_columns_are_what_widens_the_kernel_tile():
+    """Sixteen columns of index buy a whole extra power of two, and that is the blocker.
+
+    At the real student's head of 256 the router's columns are not a rounding error on the
+    tile, they double it: every query and key buffer in shared memory is sized to 512 to
+    carry them. It is the reason the sparse path needs a shallower pipeline than the dense
+    one over the same head.
+    """
+    layer = bare_layer(csa2_index_dim=64)
+    head = 256
+    assert 1 << (head - 1).bit_length() == head
+    assert 1 << (head + layer.index_dim - 1).bit_length() == 2 * head
+    assert (layer._kernel_options(head)["num_stages"]
+            > layer._kernel_options(head + layer.index_dim)["num_stages"])
+
+
 def test_block_mask_matches_a_scanned_mask():
     """`from_kv_blocks` built by hand against `create_block_mask` evaluating the rule."""
     from torch.nn.attention.flex_attention import create_block_mask

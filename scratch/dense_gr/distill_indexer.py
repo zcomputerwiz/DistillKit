@@ -27,6 +27,7 @@ attention is the thing sparsity exists to avoid computing. At 1024 tokens it is 
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import sys
 import time
@@ -42,13 +43,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import triton_shim  # noqa: F401,E402
 
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
-from distillkit.models.qwen35.csa2 import Qwen35SparseLatentAttention  # noqa: E402
+from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention,  # noqa: E402
+                                           dense_routing, router_parameters)
 
 STORE = Path("scratch/code_training/tokens-v2")
 
 
 def windows(store, vocab, count, length, device, split="train"):
-    stream = np.memmap(store / ("%s-v%d.bin" % (split, vocab)), dtype=np.uint16, mode="r")
+    from convert_full import open_split
+
+    stream = open_split(store, split, vocab)
     stride = max(length, (len(stream) - length) // max(1, count))
     for index in range(count):
         start = index * stride
@@ -115,7 +119,15 @@ def student_scores(model, ids, device):
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--source", type=Path, default=None,
+                        help="the teacher. Omit for --self-teacher, which is what "
+                             "DeepSeek does: their indexer imitates the same model's "
+                             "dense attention, not another model's.")
+    parser.add_argument("--self-teacher", action="store_true",
+                        help="take the target from the student's own attention with "
+                             "routing opened, rather than from a separate source. The "
+                             "source's attention belongs to a model whose key/value path "
+                             "this one no longer has.")
     parser.add_argument("--student", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--windows", type=int, default=512)
@@ -126,18 +138,29 @@ def main() -> int:
     parser.add_argument("--device", default="cuda:0")
     args = parser.parse_args()
 
+    if (args.source is None) == (not args.self_teacher):
+        raise SystemExit("pass either --source or --self-teacher, not both and not neither")
     device = torch.device(args.device)
-    source = Qwen35WidenedForCausalLM.from_pretrained(
-        args.source, dtype=torch.float32, attn_implementation="eager").to(device).eval()
     student = Qwen35WidenedForCausalLM.from_pretrained(
         args.student, dtype=torch.bfloat16).to(device)
+    if args.self_teacher:
+        # The student is its own teacher, read with routing opened. It has to run eager
+        # to expose attention weights at all, and in fp32 so the target is not a bf16
+        # histogram; a second copy of a 45M model is cheaper than the alternative.
+        source = Qwen35WidenedForCausalLM.from_pretrained(
+            args.student, dtype=torch.float32,
+            attn_implementation="eager").to(device).eval()
+        source.config._attn_implementation = "eager"
+        teacher_context = dense_routing(source)
+    else:
+        source = Qwen35WidenedForCausalLM.from_pretrained(
+            args.source, dtype=torch.float32,
+            attn_implementation="eager").to(device).eval()
+        teacher_context = contextlib.nullcontext()
     block = student.config.csa2_block_size
     vocab = student.config.vocab_size
 
-    trained = [p for name, p in student.named_parameters()
-               if any(part in name for part in
-                      ("index_q_proj", "index_k_proj", "index_weight", "indexer_proj",
-                       "index_gate"))]
+    trained = [p for _, p in router_parameters(student)]
     if not trained:
         raise SystemExit("the student has no indexer parameters to train")
     for parameter in student.parameters():
@@ -145,7 +168,9 @@ def main() -> int:
     for parameter in trained:
         parameter.requires_grad_(True)
     student.train()
-    print("source %s\nstudent %s" % (args.source, args.student))
+    print("teacher %s\nstudent %s"
+          % ("the student's own dense attention" if args.self_teacher else args.source,
+             args.student))
     print("training %d indexer tensors, %d parameters, everything else frozen"
           % (len(trained), sum(p.numel() for p in trained)), flush=True)
 
@@ -163,7 +188,8 @@ def main() -> int:
         total, seen = 0.0, 0
         for step, ids in enumerate(windows(args.store, vocab, args.windows,
                                            args.length, device)):
-            target = teacher_blocks(source, ids, block, device)
+            with teacher_context:
+                target = teacher_blocks(source, ids, block, device)
             scores = student_scores(student, ids, device)
             loss = 0.0
             for index, (score, eligible) in scores.items():
@@ -200,7 +226,8 @@ def main() -> int:
     args.output.mkdir(parents=True, exist_ok=True)
     student.save_pretrained(args.output, safe_serialization=True)
     (args.output / "distillation.json").write_text(json.dumps({
-        "source": str(args.source), "student": str(args.student),
+        "source": None if args.self_teacher else str(args.source),
+        "self_teacher": bool(args.self_teacher), "student": str(args.student),
         "windows": args.windows, "length": args.length, "epochs": args.epochs,
         "lr": args.lr, "tokens": args.windows * args.length * args.epochs,
         "cross_entropy": history, "seconds": time.perf_counter() - began,

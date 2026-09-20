@@ -1,0 +1,40 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 512,
+    "layers": 10,
+    "batch": 32,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": false,
+    "no_mask": false,
+    "profile": false,
+    "compile_gated_mean": false,
+    "split_compile_gated_mean": true,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h512-b32-split-gpm-idle.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 2.6222821000264958,
+  "timing": {
+    "median_ms": 420.9825500147417,
+    "minimum_ms": 408.9986000326462,
+    "maximum_ms": 456.1189999803901,
+    "samples_ms": [
+      421.1465999833308,
+      420.8185000461526,
+      409.4211999909021,
+      408.9986000326462,
+      419.6656999993138,
+      426.6026000259444,
+      456.1189999803901,
+      455.9773000073619
+    ]
+  },
+  "peak_allocated_gib": [
+    9.566601753234863,
+    3.430354118347168
+  ],
+  "tokens_per_second": 77836.95547203215
+}

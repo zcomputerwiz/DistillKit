@@ -1,0 +1,39 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 512,
+    "layers": 10,
+    "batch": 32,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": false,
+    "no_mask": false,
+    "profile": false,
+    "compile_gated_mean": true,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h512-b32-compiled-gpm.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 102.27112839999609,
+  "timing": {
+    "median_ms": 447.96884997049347,
+    "minimum_ms": 441.2309000035748,
+    "maximum_ms": 449.47160000447184,
+    "samples_ms": [
+      448.32609995501116,
+      449.47160000447184,
+      449.3213999667205,
+      448.3995999908075,
+      441.2309000035748,
+      443.898800003808,
+      447.6115999859758,
+      442.4862000159919
+    ]
+  },
+  "peak_allocated_gib": [
+    12.022534370422363,
+    3.430354118347168
+  ],
+  "tokens_per_second": 73147.94321560158
+}

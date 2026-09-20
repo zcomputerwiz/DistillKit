@@ -1,0 +1,39 @@
+{
+  "args": {
+    "mode": "step",
+    "hidden": 1024,
+    "layers": 10,
+    "batch": 8,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": true,
+    "no_mask": false,
+    "profile": false,
+    "compile_gated_mean": true,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h1024-b8-ckpt-compiled-gpm.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 5.048036599997431,
+  "timing": {
+    "median_ms": 400.80490001128055,
+    "minimum_ms": 379.83480002731085,
+    "maximum_ms": 415.1500999578275,
+    "samples_ms": [
+      395.61479998519644,
+      401.2370000127703,
+      415.1500999578275,
+      409.68669997528195,
+      379.83480002731085,
+      400.3728000097908,
+      399.83459998620674,
+      404.3202999746427
+    ]
+  },
+  "peak_allocated_gib": [
+    1.482588768005371,
+    0.7889165878295898
+  ],
+  "tokens_per_second": 20438.871879484104
+}

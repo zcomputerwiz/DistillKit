@@ -52,9 +52,17 @@ RIDGE = 1e-6
 EVALUATION_SEED = 12345
 
 
+def open_split(store, split, vocab):
+    """The remapped split when one exists for this vocabulary, else the original."""
+    compact = store / ("%s-v%d.bin" % (split, vocab))
+    if compact.exists():
+        return np.memmap(compact, dtype=np.uint16, mode="r")
+    return np.memmap(store / ("%s.bin" % split), dtype=np.uint32, mode="r")
+
+
 def calibration_windows(store, vocab, count, length, device):
     """Evenly spaced windows of the training split the arms were trained on."""
-    stream = np.memmap(store / ("train-v%d.bin" % vocab), dtype=np.uint16, mode="r")
+    stream = open_split(store, "train", vocab)
     stride = max(length, (len(stream) - length) // max(1, count))
     for index in range(count):
         start = index * stride
@@ -66,7 +74,7 @@ def calibration_windows(store, vocab, count, length, device):
 @torch.no_grad()
 def heldout(model, store, vocab, count, length, device):
     """The arms' own held-out measure: the calibration split, fixed windows, seed 12345."""
-    stream = np.memmap(store / ("calibration-v%d.bin" % vocab), dtype=np.uint16, mode="r")
+    stream = open_split(store, "calibration", vocab)
     starts = np.random.default_rng(EVALUATION_SEED).integers(
         0, stream.shape[0] - length - 1, size=count)
     total, seen = 0.0, 0
@@ -74,7 +82,7 @@ def heldout(model, store, vocab, count, length, device):
         ids = torch.from_numpy(
             np.array(stream[start:start + length], dtype=np.int64).reshape(1, length)
         ).to(device)
-        logits = model(input_ids=ids).logits.float()
+        logits = model(input_ids=ids, use_cache=False).logits.float()
         total += nn.functional.cross_entropy(
             logits[0, :-1], ids[0, 1:], reduction="sum").item()
         seen += length - 1
@@ -122,7 +130,7 @@ def source_capture(stock, full, geometry, store, vocab, count, length, device):
         hook(i), with_kwargs=True) for i in full]
     with torch.no_grad():
         for ids in calibration_windows(store, vocab, count, length, device):
-            stock(input_ids=ids)
+            stock(input_ids=ids, use_cache=False)
     for handle in handles:
         handle.remove()
     return {index: tuple(torch.cat(part) for part in zip(*rows))
@@ -148,6 +156,22 @@ def _record_latent(attention):
 
 def build_target_config(source_config, args):
     config = copy.deepcopy(source_config)
+    # CSA2 routes over a whole sequence and writes no cache, so a converted model
+    # cannot carry a config that asks for one.
+    config.use_cache = False
+    # A checkpoint trained in this project already names the four-stream route, because
+    # its arm was built with one. A stock one does not, and `residual_stream_routing`
+    # falls back to "widened" -- which `recipient_initialize` refuses, since there is no
+    # route for it to convert. Name it here so a stock source converts like any other.
+    # The rank follows `benchmark.py`: hidden // 8, which is what the 2B's measured
+    # +52.3M parameters were counted against.
+    config.residual_stream_enabled = True
+    config.residual_stream_routing = "flash_next"
+    config.residual_stream_num_branches = getattr(
+        source_config, "residual_stream_num_branches", 2)
+    config.residual_stream_lowrank = getattr(
+        source_config, "residual_stream_lowrank", max(8, config.hidden_size // 8))
+    config.residual_stream_sidecar = False
     config.mla_enabled = True
     config.mla_latent_dim = args.mla_latent_dim
     if args.csa2_modes:
@@ -174,13 +198,18 @@ def main() -> int:
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--source-device", default=None,
+                        help="where the teacher and its captured activations live. "
+                             "Defaults to --device; a second card keeps the two models "
+                             "and the calibration off each other.")
     parser.add_argument("--no-blend", action="store_true",
                         help="skip the gated residual conversion, to separate its effect")
     args = parser.parse_args()
 
     device = torch.device(args.device)
+    source_device = torch.device(args.source_device or args.device)
     stock = Qwen35WidenedForCausalLM.from_pretrained(
-        args.source, dtype=torch.bfloat16).to(device).eval()
+        args.source, dtype=torch.bfloat16).to(source_device).eval()
     config = stock.config
     head_dim = getattr(config, "head_dim",
                        config.hidden_size // config.num_attention_heads)
@@ -191,7 +220,7 @@ def main() -> int:
     full = [i for i, kind in enumerate(config.layer_types) if "linear" not in str(kind)]
     vocab = config.vocab_size
 
-    before = heldout(stock, args.store, vocab, args.evaluate, args.length, device)
+    before = heldout(stock, args.store, vocab, args.evaluate, args.length, source_device)
     print("source %s" % args.source)
     print("  hidden %d, %d layers, %d heads of %d over %d kv, full attention at %s"
           % (config.hidden_size, config.num_hidden_layers, heads, head_dim, kv_heads, full))
@@ -224,19 +253,29 @@ def main() -> int:
           % len(report.unexpected_keys))
 
     targets = source_capture(stock, full, (rope, content, head_dim, groups),
-                             args.store, vocab, args.calibrate, args.length, device)
+                             args.store, vocab, args.calibrate, args.length,
+                             source_device)
     tokens = next(iter(targets.values()))[0].shape[0]
     print("\ncalibrated on %d tokens per layer" % tokens, flush=True)
     del stock
     torch.cuda.empty_cache()
 
-    print("\n%-7s %-9s %9s %9s" % ("layer", "mode", "key r2", "value r2"))
+    print("\n%-7s %-9s %9s %9s %9s"
+          % ("layer", "mode", "key r2", "value r2", "rope r2"))
     fits = []
     for index in full:
         attention = model.model.layers[index].self_attn
         mode = getattr(attention, "mode", "full")
-        inputs, keys, values, rotary = targets[index]
-        target = torch.cat([keys, values], dim=-1)
+        # Only this layer's calibration crosses to the fitting card, and it goes back as
+        # soon as the layer is done. Six layers at once is what does not fit.
+        inputs, keys, values, rotary = (t.to(device) for t in targets[index])
+        # `kv_b_proj` is read per head -- `view(..., num_heads, content + head_dim)` then
+        # split -- so the target has to interleave each head's content with its own value.
+        # Concatenating the two blocks instead puts head 1's content where head 0's value
+        # is read, which fits its own target perfectly and is wrong in every forward.
+        target = torch.cat([keys.view(-1, heads, content),
+                            values.view(-1, heads, head_dim)],
+                           dim=-1).reshape(len(keys), heads * (content + head_dim))
 
         if hasattr(attention, "kv_a_proj"):
             # The encoder is the best rank-`latent` linear summary of everything this
@@ -244,11 +283,17 @@ def main() -> int:
             whitener = whiten(inputs.T @ inputs)
             _, _, right = torch.linalg.svd((target.T @ inputs) @ whitener,
                                            full_matrices=False)
+            rotary_rows = solve(inputs, rotary)
             with torch.no_grad():
                 attention.kv_a_proj.weight.copy_(torch.cat([
-                    right[:attention.latent] @ whitener, solve(inputs, rotary),
+                    right[:attention.latent] @ whitener, rotary_rows,
                 ]).to(attention.kv_a_proj.weight.dtype))
                 attention.kv_a_norm.weight.zero_()
+            # The rotary slice is the half of the key that `key_r2` never sees, and it is
+            # where one shared vector stands in for the source's per-head ones. Scoring it
+            # is what would have shown that the ceiling here is the collapse, not the fit.
+            rotary_fit = float(1 - (inputs @ rotary_rows.T - rotary).pow(2).sum()
+                               / rotary.pow(2).sum())
 
         # Whatever latent this layer ends up reading -- its own, or a donor's through the
         # adapter -- take it from the model as it now stands rather than from the algebra.
@@ -256,27 +301,32 @@ def main() -> int:
         with torch.no_grad():
             for ids in calibration_windows(args.store, vocab, args.calibrate,
                                            args.length, device):
-                model(input_ids=ids)
+                model(input_ids=ids, use_cache=False)
         handle.remove()
         latent = torch.cat(attention._latent_log)
         del attention._latent_log
 
         weight = solve(latent, target)
         fitted = latent @ weight.T
-        split = heads * content
+        # Undo the interleave to score the two halves against the shapes they were
+        # captured in, so `key_r2` measures the keys the forward will actually assemble.
+        parts = fitted.view(len(fitted), heads, content + head_dim)
+        fitted_keys = parts[..., :content].reshape(len(fitted), -1)
+        fitted_values = parts[..., content:].reshape(len(fitted), -1)
         with torch.no_grad():
             attention.kv_b_proj.weight.copy_(weight.to(attention.kv_b_proj.weight.dtype))
             if attention.k_norm is not None:
                 # The legacy content key norm divides the fit's own scale back out, so it
                 # has to be handed back as the gain. Without the norm the fit stands.
-                scale = fitted[:, :split].reshape(-1, content).pow(2).mean(-1).sqrt().mean()
+                scale = fitted_keys.reshape(-1, content).pow(2).mean(-1).sqrt().mean()
                 attention.k_norm.weight.fill_(float(scale) - 1.0)
 
         share = lambda a, b: float(1 - (a - b).pow(2).sum() / b.pow(2).sum())  # noqa: E731
-        fits.append((index, mode, share(fitted[:, :split], keys),
-                     share(fitted[:, split:], values)))
-        print("%-7d %-9s %9.4f %9.4f" % fits[-1], flush=True)
-        del latent, fitted, target
+        fits.append((index, mode, share(fitted_keys, keys),
+                     share(fitted_values, values), rotary_fit))
+        print("%-7d %-9s %9.4f %9.4f %9.4f" % fits[-1], flush=True)
+        del latent, fitted, target, inputs, keys, values, rotary
+        targets[index] = None
         torch.cuda.empty_cache()
 
     if not args.no_blend:
@@ -299,8 +349,8 @@ def main() -> int:
         "source": str(args.source), "heldout_source": before,
         "heldout_converted": after, "mla_latent_dim": args.mla_latent_dim,
         "csa2_modes": args.csa2_modes, "calibration_tokens": tokens,
-        "fits": [{"layer": i, "mode": m, "key_r2": k, "value_r2": v}
-                 for i, m, k, v in fits],
+        "fits": [{"layer": i, "mode": m, "key_r2": k, "value_r2": v, "rope_r2": r}
+                 for i, m, k, v, r in fits],
     }, indent=1), encoding="utf-8")
     print("wrote %s" % args.output)
     return 0

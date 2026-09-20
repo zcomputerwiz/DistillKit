@@ -1,0 +1,42 @@
+{
+  "excluded_from_performance_comparison": true,
+  "exclusion_reason": "A separate convert_full.py process (PID 308) occupied GPU 0 during this run. Do not use this timing to assess split compilation. Preserved as an invalidated raw run.",
+  "args": {
+    "mode": "step",
+    "hidden": 512,
+    "layers": 10,
+    "batch": 32,
+    "length": 1024,
+    "cards": 2,
+    "norm": "compiled",
+    "checkpointing": false,
+    "no_mask": false,
+    "profile": false,
+    "compile_gated_mean": false,
+    "split_compile_gated_mean": true,
+    "steps": 8,
+    "output": "scratch\\tp-review-20260920\\tp-h512-b32-split-gpm.json"
+  },
+  "torch": "2.11.0+cu128",
+  "cold_step_seconds": 4.597488900006283,
+  "timing": {
+    "median_ms": 1226.345750008477,
+    "minimum_ms": 983.4660000051372,
+    "maximum_ms": 1248.0924999690615,
+    "samples_ms": [
+      1156.907800002955,
+      1233.3952999906614,
+      1236.6243999567814,
+      1242.9777999641374,
+      1248.0924999690615,
+      1219.2962000262924,
+      1202.5094000273384,
+      983.4660000051372
+    ]
+  },
+  "peak_allocated_gib": [
+    9.522412300109863,
+    3.430354118347168
+  ],
+  "tokens_per_second": 26720.033889116097
+}

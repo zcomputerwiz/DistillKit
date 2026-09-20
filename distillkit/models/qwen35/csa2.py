@@ -57,6 +57,7 @@ is routed as a unit and has no way to represent half of it being absent.
 
 from __future__ import annotations
 
+import contextlib
 import math
 
 import torch
@@ -64,8 +65,8 @@ from torch import nn
 
 from .mla import Qwen35LatentAttention
 
-__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes", "router_parameters",
-           "routing_report"]
+__all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes", "dense_routing",
+           "router_parameters", "routing_report"]
 
 MODES = ("full", "reindex", "reuse")
 
@@ -124,6 +125,25 @@ def router_parameters(module):
     """``(name, parameter)`` for every router parameter under ``module``."""
     return [(name, parameter) for name, parameter in module.named_parameters()
             if any(part in name for part in ROUTER_PARAMETER_PARTS)]
+
+
+@contextlib.contextmanager
+def dense_routing(model):
+    """Run ``model`` with every causal block open and the router bias off its logits.
+
+    A converted model's own attention is the teacher a self-distillation wants -- the
+    source's attention is a different model's, fitted away by the key/value refit -- but
+    reading it needs the routing out of the way, or the teacher is the student's router
+    looking at itself.
+    """
+    layers = [m for m in model.modules() if isinstance(m, Qwen35SparseLatentAttention)]
+    for module in layers:
+        module.dense_routing = True
+    try:
+        yield model
+    finally:
+        for module in layers:
+            module.dense_routing = False
 
 
 def routing_report(model):
@@ -202,6 +222,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         self.last_allowed = None
         self.last_candidates = None
         self.last_candidate_index = None
+        self.dense_routing = False
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -438,6 +459,18 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         batch, seq, _ = hidden_states.shape
         blocks = seq // self.block_size
+        if self.dense_routing:
+            # Every causal block open and no router bias: what this model attends to when
+            # the router is not deciding. It is the teacher a self-distillation needs,
+            # because the model's own sparse attention is masked by the router being
+            # trained, and a plain-MLA copy cannot be built -- the borrowing layers have
+            # no down projection of their own to copy.
+            rows = torch.arange(blocks, device=hidden_states.device)
+            allowed = (rows.view(-1, 1) >= rows.view(1, -1)).unsqueeze(0).expand(
+                batch, blocks, blocks).contiguous()
+            self.last_candidates = None
+            return allowed, None
+
         queries, index_keys, weights = self._index_inputs(
             hidden_states, index_keys, queries, position_embeddings)
 
@@ -683,11 +716,45 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 [key_states, key_extra.expand(-1, heads, length, -1)], dim=-1)
 
         attn_output = _flex()(query_states, key_states, value_states,
-                              block_mask=mask, scale=self.scaling)
+                              block_mask=mask, scale=self.scaling,
+                              kernel_options=self._kernel_options(query_states.shape[-1]))
 
         attn_output = attn_output.transpose(1, 2).reshape(*input_shape, -1).contiguous()
         attn_output = attn_output * torch.sigmoid(gate)
         return self.o_proj(attn_output), None
+
+    def _kernel_options(self, width):
+        """Tile sizes that fit this card's shared memory at this head width.
+
+        FlexAttention rounds the key/query head up to a power of two before it allocates
+        anything -- `QK_HEAD_DIM_ROUNDED = next_power_of_two(...)` in Inductor's flex
+        common -- and then picks its tile from a table keyed on the *unrounded* width,
+        with no check that the result fits the device. Past that table's last entry at
+        256 it drops to a fixed 64x32 with three stages. Neither path has a fallback: the
+        config that does not fit is dropped, the choice list empties, and the compile ends
+        in "No valid triton configs" rather than in a smaller tile.
+
+        So pick the tile here instead. The rounding is the larger of the two terms: the
+        router's `index_dim` columns ride in `width`, and 256 + 64 rounds to 512, so every
+        query and key tile doubles to carry 64 columns of content. `num_stages` then
+        multiplies the key and value buffers that the rounding has already doubled.
+
+        Measured on SM86, which offers 101376 bytes, at the real student's geometry of 8
+        heads and 1024 positions:
+
+            width 256   default 32x64x3 asks 151552   this 16x32x3   0.703 ms
+            width 320   default 64x32x3 asks 167936   this 16x32x1   0.821 ms
+
+        Both defaults are over the limit, including the one at 256, which is the dense
+        path and carries no router columns at all. Re-measure the surface with
+        `scratch/dense_gr/flex_tiles.py` if the head or the index width changes.
+        """
+        # The toy widths land on the tuned entries of that table and fit as they stand.
+        # Leaving them alone keeps their timings comparable to what is already measured.
+        if width <= 128:
+            return None
+        rounded = 1 << (width - 1).bit_length()
+        return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 3 if rounded <= 256 else 1}
 
     def routing_statistics(self):
         """What the last forward's routing looked like, or ``None`` if none has run.
