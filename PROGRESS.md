@@ -5492,3 +5492,153 @@ Roughly 2x in isolation, and **not measurable end to end** in this model: hidden
 it is free and because the collectives were already written that way, not because it showed
 up. It will matter where a payload is large enough to see, which on present evidence is not
 here.
+
+
+---
+
+# Converting a trained model onto the stack, and what the reference says (2026-09-19)
+
+## The gated residual converts exactly, and that is the whole mechanism
+
+`recipient_initialize` had only ever run on constructed tiny configs. On the real 2B it
+converts **bitwise**: 48 sublayers, +52,297,728 parameters (+2.78%), and
+`max |difference| 0.000e+00` on 512 real tokens. Both plain toy arms convert bitwise too.
+
+Trained forward from a converted plain arm, against a control that spends the same 131M
+tokens without converting:
+
+| arm | total tokens | heldout |
+| --- | ---: | ---: |
+| `r3-1-nogr`, where it started | 524.3M | 1.5738 |
+| control, +131M, no conversion | 655.4M | 1.5464 |
+| converted, +131M | 655.4M | **1.5383** |
+| converted asymmetric, +131M | 655.4M | 1.5382 |
+| `r3-1-gr`, blend from scratch | 524.3M | 1.5329 |
+
+The conversion is worth **0.0081 over the matched control** -- 20% of the 0.0409 blend
+earns from scratch. The asymmetric conversion mode is worth nothing: 0.0001 apart at every
+checkpoint.
+
+The gate diagnostic says why. `recipient_initialize` leaves the route at an exact neutral
+point -- `W_up` and `W_write` zeroed, every read gate 1/2, every write multiplier 1 -- so
+the question is not whether training turns the gates off but whether it turns them on:
+
+| | symmetric | asymmetric | from scratch |
+| --- | ---: | ---: | ---: |
+| `\|W_up\|` | 4.5285 | 4.5426 | 11.4538 |
+| `\|W_write\|` | 0.6297 | 0.7068 | 3.0005 |
+| gain spread | 0.0030 | 0.0392 | 0.122-1.205 |
+| write multipliers | 1.150 +- 0.411 | 1.143 +- 0.454 | 0.973 +- 0.701 |
+
+131M tokens reaches 40% of the from-scratch `W_up` and 59% of the multiplier spread, and
+the branches barely differentiate at all. Asymmetric initialization raises the gain spread
+13x and is still 3x short of the from-scratch minimum, so the spread is a token-budget
+limit rather than an initialization one. The depth structure is the right shape either
+way: attenuate early, amplify late.
+
+## Latent attention costs far less trained than converted
+
+Trained from scratch at the arms' budget, 1:1, 524.3M tokens, seed 0:
+
+| arm | heldout | marginal | params | tok/s |
+| --- | ---: | ---: | ---: | ---: |
+| plain `r1-1-nogr` | 1.5296 | - | 45.34M | 113.8k |
+| MLA only | 1.5484 | +0.0188 | 45.63M | 111.8k |
+| MLA + CSA2, all Full | 1.5926 | +0.0442 | 46.45M | 101.8k |
+| MLA + CSA2, mixed modes | 1.5994 | +0.0068 | 45.91M | 106.6k |
+
+So the 0.0698 splits **MLA 0.0188 / routing machinery 0.0442 / borrowing 0.0068**. The
+prediction from the donor matrix -- that borrowing would own most of it, since borrowing
+layers fit at r2 0.45-0.63 against 0.93-0.95 for Full ones -- was wrong and backwards.
+Reconstruction r2 measures how hard borrowing is to *convert into*, not what it costs a
+model that trains into it. The mixed-mode arm also has fewer parameters than all-Full and
+runs 4.7% faster, so borrowing buys back parameters, memory and speed for 0.0068.
+
+Converting is a different matter. On the real 2B, one-shot weighted fits, 65,536
+calibration tokens and 49,152 held out:
+
+| rank | cache | vs stock | loss | cost |
+| ---: | ---: | ---: | ---: | ---: |
+| stock | 1024 | 1.00x | 1.4638 | - |
+| 256 | 384 | 2.67x | 1.5992 | +0.1354 |
+| 384 | 512 | 2.00x | 1.5011 | +0.0373 |
+| 512 | 640 | 1.60x | 1.4868 | +0.0230 |
+| 768 | 896 | 1.14x | 1.4834 | +0.0196 |
+
+Two controls: 4x the calibration data moves nothing, so the fits are not sample limited;
+and GPTQ-style sequential fitting -- each layer fitted on the input the already converted
+model produces, against the target the original produced -- comes out marginally *worse*
+at every rank. Compounding is not the dominant error here, per-layer approximation is.
+
+Reconstruction share badly under-predicts the damage: rank 256 keeps 94.6-99.5% of the
+weighted signal and costs 0.135 nats.
+
+## The router is close to inert at this geometry
+
+A learned router against a frozen random one, same converted checkpoint, 131M tokens:
+
+| step | learned | frozen | difference |
+| ---: | ---: | ---: | ---: |
+| 250 | 1.8428 | 1.8561 | -0.0133 |
+| 1000 | 1.7030 | 1.7092 | -0.0062 |
+| 1999 | 1.6603 | 1.6654 | **-0.0051** |
+
+`selected` is identical to four decimals between the two, on every layer -- the learned
+router's choices are no more diverse than random ones -- and the gap shrinks with
+training. Distilling the indexer against the source model's own block-pooled attention
+(1.05M tokens, 464,899 indexer parameters, backbone frozen) drops its cross entropy
+3.3509 -> 3.3010 and moves held-out loss by **-0.0014**.
+
+All three measurements agree, and the geometry explains them. At sequence 1024 with block
+128 there are 8 blocks, the local window and diagonal open regardless of score, density
+sits at 0.72, and the router picks about one discretionary block in three. Independently:
+picking the 4 most recent blocks already agrees with the real attention 76% of the time.
+
+## Reconciling against llama.cpp
+
+llama.cpp implements these mechanisms already, across three architectures, and the fork
+was checked against them rather than against the papers.
+
+**The hyper-connection needed no change.** `qwen4exp`'s low-rank variant is arithmetically
+identical to ours -- same norm placement, same per-branch gamma, same `1/hc` inside both
+the SiLU and the sigmoid, same `2*` centering. Note there are two HC formulations in tree:
+`hy-v4` and `deepseek4` use the full-rank iHC with `magnitude`/`eps`, and matching the
+wrong one would have been easy.
+
+**The content key norm was ours alone and is gone.** DeepSeek norms the latent and nothing
+after it; Qwen norms the whole head; a norm over the content half alone is a third thing.
+`mla_content_key_norm` keeps it for checkpoints trained with it, and every existing MLA
+checkpoint was stamped from what its weights actually contain.
+
+**The indexer was materially weaker than the reference.** `indexer_proj` is a per-token
+projection where ours was a static learned vector of `index_heads` numbers, and the
+reference ropes both indexer query and key where ours was position-blind. Both are now
+ported, along with V4.1's hierarchical level: one layer publishes a candidate block set
+and the layers after it pick positions inside it.
+
+The V4.1 port diff also settles which reference applies. `hy-v4`'s indexer builds its keys
+through a compressor and takes its query from the compressed query -- that is **V4**. V4.1
+projects the keys directly and picks blocks before positions, which is the shape ours
+already had.
+
+One deviation is deliberate. DeepSeek trains its indexer by distilling the dense attention
+distribution; this fork adds the router's score to the attention logits instead, because
+without that path every indexer parameter ends a backward pass at `grad=None`. A fully
+faithful port would reintroduce that trap, so the structure was taken and the gradient
+path kept.
+
+## What this says about the goal
+
+For extending context on limited VRAM, the cache is arithmetic and the hybrid has already
+done most of the work: 18 of 24 layers hold a fixed 19.7 MiB of recurrent state, so only
+the 6 attention layers cache per token. Stock is 12.00 KiB/token, MLA at latent 256 is
+3.75 KiB/token, a 3.2x reduction -- 3.00 GiB against 0.94 GiB at the architecture's full
+262,144-token context.
+
+That is a margin rather than an enabler at this model size, and it is bought with roughly
+27-35% more attention parameters at every scale -- the surcharge tracks the grouping ratio,
+not the model size, so a larger model does not amortize it.
+
+Two things are also not measured: no inference-time saving has been benchmarked at all,
+and CSA2 refuses `past_key_values` outright, so it cannot decode. MLA does cache correctly
+but does not fold the up-projection, which llama.cpp's `wk_b`/`wv_b` absorption does.

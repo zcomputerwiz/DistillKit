@@ -90,10 +90,15 @@ class Qwen35LatentAttention(nn.Module):
                                 bias=bias)
 
         self.q_norm = Qwen3_5RMSNorm(self.head_dim, eps=config.rms_norm_eps)
-        # Only the content half is normalized. Normalizing the assembled key would scale
-        # the shared rotary slice by the content slice's norm and couple the two, which is
-        # the decoupling this design exists to keep.
-        self.k_norm = Qwen3_5RMSNorm(self.content_dim, eps=config.rms_norm_eps)
+        # DeepSeek normalizes the latent and nothing after it: `kv_a_norm` is the only norm
+        # on the key/value path, and the up-projection's output goes to attention as it is.
+        # This fork previously added a content-half key norm, which neither parent has --
+        # Qwen norms the whole head, DeepSeek norms the latent, and a norm over the content
+        # half alone is a third thing. It is kept only to load checkpoints trained with it,
+        # because it changes the function rather than the layout.
+        self.content_key_norm = bool(getattr(config, "mla_content_key_norm", False))
+        self.k_norm = (Qwen3_5RMSNorm(self.content_dim, eps=config.rms_norm_eps)
+                       if self.content_key_norm else None)
 
     def forward(self, hidden_states, position_embeddings, attention_mask=None,
                 past_key_values=None, **kwargs):
@@ -134,7 +139,8 @@ class Qwen35LatentAttention(nn.Module):
             *kv_shape, self.num_heads, self.content_dim + self.head_dim)
         content_key, value_states = torch.split(
             projected, [self.content_dim, self.head_dim], dim=-1)
-        content_key = self.k_norm(content_key)
+        if self.k_norm is not None:
+            content_key = self.k_norm(content_key)
 
         # One rotary key for every head: shared, and the only position-dependent part.
         shared = rotary_key.expand(*kv_shape[:1], self.num_heads, kv_shape[1],

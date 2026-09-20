@@ -266,4 +266,8 @@ scratch/code_corpus/v2-build.log
 /scratch/dense_gr/checkpoints-smoke/
 /scratch/dense_gr/checkpoints-arm/
 /scratch/dense_gr/checkpoints-tp/
+# Every later dense_gr checkpoint directory: conversion, decomposition, sparse arms.
+# A glob rather than one line each, because each new arm adds a directory and the
+# enumerated form has already let 1.4 GiB of weights sit untracked-but-not-ignored.
+/scratch/dense_gr/checkpoints-*/
 

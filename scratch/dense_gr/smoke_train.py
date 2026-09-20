@@ -57,6 +57,50 @@ BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
 
 
+# The fields that decide whether a checkpoint's weights mean anything in this config.
+# Everything else -- learning rate, token budget, evaluation cadence -- is free to differ
+# between the run that wrote a checkpoint and the run that continues it.
+_ARCHITECTURE_KEYS = (
+    "vocab_size", "hidden_size", "intermediate_size", "num_hidden_layers",
+    "num_attention_heads", "num_key_value_heads", "head_dim", "layer_types",
+    "linear_num_key_heads", "linear_num_value_heads", "linear_key_head_dim",
+    "linear_value_head_dim", "residual_stream_routing", "residual_stream_num_branches",
+    "residual_stream_lowrank", "residual_stream_blend", "mla_enabled", "csa2_enabled",
+    "mla_latent_dim", "csa2_modes", "csa2_top_k", "csa2_block_size",
+)
+
+# Written by `recipient_initialize` and read back by the layer constructor, which uses
+# them to mark a route as already converted. They say nothing about shape, so they are
+# not guarded -- they are copied, because a run that dropped them would save a checkpoint
+# that no longer knows it was converted and would let itself be converted a second time.
+_PROVENANCE_KEYS = ("residual_stream_recipient_mode", "residual_stream_recipient_seed",
+                    "residual_stream_recipient_epsilon")
+
+
+def _refuse_mismatched_architecture(source: Path, config) -> None:
+    """Refuse to load a checkpoint whose shape disagrees with the requested config.
+
+    `from_pretrained` with an explicit config reports missing and unexpected keys and
+    carries on, which is right for a conversion that adds parameters and wrong for a
+    typo in `--hidden`. The difference is that a conversion adds *known* modules; a
+    mismatch here silently trains a partly random model and reports a loss for it.
+    """
+    stored = json.loads((source / "config.json").read_text(encoding="utf-8"))
+    for key in _PROVENANCE_KEYS:
+        if key in stored:
+            setattr(config, key, stored[key])
+    for key in _ARCHITECTURE_KEYS:
+        want = getattr(config, key, None)
+        have = stored.get(key, None)
+        if isinstance(want, (list, tuple)) or isinstance(have, (list, tuple)):
+            want, have = list(want or []), list(have or [])
+        if want != have:
+            raise SystemExit(
+                "%s was trained with %s = %r, but this run asks for %r. Loading it "
+                "would leave part of the model randomly initialized."
+                % (source, key, have, want))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vocab", type=int, default=16_384)
@@ -121,12 +165,44 @@ def main() -> int:
                         default=Path("scratch/dense_gr/checkpoints-smoke"),
                         help="root for the end-of-run checkpoint")
     parser.add_argument("--no-checkpoint", action="store_true")
+    parser.add_argument("--init-from", type=Path, default=None,
+                        help="start from this checkpoint instead of a fresh "
+                             "initialization. Its architecture must match the one the "
+                             "other flags describe; a mismatch is refused rather than "
+                             "loaded, because a partial load trains something nobody "
+                             "asked for.")
+    parser.add_argument("--freeze-router", action="store_true",
+                        help="hold the CSA2 indexer at its initialization. Routing still "
+                             "happens and still reaches the attention logits; only the "
+                             "learning of it stops. The control for whether learning the "
+                             "routing is worth anything.")
+    parser.add_argument("--asymmetric", action="store_true",
+                        help="convert with mean-zero per-branch gain offsets. The read "
+                             "is unchanged in exact arithmetic, but the branches no "
+                             "longer start identical -- which is what the symmetric "
+                             "conversion leaves for training to undo.")
+    parser.add_argument("--convert", action="store_true",
+                        help="run recipient_initialize on the loaded checkpoint, which "
+                             "puts it on the gated residual route at blend 1 computing "
+                             "exactly what it computed before. Requires --init-from and "
+                             "a recipient at blend 0.")
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
     variant = variant_tag(args.ratio, args.blend, args.norm_mode, args.seed)
     if args.mla:
         variant += "-csa2" if args.csa2 else "-mla"
+    if args.freeze_router:
+        variant += "-frozen"
+    if args.convert:
+        if args.init_from is None:
+            raise SystemExit("--convert needs --init-from: there is nothing to convert")
+        if args.blend != 0.0:
+            # recipient_initialize sets blend to 1 itself. `--blend` describes the
+            # checkpoint being loaded, and the recipient is the model at blend 0.
+            raise SystemExit("--convert loads a recipient, which runs at blend 0; got "
+                             "--blend %r" % args.blend)
+        variant += "-converted-asym" if args.asymmetric else "-converted"
     if args.output == Path("scratch/dense_gr/smoke-train.json"):
         args.output = Path("scratch/dense_gr/smoke-train-%s.json" % variant)
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -191,7 +267,29 @@ def main() -> int:
         config.csa2_local_window = args.csa2_local_window
         config.csa2_block_size = args.csa2_block_size
     torch.manual_seed(args.seed)
-    model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
+    if args.init_from is None:
+        model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
+    else:
+        _refuse_mismatched_architecture(args.init_from, config)
+        model = Qwen35WidenedForCausalLM.from_pretrained(
+            args.init_from, config=config, dtype=torch.bfloat16).to(device="cuda")
+        print("init: loaded %s" % args.init_from, flush=True)
+        if args.convert:
+            records = model.recipient_initialize(asymmetric=args.asymmetric)
+            print("convert: %d sublayers, mode %s, blend %.1f"
+                  % (len(records), records[0]["mode"],
+                     float(model.config.residual_stream_blend)), flush=True)
+    if args.freeze_router:
+        if not args.csa2:
+            raise SystemExit("--freeze-router needs --csa2: there is no router otherwise")
+        held = [name for name, parameter in model.named_parameters()
+                if ".index_" in name]
+        for name, parameter in model.named_parameters():
+            if ".index_" in name:
+                parameter.requires_grad_(False)
+        if not held:
+            raise SystemExit("--freeze-router found no indexer parameters to freeze")
+        print("router: froze %d indexer tensors" % len(held), flush=True)
     model.train()
     swapped = apply_liger(model, config)
     parameters = sum(p.numel() for p in model.parameters())
@@ -331,7 +429,13 @@ def main() -> int:
     report = {
         "vocab": args.vocab, "kept_ids": len(kept), "coverage": coverage,
         "store": str(store), "seed": args.seed,
-        "architecture": {"ratio": args.ratio, "blend": args.blend,
+        "architecture": {"ratio": args.ratio,
+                         "blend": float(model.config.residual_stream_blend),
+                         "init_from": None if args.init_from is None
+                         else str(args.init_from),
+                         "converted": bool(args.convert),
+                         "frozen_router": bool(args.freeze_router),
+                         "asymmetric": bool(args.asymmetric),
                          "variant": variant, "hidden": args.hidden,
                          "norm_mode": args.norm_mode,
                          "layers": args.layers,

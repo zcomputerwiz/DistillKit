@@ -160,14 +160,16 @@ def test_indexer_parameters_receive_gradient():
     checked = 0
     for name, parameter in model.named_parameters():
         if not any(part in name for part in
-                   ("index_q_proj", "index_k_proj", "index_weight", "index_gate")):
+                   ("index_q_proj", "index_k_proj", "index_weight", "indexer_proj",
+                    "index_gate")):
             continue
         checked += 1
         assert parameter.grad is not None, "%s took no gradient" % name
         assert torch.isfinite(parameter.grad).all(), "%s gradient is not finite" % name
         assert parameter.grad.abs().sum() > 0, "%s gradient is all zero" % name
-    # Two full layers own queries, keys, weights and a gate; the reindex layer owns
-    # everything but the keys.
+    # Two full layers own queries, keys, head weights and a gate; the reindex layer owns
+    # everything but the keys. The head weights are one tensor either way -- a projection
+    # under the default, a shared vector under `csa2_token_head_weights=False`.
     assert checked == 11
 
 

@@ -144,7 +144,7 @@ class SparseIndexBus:
     instead of producing quietly wrong gradients.
     """
 
-    __slots__ = ("index_keys", "latent", "rotary", "topk")
+    __slots__ = ("index_keys", "latent", "rotary", "topk", "candidates")
 
     def __init__(self) -> None:
         self.clear()
@@ -154,6 +154,9 @@ class SparseIndexBus:
         self.latent = None
         self.rotary = None
         self.topk = None
+        # Level one of the hierarchy, published by at most one layer and read by the
+        # layers after it. Stays None when the hierarchy is off, which is the default.
+        self.candidates = None
 
     def require(self, field: str, layer_idx: int):
         value = getattr(self, field)
@@ -181,6 +184,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # is still choosing anything. Bool at [batch, blocks, blocks] -- a few kilobytes,
         # detached, out of the graph.
         self.last_allowed = None
+        self.last_candidates = None
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -191,6 +195,17 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         if self.local_window < 0:
             raise ValueError("csa2_local_window must not be negative; got %d"
                              % self.local_window)
+        self.rope_index = bool(getattr(config, "csa2_rope_index", True))
+        # Level one of the hierarchy. The named layer publishes a candidate block set and
+        # the layers after it choose positions inside it. -1 leaves the hierarchy off, and
+        # a layer only publishes if it routes at all -- a reuse layer has no scores.
+        self.candidate_layer = int(getattr(config, "csa2_candidate_layer", -1))
+        self.candidate_k = int(getattr(config, "csa2_candidate_k", 0))
+        if self.candidate_k and self.candidate_k < self.top_k:
+            raise ValueError(
+                "csa2_candidate_k %d is narrower than csa2_top_k %d: level one would "
+                "hand level two fewer blocks than it is asked to pick"
+                % (self.candidate_k, self.top_k))
 
         bias = config.attention_bias
         # Index keys are published by Full layers and borrowed by everyone else.
@@ -200,7 +215,18 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         if mode in ("full", "reindex"):
             self.index_q_proj = nn.Linear(
                 config.hidden_size, self.index_heads * self.index_dim, bias=bias)
-            self.index_weight = nn.Parameter(torch.zeros(self.index_heads))
+            # DeepSeek weights the per-head scores with a projection of the token --
+            # `indexer_proj` in llama.cpp's V4/V4.1 graph, one weight per head per token.
+            # This fork used a single learned vector shared by every token, which cannot
+            # say "this head matters here"; `indexer_head_weights` keeps that form for
+            # checkpoints trained with it.
+            self.token_head_weights = bool(
+                getattr(config, "csa2_token_head_weights", True))
+            if self.token_head_weights:
+                self.indexer_proj = nn.Linear(config.hidden_size, self.index_heads,
+                                              bias=bias)
+            else:
+                self.index_weight = nn.Parameter(torch.zeros(self.index_heads))
             # How far the router may move an attention logit. This is the whole gradient
             # path into the indexer, so it starts at 1 rather than at 0: a gate of zero
             # would zero the gradient it exists to carry.
@@ -258,7 +284,99 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         fused = torch.nn.functional.linear(hidden_states, weight, bias)
         return fused.split([module.out_features for module in modules], dim=-1)
 
-    def route(self, hidden_states, index_keys, queries=None):
+    def _rope_index(self, tensor, position_embeddings):
+        """Rotate the trailing slice of an index vector, the way the reference does.
+
+        DeepSeek ropes both the indexer query and the indexer key, so a block's score
+        carries how far away it is and not only what is in it. Without this the router
+        sees content alone and has to infer distance from the local window, which is the
+        one thing it is never asked to decide.
+
+        The rotated slice is the *trailing* one here, matching the reference's nope-then-pe
+        layout, and it is fed to the stock rotary on its own -- that function rotates the
+        leading dimensions of whatever it is handed, so handing it the slice is enough.
+        """
+        from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+
+        cos, sin = position_embeddings
+        width = min(cos.shape[-1], tensor.shape[-1])
+        head = tensor if tensor.ndim == 4 else tensor.unsqueeze(1)
+        nope, rotated = head[..., :-width], head[..., -width:]
+        rotated, _ = apply_rotary_pos_emb(rotated, rotated, cos, sin)
+        out = torch.cat([nope, rotated], dim=-1)
+        return out if tensor.ndim == 4 else out.squeeze(1)
+
+    def block_scores(self, hidden_states, index_keys, queries=None,
+                     position_embeddings=None):
+        """``(scores, eligible)``: what the router thinks of every block pair.
+
+        ``route`` reads this under ``no_grad``, because top-k and a scatter carry no
+        gradient and the selection is all it wants. Distillation reads it directly: when
+        the target is a teacher's attention over the same blocks, the score itself is the
+        thing being trained, and the logit fold that normally carries the indexer's
+        gradient is not involved.
+
+        Scored from the block's *leading* query against pooled key summaries, which is the
+        same causal choice ``route`` documents -- one decision serves a whole block, so it
+        may only use what the earliest token in that block can see.
+        """
+        blocks = hidden_states.shape[1] // self.block_size
+        return self._score_blocks(*self._index_inputs(
+            hidden_states, index_keys, queries, position_embeddings), blocks)
+
+    def _score_blocks(self, queries, index_keys, weights, blocks):
+        """Leading-query scores against pooled key summaries, and which pairs compete.
+
+        One decision serves every token in the block, so it may only use what the
+        *earliest* of them can see. Pooling the block's queries -- an amax over all of
+        them, as this did -- lets the block's last token change what its first token is
+        allowed to read: measured at 18 of 200 random single-token mutations, and 191 of
+        200 at larger ones. Taking the leading query is the most informative choice that
+        stays causal, because position `i * block_size` precedes every other position in
+        block `i`, and the block's weights come from that same leading token.
+
+        Only blocks complete in the past compete. That keeps a top-k slot from being spent
+        on a block the local window forces open anyway, and keeps the diagonal block's
+        summary -- the one place a key pool holds tokens from the query's own future --
+        out of the decision entirely.
+        """
+        batch = queries.shape[0]
+        summary = index_keys.view(
+            batch, blocks, self.block_size, self.index_dim).mean(2)
+        leaders = queries.view(
+            batch, blocks, self.block_size, self.index_heads, self.index_dim)[:, :, 0]
+        scores = torch.einsum("bqhd,bnd->bhqn", leaders.float(), summary.float())
+        leader_weights = weights.view(
+            batch, blocks, self.block_size, self.index_heads)[:, :, 0]
+        scores = (torch.relu(scores)
+                  * leader_weights.permute(0, 2, 1).unsqueeze(-1).float()).sum(dim=1)
+
+        rows = torch.arange(blocks, device=queries.device)
+        offsets = rows.view(-1, 1) - rows.view(1, -1)
+        return scores, offsets > self.local_blocks
+
+    def _index_inputs(self, hidden_states, index_keys, queries, position_embeddings):
+        """Index queries, index keys and per-head weights, roped and shaped."""
+        batch, seq, _ = hidden_states.shape
+        if queries is None:
+            queries = self.index_q_proj(hidden_states)
+        queries = queries.view(batch, seq, self.index_heads, self.index_dim)
+        if self.rope_index and position_embeddings is not None:
+            queries = self._rope_index(
+                queries.transpose(1, 2), position_embeddings).transpose(1, 2)
+            index_keys = self._rope_index(index_keys, position_embeddings)
+        if self.token_head_weights:
+            # Softplus rather than the reference's raw projection: the head scores pass a
+            # ReLU and are summed, and a negative weight would turn that sum into a
+            # subtraction of evidence the ReLU already floored at zero.
+            weights = torch.nn.functional.softplus(self.indexer_proj(hidden_states))
+        else:
+            weights = torch.nn.functional.softplus(self.index_weight)
+            weights = weights.view(1, 1, -1).expand(batch, seq, -1)
+        return queries, index_keys, weights
+
+    def route(self, hidden_states, index_keys, queries=None, position_embeddings=None,
+              candidates=None):
         """``(allowed, effective)``: the hard block selection, and the query behind it.
 
         ``allowed`` is ``[batch, q_blocks, kv_blocks]`` booleans -- what the kernel skips
@@ -280,55 +398,70 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         """
         batch, seq, _ = hidden_states.shape
         blocks = seq // self.block_size
-        if queries is None:
-            queries = self.index_q_proj(hidden_states)
-        queries = queries.view(batch, seq, self.index_heads, self.index_dim)
-        weights = torch.nn.functional.softplus(self.index_weight)
+        queries, index_keys, weights = self._index_inputs(
+            hidden_states, index_keys, queries, position_embeddings)
 
         with torch.no_grad():
-            summary = index_keys.view(
-                batch, blocks, self.block_size, self.index_dim).mean(2)
-            # One decision serves every token in the block, so it may only use what the
-            # *earliest* of them can see. Pooling the block's queries -- an amax over all
-            # of them, as this did -- lets the block's last token change what its first
-            # token is allowed to read: measured at 18 of 200 random single-token
-            # mutations, and 191 of 200 at larger ones. Taking the leading query instead
-            # is the most informative choice that stays causal, because position
-            # `i * block_size` precedes every other position in block `i`.
-            leaders = queries.view(
-                batch, blocks, self.block_size, self.index_heads, self.index_dim)[:, :, 0]
-            scores = torch.einsum("bqhd,bnd->bhqn", leaders.float(), summary.float())
-            scores = (torch.relu(scores) * weights.view(1, -1, 1, 1)).sum(dim=1)
-
+            scores, eligible = self._score_blocks(queries, index_keys, weights, blocks)
             rows = torch.arange(blocks, device=hidden_states.device)
             offsets = rows.view(-1, 1) - rows.view(1, -1)
             # The recent blocks always survive routing: a query that cannot see its own
             # immediate context produces gradients about the router, not the
             # architecture.
             local = (offsets >= 0) & (offsets <= self.local_blocks)
-            # Only blocks that are complete in the past compete. This keeps a top-k slot
-            # from being spent on a block that is forced open anyway, and it keeps the
-            # diagonal block's summary -- the one place a key pool holds tokens from the
-            # query's own future -- out of the decision entirely.
-            eligible = offsets > self.local_blocks
             scores = scores.masked_fill(~eligible.unsqueeze(0), float("-inf"))
+            # Level one of the hierarchy: an earlier layer narrowed the field to candidate
+            # blocks, and this layer picks positions inside them rather than over
+            # everything. The publisher itself routes unfiltered, so the candidates are
+            # chosen by a layer that saw the whole row.
+            if candidates is not None:
+                scores = scores.masked_fill(~candidates, float("-inf"))
 
             keep = max(1, min(self.top_k // self.block_size, blocks))
+            published = None
+            if self.publishes_candidates:
+                wide = max(keep, min(self.candidate_k // self.block_size, blocks))
+                published = torch.zeros(batch, blocks, blocks, dtype=torch.bool,
+                                        device=hidden_states.device)
+                published.scatter_(-1, scores.topk(wide, dim=-1).indices, True)
+                published |= ~eligible.unsqueeze(0)
             chosen = scores.topk(keep, dim=-1).indices
             allowed = torch.zeros(batch, blocks, blocks, dtype=torch.bool,
                                   device=hidden_states.device)
             allowed.scatter_(-1, chosen, True)
             # An early block has no eligible candidates, so its top-k over an all -inf
-            # row returns arbitrary indices; this drops them.
+            # row returns arbitrary indices; this drops them. A row that level one left
+            # empty is the same case, so it is dropped the same way.
             allowed &= eligible.unsqueeze(0)
+            if candidates is not None:
+                allowed &= candidates
             allowed |= local.unsqueeze(0)
             allowed &= (offsets >= 0).unsqueeze(0)
 
         # The heads collapse here. Summing head scores through a ReLU is what makes them
         # distinct, and the ReLU cannot be folded into a dot product; the linear part can,
         # and sum_h w_h * (Q_h . K) is exactly (sum_h w_h Q_h) . K.
-        effective = (queries * weights.view(1, 1, -1, 1)).sum(dim=2)
+        # Kept beside `last_allowed` rather than returned: every caller of `route` wants
+        # the selection and the query, and only the publishing layer has a third thing.
+        self.last_candidates = published
+        effective = (queries * weights.unsqueeze(-1)).sum(dim=2)
         return allowed, effective
+
+    @property
+    def publishes_candidates(self) -> bool:
+        return (self.candidate_k > 0 and self.mode != "reuse"
+                and self.layer_idx == self.candidate_layer)
+
+    def _inherited_candidates(self):
+        """The candidate set from level one, for a layer that comes after the publisher.
+
+        The publisher routes over the whole row -- narrowing it against its own output
+        would make level one a no-op -- so it reads nothing here, and neither does any
+        layer before it.
+        """
+        if self.candidate_k <= 0 or self.layer_idx <= self.candidate_layer:
+            return None
+        return self.bus.candidates
 
     def block_mask(self, allowed):
         """`allowed` as a `BlockMask`, built from the indices rather than scanned.
@@ -405,17 +538,25 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             query, compressed, index_keys, queries = self._project(hidden_states)
             latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
             latent = self.kv_a_norm(latent)
-            allowed, effective = self.route(hidden_states, index_keys, queries)
+            allowed, effective = self.route(
+                hidden_states, index_keys, queries, position_embeddings,
+                self._inherited_candidates())
             self.bus.index_keys, self.bus.latent = index_keys, latent
             self.bus.rotary, self.bus.topk = rotary, allowed
+            if self.last_candidates is not None:
+                self.bus.candidates = self.last_candidates
         elif self.mode == "reindex":
             query, queries = self._project(hidden_states)
             index_keys = self.bus.require("index_keys", self.layer_idx)
             latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
             rotary = self.bus.require("rotary", self.layer_idx)
             # New routing over borrowed keys: this layer's own view of what matters.
-            allowed, effective = self.route(hidden_states, index_keys, queries)
+            allowed, effective = self.route(
+                hidden_states, index_keys, queries, position_embeddings,
+                self._inherited_candidates())
             self.bus.topk = allowed
+            if self.last_candidates is not None:
+                self.bus.candidates = self.last_candidates
         else:
             query, = self._project(hidden_states)
             latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
@@ -463,7 +604,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             *input_shape, self.num_heads, self.content_dim + self.head_dim)
         content_key, value_states = torch.split(
             projected, [self.content_dim, self.head_dim], dim=-1)
-        content_key = self.k_norm(content_key)
+        if self.k_norm is not None:
+            content_key = self.k_norm(content_key)
 
         from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
         cos, sin = position_embeddings
