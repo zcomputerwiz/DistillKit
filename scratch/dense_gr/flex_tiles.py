@@ -55,17 +55,32 @@ def build(batch, heads, length, width, value_width, device):
                         dtype=torch.bfloat16))
 
 
-def attempt(shape, width, options, mask, device, repeats):
-    """Compile and launch once. ('ok', ms), ('oom', asked, limit) or ('err', line)."""
+def attempt(shape, width, options, mask, device, repeats, backward=False):
+    """Compile and launch once. ('ok', ms), ('oom', asked, limit) or ('err', line).
+
+    The backward has its own table and its own failure. Inductor keys it on head_dim and
+    hands SM86 a 64x64x64x64 tile at 256 and a 16x16x16x16 one above it, so a layer that
+    carries the router's columns fits and one that does not -- a reuse layer, which has no
+    columns to carry -- asks 168960 of 101376 and never compiles.
+    """
     torch._dynamo.reset()
     query, key, value = build(*shape[:3], width, shape[3], device)
+    if backward:
+        for tensor in (query, key, value):
+            tensor.requires_grad_(True)
     compiled = torch.compile(flex_attention, dynamic=False)
+
+    def once():
+        out = compiled(query, key, value, block_mask=mask, kernel_options=options)
+        if backward:
+            out.sum().backward()
+
     try:
-        compiled(query, key, value, block_mask=mask, kernel_options=options)
+        once()
         torch.cuda.synchronize()
         began = time.perf_counter()
         for _ in range(repeats):
-            compiled(query, key, value, block_mask=mask, kernel_options=options)
+            once()
         torch.cuda.synchronize()
         return ("ok", (time.perf_counter() - began) * 1000.0 / repeats)
     except Exception as error:  # noqa: BLE001 - the message is the measurement
@@ -88,6 +103,8 @@ def main() -> int:
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--window", type=int, default=256)
     parser.add_argument("--repeats", type=int, default=20)
+    parser.add_argument("--backward", action="store_true",
+                        help="sweep the backward tile instead of the forward one")
     args = parser.parse_args()
 
     device = torch.device(args.device)
@@ -114,16 +131,41 @@ def main() -> int:
 
     print("\n%-6s %-22s %-8s %s" % ("width", "tile", "outcome", "detail"))
     print("-" * 70)
-    grid = [None] + [{"BLOCK_M": m, "BLOCK_N": n, "num_stages": s}
-                     for m, n, s in itertools.product((128, 64, 32, 16), (64, 32, 16),
-                                                      (3, 2, 1))]
+    if args.backward:
+        # The forward tile has to come along, or the graph dies there and every row
+        # reports the forward's number instead of the backward's. These are the measured
+        # forward winners, keyed on the rounded head in bytes the way _kernel_options is.
+        def forward_for(width):
+            span = (1 << (width - 1).bit_length()) * 2
+            stages = 3 if span <= 512 else 1
+            return {"fwd_BLOCK_M": 16, "fwd_BLOCK_N": 32, "fwd_num_stages": stages}
+
+        # One square tile for both halves of the backward, which is what every entry in
+        # Inductor's own table does, and the stage count on top.
+        grid = [None] + [{"bwd_BLOCK_M1": b, "bwd_BLOCK_N1": b,
+                          "bwd_BLOCK_M2": b, "bwd_BLOCK_N2": b, "bwd_num_stages": s}
+                         for b, s in itertools.product((64, 32, 16), (3, 2, 1))]
+    else:
+        grid = [None] + [{"BLOCK_M": m, "BLOCK_N": n, "num_stages": s}
+                         for m, n, s in itertools.product((128, 64, 32, 16), (64, 32, 16),
+                                                          (3, 2, 1))]
     fitting = {}
     for width in widths:
         for options in grid:
-            label = ("default" if options is None else
-                     "M%-3d N%-3d stages%d" % (options["BLOCK_M"], options["BLOCK_N"],
-                                               options["num_stages"]))
-            outcome = attempt(shape, width, options, mask, device, args.repeats)
+            if options is None:
+                label = "default"
+            elif args.backward:
+                label = "block%-3d stages%d" % (options["bwd_BLOCK_M1"],
+                                                options["bwd_num_stages"])
+            else:
+                label = "M%-3d N%-3d stages%d" % (options["BLOCK_M"], options["BLOCK_N"],
+                                                  options["num_stages"])
+            passed = options
+            if args.backward and options is not None:
+                passed = dict(options)
+                passed.update(forward_for(width))
+            outcome = attempt(shape, width, passed, mask, device, args.repeats,
+                              backward=args.backward)
             if outcome[0] == "ok":
                 detail = "%.3f ms" % outcome[1]
                 if options is not None:

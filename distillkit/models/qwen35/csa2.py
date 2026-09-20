@@ -66,7 +66,7 @@ from torch import nn
 from .mla import Qwen35LatentAttention
 
 __all__ = ["SparseIndexBus", "Qwen35SparseLatentAttention", "csa2_modes", "dense_routing",
-           "router_parameters", "routing_report"]
+           "isolated_indexer", "router_parameters", "routing_report"]
 
 MODES = ("full", "reindex", "reuse")
 
@@ -144,6 +144,36 @@ def dense_routing(model):
     finally:
         for module in layers:
             module.dense_routing = False
+
+
+@contextlib.contextmanager
+def isolated_indexer(model):
+    """Cut the gradient between the indexer and the model, both ways.
+
+    DeepSeek's sparse stage: "we detach the indexer input from the computational graph for
+    separate optimization. The training signal of the indexer is from only L_I, while the
+    optimization of the main model is according to only the language modeling loss."
+
+    That is two cuts here rather than one, because this fork has a term the reference does
+    not. Their selection is a mask and nothing else, so a language-modeling loss cannot
+    reach the indexer at all and only the input needs detaching. This fork also folds the
+    index score into the attention logits through extra query and key columns, which
+    exists precisely so the loss *can* reach an indexer that top-k would otherwise leave
+    gradient-free. Under this policy the indexer has its own objective and no longer needs
+    that path, so the columns stay in the function and carry no gradient.
+
+    Leaving either cut out is not a smaller version of the policy. Keeping the first means
+    the indexer's KL perturbs the backbone; keeping the second means the language model
+    trains the indexer against the target its KL is pulling it toward.
+    """
+    layers = [m for m in model.modules() if isinstance(m, Qwen35SparseLatentAttention)]
+    for module in layers:
+        module.isolated_indexer = True
+    try:
+        yield model
+    finally:
+        for module in layers:
+            module.isolated_indexer = False
 
 
 def routing_report(model):
@@ -227,6 +257,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # a decode step look like a collapsed router.
         self.last_token_routed = False
         self.dense_routing = False
+        # DeepSeek's sparse stage trains the indexer from its own KL alone and the model
+        # from the language-modeling loss alone. See `isolated_indexer`.
+        self.isolated_indexer = False
         self.index_dim = int(getattr(config, "csa2_index_dim", 64))
         self.index_heads = int(getattr(config, "csa2_index_heads", 4))
         self.top_k = int(getattr(config, "csa2_top_k", 128))
@@ -431,6 +464,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
     def _index_inputs(self, hidden_states, index_keys, queries, position_embeddings):
         """Index queries, index keys and per-head weights, roped and shaped."""
         batch, seq, _ = hidden_states.shape
+        if self.isolated_indexer:
+            # The first of DeepSeek's two cuts: whatever the indexer's own loss asks for,
+            # it stops here rather than travelling back into the backbone. `queries` and
+            # `index_keys` were projected before this point, so they are cut too.
+            hidden_states = hidden_states.detach()
+            queries = None if queries is None else queries.detach()
+            index_keys = index_keys.detach()
         if queries is None:
             queries = self.index_q_proj(hidden_states)
         queries = queries.view(batch, seq, self.index_heads, self.index_dim)
@@ -709,6 +749,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
     def _index_queries(self, hidden_states, queries, position_embeddings):
         """Roped index queries and their per-head weights, for the gathered path."""
         batch, seq, _ = hidden_states.shape
+        if self.isolated_indexer:
+            hidden_states, queries = hidden_states.detach(), queries.detach()
         index_queries = queries.view(batch, seq, self.index_heads, self.index_dim)
         if self.rope_index and position_embeddings is not None:
             index_queries = self._rope_index(
@@ -845,8 +887,21 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         however large the raw projections grow, which is the property a raw dot product
         would not have.
         """
+        if self.isolated_indexer:
+            # DeepSeek's second cut, at the one place both paths pass through. These
+            # columns are a real term in the logits and they stay in the function; what
+            # stops is the language-modeling loss reaching the indexer along them, which
+            # would train it against the target its own KL is pulling it toward. The
+            # reference needs no equivalent, because there the selection is a mask and
+            # there is no path from the loss to the indexer to cut.
+            effective, index_keys = effective.detach(), index_keys.detach()
         normalize = torch.nn.functional.normalize
-        query = normalize(effective.float(), dim=-1) * (self.index_gate / self.scaling)
+        # `index_gate` is an indexer parameter and the KL never touches it, so under the
+        # policy it takes no gradient from anywhere and holds where it was left. That is
+        # the closest this fork gets to the reference, which has no such scalar because it
+        # has no columns for one to scale.
+        gate = self.index_gate.detach() if self.isolated_indexer else self.index_gate
+        query = normalize(effective.float(), dim=-1) * (gate / self.scaling)
         return (query.to(effective.dtype).unsqueeze(1),
                 normalize(index_keys.float(), dim=-1).to(index_keys.dtype).unsqueeze(1))
 
@@ -941,20 +996,40 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         float32 -- and a self-distillation runs the student's own attention as that
         teacher, so those layers reach this in float32 too.
 
-        The bfloat16 rows below are measured. The float32 ones are the same rule read at
-        twice the span, which the byte formula says fits and `flex_tiles.py --dtype
-        float32` is what would confirm.
+        The backward has a second table with the same fault and an inverted twist. On SM86
+        a head *wider* than 256 gets `FlexBwDConfig(16, 16, 16, 16, 1, 4)`, which fits,
+        and a head at exactly 256 gets 64x64x64x64 with two stages, which asks 168960. So
+        a layer carrying the router's columns is saved by them, and a reuse layer, which
+        has none, is the one that cannot compile. Forward-only work never sees it: the
+        conversion and every evaluation run under `no_grad`.
+
+            width 256   forward 16x32x3  0.703 ms   backward block 32 x2  4.428 ms
+            width 320   forward 16x32x1  0.821 ms   backward block 16 x3  5.682 ms
+
+        Both halves are named with their prefix. Inductor strips `fwd_` in the forward
+        lowering and drops `bwd_`, and the reverse in the backward -- but a bare key
+        survives into both, so a plain `num_stages` silently sets the backward's as well.
+
+        The bfloat16 rows above are measured. The float32 ones are the same rule read at
+        twice the span, which the byte formula says fits and `flex_tiles.py` is what would
+        confirm.
         """
-        # The toy widths land on the tuned entries of that table and fit as they stand.
+        # The toy widths land on the tuned entries of those tables and fit as they stand.
         # Leaving them alone keeps their timings comparable to what is already measured.
         span = (1 << (width - 1).bit_length()) * element_size
         if span <= 256:
             return None
         if span <= 512:
-            return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 3}
+            return {"fwd_BLOCK_M": 16, "fwd_BLOCK_N": 32, "fwd_num_stages": 3,
+                    "bwd_BLOCK_M1": 32, "bwd_BLOCK_N1": 32, "bwd_BLOCK_M2": 32,
+                    "bwd_BLOCK_N2": 32, "bwd_num_stages": 2}
         if span <= 1024:
-            return {"BLOCK_M": 16, "BLOCK_N": 32, "num_stages": 1}
-        return {"BLOCK_M": 16, "BLOCK_N": 16, "num_stages": 1}
+            return {"fwd_BLOCK_M": 16, "fwd_BLOCK_N": 32, "fwd_num_stages": 1,
+                    "bwd_BLOCK_M1": 16, "bwd_BLOCK_N1": 16, "bwd_BLOCK_M2": 16,
+                    "bwd_BLOCK_N2": 16, "bwd_num_stages": 3}
+        return {"fwd_BLOCK_M": 16, "fwd_BLOCK_N": 16, "fwd_num_stages": 1,
+                "bwd_BLOCK_M1": 16, "bwd_BLOCK_N1": 16, "bwd_BLOCK_M2": 16,
+                "bwd_BLOCK_N2": 16, "bwd_num_stages": 1}
 
     def routing_statistics(self):
         """What the last forward's routing looked like, or ``None`` if none has run.

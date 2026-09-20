@@ -57,6 +57,8 @@ from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
+# What the corpus was tokenized at. A model this wide reads it without a remap.
+FULL_VOCABULARY = 248_320
 
 
 # The fields that decide whether a checkpoint's weights mean anything in this config.
@@ -195,6 +197,22 @@ def main() -> int:
                              "path before the indexer is asked to imitate what it "
                              "attends to. The indexer takes no gradient here, because "
                              "the bias that carries it is exactly what is switched off.")
+    parser.add_argument("--inherit", action="store_true",
+                        help="take the architecture from --init-from instead of building "
+                             "one out of --hidden and --layers. The shape flags describe "
+                             "the toy arms and cannot describe a real checkpoint, and the "
+                             "guard that refuses a mismatch is exactly what stops one "
+                             "loading. Its vocabulary comes with it, so a model that "
+                             "already covers the store's is trained on the store as it "
+                             "is, with no remap.")
+    parser.add_argument("--train-only", default="all",
+                        choices=["all", "converted", "no-embedding"],
+                        help="which parameters carry optimizer state. A converted model "
+                             "differs from its source in the attention layers and the "
+                             "residual route and nowhere else, which is 6%% of this 2B. "
+                             "The optimizer is 8-bit, so the whole of it is affordable; "
+                             "this is about what the run is allowed to move, not only "
+                             "about what it costs to hold.")
     parser.add_argument("--freeze-router", action="store_true",
                         help="hold the CSA2 indexer at its initialization. Routing still "
                              "happens and still reaches the attention logits; only the "
@@ -213,6 +231,29 @@ def main() -> int:
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
     args = parser.parse_args()
+    inherited = None
+    if args.inherit:
+        if args.init_from is None:
+            raise SystemExit("--inherit needs --init-from: there is nothing to inherit")
+        from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+
+        inherited = Qwen3_5TextConfig.from_pretrained(args.init_from)
+        # The flags stop describing a model to build and start describing the one being
+        # loaded, so everything downstream that reads them -- the variant tag, the guards
+        # on --dense-routing and --freeze-router, the record the run writes -- is made to
+        # agree with the checkpoint rather than with this run's defaults.
+        args.vocab = inherited.vocab_size
+        args.hidden = inherited.hidden_size
+        args.layers = inherited.num_hidden_layers
+        args.mla = bool(getattr(inherited, "mla_enabled", False))
+        args.csa2 = bool(getattr(inherited, "csa2_enabled", False))
+        args.mla_latent_dim = getattr(inherited, "mla_latent_dim", args.mla_latent_dim)
+        args.csa2_modes = list(getattr(inherited, "csa2_modes", None) or args.csa2_modes)
+        args.csa2_top_k = getattr(inherited, "csa2_top_k", args.csa2_top_k)
+        args.csa2_local_window = getattr(inherited, "csa2_local_window",
+                                         args.csa2_local_window)
+        args.csa2_block_size = getattr(inherited, "csa2_block_size", args.csa2_block_size)
+        args.blend = float(getattr(inherited, "residual_stream_blend", args.blend))
     variant = variant_tag(args.ratio, args.blend, args.norm_mode, args.seed)
     if args.mla:
         variant += "-csa2" if args.csa2 else "-mla"
@@ -251,54 +292,90 @@ def main() -> int:
     raw = np.memmap(store / "train.bin", dtype=np.uint32, mode="r")
     print("store: %d tokens" % raw.shape[0], flush=True)
 
-    # Counting 3B ids takes a couple of minutes and the answer never changes, so the
-    # corpus ships the ranking beside the tokens.
-    cache = store / "train-counts.npy"
-    if cache.exists():
-        counts = np.load(cache)
-        print("counts: loaded %s" % cache.name, flush=True)
+    if inherited is not None:
+        print("inherit: %s, hidden %d, %d layers, vocabulary %d"
+              % (args.init_from, inherited.hidden_size,
+                 inherited.num_hidden_layers, inherited.vocab_size), flush=True)
+
+    # A model whose vocabulary already covers the store reads the store as it is. The
+    # remap exists so a toy with 16,384 embeddings can train on a corpus tokenized at
+    # 248,320, and running it at full width would build a 12 GiB identity.
+    if args.vocab >= FULL_VOCABULARY:
+        kept = None
+        stream = raw
+        print("vocabulary: %d, the store's own; no remap" % args.vocab, flush=True)
     else:
-        counts = np.bincount(np.asarray(raw, dtype=np.int64), minlength=248_320)
-    kept, forward, bytes_ids = build_vocabulary(counts, tokenizer, args.vocab)
-    coverage = float(counts[np.asarray(kept)].sum() / counts.sum())
-    print("vocabulary: kept %d ids, %.4f%% coverage" % (len(kept), 100 * coverage),
-          flush=True)
+        # Counting 3B ids takes a couple of minutes and the answer never changes, so the
+        # corpus ships the ranking beside the tokens.
+        cache = store / "train-counts.npy"
+        if cache.exists():
+            counts = np.load(cache)
+            print("counts: loaded %s" % cache.name, flush=True)
+        else:
+            counts = np.bincount(np.asarray(raw, dtype=np.int64),
+                                 minlength=FULL_VOCABULARY)
+        kept, forward, bytes_ids = build_vocabulary(counts, tokenizer, args.vocab)
+        coverage = float(counts[np.asarray(kept)].sum() / counts.sum())
+        print("vocabulary: kept %d ids, %.4f%% coverage" % (len(kept), 100 * coverage),
+              flush=True)
 
-    stream, original_tokens, compact_tokens = cached_remap(
-        store, "train", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
-    # Into RAM: the training loop draws random windows, and a cold page cache over a
-    # multi-gigabyte file would pay for that at every step of the first pass.
-    stream = np.asarray(stream)
-    print("remap: %d tokens -> %d, inflation %.4f, %.1f GiB resident"
-          % (original_tokens, compact_tokens, compact_tokens / original_tokens,
-             stream.nbytes / 2 ** 30), flush=True)
+        stream, original_tokens, compact_tokens = cached_remap(
+            store, "train", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
+    if kept is None:
+        # The store is memory mapped and stays that way: 12 GiB of uint32 is not worth
+        # resident, and the windows are random over the whole of it either way.
+        print("stream: %d tokens, %.1f GiB mapped"
+              % (stream.shape[0], stream.nbytes / 2 ** 30), flush=True)
+    else:
+        # Into RAM: the training loop draws random windows, and a cold page cache over a
+        # multi-gigabyte file would pay for that at every step of the first pass.
+        stream = np.asarray(stream)
+        print("remap: %d tokens -> %d, inflation %.4f, %.1f GiB resident"
+              % (original_tokens, compact_tokens, compact_tokens / original_tokens,
+                 stream.nbytes / 2 ** 30), flush=True)
 
-    # Round trip: the compact stream must decode to what the original ids decode to.
-    inverse = np.asarray(kept, dtype=np.int64)
-    sample = stream[:4096].astype(np.int64)
-    round_tripped = tokenizer.decode(inverse[sample].tolist())
-    reference = tokenizer.decode(np.asarray(raw[:4096]).tolist())
-    matches = round_tripped[:2000] == reference[:2000]
-    print("round trip on the first 4096 compact tokens: %s" % matches, flush=True)
+        # Round trip: the compact stream must decode to what the original ids decode to.
+        inverse = np.asarray(kept, dtype=np.int64)
+        sample = stream[:4096].astype(np.int64)
+        round_tripped = tokenizer.decode(inverse[sample].tolist())
+        reference = tokenizer.decode(np.asarray(raw[:4096]).tolist())
+        matches = round_tripped[:2000] == reference[:2000]
+        print("round trip on the first 4096 compact tokens: %s" % matches, flush=True)
 
-    config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
-                   blend=args.blend,
-                   attn_implementation="flash_attention_2")
+    if inherited is not None:
+        # The architecture flags describe a model this run would build. This run is not
+        # building one, and letting them through would quietly resize what it loads --
+        # `--mla-latent-dim` alone defaults to 128 over a checkpoint's 384, which arrives
+        # as a shape mismatch on six layers rather than as an argument.
+        config = inherited
+        config._attn_implementation = "flash_attention_2"
+        print("inherit: latent %s, modes %s, top_k %s, block %s, taken from the checkpoint"
+              % (getattr(config, "mla_latent_dim", None),
+                 getattr(config, "csa2_modes", None),
+                 getattr(config, "csa2_top_k", None),
+                 getattr(config, "csa2_block_size", None)), flush=True)
+    else:
+        config = build(args.hidden, args.layers, args.vocab, ratio=args.ratio,
+                       blend=args.blend,
+                       attn_implementation="flash_attention_2")
+        if args.mla:
+            config.mla_enabled = True
+            config.mla_latent_dim = args.mla_latent_dim
+        if args.csa2:
+            config.csa2_enabled = True
+            config.csa2_modes = list(args.csa2_modes)
+            config.csa2_top_k = args.csa2_top_k
+            config.csa2_local_window = args.csa2_local_window
+            config.csa2_block_size = args.csa2_block_size
     config.residual_stream_norm_mode = args.norm_mode
-    if args.mla:
-        config.mla_enabled = True
-        config.mla_latent_dim = args.mla_latent_dim
-    if args.csa2:
-        config.csa2_enabled = True
-        config.csa2_modes = list(args.csa2_modes)
-        config.csa2_top_k = args.csa2_top_k
-        config.csa2_local_window = args.csa2_local_window
-        config.csa2_block_size = args.csa2_block_size
     torch.manual_seed(args.seed)
     if args.init_from is None:
         model = Qwen35WidenedForCausalLM(config).to(device="cuda", dtype=torch.bfloat16)
     else:
-        _refuse_mismatched_architecture(args.init_from, config)
+        # Inheriting *is* the agreement: the config came out of that checkpoint, so there
+        # is nothing for the guard to compare and nothing it could catch.
+        if inherited is None:
+            _refuse_mismatched_architecture(args.init_from, config)
         model = Qwen35WidenedForCausalLM.from_pretrained(
             args.init_from, config=config, dtype=torch.bfloat16).to(device="cuda")
         print("init: loaded %s" % args.init_from, flush=True)
@@ -307,6 +384,24 @@ def main() -> int:
             print("convert: %d sublayers, mode %s, blend %.1f"
                   % (len(records), records[0]["mode"],
                      float(model.config.residual_stream_blend)), flush=True)
+    if args.train_only != "all":
+        # A conversion changes the attention layers and the residual route and nothing
+        # else, so those are the parameters that have something to correct. The rest is
+        # the source's own and training it risks moving what the conversion preserved.
+        def wanted(name):
+            if args.train_only == "no-embedding":
+                return "embed" not in name and "lm_head" not in name
+            return "self_attn" in name or "residual" in name
+
+        frozen = 0
+        for name, parameter in model.named_parameters():
+            if not wanted(name):
+                parameter.requires_grad_(False)
+                frozen += parameter.numel()
+        trains = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print("train-only %s: %d train, %d frozen, %.2f GiB of 8-bit optimizer state"
+              % (args.train_only, trains, frozen, trains * 2 / 2 ** 30), flush=True)
+
     if args.freeze_router:
         if not args.csa2:
             raise SystemExit("--freeze-router needs --csa2: there is no router otherwise")
@@ -324,8 +419,11 @@ def main() -> int:
           flush=True)
 
     import bitsandbytes as bnb
-    optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=args.lr, betas=(0.9, 0.95),
-                                    weight_decay=0.1)
+    # Only what trains: a frozen parameter takes no gradient, and handing it to the
+    # optimizer still buys it two state tensors it will never read.
+    optimizer = bnb.optim.AdamW8bit(
+        [p for p in model.parameters() if p.requires_grad], lr=args.lr,
+        betas=(0.9, 0.95), weight_decay=0.1)
     # Polled on a daemon thread: reading it inline costs 1.81 s per report and
     # leaves the GPU with nothing queued for all of it.
     spill = SpillWatch(interval=args.spill_every).start()
@@ -335,8 +433,13 @@ def main() -> int:
     # what training loss becomes once a budget spans several passes.
     evaluation = None
     if args.evaluate_every:
-        held_stream, held_original, held_compact = cached_remap(
-            store, "calibration", args.vocab, tokenizer, forward, bytes_ids, counts, kept)
+        if kept is None:
+            held_stream = np.memmap(store / "calibration.bin", dtype=np.uint32, mode="r")
+            held_original = held_compact = held_stream.shape[0]
+        else:
+            held_stream, held_original, held_compact = cached_remap(
+                store, "calibration", args.vocab, tokenizer, forward, bytes_ids, counts,
+                kept)
         rng = np.random.default_rng(12345)
         starts = rng.integers(0, held_stream.shape[0] - args.length - 1,
                               size=args.evaluate_windows)
@@ -361,8 +464,9 @@ def main() -> int:
         return total / max(batches, 1)
 
     # Nats per *original* token, so vocabularies are comparable: a cut that expands more
-    # tokens is charged for the expansion rather than rewarded with an easier softmax.
-    inflation = compact_tokens / original_tokens
+    # tokens is charged for the expansion rather than rewarded with an easier softmax. A
+    # model reading the store at its own width expands nothing, so the charge is 1.
+    inflation = 1.0 if kept is None else compact_tokens / original_tokens
 
     window = args.batch * args.length
     if args.passes is not None:
@@ -459,7 +563,9 @@ def main() -> int:
     elapsed = time.perf_counter() - train_started
     spilled = spill.stop()
     report = {
-        "vocab": args.vocab, "kept_ids": len(kept), "coverage": coverage,
+        "vocab": args.vocab,
+        "kept_ids": args.vocab if kept is None else len(kept),
+        "coverage": 1.0 if kept is None else coverage,
         "store": str(store), "seed": args.seed,
         "architecture": {"ratio": args.ratio,
                          "blend": float(model.config.residual_stream_blend),
@@ -482,8 +588,9 @@ def main() -> int:
                          "csa2_local_window": (args.csa2_local_window if args.csa2
                                                else None),
                          "csa2_block_size": args.csa2_block_size if args.csa2 else None},
-        "store_tokens": int(original_tokens), "compact_tokens": int(compact_tokens),
-        "round_trip": bool(matches),
+        "store_tokens": int(stream.shape[0] if kept is None else original_tokens),
+        "compact_tokens": int(stream.shape[0] if kept is None else compact_tokens),
+        "round_trip": True if kept is None else bool(matches),
         "parameters": int(parameters), "liger": swapped,
         "batch": args.batch, "length": args.length, "steps": steps,
         "accumulate": args.accumulate,

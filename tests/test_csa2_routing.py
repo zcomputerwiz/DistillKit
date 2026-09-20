@@ -14,7 +14,8 @@ from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
 from distillkit.models import Qwen35WidenedForCausalLM
 from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention,
-                                            SparseIndexBus)
+                                            SparseIndexBus, isolated_indexer,
+                                            router_parameters)
 
 cuda = pytest.mark.skipif(not torch.cuda.is_available(),
                           reason="FlexAttention compiles a Triton kernel")
@@ -462,16 +463,37 @@ def test_the_tile_follows_bytes_rather_than_the_head_alone():
     the student's own attention as that teacher, so those layers reach this path.
     """
     layer = bare_layer()
-    assert layer._kernel_options(256, 2)["num_stages"] == 3
+    assert layer._kernel_options(256, 2)["fwd_num_stages"] == 3
     # Same head, twice the bytes: it has to land where the wider bfloat16 head lands.
     assert layer._kernel_options(256, 4) == layer._kernel_options(320, 2)
     # And the widest case steps down again rather than reusing a tile that cannot fit.
-    assert layer._kernel_options(320, 4)["BLOCK_N"] == 16
+    assert layer._kernel_options(320, 4)["fwd_BLOCK_N"] == 16
     for element_size in (2, 4):
         for width in (256, 320):
             options = layer._kernel_options(width, element_size)
-            assert layer.block_size % options["BLOCK_M"] == 0
-            assert layer.block_size % options["BLOCK_N"] == 0
+            assert layer.block_size % options["fwd_BLOCK_M"] == 0
+            assert layer.block_size % options["fwd_BLOCK_N"] == 0
+
+
+def test_both_halves_of_the_kernel_are_named_with_their_prefix():
+    """A bare key reaches both lowerings, so the forward would set the backward's stages.
+
+    Inductor strips `fwd_` in the forward and drops `bwd_`, and the reverse in the
+    backward -- but it leaves an unprefixed key alone in each, and its `setdefault` then
+    finds one already there. The backward's own table is what has to be overridden here:
+    on SM86 it hands a head of exactly 256 a 64x64x64x64 tile that asks 168960 of 101376,
+    while a wider one gets 16x16x16x16 and fits. A reuse layer carries no router columns,
+    so it is the narrow one, and it is the only layer that cannot compile its backward.
+    """
+    layer = bare_layer()
+    for width in (256, 320):
+        options = layer._kernel_options(width, 2)
+        assert all(k.startswith(("fwd_", "bwd_")) for k in options), options
+        assert options["bwd_BLOCK_M1"] == options["bwd_BLOCK_N1"]
+        assert layer.block_size % options["bwd_BLOCK_M1"] == 0
+    # The narrow head is the one Inductor over-sizes, so it must not be left alone.
+    assert layer._kernel_options(256, 2)["bwd_BLOCK_M1"] == 32
+    assert layer._kernel_options(320, 2)["bwd_BLOCK_M1"] == 16
 
 
 @pytest.mark.parametrize("width,stages", [(256, 3), (320, 1)])
@@ -487,10 +509,10 @@ def test_kernel_tiles_are_chosen_rather_than_left_to_inductor(width, stages):
     """
     layer = bare_layer()
     options = layer._kernel_options(width)
-    assert options["num_stages"] == stages
+    assert options["fwd_num_stages"] == stages
     # Inductor refuses outright when these do not divide the mask's block size.
-    assert layer.block_size % options["BLOCK_M"] == 0
-    assert layer.block_size % options["BLOCK_N"] == 0
+    assert layer.block_size % options["fwd_BLOCK_M"] == 0
+    assert layer.block_size % options["fwd_BLOCK_N"] == 0
 
 
 def test_the_router_columns_are_what_widens_the_kernel_tile():
@@ -505,8 +527,8 @@ def test_the_router_columns_are_what_widens_the_kernel_tile():
     head = 256
     assert 1 << (head - 1).bit_length() == head
     assert 1 << (head + layer.index_dim - 1).bit_length() == 2 * head
-    assert (layer._kernel_options(head)["num_stages"]
-            > layer._kernel_options(head + layer.index_dim)["num_stages"])
+    assert (layer._kernel_options(head)["fwd_num_stages"]
+            > layer._kernel_options(head + layer.index_dim)["fwd_num_stages"])
 
 
 def test_block_mask_matches_a_scanned_mask():
@@ -670,6 +692,51 @@ def test_a_borrowing_layer_writes_no_cache_and_a_full_one_holds_the_index_keys()
     keys = out.past_key_values.layers[full[0]].keys
     assert keys.shape[-1] == owner.latent + owner.index_dim
     assert owner.cached_numbers_per_token() == owner.latent + owner.rope_dim + owner.index_dim
+
+
+@cuda
+def test_isolating_the_indexer_cuts_the_gradient_both_ways():
+    """DeepSeek's sparse stage, asserted as the two things it actually claims.
+
+    "The training signal of the indexer is from only L_I, while the optimization of the
+    main model is according to only the language modeling loss." So a language-modeling
+    loss must reach the backbone and not the indexer, which is the half this fork can get
+    wrong in a way the reference cannot: its selection is a mask with no path from the
+    loss to the indexer, and this one folds the index score into the logits through extra
+    columns that exist precisely to carry that gradient.
+    """
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).cuda()
+    tokens = torch.randint(1, 64, (1, 2 * BLOCK)).cuda()
+    router = dict(router_parameters(model))
+    backbone = {n: p for n, p in model.named_parameters()
+                if n not in router and "self_attn" in n}
+    assert router and backbone
+
+    with isolated_indexer(model):
+        model(input_ids=tokens, labels=tokens, use_cache=False).loss.backward()
+
+    moved = [n for n, p in router.items() if p.grad is not None and p.grad.abs().sum() > 0]
+    assert not moved, "the language model reached the indexer through %s" % moved
+    reached = [n for n, p in backbone.items()
+               if p.grad is not None and p.grad.abs().sum() > 0]
+    assert reached, "isolating the indexer also stopped the backbone training"
+
+
+@cuda
+def test_without_isolation_the_indexer_still_takes_the_loss_gradient():
+    """The contrast that makes the previous test mean something.
+
+    Without it, a detach that silently cut everything, or a router that never took the
+    loss gradient in the first place, would both look like success.
+    """
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config()).cuda()
+    tokens = torch.randint(1, 64, (1, 2 * BLOCK)).cuda()
+    model(input_ids=tokens, labels=tokens, use_cache=False).loss.backward()
+    moved = [n for n, p in router_parameters(model)
+             if p.grad is not None and p.grad.abs().sum() > 0]
+    assert moved, "the router takes no loss gradient even unisolated; the contrast is void"
 
 
 def test_padding_and_gradient_checkpointing_are_refused():
