@@ -739,20 +739,19 @@ def test_without_isolation_the_indexer_still_takes_the_loss_gradient():
     assert moved, "the router takes no loss gradient even unisolated; the contrast is void"
 
 
-def test_padding_and_gradient_checkpointing_are_refused():
-    """Padding is not representable per block; checkpointing replays the bus out of order."""
+def test_padding_is_refused():
+    """Padding is not representable per block, so it is refused rather than attended.
+
+    Checkpointing used to be refused alongside it, because the bus was written in forward
+    order and a recompute reads it out of order. The bus is keyed by publisher now and
+    `test_csa2_checkpoints_to_the_same_gradient_it_computes_without` pins the result.
+    """
     model = Qwen35WidenedForCausalLM(csa2_config())
     tokens = torch.randint(1, 64, (2, BLOCK))
     mask = torch.ones_like(tokens)
     mask[0, -3:] = 0
     with pytest.raises(ValueError, match="cannot represent padding"):
         model.model(input_ids=tokens, attention_mask=mask, use_cache=False)
-
-    model.model.gradient_checkpointing = True
-    model.train()
-    with pytest.raises(RuntimeError, match="gradient checkpointing"):
-        model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
-                    use_cache=False)
 
 
 @pytest.mark.parametrize("mla", [False, True])

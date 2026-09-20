@@ -1,0 +1,257 @@
+{
+  "vocab": 248320,
+  "kept_ids": 248320,
+  "coverage": 1.0,
+  "store": "scratch\\code_training\\tokens-v2",
+  "seed": 0,
+  "architecture": {
+    "ratio": "1:1",
+    "blend": 1.0,
+    "init_from": "scratch\\dense_gr\\checkpoints-conv\\student-2b-csa2-allfull",
+    "converted": false,
+    "frozen_router": false,
+    "dense_routing": false,
+    "asymmetric": false,
+    "variant": "r1-1-gr-s0-csa2",
+    "hidden": 2048,
+    "norm_mode": "exact",
+    "layers": 24,
+    "full_attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "store_tokens": 3003421492,
+  "compact_tokens": 3003421492,
+  "round_trip": true,
+  "parameters": 1912742470,
+  "liger": {
+    "swiglu": 24,
+    "rmsnorm": 61
+  },
+  "batch": 2,
+  "length": 2048,
+  "steps": 48,
+  "accumulate": 2,
+  "scored_tokens": 196608,
+  "seconds": 65.8447484999997,
+  "tokens_per_second": 2985.9328872674014,
+  "first_loss": 0.4789155125617981,
+  "final_loss": 1.2894349098205566,
+  "inflation": 1.0,
+  "final_loss_per_original_token": 1.2894349098205566,
+  "final_heldout": null,
+  "final_heldout_per_original_token": null,
+  "final_copy": null,
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.7122734785079956
+    },
+    {
+      "layer": 7,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.8216632604598999
+    },
+    {
+      "layer": 11,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.8683246970176697
+    },
+    {
+      "layer": 15,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.7222181558609009
+    },
+    {
+      "layer": 19,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.8208475708961487
+    },
+    {
+      "layer": 23,
+      "mode": "full",
+      "unit": "blocks",
+      "blocks": 16,
+      "density": 0.4264705882352941,
+      "selected": 0.2571428571428571,
+      "entropy": 0.8168944716453552
+    }
+  ],
+  "passes": 6.546134151456621e-05,
+  "peak_allocated_gib": 9.792920112609863,
+  "peak_reserved_gib": 10.109375,
+  "shared_delta_gib": 0.00159454345703125,
+  "spilled": false,
+  "setup_seconds": 4.248129499999777,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 4096,
+      "passes": 1.3637779482201295e-06,
+      "loss": 0.4789155125617981,
+      "loss_per_original_token": 0.4789155125617981,
+      "tokens_per_second": 622.7873355040424,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.6097042560577393
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8683246970176697
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8085795044898987
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.662105917930603
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.7817807197570801
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.6283307671546936
+        }
+      ],
+      "shared_delta_gib": 0.0
+    },
+    {
+      "step": 47,
+      "tokens": 196608,
+      "passes": 6.546134151456621e-05,
+      "loss": 1.2894349098205566,
+      "loss_per_original_token": 1.2894349098205566,
+      "tokens_per_second": 2986.3514951142747,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.7122734785079956
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8216632604598999
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8683246970176697
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.7222181558609009
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8208475708961487
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "blocks",
+          "blocks": 16,
+          "density": 0.4264705882352941,
+          "selected": 0.2571428571428571,
+          "entropy": 0.8168944716453552
+        }
+      ],
+      "shared_delta_gib": 0.00159454345703125
+    }
+  ]
+}

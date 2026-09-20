@@ -177,17 +177,14 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             raise ValueError("Widened residual model does not expose attention weights")
         bus = getattr(self, "csa2_bus", None)
         if bus is not None:
+            # Checkpointing used to be refused here. It recomputes a layer's forward
+            # during the backward pass, out of order, and the bus was one set of slots
+            # that each publisher overwrote -- so a Reuse layer read whichever Full layer
+            # had run most recently rather than its own, and the gradients were quietly
+            # wrong. The bus is keyed by publisher now and every reader names its donor,
+            # so a re-run writes its own key and reads its donor's. Order carries no
+            # meaning left to break.
             bus.clear()
-            if self.gradient_checkpointing and self.training:
-                # Checkpointing recomputes layers in reverse during backward, so a Reuse
-                # layer would read whatever the *last* Full layer published instead of
-                # the one in front of it -- wrong gradients, silently. Checkpointing a
-                # whole Full-plus-borrowers group as one function with a group-local bus
-                # would be the fix; until then this is refused rather than risked.
-                raise RuntimeError(
-                    "CSA2 shares routing state between layers through a bus written in "
-                    "forward order, which gradient checkpointing breaks. Disable one of "
-                    "the two.")
             if (isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2
                     and not bool(attention_mask.all())):
                 # Routing picks whole blocks; there is no way to say that half a block is

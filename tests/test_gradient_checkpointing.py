@@ -14,7 +14,7 @@ import torch
 sys.path.insert(0, "scratch/dense_gr")
 
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
-from tests.test_csa2_routing import csa2_config, tiny_config  # noqa: E402
+from tests.test_csa2_routing import BLOCK, csa2_config, tiny_config  # noqa: E402
 
 
 def _model(**kwargs):
@@ -68,12 +68,37 @@ def test_checkpointing_actually_recomputes():
     assert len(calls) == 2, "backward should recompute the layer"
 
 
-def test_csa2_still_refuses_to_be_checkpointed():
-    """The bus is written in forward order, which a reverse recompute breaks."""
-    model = Qwen35WidenedForCausalLM(csa2_config())
-    model.train()
-    model.model.gradient_checkpointing = True
-    tokens = torch.randint(1, 64, (2, 64))
-    with pytest.raises(RuntimeError, match="gradient checkpointing"):
-        model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
-                    use_cache=False)
+@pytest.mark.skipif(not torch.cuda.is_available(),
+                    reason="FlexAttention has no CPU backward")
+def test_csa2_checkpoints_to_the_same_gradient_it_computes_without():
+    """What the bus being keyed by publisher is for.
+
+    It used to be one set of slots that each Full layer overwrote, so a Reuse layer took
+    whichever had run most recently. A recompute during backward runs layers out of
+    order, so the borrower read the wrong publisher and the gradients were quietly wrong,
+    and the model refused the combination. Every reader names its donor now, which it
+    knows from the mode sequence, so order carries nothing left to break -- and that
+    matters because checkpointing is what buys the sequence length this architecture
+    exists to serve.
+    """
+    torch.manual_seed(0)
+    tokens = torch.randint(1, 64, (2, 2 * BLOCK)).cuda()
+    gradients = {}
+    for checkpointing in (False, True):
+        torch.manual_seed(0)
+        model = Qwen35WidenedForCausalLM(csa2_config()).cuda()
+        model.train()
+        model.model.gradient_checkpointing = checkpointing
+        model(input_ids=tokens, labels=tokens, use_cache=False).loss.backward()
+        gradients[checkpointing] = {n: p.grad.clone()
+                                    for n, p in model.named_parameters()
+                                    if p.grad is not None}
+
+    assert set(gradients[True]) == set(gradients[False])
+    assert gradients[False], "nothing took a gradient; the comparison would be vacuous"
+    worst, where = 0.0, None
+    for name, plain in gradients[False].items():
+        gap = (plain - gradients[True][name]).abs().max().item()
+        if gap > worst:
+            worst, where = gap, name
+    assert worst < 1e-4, "%s differs by %.3g under checkpointing" % (where, worst)

@@ -160,18 +160,20 @@ def build_target_config(source_config, args):
     # adds its index keys and a borrowing one stores nothing at all, reading its donor's.
     # The conversion used to force `use_cache = False` here because CSA2 refused a cache
     # outright, which is no longer true of either.
-    # A checkpoint trained in this project already names the four-stream route, because
-    # its arm was built with one. A stock one does not, and `residual_stream_routing`
-    # falls back to "widened" -- which `recipient_initialize` refuses, since there is no
-    # route for it to convert. Name it here so a stock source converts like any other.
-    # The rank follows `benchmark.py`: hidden // 8, which is what the 2B's measured
-    # +52.3M parameters were counted against.
+    # A checkpoint trained in this project already names the route, because its arm was
+    # built with one. A stock one does not, and `residual_stream_routing` falls back to
+    # "widened" -- which `recipient_initialize` refuses, since there is no route for it to
+    # convert. Name it here so a stock source converts like any other.
+    #
+    # The width is stated rather than inherited. A stock config carries no branch count,
+    # but it reaches this having been loaded through `Qwen35WidenedForCausalLM`, whose
+    # constructor stamps its own defaults onto the config it is handed -- so reading the
+    # source for these silently returned 2 branches where every toy arm ran 4, and the 2B
+    # was converted narrower than the models its results are compared against.
     config.residual_stream_enabled = True
     config.residual_stream_routing = "flash_next"
-    config.residual_stream_num_branches = getattr(
-        source_config, "residual_stream_num_branches", 2)
-    config.residual_stream_lowrank = getattr(
-        source_config, "residual_stream_lowrank", max(8, config.hidden_size // 8))
+    config.residual_stream_num_branches = args.residual_branches
+    config.residual_stream_lowrank = args.residual_lowrank
     config.residual_stream_sidecar = False
     config.mla_enabled = True
     config.mla_latent_dim = args.mla_latent_dim
@@ -203,6 +205,13 @@ def main() -> int:
                         help="where the teacher and its captured activations live. "
                              "Defaults to --device; a second card keeps the two models "
                              "and the calibration off each other.")
+    parser.add_argument("--residual-branches", type=int, default=4,
+                        help="streams in the gated residual. Every toy arm ran 4; the 2B "
+                             "conversions before this flag existed ran 2, because the "
+                             "value was read from a source config that had been stamped "
+                             "with the library default on its way in.")
+    parser.add_argument("--residual-lowrank", type=int, default=64,
+                        help="rank of the route's read and write projections")
     parser.add_argument("--no-blend", action="store_true",
                         help="skip the gated residual conversion, to separate its effect")
     args = parser.parse_args()

@@ -153,6 +153,17 @@ def main() -> int:
                         help="steps between held-out evaluations; 0 disables")
     parser.add_argument("--evaluate-windows", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--checkpoint-layers", action="store_true",
+                        help="recompute each layer's forward during the backward pass "
+                             "instead of holding its activations. Costs roughly a third "
+                             "more compute and is what buys sequence length: at 4096 the "
+                             "activations are 11.5 of 15.6 GiB, and they are what makes "
+                             "8192 not fit.")
+    parser.add_argument("--warmup", type=int, default=100,
+                        help="steps to ramp the learning rate over from zero. It exists "
+                             "for the converted case: a from-scratch run has nothing to "
+                             "damage on its first step, and a converted one has a model "
+                             "that was fitted exactly.")
     parser.add_argument("--report-every", type=int, default=25)
     parser.add_argument("--store", type=Path, default=STORE)
     parser.add_argument("--spill-every", type=float, default=30.0,
@@ -413,6 +424,9 @@ def main() -> int:
         print("router: froze %d indexer tensors, %d parameters"
               % (len(held), sum(p.numel() for _, p in held)), flush=True)
     model.train()
+    if args.checkpoint_layers:
+        model.model.gradient_checkpointing = True
+        print("checkpointing: recomputing every layer's forward in backward", flush=True)
     swapped = apply_liger(model, config)
     parameters = sum(p.numel() for p in model.parameters())
     print("model: %.1fM parameters, liger %s" % (parameters / 1e6, json.dumps(swapped)),
@@ -502,6 +516,20 @@ def main() -> int:
             part.backward()
             loss = loss + part.detach()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if step < args.warmup:
+            # Adam's first step moves every parameter by `lr` whatever its gradient was:
+            # the bias correction divides the first moment by the square root of the
+            # first second moment, which is the same number. From a random
+            # initialization that costs nothing. From a converted one it is destructive --
+            # `kv_a_norm.weight` is exactly 0, `index_gate` exactly 1, and the residual
+            # route's gains were set for a bitwise-exact conversion, so one uniform step
+            # of 1e-4 across 119M parameters took the 2B from 1.50 to 14.97 held-out and
+            # cost about a thousand steps to climb back out of.
+            for group in optimizer.param_groups:
+                group["lr"] = args.lr * (step + 1) / max(args.warmup, 1)
+        elif step == args.warmup:
+            for group in optimizer.param_groups:
+                group["lr"] = args.lr
         optimizer.step()
         if spill.breached():
             # Set by the watcher thread the moment a poll exceeded the tolerance, so the

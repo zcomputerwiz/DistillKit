@@ -5977,3 +5977,78 @@ Nothing had hit it because every arm runs bfloat16, but `distill_indexer --self-
 runs the student's own attention in float32 as its teacher. `_kernel_options` now keys
 on the rounded head in bytes. The bfloat16 rows are measured; the float32 rows are the
 same rule read at twice the span.
+
+# Training the converted 2B, and what the bus was costing (2026-09-20)
+
+## Conversion plus 30M tokens gets within 0.044 of baseline
+
+Both arms trained with only the converted parameters moving -- 119M of 1.9B, the attention
+layers and the residual route, which is all a conversion changes -- for 30M tokens at
+1024, about 1% of the store and two and a half hours on one 3090. Held-out is the
+calibration split, 64 fixed windows, and every figure was re-read off the saved checkpoint
+by conversion_ladder.py rather than taken from the training loop.
+
+| arm | converted | trained | against 1.3029 | cache |
+| --- | --- | --- | --- | --- |
+| all-full | 1.4972 | 1.3465 | +0.0436 | 6.000 KiB/token, 2.00x |
+| full full reuse full reuse reuse | 1.6743 | 1.3619 | +0.0590 | 3.000 KiB/token, 4.00x |
+
+Training recovered 78% of the all-full conversion gap and 84% of the borrowing one. That
+reverses which configuration is worth deploying. Converted, borrowing cost +0.287 over
+all-full and looked like a bad trade for its second halving; trained, it is 0.0154 behind
+for twice the context. Borrowing is cheap to learn and expensive to convert, which the
+assignment sweep said from one side and this says from the other.
+
+Position-granular selection also overtook block-granular on both arms, -0.0046 and
+-0.0042, where on the untrained conversions it was +0.0199 and +0.0294 the other way. The
+mismatch between the granularity training sees and the one serving uses now runs in
+serving's favour.
+
+## The first optimizer step was destroying the conversion
+
+Held-out at step 0 read 14.9700 where the converted model measures 1.4972, and the run
+spent roughly its first thousand steps climbing back out. With --lr 0 it stayed flat at
+1.5458, so the evaluation was never the problem: the first optimizer step was.
+
+Adam's first step moves every parameter by the learning rate whatever its gradient was,
+because the bias correction divides the first moment by the square root of the first
+second moment and those are the same number. From a random initialization that costs
+nothing. From a conversion it is destructive -- kv_a_norm.weight is exactly 0 in the
+1 + w convention, index_gate exactly 1, and the residual route's gains were set for a
+bitwise-exact conversion -- and one uniform 1e-4 step across 119M parameters is enough to
+take the model to worse than uniform. There was no warmup or schedule of any kind.
+
+--warmup, 100 steps by default, puts step 0 at 1.4896. Whether it improves the endpoint
+is a separate question and is running.
+
+## The bus was written in forward order, and that cost the sequence length
+
+SparseIndexBus was one set of slots that each Full layer overwrote, so a borrower read
+whichever publisher had run most recently. Gradient checkpointing re-runs a layer's
+forward during the backward pass, out of order, so a Reuse layer would have read the wrong
+publisher and produced quietly wrong gradients -- and the model refused the combination
+rather than risk it.
+
+That refusal was the binding constraint on sequence length. Measured at micro-batch 1:
+
+| length | tok/s | peak | checkpointed |
+| --- | --- | --- | --- |
+| 2048 | 2986 | 10.11 GiB | -- |
+| 4096 | 3148 | 15.58 GiB | 2546 tok/s at 6.13 GiB |
+| 8192 | -- | out of memory | -- |
+
+Activations are 11.5 of those 15.6 GiB and they are what does not fit at 8192.
+
+The bus is keyed by its publisher now and every reader names its donor, resolved once at
+construction from the mode sequence. Making that explicit turned up a relationship the
+single slot had been hiding: there are *two*. A Reuse layer takes its latent from the
+nearest Full layer and its selection from the nearest layer that routes at all, which may
+be a Reindex layer in between -- Reindex publishes a selection without publishing a
+latent. The old bus got this right only because execution order happened to agree.
+
+Checkpointing is no longer refused, and a test runs a full backward both ways and compares
+every parameter's gradient rather than asserting that the combination raises. Worst
+difference under 1e-4. At 4096 it holds 6.13 GiB against 15.58 for 19% of the throughput,
+which is the trade that buys the regime this architecture is for: at 8192 with block 64
+and a top-k of 64, the router picks 1 block in 128, or 0.78% -- past DeepSeek's 1.56%,
+where at 1024 and block 128 it picks 2 in 8 and has almost nothing to decide.

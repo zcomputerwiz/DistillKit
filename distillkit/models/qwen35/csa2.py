@@ -194,42 +194,65 @@ def routing_report(model):
 
 
 class SparseIndexBus:
-    """What a Full layer publishes and the borrowing modes read.
+    """What a Full layer publishes and the borrowing modes read, keyed by its publisher.
 
     Held by the text model -- not by the config, which is serialized and shared between
     models -- and cleared at the start of every forward, so nothing survives between
-    batches. A borrowing layer that finds the bus empty is a configuration error, not
-    something to paper over with a fallback.
+    batches. A borrowing layer that finds nothing under its donor is a configuration
+    error, not something to paper over with a fallback.
 
-    The bus is written during the forward pass and read in layer order, so anything that
-    re-runs a layer's forward out of order sees the wrong publisher. Gradient
-    checkpointing does exactly that, which is why the model refuses the combination
-    instead of producing quietly wrong gradients.
+    This used to be one set of slots that each publisher overwrote, so a reader took
+    whatever had been written most recently and the answer depended on execution order.
+    That made gradient checkpointing unusable -- it re-runs a layer's forward during the
+    backward pass, out of order, and a borrower would have read the wrong publisher and
+    produced quietly wrong gradients -- and the model refused the combination rather than
+    risk it. Since checkpointing is what a long sequence needs, and long sequences are
+    the point of the architecture, the ordering assumption had to go rather than the
+    feature.
+
+    Every reader now names its publisher, which it knows statically from the mode
+    sequence: `latent_donor` is the nearest Full layer at or before it, and `topk_donor`
+    the nearest layer that routes at all, Full or Reindex -- two relationships, because a
+    Reuse layer behind a Reindex one takes its latent from the Full layer further back
+    and its selection from the Reindex layer in front of it. A re-run then writes its own
+    key and reads its donor's, and replay order stops meaning anything.
     """
 
-    __slots__ = ("index_keys", "latent", "rotary", "topk", "candidates",
-                 "candidate_index")
+    __slots__ = ("latents", "selections", "candidates", "candidate_index")
 
     def __init__(self) -> None:
         self.clear()
 
     def clear(self) -> None:
-        self.index_keys = None
-        self.latent = None
-        self.rotary = None
-        self.topk = None
+        # layer index -> (index_keys, latent, rotary), written by Full layers.
+        self.latents = {}
+        # layer index -> the block or token selection, written by anything that routes.
+        self.selections = {}
         # Level one of the hierarchy, published by at most one layer and read by the
         # layers after it. Stays None when the hierarchy is off, which is the default.
         # The indices are what a reader gathers; the mask is what a report reads.
         self.candidates = None
         self.candidate_index = None
 
-    def require(self, field: str, layer_idx: int):
-        value = getattr(self, field)
-        if value is None:
-            raise RuntimeError("layer %d needs %s from an earlier full layer and the bus "
-                               "is empty" % (layer_idx, field))
-        return value
+    def publish(self, layer_idx: int, index_keys, latent, rotary) -> None:
+        self.latents[layer_idx] = (index_keys, latent, rotary)
+
+    def select(self, layer_idx: int, allowed) -> None:
+        self.selections[layer_idx] = allowed
+
+    def require_latent(self, donor: int, layer_idx: int):
+        if donor not in self.latents:
+            raise RuntimeError(
+                "layer %d reads the latent published by layer %s, which has not run in "
+                "this forward pass" % (layer_idx, donor))
+        return self.latents[donor]
+
+    def require_selection(self, donor: int, layer_idx: int):
+        if donor not in self.selections:
+            raise RuntimeError(
+                "layer %d reads the selection made by layer %s, which has not run in "
+                "this forward pass" % (layer_idx, donor))
+        return self.selections[donor]
 
 
 class Qwen35SparseLatentAttention(Qwen35LatentAttention):
@@ -246,6 +269,29 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             raise ValueError("unknown csa2 mode %r" % mode)
         self.mode = mode
         self.bus = bus
+        # Who this layer reads from, resolved here rather than left to whoever wrote the
+        # bus last. A Full layer is its own donor for both. A Reindex layer borrows the
+        # latent and routes for itself. A Reuse layer borrows both -- but not necessarily
+        # from the same place, because a Reindex layer between it and its Full donor
+        # publishes a selection without publishing a latent.
+        order = [i for i, kind in enumerate(config.layer_types)
+                 if "linear" not in str(kind)]
+        if layer_idx in order:
+            modes = csa2_modes(config, len(order))
+            position = order.index(layer_idx)
+            self.latent_donor = next(
+                (order[q] for q in range(position, -1, -1) if modes[q] == "full"), None)
+            self.topk_donor = next(
+                (order[q] for q in range(position, -1, -1) if modes[q] != "reuse"), None)
+            if self.latent_donor is None or self.topk_donor is None:
+                raise ValueError(
+                    "csa2 layer %d is %s with no Full layer in front of it; a mode "
+                    "sequence has to open on full" % (layer_idx, mode))
+        else:
+            # Built outside the stack it belongs to, which is what a unit test does to
+            # exercise `route` on its own. There is no sequence to resolve against, so
+            # the layer answers for itself and never reads anyone.
+            self.latent_donor = self.topk_donor = layer_idx
         # The last forward's block selection, kept so a run can report whether its router
         # is still choosing anything. Bool at [batch, blocks, blocks] -- a few kilobytes,
         # detached, out of the graph.
@@ -784,17 +830,17 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 stored, rotary = stored.squeeze(1), rotary.squeeze(1)
                 latent, index_keys = torch.split(
                     stored, [self.latent, self.index_dim], dim=-1)
-            self.bus.index_keys, self.bus.latent = index_keys, latent
-            self.bus.rotary = rotary
+            self.bus.publish(self.layer_idx, index_keys, latent, rotary)
         elif self.mode == "reindex":
             query, queries = self._project(hidden_states)
-            index_keys = self.bus.require("index_keys", self.layer_idx)
-            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
-            rotary = self.bus.require("rotary", self.layer_idx)
+            index_keys, borrowed, rotary = self.bus.require_latent(
+                self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
         else:
             query, = self._project(hidden_states)
-            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
-            rotary = self.bus.require("rotary", self.layer_idx)
+            _, borrowed, rotary = self.bus.require_latent(
+                self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
             index_keys, queries = None, None
 
         kv_len = latent.shape[1]
@@ -803,7 +849,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         kv_positions = torch.arange(kv_len, device=latent.device)
 
         if self.mode == "reuse":
-            allowed, effective = self.bus.require("topk", self.layer_idx), None
+            allowed = self.bus.require_selection(self.topk_donor, self.layer_idx)
+            effective = None
         else:
             index_queries, weights = self._index_queries(
                 hidden_states, queries, position_embeddings)
@@ -816,7 +863,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                     allowed = self._select_tokens(
                         index_queries, index_keys, weights, cache_position, kv_positions)
                 effective = (index_queries * weights.unsqueeze(-1)).sum(dim=2)
-            self.bus.topk = allowed
+            self.bus.select(self.layer_idx, allowed)
 
         self.last_allowed = allowed.detach()
         self.last_token_routed = True
@@ -843,29 +890,30 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             allowed, effective = self.route(
                 hidden_states, index_keys, queries, position_embeddings,
                 self._inherited_candidates())
-            self.bus.index_keys, self.bus.latent = index_keys, latent
-            self.bus.rotary, self.bus.topk = rotary, allowed
+            self.bus.publish(self.layer_idx, index_keys, latent, rotary)
+            self.bus.select(self.layer_idx, allowed)
             if self.last_candidates is not None:
                 self.bus.candidates = self.last_candidates
                 self.bus.candidate_index = self.last_candidate_index
         elif self.mode == "reindex":
             query, queries = self._project(hidden_states)
-            index_keys = self.bus.require("index_keys", self.layer_idx)
-            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
-            rotary = self.bus.require("rotary", self.layer_idx)
+            index_keys, borrowed, rotary = self.bus.require_latent(
+                self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
             # New routing over borrowed keys: this layer's own view of what matters.
             allowed, effective = self.route(
                 hidden_states, index_keys, queries, position_embeddings,
                 self._inherited_candidates())
-            self.bus.topk = allowed
+            self.bus.select(self.layer_idx, allowed)
             if self.last_candidates is not None:
                 self.bus.candidates = self.last_candidates
                 self.bus.candidate_index = self.last_candidate_index
         else:
             query, = self._project(hidden_states)
-            latent = self.kv_adapt(self.bus.require("latent", self.layer_idx))
-            rotary = self.bus.require("rotary", self.layer_idx)
-            allowed = self.bus.require("topk", self.layer_idx)
+            _, borrowed, rotary = self.bus.require_latent(
+                self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
+            allowed = self.bus.require_selection(self.topk_donor, self.layer_idx)
             index_keys, effective = None, None
 
         self.last_allowed = allowed.detach()
