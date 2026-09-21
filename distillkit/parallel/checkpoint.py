@@ -29,9 +29,25 @@ class TensorSpec:
 def tensor_specs(model):
     """Describe each canonical tensor exactly once, including untouched tensors."""
     from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
+    from distillkit.parallel.latent_attention import (GatheredColumnLinear,
+                                                      ReducedRowLinear, RemoteEmbedding)
 
     specs = []
     for prefix, module in model.named_modules():
+        if isinstance(module, (GatheredColumnLinear, ReducedRowLinear)):
+            # The latent-attention pair splits the same way as the plain pair, and each
+            # class defines its own `weight` as exactly this concatenation, so the merge
+            # is the inverse of the split by construction rather than by coincidence.
+            specs.append(TensorSpec(prefix + ".weight",
+                                    tuple(f"{prefix}.shards.{i}" for i in range(len(module.shards))),
+                                    dim=0 if isinstance(module, GatheredColumnLinear) else 1))
+            if isinstance(module, GatheredColumnLinear) and getattr(module, "biases", None) is not None:
+                specs.append(TensorSpec(prefix + ".bias",
+                                        tuple(f"{prefix}.biases.{i}" for i in range(len(module.biases)))))
+        if isinstance(module, RemoteEmbedding):
+            # Not split, only moved -- but it wraps the table one level deeper, so the
+            # stock name has to be restored the same way a shard's would be.
+            specs.append(TensorSpec(prefix + ".weight", (prefix + ".embedding.weight",)))
         if isinstance(module, (ColumnParallelLinear, RowParallelLinear)):
             specs.append(TensorSpec(prefix + ".weight", tuple(f"{prefix}.shards.{i}" for i in range(len(module.shards))),
                                     dim=0 if isinstance(module, ColumnParallelLinear) else 1))
@@ -59,7 +75,21 @@ def tensor_specs(model):
             for name in ("A_log", "dt_bias"):
                 specs.append(TensorSpec(f"{prefix}.{name}", tuple(f"{prefix}.{name}.{i}" for i in range(len(module.devices)))))
     handled = {key for spec in specs for key in spec.keys}
-    specs.extend(TensorSpec(key, (key,)) for key in model.state_dict() if key not in handled)
+    passthrough = [key for key in model.state_dict() if key not in handled]
+    # Anything this function does not recognise is copied out under its own name, which
+    # is right for a tensor sharding never touched and catastrophic for one it did.
+    # A parallel wrapper added without a spec here used to export `...shards.0` and
+    # `...shards.1` verbatim: `save_pretrained` accepted it, and the checkpoint then
+    # loaded with those tensors freshly initialised and no error, because the plain
+    # model calls them missing and fills them in. Refuse instead.
+    leaked = [key for key in passthrough
+              if ".shards." in key or ".biases." in key or key.endswith(".embedding.weight")]
+    if leaked:
+        raise ValueError(
+            "tensor_specs does not know how to merge %d sharded tensors, so exporting "
+            "would silently write shards under their own names: %s"
+            % (len(leaked), ", ".join(sorted(leaked)[:6])))
+    specs.extend(TensorSpec(key, (key,)) for key in passthrough)
     return specs
 
 

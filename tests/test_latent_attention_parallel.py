@@ -148,3 +148,45 @@ def test_the_router_and_the_latent_stay_on_home():
     assert router, "no router parameters found; the test is not testing anything"
     off_home = [name for name, parameter in router if parameter.device.index != 0]
     assert not off_home, "router or latent parameters left home: %s" % off_home[:4]
+
+
+def test_exported_weights_carry_stock_names_not_shards():
+    """A checkpoint saved from a sharded model has to load into an unsharded one.
+
+    `smoke_train --tensor-parallel` called `save_pretrained` on the sharded model and
+    wrote `self_attn.q_proj.shards.0` where the plain model wants
+    `self_attn.q_proj.weight`. Nothing refused it: the file was written, and loading it
+    back reported every plain key as missing and initialised them fresh. Ten hours of
+    training produced weights that silently were not the trained ones.
+    """
+    from types import SimpleNamespace
+
+    from distillkit.parallel.checkpoint import consolidated_state_dict
+
+    source_q, source_o = nn.Linear(16, 8), nn.Linear(8, 16, bias=False)
+    model = nn.Module()
+    model.q_proj = GatheredColumnLinear(source_q, ["cpu", "cpu"])
+    model.o_proj = ReducedRowLinear(source_o, ["cpu", "cpu"])
+    model.config = SimpleNamespace(tie_word_embeddings=False)
+
+    exported = consolidated_state_dict(model)
+    assert sorted(exported) == ["o_proj.weight", "q_proj.bias", "q_proj.weight"]
+    torch.testing.assert_close(exported["q_proj.weight"], source_q.weight)
+    torch.testing.assert_close(exported["q_proj.bias"], source_q.bias)
+    torch.testing.assert_close(exported["o_proj.weight"], source_o.weight)
+
+
+def test_a_shard_with_no_merge_rule_is_refused():
+    """The failure above was a wrapper `tensor_specs` did not know about, and the
+    fallback copies an unknown tensor out under its own name -- right for a tensor that
+    was never sharded, catastrophic for one that was. An unmergeable shard must stop the
+    export rather than be written."""
+    from distillkit.parallel.checkpoint import tensor_specs
+
+    model = nn.Module()
+    model.mystery = nn.Module()
+    model.mystery.shards = nn.ParameterList(
+        [nn.Parameter(torch.zeros(4, 16)), nn.Parameter(torch.zeros(4, 16))])
+
+    with pytest.raises(ValueError, match="does not know how to merge"):
+        tensor_specs(model)

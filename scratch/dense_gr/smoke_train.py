@@ -625,6 +625,7 @@ def main() -> int:
                   flush=True)
 
     if args.tensor_parallel:
+        from distillkit.parallel.checkpoint import consolidated_state_dict
         from distillkit.parallel.model import shard_model
 
         if torch.cuda.device_count() < 2:
@@ -986,7 +987,14 @@ def main() -> int:
                 "%s already holds a checkpoint; move it aside or pass --checkpoints, "
                 "rather than overwriting an arm that is not this one" % target)
         target.mkdir(parents=True, exist_ok=True)
-        model.save_pretrained(target, safe_serialization=True)
+        # A sharded model's own state dict is the shards: `mlp.gate_proj.shards.0`
+        # rather than `mlp.gate_proj.weight`. Saving that directly writes a checkpoint
+        # nothing can load -- every key of the plain model reads as missing -- so the
+        # shards are merged back into stock names first. `--tensor-parallel` is meant
+        # to be invisible to everything downstream, and this is the one place where it
+        # was not.
+        state = consolidated_state_dict(model) if args.tensor_parallel else None
+        model.save_pretrained(target, safe_serialization=True, state_dict=state)
         tokenizer.save_pretrained(target)
         (target / "milestone.json").write_text(json.dumps({
             "variant": variant, "seed": args.seed,
