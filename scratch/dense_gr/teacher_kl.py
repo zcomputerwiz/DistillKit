@@ -32,11 +32,17 @@ penalty fell 38-fold to an interval spanning zero. So this is a blend, not a rep
 and the ground-truth half is also the only term that says anything about a control token the
 teacher's top-64 did not rank.
 
-One document per forward, at its own length. The alternative is a padded batch, and padding
-is the thing that changes CSA2's routing: where the indexer's scores tie at the top-k
-cutoff, which position wins depends on how wide the row is. Fixed-length windows would
-avoid that too, but this corpus is median 537 tokens and a 1024-token window would throw
-away 71% of it.
+Batches are made uniform by construction rather than by padding. Padding is the thing that
+changes CSA2's routing -- where the indexer's scores tie at the top-k cutoff, which position
+wins depends on how wide the row is -- and the architecture refuses it outright. So`grouped`sorts by length, takes neighbours, and truncates them to the shortest, which costs 0.2% of
+the corpus at six rows because sorted neighbours are nearly the same length. Widths are
+floored to the block size, trading 7.7% of the tokens for 8 distinct shapes instead of 520,
+because every distinct shape is a cold Triton autotune and a cold autotune under tensor
+parallelism is where the two backward threads race.
+
+The group size is a token budget rather than a document count. Memory follows tokens and
+this corpus runs 134 to 1024 of them per document, so a fixed count of six makes both a
+768-token batch and a 6144-token one, and only the second decides whether the run fits.
 """
 
 from __future__ import annotations
@@ -110,6 +116,94 @@ class CachedTeacher:
             if not order:
                 order = list(self.generator.permutation(len(self.ids)))
             yield self.read(self.ids[order.pop()])
+
+    def widths(self, size, block=None, budget=None):
+        """The distinct sequence lengths `grouped` will produce, ascending.
+
+        Every distinct shape is a cold Triton autotune, and a cold autotune under tensor
+        parallelism is where the two backward threads race over the autotuner's `nargs`.
+        Knowing the set in advance means each one can be warmed single-threaded before
+        training starts, instead of discovering them over the first epoch.
+        """
+        return sorted({width for _, width in self._groups(size, block, budget)})
+
+    def _groups(self, size, block=None, budget=None):
+        """Sorted neighbours, grouped so every batch costs about the same.
+
+        `size` is a document count and `budget` is a token count; a budget is the better
+        unit, because memory follows tokens rather than documents and this corpus runs
+        from 134 to 1024 of them per document. A fixed count of six makes a batch of six
+        128-token documents and a batch of six 1024-token documents, and only the second
+        decides whether the run fits. With a budget the wide groups get fewer rows and
+        the narrow ones more, so the widest batch is no larger than the rest.
+        """
+        lengths = {doc_id: min(self.cache.documents[doc_id]["length"],
+                               self.max_length or 1 << 30) for doc_id in self.ids}
+        ordered = sorted(self.ids, key=lambda doc_id: lengths[doc_id])
+        groups = []
+        start = 0
+        while start < len(ordered):
+            width = lengths[ordered[start]]
+            if block:
+                width = (width // block) * block
+            if width < 2:
+                start += 1
+                continue
+            rows = size if budget is None else max(1, budget // width)
+            group = ordered[start:start + rows]
+            if len(group) < rows:
+                break
+            # The width is the shortest in the group, and the group is sorted, so it is
+            # the first one -- already floored above.
+            groups.append((group, width))
+            start += rows
+        return groups
+
+    def grouped(self, size, block=None, budget=None):
+        """Yield batches of `size` documents that are already the same length.
+
+        One document per forward leaves the card at a fraction of its throughput, and the
+        obvious fix -- pad a batch to its longest member -- is the one thing this
+        architecture refuses. CSA2 routes over whole blocks and cannot express "half of
+        this block is padding", and even where it could, the indexer's top-k ties at the
+        cutoff often enough that a padded row routes differently from the same row alone.
+
+        So the batch is made uniform by construction instead: sort by length, take `size`
+        neighbours, and truncate them to the shortest. Neighbours in a sorted order are
+        close, so the truncation is small -- and it is a prefix, which causal attention
+        makes free of any mismatch with the teacher's cached targets.
+
+        The groups are shuffled between passes; the membership is not, because that is
+        what keeps a batch uniform.
+
+        `block` floors each width to a multiple of it, which trades tokens for shapes:
+        exact widths give 520 distinct lengths and 3,322,458 tokens, flooring to 128 gives
+        8 lengths and 92.3% of them. Eight shapes can be warmed before training; 520
+        cannot, and every unwarmed one is a chance for the two backward threads to race
+        Triton's autotuner. 128 is also CSA2's block size, so the widths line up with the
+        routing rather than cutting across it.
+        """
+        groups = self._groups(size, block, budget)
+        while True:
+            for index in self.generator.permutation(len(groups)):
+                group, width = groups[index]
+                yield self.read_batch(group, width)
+
+    def read_batch(self, doc_ids, width):
+        """One batch, every row exactly `width` long, nothing padded."""
+        ids, targets, values = [], [], []
+        for doc_id in doc_ids:
+            record = self.cache.read_document(doc_id, include_hidden_states=False)
+            ids.append(np.asarray(record["input_ids"][:width], dtype=np.int64))
+            targets.append(np.asarray(record["topk_ids"][:width], dtype=np.int64))
+            values.append(np.asarray(record["topk_logprobs"][:width], dtype=np.float32))
+        return {"input_ids": torch.from_numpy(np.stack(ids)).to(self.device,
+                                                                non_blocking=True),
+                "topk_ids": torch.from_numpy(np.stack(targets)).to(self.device,
+                                                                   non_blocking=True),
+                "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
+                                                                       non_blocking=True),
+                "doc_id": doc_ids[0]}
 
     def read(self, doc_id):
         record = self.cache.read_document(doc_id, include_hidden_states=False)

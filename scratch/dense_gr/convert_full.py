@@ -45,6 +45,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import triton_shim  # noqa: F401,E402
 
+from calibration import (LayerMoments, interleaved_columns,  # noqa: E402
+                         residual_share, solve_from_moments)
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
 
 STORE = Path("scratch/code_training/tokens-v2")
@@ -103,10 +105,27 @@ def whiten(matrix):
     return vectors @ torch.diag(eigenvalues.rsqrt()) @ vectors.T
 
 
-def source_capture(stock, full, geometry, store, vocab, count, length, device):
-    """Per-layer block inputs and the keys, values and rotary keys attention consumed."""
+def source_capture(stock, full, geometry, readers, store, vocab, count, length, device,
+                   heads=None):
+    """Second moments of what attention consumed, accumulated window by window.
+
+    This used to concatenate every calibration token's block input, keys, values and
+    rotary key in float64 and hand back the samples. At 1024-token windows that is about
+    1.6 GiB per full-attention layer and six layers at once, which is why the conversion
+    record says `calibration_tokens = 32768` -- the ceiling was memory, not a judgement
+    that 32 windows of text are enough to refit a 1.9B model's attention.
+
+    Nothing downstream needs the samples; every quantity the fit computes is a second
+    moment, and those are fixed-size in the token count. A 2048-wide input's Gram is
+    33 MiB whether it saw 32 thousand rows or 32 million.
+
+    A donor's readers are observed here rather than later because their targets enter the
+    donor's SVD against the *donor's* block input, and the two only exist together inside
+    one forward.
+    """
     rope, content, head_dim, groups = geometry
-    book = {index: [] for index in full}
+    moments = {index: LayerMoments(device) for index in full}
+    window = {}
 
     def hook(index):
         def inner(module, args, kwargs):
@@ -114,27 +133,70 @@ def source_capture(stock, full, geometry, store, vocab, count, length, device):
             shape = (*states.shape[:-1], -1, head_dim)
             key = module.k_norm(module.k_proj(states).view(shape))
             value = module.v_proj(states).view(shape)
-            book[index].append((
+            keys = (key[..., rope:].repeat_interleave(groups, dim=-2).flatten(-2)
+                    .reshape(-1, key.shape[-2] * groups * content).double())
+            values = (value.repeat_interleave(groups, dim=-2).flatten(-2)
+                      .reshape(-1, value.shape[-2] * groups * head_dim).double())
+            window[index] = (
                 states.reshape(-1, states.shape[-1]).double(),
-                key[..., rope:].repeat_interleave(groups, dim=-2).flatten(-2)
-                    .reshape(-1, key.shape[-2] * groups * content).double(),
-                value.repeat_interleave(groups, dim=-2).flatten(-2)
-                    .reshape(-1, value.shape[-2] * groups * head_dim).double(),
+                keys,
+                values,
                 # One shared rotary key against the source's one per key/value head: the
                 # mean is the least-squares target when one vector must serve them all.
                 key[..., :rope].mean(-2).reshape(-1, rope).double(),
-            ))
+            )
         return inner
 
     handles = [stock.model.layers[i].self_attn.register_forward_pre_hook(
         hook(i), with_kwargs=True) for i in full]
     with torch.no_grad():
         for ids in calibration_windows(store, vocab, count, length, device):
+            window.clear()
             stock(input_ids=ids, use_cache=False)
+            for index in full:
+                inputs, keys, values, rotary = window[index]
+                # `kv_b_proj` is read per head, so the target interleaves each head's
+                # content key with its own value. Concatenating the two blocks instead
+                # puts head 1's content where head 0's value is read.
+                target = torch.cat([keys.view(-1, heads, content),
+                                    values.view(-1, heads, head_dim)],
+                                   dim=-1).reshape(len(keys), heads * (content + head_dim))
+                moments[index].observe(inputs, target, rotary, keys, values)
+                for reader in readers.get(index, ()):
+                    # As captured rather than interleaved: permuting a target's columns
+                    # permutes rows of `target.T @ inputs` and leaves the right singular
+                    # vectors alone, so the SVD does not care and this matches what the
+                    # sample path fed it.
+                    _, reader_keys, reader_values, _ = window[reader]
+                    moments[index].observe_reader(
+                        reader, torch.cat([reader_keys, reader_values], dim=-1), inputs)
+            window.clear()
     for handle in handles:
         handle.remove()
-    return {index: tuple(torch.cat(part) for part in zip(*rows))
-            for index, rows in book.items()}
+    return moments
+
+
+def _target_hook(box, geometry, heads):
+    """Rebuild one window's interleaved key/value target from the source model.
+
+    The same arithmetic the capture does, kept separate because the second pass needs it
+    for one layer at a time rather than for all of them.
+    """
+    rope, content, head_dim, groups = geometry
+
+    def inner(module, args, kwargs):
+        states = kwargs.get("hidden_states", args[0] if args else None)
+        shape = (*states.shape[:-1], -1, head_dim)
+        key = module.k_norm(module.k_proj(states).view(shape))
+        value = module.v_proj(states).view(shape)
+        keys = (key[..., rope:].repeat_interleave(groups, dim=-2).flatten(-2)
+                .reshape(-1, key.shape[-2] * groups * content).double())
+        values = (value.repeat_interleave(groups, dim=-2).flatten(-2)
+                  .reshape(-1, value.shape[-2] * groups * head_dim).double())
+        box["target"] = torch.cat([keys.view(-1, heads, content),
+                                   values.view(-1, heads, head_dim)],
+                                  dim=-1).reshape(len(keys), heads * (content + head_dim))
+    return inner
 
 
 def _record_latent(attention):
@@ -269,18 +331,13 @@ def main() -> int:
     print("%d source tensors have no home in the target (the replaced key/value side)"
           % len(report.unexpected_keys))
 
-    targets = source_capture(stock, full, (rope, content, head_dim, groups),
-                             args.store, vocab, args.calibrate, args.length,
-                             source_device)
-    tokens = next(iter(targets.values()))[0].shape[0]
-    print("\ncalibrated on %d tokens per layer" % tokens, flush=True)
-    del stock
-    torch.cuda.empty_cache()
-
     # Which layers will read each donor's latent. A borrowing layer reads the most recent
     # full layer, so a donor's encoder has to summarize its readers' keys and values as
     # well as its own. Spending the whole rank budget on itself is what leaves a borrower
     # at 0.93 of its target where a joint fit reaches 0.97, measured by borrow_sweep.py.
+    #
+    # Established before the capture, because the capture now accumulates a donor's
+    # readers against the donor's own inputs and the two only coexist inside one forward.
     readers, donor = {}, None
     for index in full:
         if getattr(model.model.layers[index].self_attn, "mode", "full") == "full":
@@ -291,38 +348,39 @@ def main() -> int:
         print("\ndonors and their readers: %s"
               % ", ".join("%d serves %s" % (d, r) for d, r in readers.items() if r))
 
+    targets = source_capture(stock, full, (rope, content, head_dim, groups), readers,
+                             args.store, vocab, args.calibrate, args.length,
+                             source_device, heads=heads)
+    tokens = next(iter(targets.values())).rows
+    print("\ncalibrated on %d tokens per layer" % tokens, flush=True)
+    # The source stays loaded now. The up-projection's solve needs the target beside the
+    # latent, and the latent only exists once this layer's encoder is set -- so the second
+    # pass reads both, one from the converted model and one from here. Holding it costs
+    # 3.8 GiB against the 1.6 GiB per layer the samples used to cost, and `--source-device`
+    # puts it on the other card.
+    torch.cuda.empty_cache()
+
     print("\n%-7s %-9s %9s %9s %9s"
           % ("layer", "mode", "key r2", "value r2", "rope r2"))
     fits = []
     for index in full:
         attention = model.model.layers[index].self_attn
         mode = getattr(attention, "mode", "full")
-        # Only this layer's calibration crosses to the fitting card, and it goes back as
-        # soon as the layer is done. Six layers at once is what does not fit.
-        inputs, keys, values, rotary = (t.to(device) for t in targets[index])
-        # `kv_b_proj` is read per head -- `view(..., num_heads, content + head_dim)` then
-        # split -- so the target has to interleave each head's content with its own value.
-        # Concatenating the two blocks instead puts head 1's content where head 0's value
-        # is read, which fits its own target perfectly and is wrong in every forward.
-        target = torch.cat([keys.view(-1, heads, content),
-                            values.view(-1, heads, head_dim)],
-                           dim=-1).reshape(len(keys), heads * (content + head_dim))
+        # Moments rather than samples: fixed-size in the token count, so the whole layer's
+        # calibration is 33 MiB of Gram instead of 1.6 GiB of rows.
+        moments = targets[index]
 
         if hasattr(attention, "kv_a_proj"):
             # The encoder is the best rank-`latent` linear summary of everything this
-            # layer's readers want -- its own keys and values and theirs. Their halves go
-            # in as captured rather than interleaved, because permuting a target's columns
-            # permutes rows of `target.T @ inputs` and leaves the right singular vectors
-            # alone. The rotary rows are a plain least-squares fit.
-            wanted = [target] + [torch.cat(targets[reader][1:3], dim=-1).to(device)
-                                 for reader in readers.get(index, ())]
-            stacked = torch.cat(wanted, dim=-1) if len(wanted) > 1 else target
-            whitener = whiten(inputs.T @ inputs)
-            _, _, right = torch.linalg.svd((stacked.T @ inputs) @ whitener,
-                                           full_matrices=False)
-            del wanted, stacked
+            # layer's readers want -- its own keys and values and theirs. The SVD needs
+            # only `stacked^T inputs`, which the capture accumulated a block at a time.
+            whitener = whiten(moments.gram_inputs)
+            _, _, right = torch.linalg.svd(
+                moments.stacked_cross(readers.get(index, ())) @ whitener,
+                full_matrices=False)
             torch.cuda.empty_cache()
-            rotary_rows = solve(inputs, rotary)
+            rotary_rows = solve_from_moments(moments.gram_inputs, moments.cross_rotary,
+                                             RIDGE)
             with torch.no_grad():
                 attention.kv_a_proj.weight.copy_(torch.cat([
                     right[:attention.latent] @ whitener, rotary_rows,
@@ -331,40 +389,55 @@ def main() -> int:
             # The rotary slice is the half of the key that `key_r2` never sees, and it is
             # where one shared vector stands in for the source's per-head ones. Scoring it
             # is what would have shown that the ceiling here is the collapse, not the fit.
-            rotary_fit = float(1 - (inputs @ rotary_rows.T - rotary).pow(2).sum()
-                               / rotary.pow(2).sum())
+            # Expanded from the moments: tr(R G R^T) - 2 tr(R C) + ||rotary||^2.
+            rotary_fit = float(1 - (
+                float((rotary_rows @ moments.gram_inputs * rotary_rows).sum())
+                - 2 * float((rotary_rows.T * moments.cross_rotary).sum())
+                + moments.rotary_energy) / moments.rotary_energy)
 
         # Whatever latent this layer ends up reading -- its own, or a donor's through the
         # adapter -- take it from the model as it now stands rather than from the algebra.
+        # The second pass, streamed the same way: the latent this layer will actually read
+        # only exists once the encoder is set, and its moments against the target are all
+        # the up-projection's solve needs.
         handle = _record_latent(attention)
+        source_handle = stock.model.layers[index].self_attn.register_forward_pre_hook(
+            _target_hook(box := {}, (rope, content, head_dim, groups), heads),
+            with_kwargs=True)
         with torch.no_grad():
             for ids in calibration_windows(args.store, vocab, args.calibrate,
                                            args.length, device):
+                attention._latent_log.clear()
                 model(input_ids=ids, use_cache=False)
+                stock(input_ids=ids.to(source_device), use_cache=False)
+                latent = torch.cat(attention._latent_log)
+                moments.observe_latent(latent, box["target"].to(latent.device))
+                del latent
+                box.clear()
         handle.remove()
-        latent = torch.cat(attention._latent_log)
+        source_handle.remove()
         del attention._latent_log
 
-        weight = solve(latent, target)
-        fitted = latent @ weight.T
-        # Undo the interleave to score the two halves against the shapes they were
-        # captured in, so `key_r2` measures the keys the forward will actually assemble.
-        parts = fitted.view(len(fitted), heads, content + head_dim)
-        fitted_keys = parts[..., :content].reshape(len(fitted), -1)
-        fitted_values = parts[..., content:].reshape(len(fitted), -1)
+        weight = solve_from_moments(moments.gram_latent, moments.cross_latent, RIDGE)
         with torch.no_grad():
             attention.kv_b_proj.weight.copy_(weight.to(attention.kv_b_proj.weight.dtype))
             if attention.k_norm is not None:
-                # The legacy content key norm divides the fit's own scale back out, so it
-                # has to be handed back as the gain. Without the norm the fit stands.
-                scale = fitted_keys.reshape(-1, content).pow(2).mean(-1).sqrt().mean()
-                attention.k_norm.weight.fill_(float(scale) - 1.0)
+                # The legacy content key norm needs the fitted rows themselves, which the
+                # moment path does not keep. It defaults off and no checkpoint in this
+                # project sets it; refuse rather than approximate it silently.
+                raise SystemExit(
+                    "mla_content_key_norm needs per-row fitted keys, which the streaming "
+                    "calibration does not retain. Turn the norm off, or restore the "
+                    "sample path for that configuration.")
 
-        share = lambda a, b: float(1 - (a - b).pow(2).sum() / b.pow(2).sum())  # noqa: E731
-        fits.append((index, mode, share(fitted_keys, keys),
-                     share(fitted_values, values), rotary_fit))
+        key_columns, value_columns = interleaved_columns(heads, content, head_dim)
+        fits.append((index, mode,
+                     residual_share(weight, moments.gram_latent, moments.cross_latent,
+                                    moments.key_energy, key_columns.to(device)),
+                     residual_share(weight, moments.gram_latent, moments.cross_latent,
+                                    moments.value_energy, value_columns.to(device)),
+                     rotary_fit))
         print("%-7d %-9s %9.4f %9.4f %9.4f" % fits[-1], flush=True)
-        del latent, fitted, target, inputs, keys, values, rotary
         targets[index] = None
         torch.cuda.empty_cache()
 

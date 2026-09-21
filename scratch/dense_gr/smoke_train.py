@@ -169,6 +169,24 @@ def main() -> int:
                              "routing wherever the indexer's scores tie at the cutoff. "
                              "The tail is carried rather than deleted, which is only "
                              "defined at the capture temperature.")
+    parser.add_argument("--tensor-parallel", action="store_true",
+                        help="split the body across both cards. The embedding and head "
+                             "stay whole on home, because Cut Cross-Entropy never forms "
+                             "the logits and needs them that way. Measured on this model: "
+                             "micro-batch 6 at 3,090 tokens per second against one card's "
+                             "best of 2,308 at micro-batch 3.")
+    parser.add_argument("--micro-tokens", type=int, default=0, metavar="N",
+                        help="tokens per forward, which is the better unit than documents: "
+                             "memory follows tokens and this corpus runs 134 to 1024 of "
+                             "them per document, so a fixed document count makes the "
+                             "widest batch decide whether the run fits. With a budget the "
+                             "wide groups get fewer rows and the narrow ones more. "
+                             "Overrides --micro-batch.")
+    parser.add_argument("--micro-batch", type=int, default=1,
+                        help="documents per forward. They are grouped by length so a "
+                             "batch is uniform without padding -- CSA2 cannot represent "
+                             "padding, and a padded row routes differently from the same "
+                             "row alone. Grouping costs 0.2%% of the corpus at 6.")
     parser.add_argument("--teacher-weight", type=float, default=0.5,
                         help="how much of the blend is the teacher's distribution, the "
                              "rest being ground-truth cross entropy. Repairing the tail "
@@ -471,7 +489,19 @@ def main() -> int:
     model.train()
     if args.checkpoint_layers:
         model.model.gradient_checkpointing = True
-        print("checkpointing: recomputing every layer's forward in backward", flush=True)
+        if args.sparse_stage:
+            # The routing layers cannot be recomputed while their attention is being
+            # recorded as the indexer's target: the recompute does not reproduce what was
+            # captured, and `torch.utils.checkpoint` compares metadata and refuses. The
+            # linear-attention layers are unaffected, and they are where the memory is --
+            # measured at micro-batch 6 they hold 10,654 MiB of the home card's 14,567
+            # against the routing layers' 4,476.
+            model.model.gradient_checkpointing_types = ("linear_attention",)
+            print("checkpointing: recomputing the linear-attention layers "
+                  "(the routing layers are being recorded and cannot be)", flush=True)
+        else:
+            print("checkpointing: recomputing every layer's forward in backward",
+                  flush=True)
     swapped = apply_liger(model, config)
     parameters = sum(p.numel() for p in model.parameters())
     print("model: %.1fM parameters, liger %s" % (parameters / 1e6, json.dumps(swapped)),
@@ -566,6 +596,51 @@ def main() -> int:
         print("held-out: %d documents, %d tokens from the capture's own eval split"
               % (len(held_teacher), held_teacher.tokens), flush=True)
 
+    if args.tensor_parallel:
+        from distillkit.parallel.model import shard_model
+
+        if torch.cuda.device_count() < 2:
+            raise SystemExit("--tensor-parallel needs two CUDA devices")
+        shard_model(model, ["cuda:0", "cuda:1"], shard_embeddings=False)
+        print("tensor parallel: body split across two cards, head kept whole on home",
+              flush=True)
+        if teacher is not None:
+            # Triton's autotuner keeps what it is benchmarking on the instance, and
+            # autograd gives each device its own backward thread, so a cold autotune under
+            # sharding has one thread clearing `nargs` while the other is still reading
+            # it. Warm every shape the run will use, single-threaded, before training --
+            # flooring the widths to the block size is what makes that a short list.
+            shapes = teacher.widths(args.micro_batch, model.config.csa2_block_size,
+                                    args.micro_tokens or None)
+            print("warming %d shapes: %s" % (len(shapes), shapes), flush=True)
+            torch.autograd.set_multithreading_enabled(False)
+            try:
+                for width in shapes:
+                    # The same row count training will use at this width, because the
+                    # autotuner keys on the whole shape and a warm-up at the wrong number
+                    # of rows warms a kernel the run never calls.
+                    rows = (max(1, args.micro_tokens // width) if args.micro_tokens
+                            else args.micro_batch)
+                    probe = torch.randint(1, model.config.vocab_size,
+                                          (rows, width), device="cuda")
+                    state = model.model(input_ids=probe,
+                                        attention_mask=torch.ones_like(probe),
+                                        use_cache=False).last_hidden_state
+                    linear_cross_entropy(state, model.lm_head.weight, probe, shift=1,
+                                         reduction="mean").backward()
+                    del state, probe
+                    # Between shapes, not after all of them: each backward allocates the
+                    # head's gradient, 970 MiB at this vocabulary, and eight of those
+                    # accumulated runs the card out before the largest shape is reached.
+                    model.zero_grad(set_to_none=True)
+                    torch.cuda.empty_cache()
+            finally:
+                torch.autograd.set_multithreading_enabled(True)
+                model.zero_grad(set_to_none=True)
+                torch.cuda.synchronize()
+                torch.cuda.empty_cache()
+            print("warmed", flush=True)
+
     sparse_stage = None
     if args.sparse_stage:
         from indexer_kl import indexer_loss, routing_layers, watch  # noqa: F401
@@ -593,8 +668,20 @@ def main() -> int:
         # the budget cannot be divided out in advance. `window` becomes the average a
         # step is expected to score, used only to pick a step count; the loop counts the
         # tokens it actually scored and reports those.
-        window = args.accumulate * (teacher.tokens / max(len(teacher), 1))
-        documents = teacher.epochs(None)
+        if args.micro_tokens or args.micro_batch > 1:
+            block = model.config.csa2_block_size
+            budget = args.micro_tokens or None
+            groups = teacher._groups(args.micro_batch, block, budget)
+            per_step = sum(len(g) * w for g, w in groups) / max(len(groups), 1)
+            window = args.accumulate * per_step
+            documents = teacher.grouped(args.micro_batch, block, budget)
+            rows = [len(g) for g, _ in groups]
+            print("batching: %d groups, %d-%d rows, widths %s, %.0f tokens a forward"
+                  % (len(groups), min(rows), max(rows),
+                     sorted({w for _, w in groups}), per_step), flush=True)
+        else:
+            window = args.accumulate * (teacher.tokens / max(len(teacher), 1))
+            documents = teacher.epochs(None)
     steps = max(1, int(args.tokens // window))
     generator = np.random.default_rng(args.seed)
     history = []
