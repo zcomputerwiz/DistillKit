@@ -564,9 +564,18 @@ def evaluate(args):
                         continue
                     features = [record] if task == "nll" else record["choices"]
                     mode_collator, forward_mode = wiring[mode]
-                    scored = score_sequences(model, features, mode_collator, mode,
-                                             args.device, forward_mode=forward_mode,
-                                             token_classes=token_classes)
+                    # One sequence per forward, so nothing is ever padded. Causality
+                    # already keeps a real query off a pad key, and for a dense model
+                    # right padding is bit-exact -- but a routed model picks its keys by
+                    # a top-k, and where scores tie at the cutoff the winner depends on
+                    # how wide the row is. Choices of different lengths then route
+                    # differently batched than alone. Scoring them one at a time costs
+                    # four forwards per question and removes the question entirely,
+                    # for every arm alike rather than only the ones that need it.
+                    scored = [score_sequences(model, [feature], mode_collator, mode,
+                                              args.device, forward_mode=forward_mode,
+                                              token_classes=token_classes)[0]
+                              for feature in features]
                     outputs[mode] = scored[0] if task == "nll" else choice_result(scored, features, record["answer"])
                 result["records"][task].append({"id": record["id"], "modes": outputs})
                 if (index + 1) % 8 == 0:

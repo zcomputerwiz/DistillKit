@@ -274,3 +274,8 @@ scratch/code_corpus/v2-build.log
 
 # Chrome traces from the tensor-parallel profiling runs: megabytes of build product.
 /scratch/tp-review-*/*.trace.json
+
+# CSA2 conversion screen: keep RESULTS.md, ignore the result dumps it summarises.
+/scratch/csa2-eval/*.json
+/scratch/csa2-eval/*.json.partial
+/scratch/csa2-eval/*.log
