@@ -185,10 +185,14 @@ def main() -> int:
                              "the context mismatch a mid-document window would carry, "
                              "because causal attention means the first n positions see "
                              "exactly what the teacher saw. 2048 keeps 89.3% of this "
-                             "corpus, 1024 keeps 74.1%.")
+                             "corpus and peaks within a gigabyte of the ceiling; 1024 "
+                             "keeps 74.1% and leaves about three. Measured in "
+                             "teacher_kl.py.")
     parser.add_argument("--kl-chunk", type=int, default=256,
                         help="positions per head projection in the teacher KL, as a row "
-                             "budget at batch 1. A full row is 248320 wide.")
+                             "budget at batch 1. A full row is 248320 wide. It does not "
+                             "move the peak -- the chunked head frees each chunk before "
+                             "the next, so the quadratic routing sets it instead.")
     parser.add_argument("--indexer-weight", type=float, default=1.0,
                         help="how much of the indexer's KL to add. The reference gives no "
                              "figure because its two losses reach disjoint parameters, "

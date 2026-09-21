@@ -73,8 +73,21 @@ class CachedTeacher:
         # positions of a document see exactly what the teacher saw when it produced their
         # targets, so a prefix is free of the mismatch a mid-document window would carry.
         # The cap exists because the sparse stage records attention, which forces the
-        # gathered path, whose selection is O(L^2) per layer: a 4096-token document OOMs
-        # 24 GiB. At 2048 this keeps 89.3% of the corpus, at 1024 74.1%.
+        # gathered path, whose selection is O(L^2) per layer.
+        #
+        # Measured, because guessing at it cost a run. Peak over the four longest
+        # documents, forward and both losses and backward, without an optimizer: 14.00 GiB
+        # at 1024, 16.06 at 1536, 18.17 at 2048, against a 21.60 GiB allowance. That
+        # looks like room at 2048 and is not -- Adam's state adds about 2.4 GiB, which
+        # puts a real run at roughly 20.6, and the backward then asks for the lm_head
+        # gradient in one 970 MiB block and fails. A short real run at 1536 peaked 20.36,
+        # still inside a gigabyte of the ceiling. 1024 leaves about three.
+        #
+        # `--kl-chunk` is not the lever it looks like: 128 against 256 measured identical
+        # to two decimal places, because the chunked head frees each chunk's logits before
+        # the next and the peak is set by the quadratic routing instead.
+        #
+        # The cost is corpus: 74.1% of the tokens at 1024 against 89.3% at 2048.
         self.max_length = max_length
         ids = self.cache.document_ids(split)
         self.ids = [doc_id for doc_id in ids
