@@ -51,6 +51,7 @@ from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
 from distillkit.models.qwen35.csa2 import (dense_routing,  # noqa: E402
+                                           isolated_indexer, recorded_attention,
                                            routing_report, router_parameters)
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
@@ -153,6 +154,19 @@ def main() -> int:
                         help="steps between held-out evaluations; 0 disables")
     parser.add_argument("--evaluate-windows", type=int, default=64)
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--sparse-stage", action="store_true",
+                        help="the reference's second stage: every parameter trains on the "
+                             "language-modeling loss, the indexer trains on its own KL "
+                             "against the attention over the tokens it selected, and the "
+                             "two are cut apart so neither trains the other. Needs a "
+                             "model whose indexer has been warmed up by indexer_kl.py; "
+                             "from a cold one the selection is random and the KL is "
+                             "fitting to noise.")
+    parser.add_argument("--indexer-weight", type=float, default=1.0,
+                        help="how much of the indexer's KL to add. The reference gives no "
+                             "figure because its two losses reach disjoint parameters, "
+                             "which is also true here, so this scales a gradient rather "
+                             "than trading one objective against another.")
     parser.add_argument("--checkpoint-layers", action="store_true",
                         help="recompute each layer's forward during the backward pass "
                              "instead of holding its activations. Costs roughly a third "
@@ -482,6 +496,24 @@ def main() -> int:
     # model reading the store at its own width expands nothing, so the charge is 1.
     inflation = 1.0 if kept is None else compact_tokens / original_tokens
 
+    sparse_stage = None
+    if args.sparse_stage:
+        from indexer_kl import indexer_loss, routing_layers, watch  # noqa: F401
+
+        sparse_stage = routing_layers(model)
+        if not sparse_stage:
+            raise SystemExit("--sparse-stage needs a model with an indexer to align")
+        if getattr(model.config, "csa2_router_bias", True):
+            # With the fold still in place the indexer's score is a term in the logits,
+            # so the language-modeling loss has an opinion about it and the isolation
+            # cannot hold. Measured: warming an indexer in that state moves held-out the
+            # wrong way.
+            print("warning: csa2_router_bias is on, so the indexer's score still reaches "
+                  "the attention logits and the two objectives are not disjoint",
+                  flush=True)
+        print("sparse stage: %d routing layers aligned, indexer weight %.2f"
+              % (len(sparse_stage), args.indexer_weight), flush=True)
+
     window = args.batch * args.length
     if args.passes is not None:
         args.tokens = int(args.passes * stream.shape[0])
@@ -506,16 +538,57 @@ def main() -> int:
         # and write, which runs out of 24 GiB at batch 64. Accumulating keeps the
         # *effective* batch identical across arms, so a blend comparison is a comparison
         # of blend rather than of batch size.
-        loss = 0.0
+        loss, indexer_cost = 0.0, 0.0
         for chunk in tokens.chunk(args.accumulate):
-            hidden = model.model(input_ids=chunk,
-                                 attention_mask=torch.ones_like(chunk),
-                                 use_cache=False).last_hidden_state
-            part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
-                                        reduction="mean") / args.accumulate
+            if sparse_stage is None:
+                hidden = model.model(input_ids=chunk,
+                                     attention_mask=torch.ones_like(chunk),
+                                     use_cache=False).last_hidden_state
+                part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
+                                            reduction="mean") / args.accumulate
+            else:
+                # One forward serves both losses. The attention is recorded as it is
+                # computed, which is the target, and the selection it was masked by is
+                # what the KL is restricted to -- a sparse attention has no opinion about
+                # positions it did not read.
+                seen, handles = watch(model, sparse_stage)
+                with recorded_attention(model), isolated_indexer(model):
+                    hidden = model.model(input_ids=chunk,
+                                         attention_mask=torch.ones_like(chunk),
+                                         use_cache=False).last_hidden_state
+                    targets = {i: a.last_attention for i, a in sparse_stage}
+                    chosen = {i: a.last_allowed for i, a in sparse_stage}
+                    borrowed = {i: a.bus.require_latent(a.latent_donor, i)
+                                for i, a in sparse_stage}
+                    for handle in handles:
+                        handle.remove()
+                    part = linear_cross_entropy(hidden, model.lm_head.weight, chunk,
+                                                shift=1, reduction="mean")
+                    aligned = indexer_loss(model, sparse_stage, seen, targets, borrowed,
+                                           selected=chosen)
+                # Kept apart in the report as well as in the gradient: summed, the KL is
+                # an order of magnitude larger and the language-modeling loss -- the one
+                # that says whether the model is getting better -- disappears into it.
+                indexer_cost += float(aligned) / args.accumulate
+                loss = loss + part.detach() / args.accumulate
+                part = (part + args.indexer_weight * aligned) / args.accumulate
+                part.backward()
+                continue
             part.backward()
             loss = loss + part.detach()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if sparse_stage is None:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        else:
+            # Separately, because the two objectives reach disjoint parameters and a
+            # single norm would put them back together: the indexer's KL is an order of
+            # magnitude larger than the language-modeling loss here, so clipping the whole
+            # model to one norm would scale the language model's gradient by how well the
+            # router happened to be doing. That is the coupling the isolation removes.
+            held = {id(p) for _, p in router_parameters(model)}
+            torch.nn.utils.clip_grad_norm_(
+                [p for p in model.parameters() if id(p) not in held], 1.0)
+            torch.nn.utils.clip_grad_norm_(
+                [p for _, p in router_parameters(model)], 1.0)
         if step < args.warmup:
             # Adam's first step moves every parameter by `lr` whatever its gradient was:
             # the bias correction divides the first moment by the square root of the
@@ -564,8 +637,12 @@ def main() -> int:
                 row["copy"] = copy_probe(model, args.vocab, half=args.probe_half,
                                          windows=args.probe_windows, batch=args.batch)
             history.append(row)
-            print("step %5d  %5.2f passes  train %7.4f  held %8s  norm %7.4f  %8.0f tok/s"
+            if sparse_stage is not None:
+                row["indexer"] = indexer_cost
+            print("step %5d  %5.2f passes  train %7.4f%s  held %8s  norm %7.4f  %8.0f tok/s"
                   % (step, row["passes"], row["loss"],
+                     "  idx %6.3f" % (indexer_cost / max(len(sparse_stage), 1))
+                     if sparse_stage is not None else "",
                      "%.4f" % row["heldout"] if "heldout" in row else "-",
                      row.get("heldout_per_original_token",
                              row["loss_per_original_token"]),

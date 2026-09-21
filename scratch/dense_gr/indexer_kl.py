@@ -65,14 +65,8 @@ def routing_layers(model):
             and layer.self_attn.mode != "reuse"]
 
 
-def step(model, layers, ids):
-    """One KL between each indexer's scores and the attention over the same positions.
-
-    One forward, under no_grad, with routing open: it produces the target and the inputs
-    at once. Nothing in it needs a gradient, because the only thing being trained reads
-    those inputs afterwards -- and the target has to come from open routing, or the
-    indexer is fitted to the attention its own selection already shaped.
-    """
+def watch(model, layers):
+    """Catch what each routing layer was handed, so its scores can be rebuilt after."""
     seen = {}
 
     def catch(index):
@@ -83,15 +77,19 @@ def step(model, layers, ids):
 
     handles = [model.model.layers[i].self_attn.register_forward_pre_hook(
         catch(i), with_kwargs=True) for i, _ in layers]
-    with torch.no_grad(), dense_routing(model), recorded_attention(model):
-        model.model(input_ids=ids, attention_mask=torch.ones_like(ids), use_cache=False)
-        # Read inside the context: leaving it clears what was recorded.
-        targets = {index: attention.last_attention for index, attention in layers}
-        borrowed = {index: attention.bus.require_latent(attention.latent_donor, index)
-                    for index, attention in layers}
-    for handle in handles:
-        handle.remove()
+    return seen, handles
 
+
+def indexer_loss(model, layers, seen, targets, borrowed, selected=None):
+    """The KL of each indexer's scores against the attention over the same positions.
+
+    `selected` is what makes this the sparse stage rather than the warm-up. The reference
+    aligns against the whole distribution while attention is dense, and "considering only
+    the selected token set" once it is not -- which is the right restriction, because a
+    sparse main attention has no opinion about positions it did not read, and asking the
+    indexer to predict where it would have attended is asking about something that did not
+    happen.
+    """
     total = 0.0
     for index, attention in layers:
         target = targets[index]
@@ -109,12 +107,34 @@ def step(model, layers, ids):
         keys = owner.index_keys_from(latent.detach(), rotary.detach())
         scores, causal = attention.token_scores(
             hidden.detach(), keys, position_embeddings=position)
+        where = causal if selected is None else (causal & selected[index])
         predicted = torch.log_softmax(
-            scores.masked_fill(~causal, float("-inf")), dim=-1)
-        # Cross entropy against a distribution that already sums to one, which is the KL
-        # up to the target's own entropy -- and that term has no gradient here.
+            scores.masked_fill(~where, float("-inf")), dim=-1)
+        # Cross entropy against a distribution that already sums to one over the same
+        # set -- `_record` masks before its softmax -- which is the KL up to the target's
+        # own entropy, and that term has no gradient here.
         total = total + -(target * predicted.nan_to_num(neginf=0.0)).sum(-1).mean()
     return total
+
+
+def step(model, layers, ids):
+    """One warm-up step: dense attention, and the KL over everything reachable.
+
+    One forward, under no_grad, with routing open: it produces the target and the inputs
+    at once. Nothing in it needs a gradient, because the only thing being trained reads
+    those inputs afterwards -- and the target has to come from open routing, or the
+    indexer is fitted to the attention its own selection already shaped.
+    """
+    seen, handles = watch(model, layers)
+    with torch.no_grad(), dense_routing(model), recorded_attention(model):
+        model.model(input_ids=ids, attention_mask=torch.ones_like(ids), use_cache=False)
+        # Read inside the context: leaving it clears what was recorded.
+        targets = {index: attention.last_attention for index, attention in layers}
+        borrowed = {index: attention.bus.require_latent(attention.latent_donor, index)
+                    for index, attention in layers}
+    for handle in handles:
+        handle.remove()
+    return indexer_loss(model, layers, seen, targets, borrowed)
 
 
 def main() -> int:
