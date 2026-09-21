@@ -564,20 +564,31 @@ def main() -> int:
             # into a batch would route differently than scoring them alone. Token
             # weighted, so a long document counts for what it is rather than for one row.
             total, scored = 0.0, 0
-            # A fixed prefix of the split rather than all of it: the whole eval split is
-            # 258K tokens and would cost a minute of every checkpoint. The same documents
-            # every time, so the series is comparable even though it is a subset.
-            for doc_id in held_teacher.ids[:args.evaluate_windows]:
+            # A fixed subset rather than all of it: the whole eval split is 258K tokens
+            # and would cost a minute of every checkpoint. The same documents every
+            # time, so the series is comparable -- and spread across every capture, so
+            # a merged corpus is not scored entirely on whichever one was named first.
+            by_source = {}
+            for source, doc_id in held_sample:
                 record = held_teacher.read(doc_id)
                 ids = record["input_ids"]
                 state = model.model(input_ids=ids,
                                     attention_mask=torch.ones_like(ids),
                                     use_cache=False).last_hidden_state
                 count = ids.shape[1] - 1
-                total += float(linear_cross_entropy(state, model.lm_head.weight, ids,
-                                                    shift=1, reduction="mean")) * count
+                part = float(linear_cross_entropy(state, model.lm_head.weight, ids,
+                                                  shift=1, reduction="mean")) * count
+                total += part
                 scored += count
+                row = by_source.setdefault(source, [0.0, 0])
+                row[0] += part
+                row[1] += count
             model.train()
+            # Per source as well as in aggregate: a merged corpus's aggregate moves when
+            # the mixture moves, so the column that says whether the model improved on
+            # code is the code column and not the total.
+            evaluate.by_source = {name: total_nll / max(tokens, 1)
+                                  for name, (total_nll, tokens) in by_source.items()}
             return total / max(scored, 1)
         total, batches = 0.0, 0
         for start in range(0, evaluation.shape[0], args.batch):
@@ -598,7 +609,8 @@ def main() -> int:
 
     teacher = None
     if args.teacher_cache is not None:
-        from teacher_kl import CachedTeacher, grouped_tail_kl, scored_mask  # noqa: F401
+        from teacher_kl import (CachedTeacher, accumulation_shares,  # noqa: F401
+                                grouped_tail_kl, scored_mask)
 
         if kept is not None:
             raise SystemExit(
@@ -622,6 +634,14 @@ def main() -> int:
                               teacher.top_k, args.teacher_weight), flush=True)
         print("held-out: %d documents, %d tokens from the capture's own eval split"
               % (len(held_teacher), held_teacher.tokens), flush=True)
+        held_sample = held_teacher.stratified(args.evaluate_windows)
+        spread = {}
+        for source, _ in held_sample:
+            spread[source] = spread.get(source, 0) + 1
+        print("held-out sample: %d documents across %d captures (%s)"
+              % (len(held_sample), len(spread),
+                 ", ".join("%s %d" % (Path(name).name, count)
+                           for name, count in sorted(spread.items()))), flush=True)
         if args.min_answer_tokens > 0:
             print("dropped as all prompt at the cap: %d train, %d held-out"
                   % (teacher.dropped_all_prompt, held_teacher.dropped_all_prompt),
@@ -678,11 +698,11 @@ def main() -> int:
                 "exists to avoid. Those options group documents to block-rounded widths, "
                 "which is what makes the shape set finite.")
         if teacher is not None:
-            shapes = [(max(1, args.micro_tokens // width) if args.micro_tokens
-                       else args.micro_batch, width)
-                      for width in teacher.widths(args.micro_batch,
-                                                  model.config.csa2_block_size,
-                                                  args.micro_tokens or None)]
+            # The observed `(rows, width)` of the planned batches, not a row count
+            # recomputed from the budget: remainder groups are smaller than a full one
+            # and are their own shape.
+            shapes = teacher.shapes(args.micro_batch, model.config.csa2_block_size,
+                                    args.micro_tokens or None)
         else:
             # Fixed windows: one shape for the whole run, and it was getting no warm-up
             # at all because the warm-up sat behind the teacher cache.
@@ -734,9 +754,9 @@ def main() -> int:
               % (len(sparse_stage), args.indexer_weight), flush=True)
 
     window = args.batch * args.length
-    if args.passes is not None:
-        args.tokens = int(args.passes * (teacher.tokens if teacher is not None
-                                         else stream.shape[0]))
+    # `--passes` is resolved after the batching plan below, not here: grouping decides
+    # how much of the cache a pass actually covers, and sizing the budget off the cache
+    # would count tokens the plan trims away.
     # Clipping has to count a replicated parameter once rather than once per rank, or
     # the norm it measures is inflated by the replicas and every gradient is scaled down
     # for it. `distillkit.parallel.sync.clip_grad_norm` does this for a whole module;
@@ -775,9 +795,21 @@ def main() -> int:
             print("batching: %d groups, %d-%d rows, widths %s, %.0f tokens a forward"
                   % (len(groups), min(rows), max(rows),
                      sorted({w for _, w in groups}), per_step), flush=True)
+            # A pass is over what grouping keeps, not over what the cache holds: each
+            # group is cut to its shortest member and floored to the block, so sizing
+            # `--passes` off the cache would overstate the budget by the difference.
+            planned = teacher.planned_tokens(args.micro_batch, block, budget)
+            print("plan: %d of %d cached tokens (%.1f%%), %d documents dropped as "
+                  "shorter than a block, %d for losing their answer to the group width"
+                  % (planned, teacher.tokens, 100.0 * planned / max(teacher.tokens, 1),
+                     teacher.dropped_short, teacher.dropped_truncated_answer), flush=True)
+            teacher.tokens = planned
         else:
             window = args.accumulate * (teacher.tokens / max(len(teacher), 1))
             documents = teacher.epochs(None)
+    if args.passes is not None:
+        args.tokens = int(args.passes * (teacher.tokens if teacher is not None
+                                         else stream.shape[0]))
     steps = max(1, int(args.tokens // window))
     generator = np.random.default_rng(args.seed)
     history = []
@@ -808,10 +840,22 @@ def main() -> int:
         # and write, which runs out of 24 GiB at batch 64. Accumulating keeps the
         # *effective* batch identical across arms, so a blend comparison is a comparison
         # of blend rather than of batch size.
+        # Weighted by the tokens each micro-batch actually scores, not by how many
+        # micro-batches there are. Every term below is a mean over its own scored
+        # positions, so dividing each by `accumulate` averages means of different
+        # denominators: a 134-token document and a 1024-token one then count the same,
+        # and the gradient depends on where the accumulation boundaries happened to
+        # fall. With `--micro-batch 1` those boundaries are single documents, whose
+        # lengths run 134 to 1024 here, and with `--micro-tokens` the row count varies
+        # with the width. Weighting by each micro-batch's share of the step's scored
+        # tokens makes the step equal to one forward over the same examples.
+        counts, step_tokens = accumulation_shares(
+            [record["input_ids"] for record in microbatches])
         loss, indexer_cost, teacher_cost = 0.0, 0.0, 0.0
-        for record in microbatches:
+        for record, count in zip(microbatches, counts):
             chunk = record["input_ids"]
-            scored_tokens += chunk.numel() - chunk.shape[0]
+            scored_tokens += count
+            share = count / step_tokens
 
             def distil(hidden):
                 """The teacher's half of the blend, summed over the scored positions.
@@ -833,16 +877,16 @@ def main() -> int:
                 part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
                                             reduction="mean")
                 if teacher is not None:
-                    loss = loss + part.detach() / args.accumulate
+                    loss = loss + part.detach() * share
                     if args.teacher_weight > 0:
                         carried = distil(hidden)
-                        teacher_cost += float(carried) / args.accumulate
+                        teacher_cost += float(carried) * share
                         part = ((1 - args.teacher_weight) * part
                                 + args.teacher_weight * carried)
-                    part = part / args.accumulate
+                    part = part * share
                     part.backward()
                     continue
-                part = part / args.accumulate
+                part = part * share
             else:
                 # One forward serves both losses. The attention is recorded as it is
                 # computed, which is the target, and the selection it was masked by is
@@ -871,17 +915,17 @@ def main() -> int:
                 # Kept apart in the report as well as in the gradient: summed, the KL is
                 # an order of magnitude larger and the language-modeling loss -- the one
                 # that says whether the model is getting better -- disappears into it.
-                indexer_cost += float(aligned) / args.accumulate
-                loss = loss + part.detach() / args.accumulate
+                indexer_cost += float(aligned) * share
+                loss = loss + part.detach() * share
                 if carried is not None:
                     # The blend is between the two terms that share parameters. The
                     # indexer's KL is added rather than blended in, because it reaches a
                     # disjoint set and is clipped on its own below: putting it inside the
                     # blend would make `--teacher-weight` scale the router as well.
-                    teacher_cost += float(carried) / args.accumulate
+                    teacher_cost += float(carried) * share
                     part = ((1 - args.teacher_weight) * part
                             + args.teacher_weight * carried)
-                part = (part + args.indexer_weight * aligned) / args.accumulate
+                part = (part + args.indexer_weight * aligned) * share
                 part.backward()
                 continue
             part.backward()
@@ -959,6 +1003,13 @@ def main() -> int:
                     and (step % args.evaluate_every == 0 or step == steps - 1)):
                 row["heldout"] = evaluate()
                 row["heldout_per_original_token"] = row["heldout"] * inflation
+                if getattr(evaluate, "by_source", None):
+                    row["heldout_by_source"] = dict(evaluate.by_source)
+                    if len(evaluate.by_source) > 1:
+                        print("            held-out  " + "  ".join(
+                            "%s %.4f" % (Path(name).name, value)
+                            for name, value in sorted(evaluate.by_source.items())),
+                            flush=True)
             if args.probe_every and (step % args.probe_every == 0 or step == steps - 1):
                 row["copy"] = copy_probe(model, args.vocab, half=args.probe_half,
                                          windows=args.probe_windows, batch=args.batch)

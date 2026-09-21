@@ -163,3 +163,143 @@ def test_cached_teacher_takes_one_path_or_several(tmp_path):
     assert isinstance(both.cache, MergedCache)
     assert len(both) == 3
     assert both.tokens == single.tokens + 6
+
+
+def _doc(prompt, answer):
+    """A document whose answer starts right after `prompt` tokens."""
+    return [5] * prompt + MARKER + [7] * answer
+
+
+def test_grouping_keeps_the_remainder_and_is_batch_size_independent(tmp_path):
+    """The last, partial group is a smaller batch rather than a discarded one.
+
+    `break` on a short group threw away up to `rows - 1` documents every pass, and
+    because the group boundaries move with the batch size, one card and two cards were
+    not training on the same examples. Whatever the batch size, every document that
+    survives the width floor has to appear exactly once.
+    """
+    from teacher_kl import CachedTeacher
+
+    tokens = {"d%02d" % i: [5] * (16 + i) for i in range(11)}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    teacher = CachedTeacher(path, "train", device="cpu")
+
+    seen = {}
+    for size in (1, 2, 3, 4):
+        members = [doc for group, _ in teacher._groups(size) for doc in group]
+        assert len(members) == len(set(members)), "a document appears twice at size %d" % size
+        seen[size] = set(members)
+    assert seen[1] == seen[2] == seen[3] == seen[4], (
+        "changing the batch size changed which documents are trained on")
+    assert seen[1] == set(tokens)
+
+
+def test_grouping_cannot_truncate_an_answer_the_filter_admitted(tmp_path):
+    """The answer check belongs at the retained width, not at the cap.
+
+    A group is cut to its shortest member and floored to the routing block, so a
+    document can pass the check at its own length and be scored at a shorter one. The
+    filter has to run at the length the document is actually trained at.
+    """
+    from teacher_kl import CachedTeacher
+
+    # "late" carries its answer from index 22; grouped with "early" it is cut to 20
+    # and the answer is gone, while on its own it would keep two scored answer tokens.
+    tokens = {"early": _doc(prompt=2, answer=16), "late": _doc(prompt=20, answer=8)}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    teacher = CachedTeacher(path, "train", device="cpu",
+                            answer_marker=MARKER, min_answer_tokens=2)
+    assert sorted(teacher.ids) == ["early", "late"], "both pass at their own length"
+
+    groups = teacher._groups(2)
+    survivors = {doc for group, _ in groups for doc in group}
+    assert "late" not in survivors, (
+        "a document kept its place in a group that truncates its answer away")
+    assert teacher.dropped_truncated_answer == 1
+
+    for group, width in groups:
+        for doc_id in group:
+            assert teacher._kept_answer(doc_id, width) >= 2
+
+
+def test_planned_tokens_counts_what_grouping_keeps(tmp_path):
+    """`--passes` sized off the cache overstates the budget by whatever grouping trims."""
+    from teacher_kl import CachedTeacher
+
+    tokens = {"d%02d" % i: [5] * (16 + i) for i in range(8)}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    teacher = CachedTeacher(path, "train", device="cpu")
+
+    planned = teacher.planned_tokens(4)
+    assert planned == sum(len(g) * w for g, w in teacher._groups(4))
+    # Groups are cut to their shortest member, so the plan is never the whole cache.
+    assert planned < teacher.tokens
+
+
+def test_the_held_out_sample_covers_every_capture(tmp_path):
+    """Taking the first N of a merged corpus takes them all from the first capture."""
+    from teacher_kl import CachedTeacher
+
+    first = {"a%02d" % i: [5] * 8 for i in range(20)}
+    second = {"b%02d" % i: [6] * 8 for i in range(20)}
+    one = write(tmp_path / "one", list(first), tokens=first, split="eval")
+    two = write(tmp_path / "two", list(second), tokens=second, split="eval")
+
+    teacher = CachedTeacher([one, two], "eval", device="cpu")
+    assert len({source for source, _ in teacher.stratified(10)}) == 2, (
+        "the sample came from a single capture")
+
+    # Naming the captures the other way round selects the same documents, or a
+    # held-out series is not comparable between runs that ordered them differently.
+    flipped = CachedTeacher([two, one], "eval", device="cpu")
+    assert ({doc for _, doc in teacher.stratified(10)}
+            == {doc for _, doc in flipped.stratified(10)})
+
+
+def test_splitting_a_step_into_microbatches_does_not_change_the_gradient(tmp_path):
+    """The acceptance test for the reduction: same examples, different boundaries.
+
+    Every term is a mean over its own scored positions, so dividing each micro-batch by
+    `accumulate` averages means of different denominators. Documents here run 134 to
+    1024 tokens, so with one document per micro-batch a short document carried the same
+    weight as a document eight times its length, and the gradient moved with where the
+    accumulation boundaries fell. Weighting by each micro-batch's share of the step's
+    scored tokens makes an accumulated step equal to one forward over the same rows.
+    """
+    import torch
+    from torch import nn
+    from torch.nn import functional as F
+
+    from teacher_kl import accumulation_shares
+
+    torch.manual_seed(0)
+    hidden_size, vocab = 8, 16
+    head = nn.Linear(hidden_size, vocab, bias=False)
+    # Deliberately uneven: 2 rows of 12, 1 row of 5, 3 rows of 7.
+    chunks = [torch.randint(0, vocab, shape) for shape in ((2, 12), (1, 5), (3, 7))]
+    states = [torch.randn(*chunk.shape, hidden_size) for chunk in chunks]
+
+    def scored(state, chunk):
+        logits = head(state)[:, :-1].reshape(-1, vocab)
+        return logits, chunk[:, 1:].reshape(-1)
+
+    # One forward over every scored position, which is what the step should equal.
+    logits = torch.cat([scored(s, c)[0] for s, c in zip(states, chunks)])
+    targets = torch.cat([scored(s, c)[1] for s, c in zip(states, chunks)])
+    F.cross_entropy(logits, targets).backward()
+    reference = head.weight.grad.detach().clone()
+    head.zero_grad(set_to_none=True)
+
+    counts, total = accumulation_shares(chunks)
+    assert counts == [22, 4, 18] and total == 44
+    for state, chunk, count in zip(states, chunks, counts):
+        piece_logits, piece_targets = scored(state, chunk)
+        (F.cross_entropy(piece_logits, piece_targets) * (count / total)).backward()
+    torch.testing.assert_close(head.weight.grad, reference, rtol=1e-5, atol=1e-7)
+    head.zero_grad(set_to_none=True)
+
+    # And the rule it replaces does not have the property, or this test proves nothing.
+    for state, chunk in zip(states, chunks):
+        piece_logits, piece_targets = scored(state, chunk)
+        (F.cross_entropy(piece_logits, piece_targets) / len(chunks)).backward()
+    assert not torch.allclose(head.weight.grad, reference, rtol=1e-3, atol=1e-5)

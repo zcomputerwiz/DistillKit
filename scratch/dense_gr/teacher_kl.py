@@ -197,6 +197,14 @@ class CachedTeacher:
         # measured so far ran without it. `independent_eval` applies the same rule to
         # the NLL bank under `--min-assistant-tokens`, where 21 of 384 documents at a
         # 512-token window were all prompt.
+        #
+        # The answer position is recorded per document rather than used to filter here,
+        # because the length a document is finally scored at is not its cap: `grouped`
+        # truncates a batch to its shortest member and then floors that to the routing
+        # block, so a document can pass this check at 1024 and be trained at 896. The
+        # check that matters is the one `_groups` makes at the retained length.
+        self.min_answer_tokens = min_answer_tokens
+        self.answer_start = {}
         self.dropped_all_prompt = 0
         if min_answer_tokens > 0:
             if not answer_marker:
@@ -204,8 +212,10 @@ class CachedTeacher:
                                  "that opens an assistant turn in the capture's own "
                                  "vocabulary")
             before = len(self.ids)
+            for doc_id in self.ids:
+                self.answer_start[doc_id] = self._answer_start(doc_id, answer_marker)
             self.ids = [doc_id for doc_id in self.ids
-                        if self._answer_tokens(doc_id, answer_marker) >= min_answer_tokens]
+                        if self._kept_answer(doc_id, self.cap(doc_id)) >= min_answer_tokens]
             self.dropped_all_prompt = before - len(self.ids)
         self.generator = np.random.default_rng(seed)
         self.tokens = sum(min(self.cache.documents[doc_id]["length"], max_length or 1 << 30)
@@ -215,13 +225,69 @@ class CachedTeacher:
         # cache format and checked when the manifest is validated, which is what makes
         # the grouped tail applicable here without a temperature argument.
 
-    def _answer_tokens(self, doc_id, marker):
-        """Scored answer positions surviving the prefix cap, for one document."""
+    def sources(self):
+        """Document ids grouped by the capture they came from, keyed by its path.
+
+        A merge concatenates its captures, so any prefix of `ids` is drawn from the
+        first one until it runs out. That is what an evaluation subset must not do.
+        """
+        owner = getattr(self.cache, "_owner", None)
+        if owner is None:
+            return {str(getattr(self.cache, "path", "cache")): list(self.ids)}
+        grouped = {}
+        for doc_id in self.ids:
+            grouped.setdefault(str(owner[doc_id][0]), []).append(doc_id)
+        return grouped
+
+    def stratified(self, count, seed=12345):
+        """`count` documents spread across every capture, the same ones every time.
+
+        Taking the first N of a merged corpus gives N documents from whichever capture
+        was named first: a held-out loss over a chat cache and two code caches would
+        have been entirely chat, and adding the code captures would have moved the
+        number only through the model. Each capture contributes in proportion to its
+        size, drawn by a fixed seed, and the sources are visited in sorted order so
+        that reordering the `--teacher-cache` arguments selects the same set.
+        """
+        groups = self.sources()
+        total = sum(len(ids) for ids in groups.values()) or 1
+        generator = np.random.default_rng(seed)
+        picked = []
+        for name in sorted(groups):
+            ids = sorted(groups[name])
+            share = max(1, round(count * len(ids) / total)) if ids else 0
+            share = min(share, len(ids))
+            order = generator.permutation(len(ids))[:share]
+            picked.extend((name, ids[index]) for index in sorted(order))
+        # Proportional rounding can overshoot; drop from the largest source first so
+        # the small ones keep their representation.
+        while len(picked) > count:
+            counts = {}
+            for name, _ in picked:
+                counts[name] = counts.get(name, 0) + 1
+            biggest = max(sorted(counts), key=lambda name: counts[name])
+            for index in range(len(picked) - 1, -1, -1):
+                if picked[index][0] == biggest:
+                    picked.pop(index)
+                    break
+        return picked
+
+    def cap(self, doc_id):
+        """How long this document is before any batching truncates it further."""
+        return min(self.cache.documents[doc_id]["length"], self.max_length or 1 << 30)
+
+    def _answer_start(self, doc_id, marker):
+        """Index of the first answer token, or None if the document has no answer."""
         ids = self.cache.read_document(doc_id, tokens_only=True)["input_ids"]
-        cap = min(len(ids), self.max_length or len(ids))
-        start = first_response(ids[:cap], marker)
-        # The last kept position has no ground truth and is not scored, hence `cap - 1`.
-        return 0 if start is None else max(0, cap - 1 - start)
+        return first_response(ids[:self.cap(doc_id)], marker)
+
+    def _kept_answer(self, doc_id, width):
+        """Scored answer positions left once the document is cut to `width`.
+
+        The last kept position has no ground truth and is not scored, hence `width - 1`.
+        """
+        start = self.answer_start.get(doc_id)
+        return 0 if start is None else max(0, min(width, self.cap(doc_id)) - 1 - start)
 
     def __len__(self):
         return len(self.ids)
@@ -244,6 +310,18 @@ class CachedTeacher:
         """
         return sorted({width for _, width in self._groups(size, block, budget)})
 
+    def shapes(self, size, block=None, budget=None):
+        """Every distinct `(rows, width)` a pass will forward, ascending.
+
+        `widths` alone is not enough to warm the autotuner, which keys on the whole
+        shape. Rows are not constant across groups: a token budget gives each width its
+        own row count, and the last group of a width is a remainder that is smaller
+        still. Warming a computed row count instead of the observed ones warms kernels
+        the run never calls and leaves the ones it does call cold.
+        """
+        return sorted({(len(group), width)
+                       for group, width in self._groups(size, block, budget)})
+
     def _groups(self, size, block=None, budget=None):
         """Sorted neighbours, grouped so every batch costs about the same.
 
@@ -254,27 +332,50 @@ class CachedTeacher:
         decides whether the run fits. With a budget the wide groups get fewer rows and
         the narrow ones more, so the widest batch is no larger than the rest.
         """
-        lengths = {doc_id: min(self.cache.documents[doc_id]["length"],
-                               self.max_length or 1 << 30) for doc_id in self.ids}
-        ordered = sorted(self.ids, key=lambda doc_id: lengths[doc_id])
+        lengths = {doc_id: self.cap(doc_id) for doc_id in self.ids}
+        ordered = sorted(self.ids, key=lambda doc_id: (lengths[doc_id], doc_id))
         groups = []
+        self.dropped_short = 0
+        self.dropped_truncated_answer = 0
         start = 0
         while start < len(ordered):
             width = lengths[ordered[start]]
             if block:
                 width = (width // block) * block
             if width < 2:
+                # Shorter than the routing block, so flooring leaves nothing to score.
+                self.dropped_short += 1
                 start += 1
                 continue
             rows = size if budget is None else max(1, budget // width)
+            # The remainder is a smaller batch, not a discarded one. Breaking here threw
+            # away up to `rows - 1` of the longest documents in the corpus every pass,
+            # and which ones depended on the batch size, so one card and two cards were
+            # not training on the same examples.
             group = ordered[start:start + rows]
-            if len(group) < rows:
-                break
-            # The width is the shortest in the group, and the group is sorted, so it is
-            # the first one -- already floored above.
-            groups.append((group, width))
-            start += rows
+            start += len(group)
+            # The width is the shortest in the group -- the group is sorted -- floored
+            # above, so this is the exact length every member will be scored at. The
+            # answer check belongs here rather than at the cap, because this is shorter.
+            if self.min_answer_tokens > 0:
+                kept = [doc_id for doc_id in group
+                        if self._kept_answer(doc_id, width) >= self.min_answer_tokens]
+                self.dropped_truncated_answer += len(group) - len(kept)
+                group = kept
+            if group:
+                groups.append((group, width))
         return groups
+
+    def planned_tokens(self, size, block=None, budget=None):
+        """Tokens a pass over `grouped` actually scores.
+
+        Not the same as `self.tokens`, which counts each document at its own cap: a
+        group is cut to its shortest member and floored to the routing block, so the
+        corpus a grouped run sees is smaller than the corpus the cache holds. Using the
+        larger number to size `--passes` overstates the budget by however much grouping
+        trimmed.
+        """
+        return sum(len(group) * width for group, width in self._groups(size, block, budget))
 
     def grouped(self, size, block=None, budget=None):
         """Yield batches of `size` documents that are already the same length.
@@ -356,6 +457,25 @@ def grouped_tail_kl(hidden, head, target_ids, target_values, mask, chunk_length=
         missing=MissingProbabilityHandling.SYMMETRIC_UNIFORM,
         log_target=True,
     )
+
+
+def accumulation_shares(chunks):
+    """Each micro-batch's weight in an optimizer step, by the tokens it scores.
+
+    Every term in the objective is a mean over its own scored positions, so averaging
+    micro-batch means equally averages means of different denominators: a 134-token
+    document and a 1024-token one count the same, and the gradient depends on where the
+    accumulation boundaries happened to fall rather than on the examples. Weighting each
+    by its share of the step's scored tokens makes an accumulated step equal to one
+    forward over the same examples, which is the property that lets a batch size change
+    for memory without changing what is learned.
+
+    The last position of a row has no ground truth and is not scored, hence the
+    subtraction of the row count.
+    """
+    counts = [int(chunk.numel() - chunk.shape[0]) for chunk in chunks]
+    total = max(sum(counts), 1)
+    return counts, total
 
 
 def scored_mask(length, device, rows=1):
