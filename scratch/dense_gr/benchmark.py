@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -243,9 +244,15 @@ class SpillWatch:
     than a threshold it has to know -- one definition of "spilled" instead of one per
     runner, and a breach is recorded when it happens rather than at whatever step the
     next report falls on. Checking the flag is free, so the loop can ask every step.
+
+    The tolerance is a gibibyte because the counter is per process now and a reservation
+    is not a spill: a CUDA context and a compile's workspaces take a few hundred
+    megabytes of shared memory on Windows whatever the model does, and the thing worth
+    stopping for is a run whose working set no longer fits and has started being served
+    over PCIe. That shows up as growth of gibibytes, not of hundreds of megabytes.
     """
 
-    def __init__(self, interval=30.0, tolerance=0.25):
+    def __init__(self, interval=30.0, tolerance=1.0):
         self.interval = float(interval)
         self.tolerance = float(tolerance)
         self.baseline = float("nan")
@@ -298,7 +305,7 @@ class SpillWatch:
 
 
 def shared_gpu_gib():
-    """Bytes the driver is serving from system RAM as GPU memory, worst adapter.
+    """Bytes *this process* is being served from system RAM as GPU memory.
 
     `set_per_process_memory_fraction` caps PyTorch's allocator, which is necessary but
     not sufficient: the CUDA context, cuBLAS and Triton workspaces allocate outside it,
@@ -306,15 +313,33 @@ def shared_gpu_gib():
     over PCIe rather than raising. nvidia-smi does not report this, so the only honest
     check is the WDDM performance counter. A run whose shared usage climbs is measuring
     the bus, not the model, and its numbers must be thrown away.
+
+    Per process, and that is the correction. This read the *adapter* counter, which is
+    every process on the machine: a training run was stopped at step 501 having "spilled
+    17.00 GiB" that belonged to two compiled decode benchmarks on the other card. The
+    guard was right that something was paging and wrong about whose, and a guard that
+    cannot tell those apart makes the second card unusable while the first one trains.
+
+    A process has one instance per adapter and segment, so they are summed. Falls back to
+    the adapter counter when the per-process one is unavailable, and says which it used,
+    because a silent fallback would put the old behaviour back without saying so.
     """
-    command = ("$c = Get-Counter '\\GPU Adapter Memory(*)\\Shared Usage' "
-               "-ErrorAction SilentlyContinue; "
-               "($c.CounterSamples | Measure-Object -Property CookedValue "
-               "-Maximum).Maximum")
+    instance = "pid_%d*" % os.getpid()
+    command = (
+        "$p = Get-Counter '\\GPU Process Memory(%s)\\Shared Usage' "
+        "-ErrorAction SilentlyContinue; "
+        "if ($p) { 'process ' + ($p.CounterSamples | Measure-Object "
+        "-Property CookedValue -Sum).Sum } else { "
+        "$a = Get-Counter '\\GPU Adapter Memory(*)\\Shared Usage' "
+        "-ErrorAction SilentlyContinue; "
+        "'adapter ' + ($a.CounterSamples | Measure-Object -Property CookedValue "
+        "-Maximum).Maximum }" % instance)
     try:
         output = subprocess.run(["powershell", "-NoProfile", "-Command", command],
                                 capture_output=True, text=True, timeout=30)
-        return float(output.stdout.strip()) / 2 ** 30
+        scope, _, value = output.stdout.strip().partition(" ")
+        shared_gpu_gib.scope = scope
+        return float(value) / 2 ** 30
     except Exception:
         return float("nan")
 
