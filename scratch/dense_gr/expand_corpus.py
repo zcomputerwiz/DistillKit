@@ -189,7 +189,7 @@ def iter_source(repo, split, adapter, domain, label, tokenizer, max_tokens):
             text = tokenizer.decode(ids[:max_tokens])
             ids = ids[:max_tokens]
         yield {"doc_id": "%s:%s" % (label, row.get("id") or row.get("sha1") or index),
-               "text": text, "split": "train", "source": label, "domain": domain,
+               "text": text, "source": label, "domain": domain,
                "subsource": row.get("source"), "tokens": len(ids)}
 
 
@@ -206,6 +206,13 @@ def main() -> int:
     parser.add_argument("--tokens-per-source", type=int, default=1_250_000)
     parser.add_argument("--max-doc-tokens", type=int, default=4096,
                         help="the capture's sequence_length; longer rows are cut there")
+    parser.add_argument("--eval-every", type=int, default=20,
+                        help="every Nth document of each source is held out. Explicit "
+                             "rather than left to the capture's own fallback, because "
+                             "the capture only applies that fallback when a record "
+                             "carries no split at all, and a corpus written without one "
+                             "would be entirely train -- leaving the held-out loss "
+                             "measured on the old corpus while training runs on both.")
     parser.add_argument("--screen-only", type=Path,
                         help="audit an existing JSONL for benchmark overlap and stop")
     args = parser.parse_args()
@@ -249,7 +256,8 @@ def main() -> int:
                 iter_source(repo, split, adapter, domain, label, tokenizer,
                             args.max_doc_tokens))
                for repo, split, adapter, domain, label in SOURCES]
-    stats = {label: {"kept": 0, "tokens": 0, "scored": 0, "related": 0, "duplicate": 0}
+    stats = {label: {"kept": 0, "tokens": 0, "train": 0, "eval": 0,
+                     "scored": 0, "related": 0, "duplicate": 0}
              for label, _, _ in streams}
     dropped = []
 
@@ -278,8 +286,15 @@ def main() -> int:
                                         "subsource": row.get("subsource")})
                         continue
                     seen.add(key)
+                    # Counted per source, not globally. A global stride aliases against
+                    # the round-robin: with four sources and a stride of 20, every 20th
+                    # document is always the same source's, and ultrachat -- last in the
+                    # cycle -- got no held-out documents at all.
+                    row["split"] = ("eval" if record["kept"] % args.eval_every == 0
+                                    else "train")
                     record["kept"] += 1
                     record["tokens"] += row["tokens"]
+                    record[row["split"]] += 1
                     out.write(json.dumps(row) + "\n")
                     written += 1
                     if written % 500 == 0:
@@ -290,12 +305,12 @@ def main() -> int:
                 else:
                     active.remove(entry)
 
-    columns = ("kept", "tokens", "scored", "related", "duplicate")
-    print("\n%-20s %8s %12s %8s %9s %11s" % (("source",) + columns))
+    columns = ("kept", "tokens", "eval", "scored", "related", "duplicate")
+    print("\n%-20s %8s %12s %6s %8s %9s %11s" % (("source",) + columns))
     for label, record in stats.items():
-        print("%-20s %8d %12d %8d %9d %11d"
+        print("%-20s %8d %12d %6d %8d %9d %11d"
               % ((label,) + tuple(record[c] for c in columns)))
-    print("%-20s %8d %12d %8d %9d %11d"
+    print("%-20s %8d %12d %6d %8d %9d %11d"
           % (("total",) + tuple(sum(s[c] for s in stats.values()) for c in columns)))
     print("\nwrote %s" % args.output)
 

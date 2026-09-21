@@ -88,15 +88,28 @@ the existing corpus using the same bank in the same run.
 The 125 duplicates are exact repeats inside tulu-3-sft-mixture itself, after
 normalisation.
 
-### A measurement error worth recording
+497 documents, every twentieth of each source, are marked `eval`. The split has to be
+written explicitly: the capture applies its own every-Nth fallback only to records that
+carry no split at all, so a corpus written as entirely `train` would leave the held-out
+loss measured on the old corpus while training ran on both.
 
-The first run of this reported 137 duplicates, including 11 from Magicoder and 1 from
+### Two bugs worth recording
+
+The first run reported 137 duplicates, including 11 from Magicoder and 1 from
 self-oss-instruct. They were not duplicates. `fingerprint` hashed the first 400
 characters of the normalised text, and these documents open with the chat template and
 its default system prompt, so the first 400 characters are shared by every row from a
 given source. The same bug made the deduplication against the existing corpus useless in
 the other direction: 5,598 documents collapsed to 11 distinct keys. Hashing the whole
-normalised word sequence fixes both, and the table above is from the rerun.
+normalised word sequence fixes both.
+
+The held-out split was then assigned on a global counter, one document in twenty. The
+stream is a round-robin over four sources, so a stride of twenty is a stride of five
+whole cycles and lands on the same source every time. Magicoder got 262 held-out
+documents, tulu-3 150, self-oss 85, and **ultrachat none at all** -- a held-out set that
+contained none of the one source added for multi-turn chat. Counting per source instead
+of globally is immune to it, and to the cycle length changing as sources hit their
+quota. The tables above are from the rerun that has both fixes.
 
 ## What this does not check
 
