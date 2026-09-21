@@ -192,6 +192,39 @@ def role_spans(text, offsets):
     return {role: ranges for role, ranges in spans.items() if ranges}
 
 
+def normalise_question(text, task):
+    """A question's text, reduced to what two renderings of it would share.
+
+    Letters and digits only, because the training corpus renders a question inside a chat
+    template and the screen renders it as a bare prompt; punctuation, casing and framing
+    differ while the question does not.
+    """
+    if task == "arc":
+        body = text.split("Question:")[-1].split("Answer:")[0]
+    else:
+        body = text.split("\n")[0]
+    return re.sub(r"[^a-z0-9]+", " ", body.lower()).strip()
+
+
+def question_texts(path):
+    """Every question the training corpus contains, normalised, for decontamination.
+
+    Reads the rendered documents rather than a manifest: what matters is whether the model
+    saw the text, not whether two pipelines agreed on an id.
+    """
+    if not path:
+        return set()
+    seen = set()
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        text = json.loads(line).get("text", "")
+        turn = re.search(r"<\|im_start\|>user\n(.*?)<\|im_end\|>", text, re.S)
+        body = (turn.group(1) if turn else text).split("Choices:")[0]
+        seen.add(re.sub(r"[^a-z0-9]+", " ", body.lower()).strip())
+    return seen
+
+
 def read_benchmark(path, dataset, config):
     if path:
         obj = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -225,6 +258,8 @@ def prepare(args):
                      "roles": spans, "assistant_tokens": assistant,
                      "text_sha256": digest(row["text"])})
     banks = {"nll": docs}
+    seen_questions = question_texts(args.decontaminate)
+    dropped_overlap = {}
     if not args.text_only:
         for task, source, dataset, config in [
             ("mmlu", args.mmlu_json, "cais/mmlu", "all"),
@@ -232,7 +267,20 @@ def prepare(args):
         ]:
             rows = read_benchmark(source, dataset, config)
             bank = [benchmark_record(task, r, tokenizer, args.max_question_tokens) for r in rows]
-            banks[task] = list({r["id"]: r for r in bank}.values())
+            bank = list({r["id"]: r for r in bank}.values())
+            if seen_questions:
+                # `unseen_records` excludes NLL documents by teacher-cache manifest id.
+                # Nothing was checking these: the MMLU and ARC banks come straight from
+                # the dataset, so a training corpus drawn from public SFT mixtures can
+                # and did contain the questions being scored -- 4.9% of the ARC screen,
+                # against 0.0% of MMLU. Compare the question text rather than ids,
+                # because the two pipelines assign their own and a shared question under
+                # two names is still a shared question.
+                kept = [r for r in bank if normalise_question(r["prompt"], task)
+                        not in seen_questions]
+                dropped_overlap[task] = len(bank) - len(kept)
+                bank = kept
+            banks[task] = bank
     bundle = {"protocol": "independent-eval-v1", "tokenizer": str(Path(args.tokenizer).resolve()),
               "tokenizer_sha256": digest(tokenizer.backend_tokenizer.to_str()),
               "pad_token_id": (tokenizer.eos_token_id if tokenizer.pad_token_id is None
@@ -249,6 +297,7 @@ def prepare(args):
     scored = {task: sum(r.get("assistant_tokens", 0) for r in records)
               for task, records in bundle["splits"]["screen"].items() if task == "nll"}
     print(json.dumps({"output": args.output, "unseen": len(unseen), "eligible": len(docs),
+                      "dropped_for_overlap": dropped_overlap,
                       "counts_per_split": {k: len(v) for k, v in bundle["splits"]["screen"].items()},
                       "screen_assistant_tokens": scored}))
 
@@ -725,6 +774,11 @@ def main():
     prep.add_argument("--min-assistant-tokens", type=int, default=0,
                       help="drop documents whose window carries fewer assistant tokens")
     prep.add_argument("--max-question-tokens", type=int, default=4096)
+    prep.add_argument("--decontaminate", default=None, metavar="JSONL",
+                      help="training corpus whose question text to exclude from the "
+                           "MMLU and ARC banks. Nothing checked these before: they come "
+                           "straight from the dataset, and a corpus drawn from public "
+                           "SFT mixtures contained 4.9%% of the ARC screen.")
     prep.add_argument("--text-only", action="store_true")
     prep.add_argument("--mmlu-json")
     prep.add_argument("--arc-json")
