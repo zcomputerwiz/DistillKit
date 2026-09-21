@@ -27,7 +27,8 @@ TOKENIZER = "a" * 64
 VOCAB_HASH = "b" * 64
 
 
-def write(path, doc_ids, *, top_k=TOP_K, tokenizer=TOKENIZER, length=6, split="train"):
+def write(path, doc_ids, *, top_k=TOP_K, tokenizer=TOKENIZER, length=6, split="train",
+          tokens=None):
     """A capture holding `doc_ids`, with each document's tokens keyed to its id."""
     writer = OfflineCacheWriter(path, tokenizer_hash=tokenizer, anchor_layers=ANCHORS,
                                 hidden_size=HIDDEN, vocab_size=VOCAB,
@@ -35,11 +36,13 @@ def write(path, doc_ids, *, top_k=TOP_K, tokenizer=TOKENIZER, length=6, split="t
                                 tokenizer_vocab_fingerprint=VOCAB_HASH)
     for index, doc_id in enumerate(doc_ids):
         # The token value identifies the document, so a misrouted read is visible.
-        writer.append(doc_id,
-                      np.full(length, index + 1, dtype=np.uint32),
-                      np.zeros((length, top_k), dtype=np.uint32),
-                      np.zeros((length, top_k), dtype=np.float16),
-                      np.zeros((length, len(ANCHORS), HIDDEN), dtype=np.uint8),
+        ids = (np.asarray(tokens[doc_id], dtype=np.uint32) if tokens
+               else np.full(length, index + 1, dtype=np.uint32))
+        width = len(ids)
+        writer.append(doc_id, ids,
+                      np.zeros((width, top_k), dtype=np.uint32),
+                      np.zeros((width, top_k), dtype=np.float16),
+                      np.zeros((width, len(ANCHORS), HIDDEN), dtype=np.uint8),
                       split=split)
     writer.close()
     return path
@@ -84,6 +87,67 @@ def test_merged_cache_refuses_a_different_tokenizer(tmp_path):
     with pytest.raises(ValueError, match="tokenizer_hash"):
         MergedCache([write(tmp_path / "one", ["a"]),
                      write(tmp_path / "two", ["b"], tokenizer="c" * 64)])
+
+
+MARKER = [90, 91]
+
+
+def test_first_response_finds_the_marker_run():
+    from teacher_kl import first_response
+
+    assert first_response([5, 90, 91, 7, 8], MARKER) == 3
+    # The first marker, not the last: a multi-turn document has several, and what the
+    # cap decides is whether any response survives it.
+    assert first_response([90, 91, 7, 90, 91, 8], MARKER) == 2
+    assert first_response([5, 6, 7], MARKER) is None
+    # A marker split across the cap boundary is not a marker.
+    assert first_response([5, 6, 90], MARKER) is None
+
+
+def test_min_answer_tokens_drops_documents_that_are_all_prompt(tmp_path):
+    from teacher_kl import CachedTeacher
+
+    # The answer starts at index 8 in the first two. The last position of a document
+    # carries no ground truth and is not scored, so a length-16 document has 7 scored
+    # answer positions (8..14) and a length-11 one has 2.
+    tokens = {"answer": [5] * 6 + MARKER + [7] * 8,
+              "short": [5] * 6 + MARKER + [7] * 3,
+              "prompt": [5] * 10}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    assert len(CachedTeacher(path, "train", device="cpu")) == 3
+
+    kept = CachedTeacher(path, "train", device="cpu", answer_marker=MARKER,
+                         min_answer_tokens=1)
+    assert sorted(kept.ids) == ["answer", "short"]
+    assert kept.dropped_all_prompt == 1
+
+    strict = CachedTeacher(path, "train", device="cpu", answer_marker=MARKER,
+                           min_answer_tokens=4)
+    assert strict.ids == ["answer"]
+    assert strict.dropped_all_prompt == 2
+    # Reported tokens follow the documents that survived, or the budget is wrong.
+    assert strict.tokens == 16
+
+
+def test_min_answer_tokens_counts_only_what_the_cap_keeps(tmp_path):
+    from teacher_kl import CachedTeacher
+
+    # The answer starts at index 12, so a cap of 14 leaves one scored answer position
+    # and a cap of 13 leaves none -- this is the case the whole option exists for.
+    tokens = {"late": [5] * 10 + MARKER + [7] * 8}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    assert CachedTeacher(path, "train", device="cpu", max_length=14,
+                         answer_marker=MARKER, min_answer_tokens=1).ids == ["late"]
+    assert CachedTeacher(path, "train", device="cpu", max_length=13,
+                         answer_marker=MARKER, min_answer_tokens=1).ids == []
+
+
+def test_min_answer_tokens_needs_a_marker(tmp_path):
+    from teacher_kl import CachedTeacher
+
+    path = write(tmp_path / "one", ["a"])
+    with pytest.raises(ValueError, match="answer_marker"):
+        CachedTeacher(path, "train", device="cpu", min_answer_tokens=1)
 
 
 def test_cached_teacher_takes_one_path_or_several(tmp_path):

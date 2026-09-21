@@ -149,6 +149,65 @@ confounded piece of evidence into a clean test. The two captures are kept separa
 mixture stays a training-time argument -- code-with-teacher against chat-only at a matched
 token budget is then one run, and dropping the code half costs nothing if it loses.
 
+## Does the prefix cap ever cut the answer off?
+
+Both objectives score every position but the last -- `scored_mask` masks only the final
+token -- so a document's system prompt and user turn are trained on exactly like its
+answer. That is fine while the answer is in there. The prefix cap makes it a question:
+`--teacher-max-length 1024` keeps a document's first 1024 tokens, so a document whose
+framing outruns the cap is scored entirely on framing, and the model is trained to
+reproduce a prompt it will never be asked to produce.
+
+`prefix_audit.py` counts it, locating the answer by the token run for
+`<|im_start|>assistant` in the ids rather than by searching decoded text.
+
+| corpus | cap | all prompt | share | answer share of scored tokens |
+| --- | --- | --- | --- | --- |
+| `teacher-cache-5m` train (5,303) | 1024 | 115 | 2.17% | 60.6% |
+| | 2048 | 83 | 1.57% | 64.9% |
+| | 4096 | 72 | 1.36% | 65.0% |
+| `teacher-cache-5m` eval (295) | 1024 | 8 | 2.71% | 61.1% |
+| the 128 the training loop scores | 1024 | 3 | 2.34% | 62.8% |
+| `expand.jsonl` (9,932) | 1024 | 26 | 0.26% | 61.8% |
+| | 2048 | 1 | 0.01% | 64.2% |
+| | 4096 | 0 | **0.00%** | 64.6% |
+
+**It happens, and it is small.** About 2.2% of the documents and 3.5% of the scored
+tokens in the corpus currently being trained on are spent on documents whose answer
+never arrives. No cap that fits in 24 GiB fixes it: the prompt length before the first
+answer token runs median 185, p90 456, p99 4,848, max 7,131, and that tail is the
+`k3_grounded_long_context` documents, whose answers sit beyond any reachable cap.
+
+**The new corpus does not have the problem.** Its worst prompt is 2,210 tokens against
+7,131, so at a 4096 cap nothing is cut off at all, and even at 1024 it is 0.26%.
+
+`--min-answer-tokens` drops the affected documents, and reports how many it dropped. It
+defaults to zero -- keeping every document -- because turning it on changes the corpus,
+and every arm measured so far ran without it. It is worth enabling for a whole
+generation of runs at once, not for one arm of a comparison.
+
+**The evaluation was already guarded.** `independent_eval.prepare` applies
+`--min-assistant-tokens` to the NLL bank, with the note that at a 512-token window 21 of
+384 documents were all prompt. Every one of the 32 NLL documents in `q512-bundle.json`
+has assistant tokens -- minimum 15, median 262 -- and scoring is broken out by role, so
+`nll content` is assistant tokens minus layout while `nll all` is the whole window. The
+per-role columns were already the right ones to read.
+
+**What is not a bug but is worth knowing.** Roughly 39% of the scored tokens are system,
+user and template tokens, by design. That is ordinary full-document SFT and the teacher's
+distribution over those positions is just as valid, but it does mean about two fifths of
+the token budget teaches prompt reproduction -- which is a plausible part of why control
+tokens came out eight times better than the source model's.
+
+### The split field in run5m.jsonl does not match its capture
+
+`run5m.jsonl` marks all 5,598 documents `split: "train"`, while `teacher-cache-5m` holds
+5,303 train and 295 eval. The 295 are scattered through the file, not every Nth, and are
+drawn from the same source mix. The cache is what training reads and its two sets are
+disjoint, so the held-out number is sound -- but the JSONL cannot be used to reconstruct
+that split, and recapturing from it would produce a cache with no held-out documents at
+all. `expand.jsonl` carries its split explicitly for this reason.
+
 ## What this does not check
 
 * **The teacher's framing.** The template's default system prompt asks for reasoning at

@@ -120,6 +120,26 @@ class MergedCache:
             cache.close()
 
 
+def first_response(ids, marker):
+    """Index of the first token after the first assistant marker, or None.
+
+    Scans the ids for the marker run rather than decoding and searching text: the ids
+    are what the model reads, and a decode-and-search would match a marker the tokenizer
+    had split differently and never actually emitted.
+
+    The *first* marker, not the last: a multi-turn document has several, and what the
+    prefix cap decides is whether any response survives it at all.
+    """
+    marker = list(marker)
+    width = len(marker)
+    if not width:
+        return None
+    for start in range(len(ids) - width + 1):
+        if list(ids[start:start + width]) == marker:
+            return start + width
+    return None
+
+
 class CachedTeacher:
     """Documents and their top-k targets, shuffled, one at a time.
 
@@ -133,7 +153,7 @@ class CachedTeacher:
     """
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
-                 max_length=None):
+                 max_length=None, answer_marker=None, min_answer_tokens=0):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         self.cache = (OfflineTeacherCache(paths[0]) if len(paths) == 1
                       else MergedCache(paths))
@@ -162,6 +182,31 @@ class CachedTeacher:
         ids = self.cache.document_ids(split)
         self.ids = [doc_id for doc_id in ids
                     if self.cache.documents[doc_id]["length"] >= min_tokens]
+        # Both objectives score every position but the last, so a document's system
+        # prompt and user turn are trained on exactly like its answer. That is fine
+        # while the answer is in there, and the prefix cap makes it a question: a
+        # document whose framing runs past the cap is scored entirely on framing, and
+        # the model is trained to reproduce a prompt it will never be asked to produce.
+        #
+        # Measured on `teacher-cache-5m` at a 1024 cap: 115 of 5,303 train documents
+        # (2.17%) and 8 of 295 eval documents, about 3.5% of the scored tokens. The
+        # tail is long-context documents -- the prompt runs to 7,131 tokens at the
+        # worst -- so no cap that fits in 24 GiB reaches their answers.
+        #
+        # Off by default because turning it on changes the corpus, and every arm
+        # measured so far ran without it. `independent_eval` applies the same rule to
+        # the NLL bank under `--min-assistant-tokens`, where 21 of 384 documents at a
+        # 512-token window were all prompt.
+        self.dropped_all_prompt = 0
+        if min_answer_tokens > 0:
+            if not answer_marker:
+                raise ValueError("min_answer_tokens needs answer_marker: the token run "
+                                 "that opens an assistant turn in the capture's own "
+                                 "vocabulary")
+            before = len(self.ids)
+            self.ids = [doc_id for doc_id in self.ids
+                        if self._answer_tokens(doc_id, answer_marker) >= min_answer_tokens]
+            self.dropped_all_prompt = before - len(self.ids)
         self.generator = np.random.default_rng(seed)
         self.tokens = sum(min(self.cache.documents[doc_id]["length"], max_length or 1 << 30)
                           for doc_id in self.ids)
@@ -169,6 +214,14 @@ class CachedTeacher:
         # `log_values: True` and `generation_temperature: 1.0` are both pinned by the
         # cache format and checked when the manifest is validated, which is what makes
         # the grouped tail applicable here without a temperature argument.
+
+    def _answer_tokens(self, doc_id, marker):
+        """Scored answer positions surviving the prefix cap, for one document."""
+        ids = self.cache.read_document(doc_id, tokens_only=True)["input_ids"]
+        cap = min(len(ids), self.max_length or len(ids))
+        start = first_response(ids[:cap], marker)
+        # The last kept position has no ground truth and is not scored, hence `cap - 1`.
+        return 0 if start is None else max(0, cap - 1 - start)
 
     def __len__(self):
         return len(self.ids)

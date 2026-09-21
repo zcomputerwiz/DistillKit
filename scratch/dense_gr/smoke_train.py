@@ -60,6 +60,9 @@ BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
 # What the corpus was tokenized at. A model this wide reads it without a remap.
 FULL_VOCABULARY = 248_320
+# What opens an assistant turn in the capture's chat template. Used only to find where
+# a document stops being prompt; see --min-answer-tokens.
+ANSWER_MARKER = "<|im_start|>assistant"
 
 
 # The fields that decide whether a checkpoint's weights mean anything in this config.
@@ -208,6 +211,16 @@ def main() -> int:
                              "corpus and peaks within a gigabyte of the ceiling; 1024 "
                              "keeps 74.1% and leaves about three. Measured in "
                              "teacher_kl.py.")
+    parser.add_argument("--min-answer-tokens", type=int, default=0,
+                        help="drop cached documents with fewer than this many assistant "
+                             "tokens left inside the prefix cap. Both objectives score "
+                             "every position but the last, so a document whose framing "
+                             "outruns the cap is trained entirely on framing. Measured "
+                             "on teacher-cache-5m at a 1024 cap: 115 of 5,303 train "
+                             "documents and 8 of 295 held-out ones, about 3.5%% of the "
+                             "scored tokens; the tail is long-context documents whose "
+                             "prompts reach 7,131 tokens. Zero keeps every document, "
+                             "which is what every arm measured so far did.")
     parser.add_argument("--kl-chunk", type=int, default=256,
                         help="positions per head projection in the teacher KL, as a row "
                              "budget at batch 1. A full row is 248320 wide. It does not "
@@ -588,15 +601,28 @@ def main() -> int:
             raise SystemExit(
                 "--teacher-cache carries the capture's own token ids; a remapped "
                 "vocabulary would address a different space than the targets")
+        # The capture's ids are the original vocabulary, which is what `tokenizer`
+        # speaks -- the remapped case is refused above, so there is no second space
+        # this marker could be in.
+        marker = (tokenizer(ANSWER_MARKER, add_special_tokens=False)["input_ids"]
+                  if args.min_answer_tokens > 0 else None)
         teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
-                                max_length=args.teacher_max_length)
+                                max_length=args.teacher_max_length,
+                                answer_marker=marker,
+                                min_answer_tokens=args.min_answer_tokens)
         held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
-                                     max_length=args.teacher_max_length)
+                                     max_length=args.teacher_max_length,
+                                     answer_marker=marker,
+                                     min_answer_tokens=args.min_answer_tokens)
         print("teacher: %d documents, %d tokens at a %d cap, top-%d, grouped tail, "
               "blend %.2f" % (len(teacher), teacher.tokens, args.teacher_max_length,
                               teacher.top_k, args.teacher_weight), flush=True)
         print("held-out: %d documents, %d tokens from the capture's own eval split"
               % (len(held_teacher), held_teacher.tokens), flush=True)
+        if args.min_answer_tokens > 0:
+            print("dropped as all prompt at the cap: %d train, %d held-out"
+                  % (teacher.dropped_all_prompt, held_teacher.dropped_all_prompt),
+                  flush=True)
 
     if args.tensor_parallel:
         from distillkit.parallel.model import shard_model
