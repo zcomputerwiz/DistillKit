@@ -44,11 +44,17 @@ __all__ = ["shard_model", "sharded_parameter_report", "sync_replicated_gradients
 
 
 def shard_model(model: nn.Module, devices, home: str | int | None = None,
-                shard_embeddings: bool = True) -> nn.Module:
+                shard_embeddings: bool = True,
+                embedding_device: str | int | None = None) -> nn.Module:
     """Replace every shardable submodule in place. Returns the same model.
 
     ``devices`` are the cards to split across; the first is home, where the residual
     stream stays.
+
+    ``embedding_device`` moves the whole embedding and head to another card instead of
+    splitting them, which only applies when ``shard_embeddings`` is False. It costs one
+    ``[batch, length, hidden]`` tensor across the link each way and takes 3.05 GiB off
+    home, which is the difference between micro-batch 6 and micro-batch 8 here.
 
     ``shard_embeddings=False`` keeps the tied embedding and head whole on home. Cut
     Cross-Entropy never forms the logits, which is what makes a 248,320-wide vocabulary
@@ -82,6 +88,27 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None,
     model.to(home_device)
     if shard_embeddings:
         _shard_tied_embeddings(model, base, resolved)
+    elif embedding_device is not None:
+        # Not split, moved. The head has to stay whole for Cut Cross-Entropy, but nothing
+        # says it has to stay *here*, and the cards are not equally full: home carries the
+        # residual stream, every unsharded norm, the router and the gathered output of
+        # every sharded projection. Moving the table evens that up by 3.05 GiB.
+        from distillkit.parallel.latent_attention import RemoteEmbedding
+
+        away = torch.device(embedding_device)
+        if away not in resolved:
+            raise ValueError(
+                "embedding_device %s is not one of the sharding devices %s"
+                % (away, [str(d) for d in resolved]))
+        base.embed_tokens = RemoteEmbedding(base.embed_tokens, away, home_device)
+        head = getattr(model, "lm_head", None)
+        if head is not None:
+            # Tied or not, the head follows the table: a tied head *is* the table, and an
+            # untied one is the same size and wanted on the same card as the loss.
+            tied = getattr(model.config, "tie_word_embeddings", False)
+            head.to(away)
+            if tied:
+                head.weight = base.embed_tokens.weight
 
     from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
     from distillkit.parallel.latent_attention import (is_latent_attention,

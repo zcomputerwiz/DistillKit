@@ -175,6 +175,50 @@ class ReducedRowLinear(nn.Module):
         return total if self.bias is None else total + self.bias
 
 
+class RemoteEmbedding(nn.Module):
+    """An embedding table that lives on a card other than home.
+
+    The tied embedding and head are 508.6M parameters here -- 26.6% of the model, and
+    3.05 GiB once a bf16 weight, a bf16 gradient and two 8-bit optimizer states are
+    counted. They cannot be *split*, because Cut Cross-Entropy never forms the logits and
+    needs the whole head to do that, which is the only reason a 248,320-wide vocabulary is
+    affordable at all. They can be *moved*, and the two cards are not equally full: at
+    micro-batch 6 home peaks at 20.61 GiB against the other card's 9.64.
+
+    What crosses the link is the embedding's output rather than its table: one
+    `[batch, length, hidden]` tensor each way, 25 MiB at micro-batch 6, against the
+    3.05 GiB that stops crossing at all.
+    """
+
+    def __init__(self, source: nn.Embedding, device, home):
+        super().__init__()
+        self.away = torch.device(device)
+        self.home = torch.device(home)
+        self.embedding = source.to(self.away)
+        self.num_embeddings = source.num_embeddings
+        self.embedding_dim = source.embedding_dim
+
+    @property
+    def weight(self) -> torch.Tensor:
+        return self.embedding.weight
+
+    def forward(self, ids: torch.Tensor) -> torch.Tensor:
+        return self.embedding(ids.to(self.away)).to(self.home)
+
+
+def head_device(model: nn.Module) -> torch.device:
+    """Where a loss must put its hidden state to reach the output head.
+
+    Callers hand `lm_head.weight` to Cut Cross-Entropy directly, so they need to know
+    where it went. Returns home for an unmoved head, which keeps the ordinary path a
+    no-op rather than a special case.
+    """
+    head = getattr(model, "lm_head", None)
+    if head is None:
+        return next(model.parameters()).device
+    return head.weight.device
+
+
 def is_latent_attention(module: nn.Module) -> bool:
     """A latent attention is one that compressed its keys and values away.
 

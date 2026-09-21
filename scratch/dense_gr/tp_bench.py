@@ -59,12 +59,26 @@ def warm_autotune(model, home, length, micro):
     try:
         hidden = model.model(input_ids=tokens, attention_mask=torch.ones_like(tokens),
                              use_cache=False).last_hidden_state
-        linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
-                             reduction="mean").backward()
+        cross_entropy(model, hidden, tokens).backward()
     finally:
         torch.autograd.set_multithreading_enabled(True)
         model.zero_grad(set_to_none=True)
         torch.cuda.synchronize()
+
+
+def cross_entropy(model, hidden, tokens):
+    """CCE wherever the head is, with the scalar brought home.
+
+    The head may have been moved off home to even the cards up, and callers hand its
+    weight to CCE directly, so the hidden state and the labels follow it. Both moves are
+    autograd nodes, so the gradient finds its way back without help.
+    """
+    from distillkit.parallel.latent_attention import head_device
+
+    where = head_device(model)
+    loss = linear_cross_entropy(hidden.to(where), model.lm_head.weight,
+                                tokens.to(where), shift=1, reduction="mean")
+    return loss.to(hidden.device)
 
 
 def step(model, stage, tokens):
@@ -78,8 +92,7 @@ def step(model, stage, tokens):
         borrowed = {i: a.bus.require_latent(a.latent_donor, i) for i, a in stage}
         for handle in handles:
             handle.remove()
-        loss = linear_cross_entropy(hidden, model.lm_head.weight, tokens, shift=1,
-                                    reduction="mean")
+        loss = cross_entropy(model, hidden, tokens)
         loss = loss + indexer_loss(model, stage, seen, targets, borrowed, selected=chosen)
     return loss
 
@@ -91,12 +104,23 @@ def main() -> int:
     parser.add_argument("--batches", type=int, nargs="+", default=[1, 2, 4, 6, 8])
     parser.add_argument("--steps", type=int, default=6)
     parser.add_argument("--checkpoint", default=CHECKPOINT)
+    parser.add_argument("--embedding-on", type=int, default=None, metavar="CARD",
+                        help="move the whole embedding and head to this card instead of "
+                             "leaving them home. They cannot be split -- CCE needs the "
+                             "head whole -- but they are 3.05 GiB and the cards are not "
+                             "equally full.")
+    parser.add_argument("--fraction", type=float, default=0.9,
+                        help="share of each card the allocator may use. 0.9 of 24 GiB is "
+                             "21.6, and micro-batch 8 misses that by 32 MiB. Raising it "
+                             "spends the margin that keeps Windows from serving VRAM out "
+                             "of system RAM over PCIe, which does not fail -- it silently "
+                             "measures the bus instead of the model.")
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
 
     devices = ["cuda:0"] if args.cards == 1 else ["cuda:0", "cuda:1"]
     for device in devices:
-        torch.cuda.set_per_process_memory_fraction(0.9, torch.device(device))
+        torch.cuda.set_per_process_memory_fraction(args.fraction, torch.device(device))
     model = Qwen35WidenedForCausalLM.from_pretrained(
         args.checkpoint, dtype=torch.bfloat16).to(devices[0]).train()
     total = sum(p.numel() for p in model.parameters())
@@ -104,8 +128,11 @@ def main() -> int:
     if args.cards == 2:
         from distillkit.parallel.model import shard_model
 
-        # The head stays whole: CCE never forms the logits and needs it that way.
-        shard_model(model, devices, shard_embeddings=False)
+        # The head stays whole: CCE never forms the logits and needs it that way. Whole
+        # is not the same as home, though, and --embedding-on moves it.
+        shard_model(model, devices, shard_embeddings=False,
+                    embedding_device=(None if args.embedding_on is None
+                                      else "cuda:%d" % args.embedding_on))
     stage = routing_layers(model)
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=1e-8)
 
