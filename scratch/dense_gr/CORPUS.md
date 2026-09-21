@@ -111,6 +111,44 @@ contained none of the one source added for multi-turn chat. Counting per source 
 of globally is immune to it, and to the cycle length changing as sources hit their
 quota. The tables above are from the rerun that has both fixes.
 
+## Why the code half is worth capturing rather than assumed harmful
+
+The obvious objection to adding 2.5M tokens of code is that code has hurt this model
+before. It is worth being precise about what was actually measured, because the two
+pieces of evidence say different things and only one of them is about training.
+
+**The calibration result does not bear on this at all.** Calibrating the conversion on
+Python instead of chat costs 5.7 MMLU points, and mixing the two costs 3.7 against pure
+chat at matched size. Neither arm involves a teacher: `convert_full.py` solves each
+layer's projections by least squares against the *source dense model's* own keys, values
+and rotary key on the calibration tokens. That result is about which input distribution
+the fit sees, and it is already acted on -- the conversion this is all built from is
+chat-calibrated. It says nothing about what to train on afterwards.
+
+**The training result is confounded, in exactly the way that matters.** The 30M tokens of
+code that destroyed control tokens were cross-entropy alone, because no teacher capture
+exists for `scratch/code_training/tokens-v2` -- both caches on disk are the chat mixture.
+And DISTILLATION.md separately establishes, on the chat corpus with the corpus held
+fixed, that cross entropy alone costs MMLU and that carrying the teacher's distribution
+is what stops it: the blend beats cross-entropy-only by 5.5 points,
+[+0.021484, +0.089844]. Its own conclusion is that the teacher term "protects, not
+recovers".
+
+So "code hurt" and "cross entropy alone hurt" have never been separated. Nothing measured
+here holds the objective fixed and varies the corpus.
+
+Two further differences make the old result a poor guide to the new corpus. The old code
+was raw source files from the-stack-v2, which DISTILLATION.md notes "carries none of this
+tokenizer's protocol tokens" -- that is the other half of why it wrecked control tokens,
+and it does not apply here, because Magicoder and self-oss-instruct are rendered through
+the teacher's chat template like everything else. And the old run was a 30M-token
+pre-training pass, not 2.5M inside a 10M mixture.
+
+That is the argument for capturing it rather than dropping it: it converts the one
+confounded piece of evidence into a clean test. The two captures are kept separate so the
+mixture stays a training-time argument -- code-with-teacher against chat-only at a matched
+token budget is then one run, and dropping the code half costs nothing if it loses.
+
 ## What this does not check
 
 * **The teacher's framing.** The template's default system prompt asks for reasoning at
