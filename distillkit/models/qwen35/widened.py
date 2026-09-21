@@ -159,6 +159,21 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
         self.norm = Qwen3_5RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen3_5TextRotaryEmbedding(config=config)
         self.gradient_checkpointing = False
+        # Which layer types to recompute, or None for all of them. Two reasons to want
+        # this narrower than the flag.
+        #
+        # It has to be narrower to work at all during the sparse stage. `recorded_attention`
+        # captures each routing layer's attention as the target for the indexer's KL, and a
+        # recomputed forward does not reproduce the tensors that were captured -- checkpoint
+        # compares metadata and raises "Recomputed values ... have different metadata".
+        # The recording only touches full-attention layers, so recomputing the linear ones
+        # is unaffected by it.
+        #
+        # And narrower is where the memory is. Measured at micro-batch 6 on the 2B: the 18
+        # linear-attention layers hold 10,654 MiB of card 0's 14,567, against the six
+        # routing layers' 4,476. Recomputing them is cheap because fla's chunked kernel is
+        # what runs in the recompute.
+        self.gradient_checkpointing_types = None
         self.post_init()
 
     def _stream_offload_device(self):
@@ -224,6 +239,11 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             *inputs_embeds.shape[:-1], self.config.residual_stream_num_branches,
             inputs_embeds.shape[-1])
         captured = (inputs_embeds,) if output_hidden_states else None
+        def _recomputes(index):
+            wanted = self.gradient_checkpointing_types
+            return wanted is None or self.config.layer_types[index] in wanted
+
+        self._recomputes = _recomputes
         with offload_stream_boundaries(self._stream_offload_device()):
             for index, layer in enumerate(self.layers):
                 options = dict(position_embeddings=position_embeddings,
@@ -231,7 +251,8 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
                                position_ids=text_position_ids,
                                past_key_values=past_key_values,
                                use_cache=use_cache, **kwargs)
-                if self.gradient_checkpointing and self.training:
+                if (self.gradient_checkpointing and self.training
+                        and self._recomputes(index)):
                     # The flag existed and did nothing: this loop called every layer
                     # directly, so a run that asked for checkpointing paid none of its
                     # cost and got none of its saving. Non-reentrant, because the layer

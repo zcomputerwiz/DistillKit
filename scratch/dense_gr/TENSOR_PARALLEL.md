@@ -114,10 +114,71 @@ per second against the unwrapped 3,090. The cost is the two cross-device synchro
 it introduces, at the first operation of the forward and the last before backward, on a
 graph whose other traffic was already overlapping.
 
-So the parameters can be balanced and it is not worth doing. The imbalance that matters is
-the activations, and moving those means not gathering the sharded outputs -- the split
-forward this design deliberately avoided, which would require a second implementation of
-the CSA2 routing. That is the honest next lever, and it is a large one.
+So the parameters can be balanced and it is not worth doing.
+
+## Where the activations actually are, which is not where this was looking
+
+The split forward was the assumed next lever, on the assumption that the CSA2 attention's
+gathered outputs were what filled home. Measured per layer type at micro-batch 6, they are
+not:
+
+| layer kind | count | card 0 MiB | card 1 MiB |
+| --- | --- | --- | --- |
+| linear attention | 18 | **10,654** | 6,259 |
+| csa2 full | 6 | 4,476 | 891 |
+
+The 18 linear-attention layers hold 70% of card 0's activations. The six routing layers
+this file spent its effort on hold 30%. A split forward for CSA2 would have been a large
+piece of work aimed at the smaller half.
+
+What the linear layers respond to is recomputation, and fla is why it is cheap: its
+chunked gated-delta kernel is what runs in the recompute. Checkpointing them has to be
+*selective*, because the routing layers cannot be recomputed at all during the sparse
+stage -- `recorded_attention` captures their attention as the indexer's target and a
+recomputed forward does not reproduce what was captured, which `torch.utils.checkpoint`
+detects and refuses. `gradient_checkpointing_types` narrows the flag to the layer types
+that can take it.
+
+| configuration | best micro-batch | tokens/s | peak GiB |
+| --- | --- | --- | --- |
+| one card | 3 | 2308 | 19.45 |
+| one card, linear layers recomputed | 8 | 2256 | 17.05 |
+| **two cards** | **6** | **3090** | 20.61 / 9.64 |
+| two cards, linear layers recomputed | 10 | 2626 | 12.57 / 9.70 |
+
+Recomputation works exactly as intended and does not pay. It takes micro-batch 8 from an
+out-of-memory failure at 21.25 GiB to a comfortable 10.98, and throughput falls. The
+reason is the last column of the table above it: past about micro-batch 6 this step is
+compute-bound, so buying more memory buys nothing. One card at micro-batch 3 beats one
+card at micro-batch 8 with recomputation, 2,308 against 2,256.
+
+That also settles the balancing question. Further balancing would unlock capacity that
+does not convert into throughput.
+
+## What NCCL, FlashAttention and fla can and cannot do here
+
+* **fla** is the one that mattered, and it already had. Its chunked kernel is bound through
+  transformers' kernel hub, and it is what makes recomputing 18 layers affordable at all.
+* **FlashAttention 2** is installed (2.8.4) and is not the lever: the quadratic score
+  matrix it avoids is in the CSA2 layers, which are 30% of the activations, and those
+  layers need an arbitrary routing mask that FA2 does not take. FlexAttention already
+  serves that path when the recording is off.
+* **NCCL** is absent from this torch wheel -- `is_nccl_available()` is False,
+  `ProcessGroupNCCL` raises ImportError, `torch._C._nccl_version` does not exist. The
+  local `torch_c10d_nccl_test` build has compiled its objects but never linked a `.pyd`,
+  so nothing is importable. Finishing it would not address this: communication is already
+  2.6-4% of a step, and peer copies on this box measured 38-48 GB/s against NCCL's 37.5.
+  Its real prize is Cut Cross-Entropy's `VocabParallelOptions`, which would let the
+  508.6M-parameter embedding be split rather than replicated -- but that wants a process
+  group with one rank per device, which means abandoning the single-process design the
+  whole `distillkit.parallel` package is built on.
+
+## Known bug
+
+Under recomputation, micro-batch 12 and above raises `AssertionError: expected size
+12==12, stride 2097152==3670016` out of a custom op's meta kernel. It is a stride
+disagreement in the recompute, not an out-of-memory, and it was not chased because the
+configuration it blocks is slower than the one that does not need it.
 
 ## Caveats
 

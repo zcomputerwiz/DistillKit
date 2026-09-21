@@ -109,6 +109,11 @@ def main() -> int:
                              "leaving them home. They cannot be split -- CCE needs the "
                              "head whole -- but they are 3.05 GiB and the cards are not "
                              "equally full.")
+    parser.add_argument("--recompute", action="store_true",
+                        help="recompute layer forwards in backward. Worth measuring here "
+                             "rather than assuming: 18 of the 24 layers are linear "
+                             "attention and they hold 10.6 GiB of card 0's 14.5, and fla's "
+                             "chunked kernel is what makes recomputing them cheap.")
     parser.add_argument("--fraction", type=float, default=0.9,
                         help="share of each card the allocator may use. 0.9 of 24 GiB is "
                              "21.6, and micro-batch 8 misses that by 32 MiB. Raising it "
@@ -133,6 +138,12 @@ def main() -> int:
         shard_model(model, devices, shard_embeddings=False,
                     embedding_device=(None if args.embedding_on is None
                                       else "cuda:%d" % args.embedding_on))
+    if args.recompute:
+        model.model.gradient_checkpointing = True
+        # Linear layers only. The routing layers have their attention recorded as the
+        # indexer's target, and a recomputed forward does not reproduce what was captured;
+        # checkpoint notices and raises. They are also the smaller half of the memory.
+        model.model.gradient_checkpointing_types = ("linear_attention",)
     stage = routing_layers(model)
     optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=1e-8)
 
