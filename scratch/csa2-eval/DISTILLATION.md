@@ -91,6 +91,77 @@ least-squares refit onto MLA and CSA2 gave away.
 **ARC never moves.** Every arm, every normalisation, every interval spans zero. Whatever
 the conversion costs and whatever the training recovers, ARC does not see it.
 
+## Training the chat-calibrated conversion (2026-09-21, later) -- confounded
+
+Recalibrating the conversion on chat left it 2.9 MMLU points from the source instead of
+8.8, so the obvious question was whether training holds that. It was trained the same
+way as `blend` above -- `teacher-cache-5m`, 0.5/0.5, three passes, 9,964,545 scored
+tokens, lr 7.3e-6, prefix cap 1024 -- from `checkpoints-2b/warmed-chat32`, and on both
+cards under `--tensor-parallel`.
+
+Every prior arm used one card. That difference turns out to matter, so the numbers below
+are reported and then set aside rather than compared.
+
+| metric | source | conv chat/32K | kd (python calib) | chatkd (chat calib) |
+| --- | --- | --- | --- | --- |
+| mmlu acc (512) | **0.5762** | 0.5469 | 0.5137 | 0.4785 |
+| nll all | 1.3094 | 1.4174 | **0.7269** | 1.0652 |
+| nll content | 1.6954 | 1.8348 | **0.8997** | 1.2613 |
+| nll layout | **0.5575** | 0.5815 | 0.3422 | 0.7354 |
+| nll control | 0.4049 | 0.4702 | 0.0586 | **0.0618** |
+
+The NLL column is on the 32-document bank in `q512-bundle.json`, 14,396 scored tokens.
+The 384-document bank the earlier tables used is not on disk any more, so every arm here
+was rescored on the current one; the numbers differ from the earlier tables for that
+reason and not because any model changed.
+
+| comparison | estimate | 95% CI |
+| --- | --- | --- |
+| chatkd - conv chat/32K | -0.068359 | [-0.113281, -0.023438] |
+| chatkd - kd | -0.035156 | [-0.078125, +0.007812] |
+| chatkd - warmed (python conv) | -0.009766 | [-0.052734, +0.031250] |
+| chatkd - source | -0.097656 | [-0.144531, -0.052734] |
+
+Read at face value this says training cost 6.8 MMLU points from the better conversion and
+landed below the arm that started 5.9 points lower. Two things say not to read it that
+way.
+
+**The generalisation gap is five times the other arm's.** `kd` ended at 0.6592 training
+cross entropy and 0.7269 held-out, a gap of 0.068. `chatkd` ended at 0.7262 and 1.0652,
+a gap of 0.339, on the same corpus with the same objective and the same token budget.
+
+**Layout got worse than the source.** 0.7354 against the source's 0.5575 and against the
+0.5815 of the conversion it started from. Training on a chat corpus making a model worse
+at chat layout is not a thing the corpus can explain.
+
+**Sharded gradients do not match unsharded ones.** Measured on a small CSA2 model in
+fp32: two identical backwards on one card agree to 9e-8, and the largest disagreement
+anywhere is 9.0e-8, so the path is deterministic. Reassembling the sharded model's
+gradients under stock names -- by the same partition the checkpoint export uses for
+weights, which round-trips exactly -- leaves nine tensors differing by more than 1e-3
+relative, the worst at 6.4e-1. All nine are in `linear_attn`: `A_log`, `dt_bias` and
+`in_proj_a` at layers 4, 6 and 8. The forward is exact, and is tested; the backward was
+not tested and is not exact.
+
+So `chatkd` is not a measurement of what chat calibration is worth after training. It is
+a measurement of a tensor-parallel run whose gradients are wrong somewhere in the linear
+attention. The comparison has to be redone on one card, matching `kd` exactly, before
+anything is concluded about the calibration.
+
+### The checkpoint it was read from
+
+`smoke_train --tensor-parallel` wrote the sharded state dict: `mlp.gate_proj.shards.0`
+where the plain model wants `mlp.gate_proj.weight`. It saved without complaint and loaded
+with every plain key reported missing and freshly initialised. `merge_tp_checkpoint.py`
+reassembles it; the merged checkpoint scores 0.9936 on the capture's eval split and the
+sharded model scores 0.9936 on the same documents, so the merge is the trained weights
+and the table above is of the right model.
+
+The run log reported 0.9812 for the same 128 documents at the last step. The checkpoint
+and the sharded model in memory agree with each other and disagree with the log, so the
+difference is in how the training loop evaluates rather than in what it saved. Not
+chased; the independent screen loads a fresh checkpoint and is unaffected.
+
 ## Caveats
 
 * The 512-question set is the `screen` split extended from 256, not an independent test.
