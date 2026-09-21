@@ -134,7 +134,30 @@ a gap of 0.339, on the same corpus with the same objective and the same token bu
 0.5815 of the conversion it started from. Training on a chat corpus making a model worse
 at chat layout is not a thing the corpus can explain.
 
-**The replicated norms trained on a fraction of their gradient.** A parameter replicated
+**Most of the model never trained.** The optimizer was built from `model.parameters()`
+before `shard_model` ran. Sharding *replaces* the modules it splits, so every parameter
+of a sharded module becomes a new tensor and the ones the optimizer was holding are
+orphans -- still stepped, no longer attached to anything.
+
+Diffed against the checkpoint it started from, the run moved 546.3M of 1,915.2M
+parameters, and 508.6M of that is the tied embedding. What moved is exactly what
+sharding leaves alone: the residual adapters, the indexer, `kv_a_proj`, `kv_a_norm` and
+the embedding, about 37.7M parameters outside the embedding. What is **bitwise
+identical** to the starting checkpoint is every MLP, the whole gated delta net,
+`q_proj`, `kv_b_proj`, `o_proj` and every norm. The single-card `kd` arm, diffed the
+same way, moved 1,915.1M of 1,915.2M.
+
+So the two arms are not the same experiment. `kd` trained 1.9B parameters on 10M tokens;
+`chatkd` trained 37.7M adapters plus the embedding on the same 10M tokens, and the
+comparison says nothing about calibration. Nothing raised, the loss fell from 1.2983 to
+0.7262, and only a diff against the starting checkpoint shows it.
+
+`tp_bench.py` builds its optimizer after sharding, so the throughput and memory numbers
+in `TENSOR_PARALLEL.md` are of the full thing and still stand. The 19.30 GiB peak quoted
+for this run does not: it was measured without optimizer state or gradients for the
+sharded body, so a corrected run needs its batch re-tuned rather than inherited.
+
+**A second defect, real but inert here.** A parameter replicated
 across ranks sees only its own rank's share of the loss, so each copy holds a partial
 and `sync_replicated_gradients` has to sum them before the optimizer step. Its own
 docstring says so, `trainer.py` calls it and `tp_train.py` calls it; `smoke_train.py`
@@ -157,10 +180,13 @@ Clipping had the mirror of the same problem: `clip_grad_norm_` over `model.param
 counts a replicated parameter once per rank, inflating the norm it measures and scaling
 every gradient down for it.
 
-So `chatkd` is not a measurement of what chat calibration is worth after training. It is
-a measurement of a run whose replicated norms trained on a fraction and whose gradients
-were then over-clipped. The comparison has to be redone before anything is concluded
-about the calibration.
+It did not affect this run. The 18 replicated norms were frozen by the stale optimizer
+along with the rest of the sharded body: all 18 are bitwise identical between the two
+ranks and bitwise identical to the starting checkpoint. The reduction is still required
+for any run that actually trains them, which is every corrected run from here.
+
+So `chatkd` is not a measurement of what chat calibration is worth after training, and
+the comparison has to be redone before anything is concluded about the calibration.
 
 **A measurement error worth recording.** This was first reported here as nine tensors --
 `A_log`, `dt_bias` and `in_proj_a` at layers 4, 6 and 8 -- differing by up to 6.4e-1,

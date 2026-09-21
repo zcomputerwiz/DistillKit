@@ -523,11 +523,14 @@ def main() -> int:
           flush=True)
 
     import bitsandbytes as bnb
-    # Only what trains: a frozen parameter takes no gradient, and handing it to the
-    # optimizer still buys it two state tensors it will never read.
-    optimizer = bnb.optim.AdamW8bit(
-        [p for p in model.parameters() if p.requires_grad], lr=args.lr,
-        betas=(0.9, 0.95), weight_decay=0.1)
+    # Built after `shard_model`, further down, and not here. Sharding *replaces* the
+    # modules it splits, so every parameter of a sharded module becomes a new tensor and
+    # the ones an optimizer was holding are orphans: still stepped, no longer part of the
+    # model. Building it here trained the residual adapters, the indexer, `kv_a_proj` and
+    # the embedding -- everything sharding left alone -- and silently left the MLPs, the
+    # gated delta net, `q_proj`, `kv_b_proj` and `o_proj` bitwise identical to the
+    # checkpoint they started from, while the loss fell and nothing raised.
+    optimizer = None
     # Polled on a daemon thread: reading it inline costs 1.81 s per report and
     # leaves the GPU with nothing queued for all of it.
     spill = SpillWatch(interval=args.spill_every).start()
@@ -635,6 +638,27 @@ def main() -> int:
         shard_model(model, ["cuda:0", "cuda:1"], shard_embeddings=False)
         print("tensor parallel: body split across two cards, head kept whole on home",
               flush=True)
+
+    # After sharding, so that the parameters handed over are the model's current ones.
+    # Only what trains: a frozen parameter takes no gradient, and handing it to the
+    # optimizer still buys it two state tensors it will never read.
+    trainable = [p for p in model.parameters() if p.requires_grad]
+    optimizer = bnb.optim.AdamW8bit(trainable, lr=args.lr, betas=(0.9, 0.95),
+                                    weight_decay=0.1)
+    # The failure this guards against is silent in every other way: the loss falls, no
+    # tensor is missing, and only a diff against the starting checkpoint shows that most
+    # of the model never moved. So the invariant is asserted rather than assumed.
+    held = {id(p) for group in optimizer.param_groups for p in group["params"]}
+    stranded = [name for name, p in model.named_parameters()
+                if p.requires_grad and id(p) not in held]
+    if stranded:
+        raise SystemExit(
+            "%d trainable parameters are not in the optimizer, so they would never be "
+            "updated: %s" % (len(stranded), ", ".join(stranded[:6])))
+    print("optimizer: %d tensors, %.1fM parameters"
+          % (len(trainable), sum(p.numel() for p in trainable) / 1e6), flush=True)
+
+    if args.tensor_parallel:
         if teacher is not None:
             # Triton's autotuner keeps what it is benchmarking on the instance, and
             # autograd gives each device its own backward thread, so a cold autotune under

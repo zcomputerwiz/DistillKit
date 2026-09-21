@@ -212,3 +212,30 @@ def test_non_reentrant_checkpoint_matches_uncheckpointed_training(shard_all, dty
             )
         del actual
         model.zero_grad(set_to_none=True)
+
+
+def test_sharding_replaces_parameters_so_an_optimizer_built_first_is_stale():
+    """An optimizer constructed before `shard_model` holds tensors the model no longer has.
+
+    Sharding replaces the modules it splits, so every parameter of a sharded module
+    becomes a new tensor. An optimizer built beforehand keeps references to the old
+    ones: it still steps them, they are simply no longer attached to anything. The loss
+    falls -- the parameters sharding left alone are still training -- and nothing raises.
+    A ten million token run here trained its residual adapters, its indexer and its
+    embedding, and left every MLP and the whole gated delta net bitwise identical to the
+    checkpoint it started from.
+
+    This pins the mechanism so the ordering is not quietly reintroduced.
+    """
+    model = _model()
+    before = {name: id(p) for name, p in model.named_parameters()}
+    shard_model(model, ["cpu", "cpu"], shard_embeddings=False)
+    after = {id(p) for p in model.parameters()}
+
+    survived = {name for name, ident in before.items() if ident in after}
+    replaced = set(before) - survived
+    assert replaced, "sharding replaced no parameters, so this hazard would not exist"
+    # The ones that keep their identity are what sharding does not touch; everything a
+    # sharded module owned is a different tensor now.
+    assert any("mlp." in name for name in replaced), sorted(replaced)[:5]
+    assert all(not name.startswith("lm_head") for name in replaced)
