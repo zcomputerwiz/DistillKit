@@ -61,6 +61,65 @@ from distillkit.missing_probability import MissingProbabilityHandling
 from distillkit.offline_cache import OfflineTeacherCache
 
 
+# Everything about a capture that has to agree before two of them can be read as one
+# corpus. The tokenizer decides what the token ids mean; `top_k` sets the width of the
+# kept head and therefore the mass the grouped tail has to account for; the temperature,
+# `log_values` and `normalization` are the assumptions the grouped tail is derived under.
+# A mismatch in any of them is a silently wrong objective rather than a loud failure,
+# which is why this is checked rather than trusted.
+SHARED_KEYS = ("tokenizer_hash", "tokenizer_vocab_hash", "vocab_size", "top_k",
+               "generation_temperature", "log_values", "normalization",
+               "position_alignment", "topk_value_dtype")
+
+
+class MergedCache:
+    """Several captures behind one cache's interface.
+
+    Capturing 5M tokens costs hours of the teacher's time, so a corpus that grows should
+    not mean recapturing what is already on disk. `CachedTeacher` touches five things on
+    a cache -- `documents`, `manifest`, `document_ids`, `read_document` and `close` --
+    so merging is a routing table rather than a format change.
+
+    Document ids are unique within a capture and nothing makes them unique across two.
+    A collision is raised rather than resolved, because the two entries would have
+    different targets and picking either one silently is the kind of error that shows up
+    as a slightly worse number months later.
+    """
+
+    def __init__(self, paths):
+        self.caches = [OfflineTeacherCache(path) for path in paths]
+        first = self.caches[0].manifest
+        for path, cache in zip(paths[1:], self.caches[1:]):
+            differing = [key for key in SHARED_KEYS
+                         if cache.manifest.get(key) != first.get(key)]
+            if differing:
+                raise ValueError(
+                    "%s was captured under different settings than %s and cannot be "
+                    "merged with it: %s" % (path, paths[0], ", ".join(
+                        "%s %r against %r" % (key, cache.manifest.get(key),
+                                              first.get(key))
+                        for key in differing)))
+        self.manifest = first
+        self.documents, self._owner = {}, {}
+        for path, cache in zip(paths, self.caches):
+            for doc_id, document in cache.documents.items():
+                if doc_id in self._owner:
+                    raise ValueError("document %r is in both %s and %s"
+                                     % (doc_id, self._owner[doc_id][0], path))
+                self._owner[doc_id] = (path, cache)
+                self.documents[doc_id] = document
+
+    def document_ids(self, split=None):
+        return [doc_id for cache in self.caches for doc_id in cache.document_ids(split)]
+
+    def read_document(self, doc_id, **kwargs):
+        return self._owner[doc_id][1].read_document(doc_id, **kwargs)
+
+    def close(self):
+        for cache in self.caches:
+            cache.close()
+
+
 class CachedTeacher:
     """Documents and their top-k targets, shuffled, one at a time.
 
@@ -68,11 +127,16 @@ class CachedTeacher:
     hidden states are never read: they are 5120 wide against this student's 2048 and
     would need a projection to mean anything, while the top-k logprobs are directly
     comparable and are what the objective actually uses.
+
+    `path` may be one capture or several; several are read as one corpus, after checking
+    that they agree about everything the objective depends on.
     """
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None):
-        self.cache = OfflineTeacherCache(path)
+        paths = [path] if isinstance(path, (str, Path)) else list(path)
+        self.cache = (OfflineTeacherCache(paths[0]) if len(paths) == 1
+                      else MergedCache(paths))
         self.device = device
         self.split = split
         # A prefix, never a window from the middle. Causal context means the first `n`

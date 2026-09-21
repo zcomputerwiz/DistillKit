@@ -162,13 +162,15 @@ def main() -> int:
                              "model whose indexer has been warmed up by indexer_kl.py; "
                              "from a cold one the selection is random and the KL is "
                              "fitting to noise.")
-    parser.add_argument("--teacher-cache", type=Path, default=None,
+    parser.add_argument("--teacher-cache", type=Path, default=None, nargs="+",
                         help="distil against an offline top-k capture instead of reading "
                              "plain tokens from the store. One document per forward at "
                              "its own length, never padded: a padded batch changes CSA2's "
                              "routing wherever the indexer's scores tie at the cutoff. "
                              "The tail is carried rather than deleted, which is only "
-                             "defined at the capture temperature.")
+                             "defined at the capture temperature. Several captures are "
+                             "read as one corpus, after checking that they agree about "
+                             "the tokenizer, the top-k width and the temperature.")
     parser.add_argument("--tensor-parallel", action="store_true",
                         help="split the body across both cards. The embedding and head "
                              "stay whole on home, because Cut Cross-Entropy never forms "
