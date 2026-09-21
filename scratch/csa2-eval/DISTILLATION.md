@@ -134,19 +134,42 @@ a gap of 0.339, on the same corpus with the same objective and the same token bu
 0.5815 of the conversion it started from. Training on a chat corpus making a model worse
 at chat layout is not a thing the corpus can explain.
 
-**Sharded gradients do not match unsharded ones.** Measured on a small CSA2 model in
-fp32: two identical backwards on one card agree to 9e-8, and the largest disagreement
-anywhere is 9.0e-8, so the path is deterministic. Reassembling the sharded model's
-gradients under stock names -- by the same partition the checkpoint export uses for
-weights, which round-trips exactly -- leaves nine tensors differing by more than 1e-3
-relative, the worst at 6.4e-1. All nine are in `linear_attn`: `A_log`, `dt_bias` and
-`in_proj_a` at layers 4, 6 and 8. The forward is exact, and is tested; the backward was
-not tested and is not exact.
+**The replicated norms trained on a fraction of their gradient.** A parameter replicated
+across ranks sees only its own rank's share of the loss, so each copy holds a partial
+and `sync_replicated_gradients` has to sum them before the optimizer step. Its own
+docstring says so, `trainer.py` calls it and `tp_train.py` calls it; `smoke_train.py`
+never did.
+
+Isolated on the sharded `GatedDeltaNet` in float32 on CPU, where the split is exact:
+
+| | norm.weight | every other parameter |
+| --- | --- | --- |
+| shards as the run left them | **0.44** relative | inside 1e-6 |
+| after `sync_replicated_gradients` | inside 1e-6 | inside 1e-6 |
+
+On CUDA, with the autotuner warmed and the reduction applied, the whole module agrees
+with the unsharded one to 8.6e-6, against 9e-8 for the unsharded module measured twice.
+So the sharding arithmetic is right on both devices and the missing call is the whole of
+the defect. It touches the `norm` of every linear-attention layer and the `q_norm` and
+`k_norm` of every sharded full-attention layer.
+
+Clipping had the mirror of the same problem: `clip_grad_norm_` over `model.parameters()`
+counts a replicated parameter once per rank, inflating the norm it measures and scaling
+every gradient down for it.
 
 So `chatkd` is not a measurement of what chat calibration is worth after training. It is
-a measurement of a tensor-parallel run whose gradients are wrong somewhere in the linear
-attention. The comparison has to be redone on one card, matching `kd` exactly, before
-anything is concluded about the calibration.
+a measurement of a run whose replicated norms trained on a fraction and whose gradients
+were then over-clipped. The comparison has to be redone before anything is concluded
+about the calibration.
+
+**A measurement error worth recording.** This was first reported here as nine tensors --
+`A_log`, `dt_bias` and `in_proj_a` at layers 4, 6 and 8 -- differing by up to 6.4e-1,
+measured on the whole model on CUDA. They do not. That check ran the sharded model's
+backward without first warming the Triton autotuner, which the existing sharded-forward
+test does explicitly and comments on; repeating it with the warm-up puts every one of
+those tensors inside 1e-5. The reassembly in that check also summed the replicated
+groups itself, which masked the one parameter that was genuinely wrong. The number that
+stands is 0.44 on `norm.weight`, from the module in isolation.
 
 ### The checkpoint it was read from
 
