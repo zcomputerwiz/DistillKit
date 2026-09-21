@@ -162,6 +162,33 @@ def main() -> int:
                              "model whose indexer has been warmed up by indexer_kl.py; "
                              "from a cold one the selection is random and the KL is "
                              "fitting to noise.")
+    parser.add_argument("--teacher-cache", type=Path, default=None,
+                        help="distil against an offline top-k capture instead of reading "
+                             "plain tokens from the store. One document per forward at "
+                             "its own length, never padded: a padded batch changes CSA2's "
+                             "routing wherever the indexer's scores tie at the cutoff. "
+                             "The tail is carried rather than deleted, which is only "
+                             "defined at the capture temperature.")
+    parser.add_argument("--teacher-weight", type=float, default=0.5,
+                        help="how much of the blend is the teacher's distribution, the "
+                             "rest being ground-truth cross entropy. Repairing the tail "
+                             "alone was measured and changed nothing -- two thirds of the "
+                             "harm sat inside the teacher's list -- and it was keeping "
+                             "cross entropy that removed it. Ground truth is also the "
+                             "only term that says anything about a control token the "
+                             "teacher's top-64 never ranked.")
+    parser.add_argument("--teacher-max-length", type=int, default=2048,
+                        help="prefix cap on a cached document. The sparse stage records "
+                             "attention, which forces CSA2's gathered path, whose "
+                             "selection is quadratic in the sequence: a 4096-token "
+                             "document runs 24 GiB out of memory. A prefix is free of "
+                             "the context mismatch a mid-document window would carry, "
+                             "because causal attention means the first n positions see "
+                             "exactly what the teacher saw. 2048 keeps 89.3% of this "
+                             "corpus, 1024 keeps 74.1%.")
+    parser.add_argument("--kl-chunk", type=int, default=256,
+                        help="positions per head projection in the teacher KL, as a row "
+                             "budget at batch 1. A full row is 248320 wide.")
     parser.add_argument("--indexer-weight", type=float, default=1.0,
                         help="how much of the indexer's KL to add. The reference gives no "
                              "figure because its two losses reach disjoint parameters, "
@@ -460,7 +487,7 @@ def main() -> int:
     # generalization rather than how much of the corpus has been memorized -- which is
     # what training loss becomes once a budget spans several passes.
     evaluation = None
-    if args.evaluate_every:
+    if args.evaluate_every and args.teacher_cache is None:
         if kept is None:
             held_stream = np.memmap(store / "calibration.bin", dtype=np.uint32, mode="r")
             held_original = held_compact = held_stream.shape[0]
@@ -479,6 +506,27 @@ def main() -> int:
     @torch.no_grad()
     def evaluate():
         model.eval()
+        if teacher is not None:
+            # The capture's own eval split, one document per forward for the same reason
+            # training uses one: these documents are median 537 tokens and padding them
+            # into a batch would route differently than scoring them alone. Token
+            # weighted, so a long document counts for what it is rather than for one row.
+            total, scored = 0.0, 0
+            # A fixed prefix of the split rather than all of it: the whole eval split is
+            # 258K tokens and would cost a minute of every checkpoint. The same documents
+            # every time, so the series is comparable even though it is a subset.
+            for doc_id in held_teacher.ids[:args.evaluate_windows]:
+                record = held_teacher.read(doc_id)
+                ids = record["input_ids"]
+                state = model.model(input_ids=ids,
+                                    attention_mask=torch.ones_like(ids),
+                                    use_cache=False).last_hidden_state
+                count = ids.shape[1] - 1
+                total += float(linear_cross_entropy(state, model.lm_head.weight, ids,
+                                                    shift=1, reduction="mean")) * count
+                scored += count
+            model.train()
+            return total / max(scored, 1)
         total, batches = 0.0, 0
         for start in range(0, evaluation.shape[0], args.batch):
             chunk = evaluation[start:start + args.batch].to("cuda")
@@ -495,6 +543,24 @@ def main() -> int:
     # tokens is charged for the expansion rather than rewarded with an easier softmax. A
     # model reading the store at its own width expands nothing, so the charge is 1.
     inflation = 1.0 if kept is None else compact_tokens / original_tokens
+
+    teacher = None
+    if args.teacher_cache is not None:
+        from teacher_kl import CachedTeacher, grouped_tail_kl, scored_mask  # noqa: F401
+
+        if kept is not None:
+            raise SystemExit(
+                "--teacher-cache carries the capture's own token ids; a remapped "
+                "vocabulary would address a different space than the targets")
+        teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
+                                max_length=args.teacher_max_length)
+        held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
+                                     max_length=args.teacher_max_length)
+        print("teacher: %d documents, %d tokens at a %d cap, top-%d, grouped tail, "
+              "blend %.2f" % (len(teacher), teacher.tokens, args.teacher_max_length,
+                              teacher.top_k, args.teacher_weight), flush=True)
+        print("held-out: %d documents, %d tokens from the capture's own eval split"
+              % (len(held_teacher), held_teacher.tokens), flush=True)
 
     sparse_stage = None
     if args.sparse_stage:
@@ -516,8 +582,16 @@ def main() -> int:
 
     window = args.batch * args.length
     if args.passes is not None:
-        args.tokens = int(args.passes * stream.shape[0])
-    steps = max(1, args.tokens // window)
+        args.tokens = int(args.passes * (teacher.tokens if teacher is not None
+                                         else stream.shape[0]))
+    if teacher is not None:
+        # Documents are what a step is made of here and they are not all one length, so
+        # the budget cannot be divided out in advance. `window` becomes the average a
+        # step is expected to score, used only to pick a step count; the loop counts the
+        # tokens it actually scored and reports those.
+        window = args.accumulate * (teacher.tokens / max(len(teacher), 1))
+        documents = teacher.epochs(None)
+    steps = max(1, int(args.tokens // window))
     generator = np.random.default_rng(args.seed)
     history = []
     torch.cuda.synchronize()
@@ -526,11 +600,20 @@ def main() -> int:
     # to know, and the evaluation inherits it so the reported loss is the stage's.
     stage = dense_routing(model) if args.dense_routing else contextlib.nullcontext()
     stage.__enter__()
+    scored_tokens = 0
     for step in range(steps):
-        starts = generator.integers(0, stream.shape[0] - args.length - 1,
-                                    size=args.batch)
-        batch = np.stack([stream[s:s + args.length] for s in starts]).astype(np.int64)
-        tokens = torch.from_numpy(batch).to("cuda", non_blocking=True)
+        if teacher is not None:
+            # One document per micro-batch, at its own length. Nothing is stacked, so
+            # nothing is padded, and the routing each document sees while training is the
+            # routing it would see alone.
+            microbatches = [next(documents) for _ in range(args.accumulate)]
+        else:
+            starts = generator.integers(0, stream.shape[0] - args.length - 1,
+                                        size=args.batch)
+            batch = np.stack([stream[s:s + args.length] for s in starts]).astype(np.int64)
+            tokens = torch.from_numpy(batch).to("cuda", non_blocking=True)
+            microbatches = [{"input_ids": part}
+                            for part in tokens.chunk(args.accumulate)]
         optimizer.zero_grad(set_to_none=True)
         # One micro-batch is the ordinary path and stays bitwise what it was. More than
         # one exists because an active gated residual does not fit otherwise: at blend 0
@@ -538,14 +621,41 @@ def main() -> int:
         # and write, which runs out of 24 GiB at batch 64. Accumulating keeps the
         # *effective* batch identical across arms, so a blend comparison is a comparison
         # of blend rather than of batch size.
-        loss, indexer_cost = 0.0, 0.0
-        for chunk in tokens.chunk(args.accumulate):
+        loss, indexer_cost, teacher_cost = 0.0, 0.0, 0.0
+        for record in microbatches:
+            chunk = record["input_ids"]
+            scored_tokens += chunk.numel() - chunk.shape[0]
+
+            def distil(hidden):
+                """The teacher's half of the blend, summed over the scored positions.
+
+                Divided by the same count cross entropy averaged over, so the two terms
+                are both nats per token and `--teacher-weight` is a blend rather than a
+                ratio between differently normalised numbers.
+                """
+                mask = scored_mask(chunk.shape[1], chunk.device)
+                total = grouped_tail_kl(hidden, model.lm_head, record["topk_ids"],
+                                        record["topk_logprobs"], mask,
+                                        chunk_length=args.kl_chunk)
+                return total / max(int(mask.sum()), 1)
+
             if sparse_stage is None:
                 hidden = model.model(input_ids=chunk,
                                      attention_mask=torch.ones_like(chunk),
                                      use_cache=False).last_hidden_state
                 part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
-                                            reduction="mean") / args.accumulate
+                                            reduction="mean")
+                if teacher is not None:
+                    loss = loss + part.detach() / args.accumulate
+                    if args.teacher_weight > 0:
+                        carried = distil(hidden)
+                        teacher_cost += float(carried) / args.accumulate
+                        part = ((1 - args.teacher_weight) * part
+                                + args.teacher_weight * carried)
+                    part = part / args.accumulate
+                    part.backward()
+                    continue
+                part = part / args.accumulate
             else:
                 # One forward serves both losses. The attention is recorded as it is
                 # computed, which is the target, and the selection it was masked by is
@@ -566,11 +676,24 @@ def main() -> int:
                                                 shift=1, reduction="mean")
                     aligned = indexer_loss(model, sparse_stage, seen, targets, borrowed,
                                            selected=chosen)
+                    # Inside the recording context, because the head projection this
+                    # walks has to see the same forward the attention was recorded from.
+                    carried = (distil(hidden)
+                               if teacher is not None and args.teacher_weight > 0
+                               else None)
                 # Kept apart in the report as well as in the gradient: summed, the KL is
                 # an order of magnitude larger and the language-modeling loss -- the one
                 # that says whether the model is getting better -- disappears into it.
                 indexer_cost += float(aligned) / args.accumulate
                 loss = loss + part.detach() / args.accumulate
+                if carried is not None:
+                    # The blend is between the two terms that share parameters. The
+                    # indexer's KL is added rather than blended in, because it reaches a
+                    # disjoint set and is clipped on its own below: putting it inside the
+                    # blend would make `--teacher-weight` scale the router as well.
+                    teacher_cost += float(carried) / args.accumulate
+                    part = ((1 - args.teacher_weight) * part
+                            + args.teacher_weight * carried)
                 part = (part + args.indexer_weight * aligned) / args.accumulate
                 part.backward()
                 continue
@@ -617,10 +740,15 @@ def main() -> int:
         if step % args.report_every == 0 or step == steps - 1:
             torch.cuda.synchronize()
             elapsed = time.perf_counter() - train_started
-            seen = (step + 1) * window
-            row = {"step": step, "tokens": seen, "passes": seen / stream.shape[0],
+            # Counted rather than multiplied out: documents are not all one length, so
+            # `window` is an expectation used to pick a step count and nothing else.
+            corpus = teacher.tokens if teacher is not None else stream.shape[0]
+            seen = scored_tokens if teacher is not None else (step + 1) * window
+            row = {"step": step, "tokens": seen, "passes": seen / corpus,
                    "loss": float(loss), "loss_per_original_token": float(loss) * inflation,
                    "tokens_per_second": seen / elapsed}
+            if teacher is not None:
+                row["teacher_kl"] = teacher_cost
             # Read before the probe and the held-out pass. Both run their own forward at
             # their own sequence length, and the layers keep only the last routing they
             # computed -- reading after them reports the probe's 512-token routing, where
@@ -639,8 +767,9 @@ def main() -> int:
             history.append(row)
             if sparse_stage is not None:
                 row["indexer"] = indexer_cost
-            print("step %5d  %5.2f passes  train %7.4f%s  held %8s  norm %7.4f  %8.0f tok/s"
+            print("step %5d  %5.2f passes  train %7.4f%s%s  held %8s  norm %7.4f  %8.0f tok/s"
                   % (step, row["passes"], row["loss"],
+                     "  kd %7.4f" % teacher_cost if teacher is not None else "",
                      "  idx %6.3f" % (indexer_cost / max(len(sparse_stage), 1))
                      if sparse_stage is not None else "",
                      "%.4f" % row["heldout"] if "heldout" in row else "-",
@@ -665,6 +794,9 @@ def main() -> int:
 
     stage.__exit__(None, None, None)
     torch.cuda.synchronize()
+    # Documents vary in length under a teacher cache, so the budget is what the loop
+    # actually scored rather than the step count times an expected window.
+    total_scored = scored_tokens if teacher is not None else steps * window
     elapsed = time.perf_counter() - train_started
     spilled = spill.stop()
     report = {
@@ -699,8 +831,8 @@ def main() -> int:
         "parameters": int(parameters), "liger": swapped,
         "batch": args.batch, "length": args.length, "steps": steps,
         "accumulate": args.accumulate,
-        "scored_tokens": steps * window,
-        "seconds": elapsed, "tokens_per_second": steps * window / elapsed,
+        "scored_tokens": total_scored,
+        "seconds": elapsed, "tokens_per_second": total_scored / elapsed,
         "first_loss": history[0]["loss"], "final_loss": history[-1]["loss"],
         "inflation": inflation,
         "final_loss_per_original_token": history[-1]["loss_per_original_token"],
@@ -736,7 +868,7 @@ def main() -> int:
         (target / "milestone.json").write_text(json.dumps({
             "variant": variant, "seed": args.seed,
             "architecture": report["architecture"],
-            "scored_tokens": steps * window, "optimizer_steps": steps,
+            "scored_tokens": total_scored, "optimizer_steps": steps,
             "final_loss": report["final_loss"],
             "final_heldout": report["final_heldout"],
             "final_copy": report["final_copy"],
@@ -745,7 +877,7 @@ def main() -> int:
             "peak_reserved_gib": report["peak_reserved_gib"],
         }, indent=2), encoding="utf-8")
         print("CHECKPOINT %s: %d tokens, %d steps, loss %.4f"
-              % (target.name, steps * window, steps, report["final_loss"]),
+              % (target.name, total_scored, steps, report["final_loss"]),
               flush=True)
     print("\nloss %.4f -> %.4f over %d tokens at %.0f tok/s, peak %.2f GiB, spill %+.2f GiB"
           % (report["first_loss"], report["final_loss"], report["scored_tokens"],
