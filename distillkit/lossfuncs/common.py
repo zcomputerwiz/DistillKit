@@ -23,6 +23,28 @@ def get_target_logprobs(
         distillation_temperature, target_generation_temperature
     )
     if log_target:
+        if temperature_change and missing == MissingProbabilityHandling.SYMMETRIC_UNIFORM:
+            # The grouped tail works because the per-token factor cancels between the
+            # teacher and the student, so the uniform assumption never survives the ratio
+            # and the result asserts only the mass the cache knows about. Temperature
+            # breaks that. Softening the teacher means softening its *true* distribution
+            # and then coarsening, which under a uniform tail is
+            # `(V-k)^(1-alpha) * leftover^alpha` -- the factor no longer cancels, and the
+            # `(V-k)^(1-alpha)` is four to five orders of magnitude at this vocabulary.
+            # Applying temperature to the already-coarsened distribution instead, which
+            # is what `leftover.pow(alpha)` below would do, is a different objective that
+            # silently keeps 0.77 of the mass in the top-k where the dense computation
+            # keeps 0.05. Neither is recoverable from a top-k cache without asserting a
+            # tail shape it does not record, so refuse rather than pick one.
+            raise ValueError(
+                "MissingProbabilityHandling.SYMMETRIC_UNIFORM is only defined at the "
+                "capture temperature: the grouped tail depends on the per-token factor "
+                "cancelling between teacher and student, and a temperature change leaves "
+                f"a (V-k)^(1-alpha) term behind. Got distillation temperature "
+                f"{distillation_temperature} against generation temperature "
+                f"{target_generation_temperature}. Use ZERO, or distil at the capture "
+                "temperature."
+            )
         if (
             not temperature_change
             and missing == MissingProbabilityHandling.SYMMETRIC_UNIFORM

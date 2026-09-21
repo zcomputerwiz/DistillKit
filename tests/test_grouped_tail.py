@@ -137,3 +137,31 @@ def test_grouped_tail_survives_a_top_k_that_already_covers_the_mass():
         confident, ids, values.log().to(torch.float32), mask,
         missing=MissingProbabilityHandling.SYMMETRIC_UNIFORM, log_target=True)
     assert torch.isfinite(loss), loss
+def test_grouped_tail_refuses_a_temperature_it_cannot_represent():
+    """The cancellation is what makes the grouped tail honest, and temperature breaks it.
+
+    Softening the teacher means softening its true distribution and then coarsening, which
+    under a uniform tail leaves a `(V-k)^(1-alpha)` factor that no longer cancels -- four
+    to five orders of magnitude at this vocabulary. Applying temperature to the coarsened
+    distribution instead is a different objective: at alpha 0.5 it keeps 0.77 of the mass
+    inside the top-k where the dense computation keeps 0.05. A top-k cache cannot tell
+    those apart, so the combination is refused rather than silently resolved.
+    """
+    import pytest
+
+    logits, ids, values, mask = case()
+    for temperature in (0.5, 2.0):
+        with pytest.raises(ValueError, match="capture temperature"):
+            sparse_kl_div_inner(
+                logits, ids, values.log(), mask,
+                missing=MissingProbabilityHandling.SYMMETRIC_UNIFORM,
+                log_target=True, temperature=temperature)
+
+
+def test_the_zero_tail_still_accepts_a_temperature():
+    """The refusal is specific to the grouped tail; the zero tail renormalises anyway."""
+    logits, ids, values, mask = case()
+    loss = sparse_kl_div_inner(
+        logits, ids, values.log(), mask,
+        missing=MissingProbabilityHandling.ZERO, log_target=True, temperature=2.0)
+    assert torch.isfinite(loss), loss
