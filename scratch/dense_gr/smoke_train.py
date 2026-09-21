@@ -659,23 +659,42 @@ def main() -> int:
           % (len(trainable), sum(p.numel() for p in trainable) / 1e6), flush=True)
 
     if args.tensor_parallel:
+        # Triton's autotuner keeps what it is benchmarking on the instance, and autograd
+        # gives each device its own backward thread, so a cold autotune under sharding
+        # has one thread clearing `nargs` while the other is still reading it. Every
+        # shape the run will use has to be warmed single-threaded before training, which
+        # means the set of shapes has to be finite and known.
+        #
+        # The shapes are taken from the iterator the run will actually draw from, not
+        # from one of them. `grouped` floors its widths to the block size, which is what
+        # makes the list short; `epochs` hands over each document at its own length, so
+        # its shape set is as large as the corpus has distinct lengths and cannot be
+        # warmed. That path is refused here rather than left to race.
+        if teacher is not None and not (args.micro_tokens or args.micro_batch > 1):
+            raise SystemExit(
+                "--tensor-parallel needs --micro-tokens or --micro-batch above 1: "
+                "without them each forward is one document at its own length, which is "
+                "a fresh Triton autotune per distinct length and the race the warm-up "
+                "exists to avoid. Those options group documents to block-rounded widths, "
+                "which is what makes the shape set finite.")
         if teacher is not None:
-            # Triton's autotuner keeps what it is benchmarking on the instance, and
-            # autograd gives each device its own backward thread, so a cold autotune under
-            # sharding has one thread clearing `nargs` while the other is still reading
-            # it. Warm every shape the run will use, single-threaded, before training --
-            # flooring the widths to the block size is what makes that a short list.
-            shapes = teacher.widths(args.micro_batch, model.config.csa2_block_size,
-                                    args.micro_tokens or None)
+            shapes = [(max(1, args.micro_tokens // width) if args.micro_tokens
+                       else args.micro_batch, width)
+                      for width in teacher.widths(args.micro_batch,
+                                                  model.config.csa2_block_size,
+                                                  args.micro_tokens or None)]
+        else:
+            # Fixed windows: one shape for the whole run, and it was getting no warm-up
+            # at all because the warm-up sat behind the teacher cache.
+            shapes = [(max(1, args.batch // args.accumulate), args.length)]
+        if shapes:
             print("warming %d shapes: %s" % (len(shapes), shapes), flush=True)
             torch.autograd.set_multithreading_enabled(False)
             try:
-                for width in shapes:
+                for rows, width in shapes:
                     # The same row count training will use at this width, because the
                     # autotuner keys on the whole shape and a warm-up at the wrong number
                     # of rows warms a kernel the run never calls.
-                    rows = (max(1, args.micro_tokens // width) if args.micro_tokens
-                            else args.micro_batch)
                     probe = torch.randint(1, model.config.vocab_size,
                                           (rows, width), device="cuda")
                     state = model.model(input_ids=probe,
@@ -801,7 +820,7 @@ def main() -> int:
                 are both nats per token and `--teacher-weight` is a blend rather than a
                 ratio between differently normalised numbers.
                 """
-                mask = scored_mask(chunk.shape[1], chunk.device)
+                mask = scored_mask(chunk.shape[1], chunk.device, chunk.shape[0])
                 total = grouped_tail_kl(hidden, model.lm_head, record["topk_ids"],
                                         record["topk_logprobs"], mask,
                                         chunk_length=args.kl_chunk)

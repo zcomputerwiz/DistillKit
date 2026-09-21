@@ -21,6 +21,9 @@ worth a test rather than a comment, because the next person to read the enum wil
 the name.
 """
 
+import math
+
+import pytest
 import torch
 
 from distillkit.lossfuncs.kl import sparse_kl_div_inner
@@ -165,3 +168,42 @@ def test_the_zero_tail_still_accepts_a_temperature():
         logits, ids, values.log(), mask,
         missing=MissingProbabilityHandling.ZERO, log_target=True, temperature=2.0)
     assert torch.isfinite(loss), loss
+
+def test_the_reported_divergence_does_not_depend_on_the_batch():
+    """One document duplicated into a batch has the same per-token divergence.
+
+    `grouped_tail_kl` returns a sum and the caller divides by `mask.sum()`. A
+    `[1, length]` mask broadcasts over the batch while counting one row of it, so the
+    sum covered `rows * (length - 1)` positions and the divisor covered `length - 1`.
+    The reported per-token KL then scaled with the batch -- measured 2.770803 at one
+    row, 5.541607 at two, 16.624821 at six, all the same document -- and since cross
+    entropy is a mean over every scored position, `--teacher-weight` quietly became
+    `weight * rows`. Nothing raises; the blend is simply not the blend that was asked
+    for, and it moves with document length under `--micro-tokens`.
+    """
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scratch" / "dense_gr"))
+    from teacher_kl import grouped_tail_kl, scored_mask
+
+    torch.manual_seed(0)
+    length, hidden_size, vocab, top_k = 16, 32, 128, 8
+    head = torch.nn.Linear(hidden_size, vocab, bias=False)
+    row = torch.randn(1, length, hidden_size)
+    ids = torch.randint(0, vocab, (1, length, top_k))
+    values = torch.log_softmax(torch.randn(1, length, top_k), dim=-1) + math.log(0.9)
+
+    reported = []
+    for rows in (1, 2, 6):
+        hidden = row.repeat(rows, 1, 1)
+        mask = scored_mask(length, hidden.device, rows)
+        assert int(mask.sum()) == rows * (length - 1)
+        total = grouped_tail_kl(hidden, head, ids.repeat(rows, 1, 1),
+                                values.repeat(rows, 1, 1), mask, chunk_length=64)
+        reported.append(float(total) / int(mask.sum()))
+
+    for rows, value in zip((2, 6), reported[1:]):
+        assert value == pytest.approx(reported[0], rel=1e-5), (
+            "%d rows of the same document report %.6f against %.6f at one row"
+            % (rows, value, reported[0]))

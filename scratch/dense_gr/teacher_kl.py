@@ -358,14 +358,25 @@ def grouped_tail_kl(hidden, head, target_ids, target_values, mask, chunk_length=
     )
 
 
-def scored_mask(length, device):
-    """The positions both objectives score.
+def scored_mask(length, device, rows=1):
+    """The positions both objectives score, for every row in the forward.
 
     Cross-entropy at position t predicts token t+1, so the last position has no ground
     truth. The teacher has an opinion there, but scoring it under one objective and not
     the other would make the blend weight mean something different at the end of every
     document, so both stop at the same place.
+
+    `rows` exists because the caller divides the summed divergence by `mask.sum()`, and
+    a `[1, length]` mask broadcasts over the batch while counting one row of it. The
+    summed KL then covers `rows * (length - 1)` positions and the divisor covers
+    `length - 1`, so the reported per-token divergence -- and with it the teacher's
+    share of the blend -- comes out multiplied by the batch size. Measured on one
+    document duplicated into a batch: 2.770803 at one row, 5.541607 at two, 16.624821
+    at six, where all three are the same document. Cross entropy is a mean over every
+    scored position in the batch, so only the KL moved and `--teacher-weight` stopped
+    meaning what it says. Returning the mask at full width makes the count match the
+    sum by construction.
     """
-    mask = torch.ones(1, length, dtype=torch.bool, device=device)
+    mask = torch.ones(rows, length, dtype=torch.bool, device=device)
     mask[:, -1] = False
     return mask
