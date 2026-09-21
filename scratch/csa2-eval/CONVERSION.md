@@ -124,6 +124,58 @@ stated -- more room fitting worse is a solve outrunning its sample -- but the la
 remeasuring under a calibration that is not itself the dominant error before anything is
 concluded about capacity.
 
+### Mixing the two corpora does not help
+
+If chat fixes MMLU and volume fixes NLL, a corpus containing both ought to get both.
+`mixed_store.py` interleaves them in window-sized blocks, half each.
+
+| arm | mmlu (512) | nll all |
+| --- | --- | --- |
+| chat/32K | **0.5469** | 1.4823 |
+| mixed/32K | 0.5098 | 1.4814 |
+| chat/256K | 0.5293 | 1.4546 |
+| mixed/256K | 0.5254 | **1.4504** |
+
+Paired against chat at matched size, the mixture is -0.037109 MMLU
+[-0.064453, -0.009766] at 32K and -0.003906 [-0.027344, +0.019531] at 256K. So it is
+significantly worse at the small size and indistinguishable at the large one, and it buys
+0.004 nats. Adding Python back costs MMLU, and costs more when the sample is small enough
+that the wrong half competes for the fit. Pure chat is the better corpus.
+
+### Refitting a trained model against its source does not help either
+
+The conversion solves each layer's projections with the *source* model's hidden states as
+the regressor, which is not what the layer ends up seeing once training moves the model.
+`refit.py` re-solves `kv_a_proj` and `kv_b_proj` from the **trained** model's own block
+inputs, leaving `q_proj`, `o_proj`, the router, the MLPs and the residual route as training
+left them.
+
+It is worse on everything that was not fitted:
+
+| | trained (kd) | refit | source |
+| --- | --- | --- | --- |
+| mmlu (512) | 0.5137 | 0.5273 | 0.5762 |
+| nll all | **0.7569** | 1.0256 | 1.3713 |
+| nll content | **0.9296** | 1.3305 | 1.7572 |
+| nll control | **0.0808** | 0.3286 | 0.6327 |
+
+MMLU moves +0.013672 [-0.027344, +0.054688], an interval spanning zero. NLL loses 0.27
+nats and control tokens get four times worse. Calibrated on chat instead of mixed and
+scored on the chat held-out the model actually serves, the refit moves it from 0.8822 to
+0.9827.
+
+The reason is structural rather than a tuning problem. The refit's target is the source
+model's attention, and the trained model has moved past the source on this corpus --
+0.7569 against 1.3713. Pulling its projections back toward the source undoes what training
+bought, and there is no better target available, because the only dense reference is the
+source and the trained model's own attention is produced by the projections being solved.
+
+**A measurement error worth recording.** The refit was first read as an improvement,
+1.3110 to 1.2879, from the held-out split of its own calibration store -- the mixed one,
+half Python. That is the distribution that flatters a model pulled back toward the source,
+and it disagreed with every independent metric. The success criterion was taken from the
+data being fitted.
+
 ## Caveats
 
 * All four latent checkpoints came from one recipe within eight minutes. That is what
