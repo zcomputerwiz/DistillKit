@@ -1,0 +1,36 @@
+{
+  "cards": 1,
+  "length": 1024,
+  "checkpoint": "scratch/dense_gr/checkpoints-2b/warmed-scaled",
+  "parameters": 1915249222,
+  "resident": {
+    "cuda:0": 1915249222
+  },
+  "rows": [
+    {
+      "batch": 1,
+      "tokens_per_second": 1731.7700200395682,
+      "ms_per_step": 591.3025333332674,
+      "peak_gib": [
+        12.090750217437744
+      ],
+      "status": "ok"
+    },
+    {
+      "batch": 2,
+      "tokens_per_second": 2150.767619955876,
+      "ms_per_step": 952.2181666664741,
+      "peak_gib": [
+        15.78799295425415
+      ],
+      "status": "ok"
+    },
+    {
+      "batch": 4,
+      "status": "OOM",
+      "peak_gib": [
+        20.88252019882202
+      ]
+    }
+  ]
+}

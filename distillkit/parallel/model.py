@@ -43,11 +43,20 @@ LOG = logging.getLogger(__name__)
 __all__ = ["shard_model", "sharded_parameter_report", "sync_replicated_gradients"]
 
 
-def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.Module:
+def shard_model(model: nn.Module, devices, home: str | int | None = None,
+                shard_embeddings: bool = True) -> nn.Module:
     """Replace every shardable submodule in place. Returns the same model.
 
     ``devices`` are the cards to split across; the first is home, where the residual
     stream stays.
+
+    ``shard_embeddings=False`` keeps the tied embedding and head whole on home. Cut
+    Cross-Entropy never forms the logits, which is what makes a 248,320-wide vocabulary
+    affordable at all, and it needs the whole head to do that; a vocabulary-parallel loss
+    has to form them. CCE does ship ``VocabParallelOptions``, but it wants a
+    ``torch.distributed`` process group, and this design has neither -- NCCL is absent
+    from this wheel and both cards are in one process. So a run whose loss is CCE passes
+    False here and keeps 1.42 GiB on home rather than losing the chunked head.
     """
     resolved = [torch.device(d) for d in devices]
     if hasattr(model, "_distillkit_tp_devices"):
@@ -71,17 +80,27 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
     # The outer model stays on the home card: both layer norms per layer, the final
     # norm and rotary. The tied embedding/head is then split by rows across all cards.
     model.to(home_device)
-    _shard_tied_embeddings(model, base, resolved)
+    if shard_embeddings:
+        _shard_tied_embeddings(model, base, resolved)
 
     from distillkit.models.qwen35.tp_gated_delta_module import TensorParallelGatedDeltaNet
+    from distillkit.parallel.latent_attention import (is_latent_attention,
+                                                      shard_latent_attention)
 
-    counts = {"mlp": 0, "full_attention": 0, "linear_attention": 0}
+    counts = {"mlp": 0, "full_attention": 0, "latent_attention": 0,
+              "linear_attention": 0}
     for layer in base.layers:
         layer.mlp = TensorParallelMLP(layer.mlp, resolved)
         counts["mlp"] += 1
         if getattr(layer, "self_attn", None) is not None:
-            layer.self_attn = TensorParallelAttention(layer.self_attn, resolved)
-            counts["full_attention"] += 1
+            if is_latent_attention(layer.self_attn):
+                # MLA compressed the keys and values into a latent every head shares,
+                # so there is no k_proj or v_proj to cut and the split falls elsewhere.
+                shard_latent_attention(layer.self_attn, resolved)
+                counts["latent_attention"] += 1
+            else:
+                layer.self_attn = TensorParallelAttention(layer.self_attn, resolved)
+                counts["full_attention"] += 1
         if getattr(layer, "linear_attn", None) is not None:
             layer.linear_attn = TensorParallelGatedDeltaNet(layer.linear_attn, resolved)
             counts["linear_attention"] += 1
@@ -96,11 +115,12 @@ def shard_model(model: nn.Module, devices, home: str | int | None = None) -> nn.
 
     report = sharded_parameter_report(model)
     LOG.info(
-        "Tensor-parallel across %s: sharded %d MLPs, %d attention, %d gated-delta "
-        "blocks and the tied embedding; %.1f%% of parameters split, %.2f/%.2f GiB per card",
+        "Tensor-parallel across %s: sharded %d MLPs, %d attention, %d latent attention, "
+        "%d gated-delta blocks%s; %.1f%% of parameters split, %.2f/%.2f GiB per card",
         [str(d) for d in resolved], counts["mlp"], counts["full_attention"],
-        counts["linear_attention"], 100 * report["sharded_fraction"],
-        *(report["gib_per_device"] + [0.0])[:2],
+        counts["latent_attention"], counts["linear_attention"],
+        " and the tied embedding" if shard_embeddings else " (embedding kept whole)",
+        100 * report["sharded_fraction"], *(report["gib_per_device"] + [0.0])[:2],
     )
     return model
 

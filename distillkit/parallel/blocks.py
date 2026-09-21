@@ -302,9 +302,20 @@ def shard_decoder_layer(layer: nn.Module, devices) -> bool:
 
     Returns whether the attention was sharded. The linear-attention layers keep their
     module and get only the MLP, until head-sharded GatedDeltaNet lands.
+
+    A latent attention takes the other route. MLA has no `k_proj` or `v_proj` for
+    `TensorParallelAttention` to split -- it compressed them into one latent that every
+    head and every borrowing layer shares -- so it is sharded by its own rules, which
+    replicate that latent and the router rather than cutting them.
     """
+    from distillkit.parallel.latent_attention import (is_latent_attention,
+                                                      shard_latent_attention)
+
     layer.mlp = TensorParallelMLP(layer.mlp, devices)
     if hasattr(layer, "self_attn") and layer.self_attn is not None:
-        layer.self_attn = TensorParallelAttention(layer.self_attn, devices)
+        if is_latent_attention(layer.self_attn):
+            shard_latent_attention(layer.self_attn, devices)
+        else:
+            layer.self_attn = TensorParallelAttention(layer.self_attn, devices)
         return True
     return False
