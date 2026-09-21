@@ -761,8 +761,12 @@ def main() -> int:
             routing = routing_report(model)
             if routing:
                 row["routing"] = routing
-            if evaluation is not None and (step % args.evaluate_every == 0
-                                           or step == steps - 1):
+            # `evaluation` is the dense_gr held-out and stays None under a teacher cache,
+            # which evaluates on the capture's own eval split instead. Testing it alone
+            # silently skipped every evaluation of the first two distillation arms.
+            if ((evaluation is not None or teacher is not None)
+                    and args.evaluate_every
+                    and (step % args.evaluate_every == 0 or step == steps - 1)):
                 row["heldout"] = evaluate()
                 row["heldout_per_original_token"] = row["heldout"] * inflation
             if args.probe_every and (step % args.probe_every == 0 or step == steps - 1):
