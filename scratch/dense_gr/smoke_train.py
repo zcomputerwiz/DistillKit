@@ -627,6 +627,8 @@ def main() -> int:
     if args.tensor_parallel:
         from distillkit.parallel.checkpoint import consolidated_state_dict
         from distillkit.parallel.model import shard_model
+        from distillkit.parallel.sync import (replicated_parameter_groups,
+                                              sync_replicated_gradients)
 
         if torch.cuda.device_count() < 2:
             raise SystemExit("--tensor-parallel needs two CUDA devices")
@@ -692,6 +694,28 @@ def main() -> int:
     if args.passes is not None:
         args.tokens = int(args.passes * (teacher.tokens if teacher is not None
                                          else stream.shape[0]))
+    # Clipping has to count a replicated parameter once rather than once per rank, or
+    # the norm it measures is inflated by the replicas and every gradient is scaled down
+    # for it. `distillkit.parallel.sync.clip_grad_norm` does this for a whole module;
+    # the sparse stage clips two disjoint parameter lists separately, so the same rule
+    # is applied per list here and the replicas are refreshed from their primary after.
+    if args.tensor_parallel:
+        _groups = list(replicated_parameter_groups(model))
+        _duplicates = {id(p) for group in _groups for p in group[1:]}
+
+        def clip(parameters, max_norm):
+            total = torch.nn.utils.clip_grad_norm_(
+                [p for p in parameters if id(p) not in _duplicates], max_norm)
+            for group in _groups:
+                if group[0].grad is not None:
+                    for replica in group[1:]:
+                        replica.grad.copy_(
+                            group[0].grad.to(replica.device, non_blocking=True))
+            return total
+    else:
+        def clip(parameters, max_norm):
+            return torch.nn.utils.clip_grad_norm_(parameters, max_norm)
+
     if teacher is not None:
         # Documents are what a step is made of here and they are not all one length, so
         # the budget cannot be divided out in advance. `window` becomes the average a
@@ -819,8 +843,17 @@ def main() -> int:
                 continue
             part.backward()
             loss = loss + part.detach()
+        if args.tensor_parallel:
+            # A replicated parameter sees only its own rank's share of the loss, so each
+            # copy holds a partial gradient and summing them is what makes the replica
+            # equivalent to the unsharded parameter. Omitting this does not raise: the
+            # norms simply train on a fraction. Measured on the sharded GatedDeltaNet in
+            # isolation, `norm.weight` comes out 44% away from the unsharded gradient
+            # without it and inside 1e-6 with it, every other parameter matching either
+            # way. The first tensor-parallel run here was trained without it.
+            sync_replicated_gradients(model)
         if sparse_stage is None:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+            clip(model.parameters(), 1.0)
         else:
             # Separately, because the two objectives reach disjoint parameters and a
             # single norm would put them back together: the indexer's KL is an order of
@@ -828,10 +861,8 @@ def main() -> int:
             # model to one norm would scale the language model's gradient by how well the
             # router happened to be doing. That is the coupling the isolation removes.
             held = {id(p) for _, p in router_parameters(model)}
-            torch.nn.utils.clip_grad_norm_(
-                [p for p in model.parameters() if id(p) not in held], 1.0)
-            torch.nn.utils.clip_grad_norm_(
-                [p for _, p in router_parameters(model)], 1.0)
+            clip([p for p in model.parameters() if id(p) not in held], 1.0)
+            clip([p for _, p in router_parameters(model)], 1.0)
         if step < args.warmup:
             # Adam's first step moves every parameter by `lr` whatever its gradient was:
             # the bias correction divides the first moment by the square root of the

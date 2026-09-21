@@ -142,3 +142,53 @@ def test_sharded_output_matches_across_two_cards():
 
     torch.testing.assert_close(out, reference, rtol=2e-3, atol=2e-4)
     torch.testing.assert_close(sharded_x.grad, reference_x.grad, rtol=2e-3, atol=2e-4)
+
+
+def test_parameter_gradients_need_the_replica_sync_to_match_the_stock_module():
+    """The parameters the optimizer moves, not just the gradient flowing back to the input.
+
+    The test above compares `x.grad`, which is correct whether or not the replicated
+    norm was reduced -- the input gradient does not pass through it. The norm's own
+    gradient does, and each rank holds only its share until they are summed. Omitting
+    the sum does not raise; the norm trains on a fraction of its gradient, and a run
+    that forgets it converges to a worse model while reporting a falling loss.
+
+    Measured here rather than asserted qualitatively: without the reduction the norm is
+    44% away from the unsharded gradient and every other parameter is inside 1e-6, so
+    the failure is specific rather than a general drift.
+    """
+    torch.manual_seed(0)
+    x = torch.randn(2, 8, 32)
+
+    source = _linear_attention_module()
+    source(x).square().sum().backward()
+    reference = {name: p.grad.detach().clone()
+                 for name, p in source.named_parameters() if p.grad is not None}
+
+    def sharded_gradients(reduce):
+        holder = torch.nn.Module()
+        holder.add_module("m", TensorParallelGatedDeltaNet(
+            _linear_attention_module(), ["cpu", "cpu"]))
+        holder.m(x.clone()).square().sum().backward()
+        if reduce:
+            assert sync_replicated_gradients(holder) == 1
+        return {name: p.grad for name, p in holder.named_parameters()}
+
+    # The norm is the replicated one; its two copies are `m.norm.0` and `m.norm.1`.
+    for reduce, expected in ((False, False), (True, True)):
+        grads = sharded_gradients(reduce)
+        got = grads["m.norm.0.weight"]
+        want = reference["norm.weight"]
+        close = torch.allclose(got, want, rtol=1e-5, atol=1e-6)
+        assert close is expected, (
+            "norm gradient %s the unsharded one with reduce=%s"
+            % ("matches" if close else "does not match", reduce))
+
+    # Everything that is genuinely split is already right without the reduction, which
+    # is what makes the norm the whole of the bug rather than a symptom of a wider one.
+    grads = sharded_gradients(False)
+    for name in ("in_proj_z", "in_proj_a", "in_proj_b"):
+        merged = torch.cat([grads["m.%s.0.weight" % name],
+                            grads["m.%s.1.weight" % name]], dim=0)
+        torch.testing.assert_close(merged, reference[name + ".weight"],
+                                   rtol=2e-4, atol=2e-6)
