@@ -347,10 +347,11 @@ def main() -> int:
                      "%.4f" % row["heldout"] if "heldout" in row else "-",
                      "%+.5f" % row["content_delta"] if "content_delta" in row else "-",
                      row["tokens_per_second"]), flush=True)
-            row["shared_delta_gib"] = spill.drift()
+            row.update(spill.report())
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
+    spill.stop()
     report = {
         "arm": args.arm, "seed": args.seed, "vocab": args.vocab, "beta": args.beta,
         "architecture": {"ratio": args.ratio, "blend": args.blend,
@@ -372,7 +373,7 @@ def main() -> int:
         "final_loss": history[-1]["loss"], "final_heldout": history[-1].get("heldout"),
         "final_heldout_per_original_token": history[-1].get("heldout_per_original_token"),
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
-        "shared_delta_gib": spill.stop(),
+        **spill.report(),
         "setup_seconds": train_started - started, "history": history,
     }
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

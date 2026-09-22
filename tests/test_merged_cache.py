@@ -213,9 +213,8 @@ def test_grouping_cannot_truncate_an_answer_the_filter_admitted(tmp_path):
 
     groups = teacher._groups(2)
     survivors = {doc for group, _ in groups for doc in group}
-    assert "late" not in survivors, (
-        "a document kept its place in a group that truncates its answer away")
-    assert teacher.dropped_truncated_answer == 1
+    assert survivors == {"early", "late"}
+    assert teacher.dropped_truncated_answer == 0
 
     for group, width in groups:
         for doc_id in group:
@@ -231,9 +230,31 @@ def test_planned_tokens_counts_what_grouping_keeps(tmp_path):
     teacher = CachedTeacher(path, "train", device="cpu")
 
     planned = teacher.planned_tokens(4)
-    assert planned == sum(len(g) * w for g, w in teacher._groups(4))
-    # Groups are cut to their shortest member, so the plan is never the whole cache.
-    assert planned < teacher.tokens
+    assert planned == sum(len(g) * (w - 1) for g, w in teacher._groups(4))
+    assert planned == teacher.tokens - len(tokens)
+
+
+@pytest.mark.parametrize("minimum", [0, 2])
+def test_prefixes_filtering_and_targets_are_independent_of_batching(tmp_path, minimum):
+    from teacher_kl import CachedTeacher
+
+    tokens = {"a": _doc(2, 11), "b": _doc(9, 5), "c": _doc(10, 6),
+              "d": _doc(1, 5), "e": _doc(15, 8)}
+    teacher = CachedTeacher(write(tmp_path / "cache", list(tokens), tokens=tokens),
+                            device="cpu", answer_marker=MARKER, min_answer_tokens=minimum)
+    reference = None
+    for rows, budget in ((1, None), (2, None), (6, None), (1, 48)):
+        groups = teacher._groups(rows, 8, budget)
+        prefixes = {doc: width for group, width in groups for doc in group}
+        assert len(prefixes) == sum(len(group) for group, _ in groups)
+        reference = prefixes if reference is None else reference
+        assert prefixes == reference
+        assert teacher.planned_tokens(rows, 8, budget) == sum(w - 1 for w in reference.values())
+        assert teacher.shapes(rows, 8, budget) == sorted({(len(g), w) for g, w in groups})
+        for group, width in groups:
+            if minimum:
+                assert all(teacher._kept_answer(d, width) >= minimum for d in group)
+    teacher.close()
 
 
 def test_the_held_out_sample_covers_every_capture(tmp_path):
@@ -254,6 +275,17 @@ def test_the_held_out_sample_covers_every_capture(tmp_path):
     flipped = CachedTeacher([two, one], "eval", device="cpu")
     assert ({doc for _, doc in teacher.stratified(10)}
             == {doc for _, doc in flipped.stratified(10)})
+
+
+def test_stratified_sample_fills_rounding_shortfall():
+    from teacher_kl import CachedTeacher
+
+    teacher = CachedTeacher.__new__(CachedTeacher)
+    teacher.sources = lambda: {s: [s + str(i) for i in range(4)] for s in ("a", "b", "c")}
+    picked = teacher.stratified(4)
+    assert len(picked) == len({doc for _, doc in picked}) == 4
+    assert {source for source, _ in picked} == {"a", "b", "c"}
+    assert len(teacher.stratified(100)) == 12
 
 
 def test_splitting_a_step_into_microbatches_does_not_change_the_gradient(tmp_path):

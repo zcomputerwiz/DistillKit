@@ -51,10 +51,12 @@ from copy_probe import copy_probe, format_probe  # noqa: E402
 from cut_cross_entropy import linear_cross_entropy  # noqa: E402
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
 from distillkit.models.qwen35.csa2 import (dense_routing,  # noqa: E402
-                                           isolated_indexer, recorded_attention,
                                            routing_report, router_parameters)
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
+from training_step import backward_step, check_optimizer, optimizer_step, synchronize  # noqa: E402
+from training_state import (PlannedBatches, WindowBatches, read_training_state,  # noqa: E402
+                            restore_training_state, save_training_state, take_step)
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
 STORE = Path("scratch/code_training/tokens-v2")
@@ -124,7 +126,7 @@ def _refuse_mismatched_architecture(source: Path, config) -> None:
                 % (source, key, have, want))
 
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--vocab", type=int, default=16_384)
     parser.add_argument("--hidden", type=int, default=512)
@@ -144,9 +146,9 @@ def main() -> int:
     parser.add_argument("--batch", type=int, default=64)
     parser.add_argument("--length", type=int, default=1024)
     parser.add_argument("--accumulate", type=int, default=1,
-                        help="micro-batches per optimizer step; the effective batch "
-                             "stays --batch, so a blend comparison compares blend "
-                             "and not batch size")
+                        help="micro-batches per optimizer step; fixed-window sampling "
+                             "keeps --batch rows per step, while cached documents use "
+                             "--micro-batch or --micro-tokens per forward")
     parser.add_argument("--tokens", type=int, default=30_000_000,
                         help="scored tokens; one pass over the v1 store is 30.7M")
     parser.add_argument("--passes", type=float, default=None,
@@ -177,9 +179,8 @@ def main() -> int:
     parser.add_argument("--tensor-parallel", action="store_true",
                         help="split the body across both cards. The embedding and head "
                              "stay whole on home, because Cut Cross-Entropy never forms "
-                             "the logits and needs them that way. Measured on this model: "
-                             "micro-batch 6 at 3,090 tokens per second against one card's "
-                             "best of 2,308 at micro-batch 3.")
+                             "the logits and needs them that way. Measure the current "
+                             "training objective with tp_bench.py before sizing batches.")
     parser.add_argument("--micro-tokens", type=int, default=0, metavar="N",
                         help="tokens per forward, which is the better unit than documents: "
                              "memory follows tokens and this corpus runs 134 to 1024 of "
@@ -273,6 +274,13 @@ def main() -> int:
                         default=Path("scratch/dense_gr/checkpoints-smoke"),
                         help="root for the end-of-run checkpoint")
     parser.add_argument("--no-checkpoint", action="store_true")
+    parser.add_argument("--resume", type=Path, help="resume a complete training-state directory")
+    parser.add_argument("--save-every", type=int, default=0,
+                        help="save resumable state every N optimizer steps (0: final only)")
+    parser.add_argument("--max-steps", type=int, default=None,
+                        help="additional hard limit on total optimizer steps")
+    parser.add_argument("--benchmark-warmup-steps", type=int, default=0,
+                        help="exclude this many real optimizer steps from step timing")
     parser.add_argument("--init-from", type=Path, default=None,
                         help="start from this checkpoint instead of a fresh "
                              "initialization. Its architecture must match the one the "
@@ -319,7 +327,36 @@ def main() -> int:
                              "a recipient at blend 0.")
     parser.add_argument("--output", type=Path,
                         default=Path("scratch/dense_gr/smoke-train.json"))
-    args = parser.parse_args()
+    argv = sys.argv[1:] if argv is None else argv
+    args = parser.parse_args(argv)
+    resume_state = read_training_state(args.resume) if args.resume else None
+    if resume_state is not None:
+        explicit = {arg.split("=")[0] for arg in argv if arg.startswith("--")}
+        mutable = {"resume", "output", "checkpoints", "tokens", "passes", "max_steps", "save_every"}
+        for action in parser._actions:
+            key = action.dest
+            if key not in resume_state["run_args"]:
+                continue
+            value = resume_state["run_args"][key]
+            if action.type is Path and value is not None:
+                value = [Path(v) for v in value] if isinstance(value, list) else Path(value)
+            supplied = any(option in explicit for option in action.option_strings)
+            if supplied and key not in mutable and getattr(args, key) != value:
+                raise SystemExit("resume cannot change --" + key.replace("_", "-"))
+            if not supplied:
+                setattr(args, key, value)
+        if "--tokens" in explicit and "--passes" not in explicit:
+            args.passes = None
+        if "--output" not in explicit or "--checkpoints" not in explicit:
+            raise SystemExit("resume needs fresh --output and --checkpoints paths")
+    if (args.tokens < 1 or args.length < 2 or args.micro_batch < 1 or args.micro_tokens < 0
+            or args.save_every < 0 or args.report_every < 1 or args.evaluate_windows < 1
+            or args.benchmark_warmup_steps < 0
+            or (args.max_steps is not None and args.max_steps < 1)
+            or (args.passes is not None and args.passes <= 0)):
+        raise SystemExit("budgets, lengths and reporting counts must be positive")
+    if args.no_checkpoint and args.save_every:
+        raise SystemExit("--no-checkpoint conflicts with --save-every")
     inherited = None
     if args.inherit:
         if args.init_from is None:
@@ -363,13 +400,18 @@ def main() -> int:
         variant += "-converted-asym" if args.asymmetric else "-converted"
     if args.output == Path("scratch/dense_gr/smoke-train.json"):
         args.output = Path("scratch/dense_gr/smoke-train-%s.json" % variant)
+    if args.output.exists():
+        raise SystemExit("refusing to overwrite existing report: %s" % args.output)
+    target = args.checkpoints / ("smoke-%s" % variant)
+    if not args.no_checkpoint and target.exists():
+        raise SystemExit("refusing to overwrite existing checkpoint: %s" % target)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.accumulate < 1 or args.batch % args.accumulate:
-        # `chunk` splits unevenly when it does not divide, and the loop divides every
-        # micro-batch's mean by the same `accumulate` -- so an uneven split silently
-        # weights some tokens more than others and the reported loss is not the batch's.
-        raise SystemExit("--batch %d is not divisible by --accumulate %d; the micro-"
-                         "batches would be uneven and the loss would be mis-weighted"
+    if args.accumulate < 1 or args.batch < 1:
+        raise SystemExit("--batch and --accumulate must be positive")
+    if not args.teacher_cache and args.batch % args.accumulate:
+        # Fixed-window sampling uses an integer row count. Cached-document batches
+        # have their own plan and are weighted by their actual supervised targets.
+        raise SystemExit("--batch %d is not divisible by --accumulate %d for fixed windows"
                          % (args.batch, args.accumulate))
     store = args.store
 
@@ -590,17 +632,18 @@ def main() -> int:
             evaluate.by_source = {name: total_nll / max(tokens, 1)
                                   for name, (total_nll, tokens) in by_source.items()}
             return total / max(scored, 1)
-        total, batches = 0.0, 0
+        total, scored = 0.0, 0
         for start in range(0, evaluation.shape[0], args.batch):
             chunk = evaluation[start:start + args.batch].to("cuda")
             state = model.model(input_ids=chunk,
                                 attention_mask=torch.ones_like(chunk),
                                 use_cache=False).last_hidden_state
+            count = chunk.numel() - chunk.shape[0]
             total += float(linear_cross_entropy(state, model.lm_head.weight, chunk,
-                                                shift=1, reduction="mean"))
-            batches += 1
+                                                shift=1, reduction="mean")) * count
+            scored += count
         model.train()
-        return total / max(batches, 1)
+        return total / max(scored, 1)
 
     # Nats per *original* token, so vocabularies are comparable: a cut that expands more
     # tokens is charged for the expansion rather than rewarded with an easier softmax. A
@@ -609,8 +652,7 @@ def main() -> int:
 
     teacher = None
     if args.teacher_cache is not None:
-        from teacher_kl import (CachedTeacher, accumulation_shares,  # noqa: F401
-                                grouped_tail_kl, scored_mask)
+        from teacher_kl import CachedTeacher
 
         if kept is not None:
             raise SystemExit(
@@ -634,7 +676,9 @@ def main() -> int:
                               teacher.top_k, args.teacher_weight), flush=True)
         print("held-out: %d documents, %d tokens from the capture's own eval split"
               % (len(held_teacher), held_teacher.tokens), flush=True)
-        held_sample = held_teacher.stratified(args.evaluate_windows)
+        if args.evaluate_every and not len(held_teacher):
+            raise SystemExit("no held-out documents survive evaluation filtering")
+        held_sample = held_teacher.stratified(args.evaluate_windows) if len(held_teacher) else []
         spread = {}
         for source, _ in held_sample:
             spread[source] = spread.get(source, 0) + 1
@@ -650,8 +694,6 @@ def main() -> int:
     if args.tensor_parallel:
         from distillkit.parallel.checkpoint import consolidated_state_dict
         from distillkit.parallel.model import shard_model
-        from distillkit.parallel.sync import (replicated_parameter_groups,
-                                              sync_replicated_gradients)
 
         if torch.cuda.device_count() < 2:
             raise SystemExit("--tensor-parallel needs two CUDA devices")
@@ -677,294 +719,108 @@ def main() -> int:
             "updated: %s" % (len(stranded), ", ".join(stranded[:6])))
     print("optimizer: %d tensors, %.1fM parameters"
           % (len(trainable), sum(p.numel() for p in trainable) / 1e6), flush=True)
-
-    if args.tensor_parallel:
-        # Triton's autotuner keeps what it is benchmarking on the instance, and autograd
-        # gives each device its own backward thread, so a cold autotune under sharding
-        # has one thread clearing `nargs` while the other is still reading it. Every
-        # shape the run will use has to be warmed single-threaded before training, which
-        # means the set of shapes has to be finite and known.
-        #
-        # The shapes are taken from the iterator the run will actually draw from, not
-        # from one of them. `grouped` floors its widths to the block size, which is what
-        # makes the list short; `epochs` hands over each document at its own length, so
-        # its shape set is as large as the corpus has distinct lengths and cannot be
-        # warmed. That path is refused here rather than left to race.
-        if teacher is not None and not (args.micro_tokens or args.micro_batch > 1):
-            raise SystemExit(
-                "--tensor-parallel needs --micro-tokens or --micro-batch above 1: "
-                "without them each forward is one document at its own length, which is "
-                "a fresh Triton autotune per distinct length and the race the warm-up "
-                "exists to avoid. Those options group documents to block-rounded widths, "
-                "which is what makes the shape set finite.")
-        if teacher is not None:
-            # The observed `(rows, width)` of the planned batches, not a row count
-            # recomputed from the budget: remainder groups are smaller than a full one
-            # and are their own shape.
-            shapes = teacher.shapes(args.micro_batch, model.config.csa2_block_size,
-                                    args.micro_tokens or None)
-        else:
-            # Fixed windows: one shape for the whole run, and it was getting no warm-up
-            # at all because the warm-up sat behind the teacher cache.
-            shapes = [(max(1, args.batch // args.accumulate), args.length)]
-        if shapes:
-            print("warming %d shapes: %s" % (len(shapes), shapes), flush=True)
-            torch.autograd.set_multithreading_enabled(False)
-            try:
-                for rows, width in shapes:
-                    # The same row count training will use at this width, because the
-                    # autotuner keys on the whole shape and a warm-up at the wrong number
-                    # of rows warms a kernel the run never calls.
-                    probe = torch.randint(1, model.config.vocab_size,
-                                          (rows, width), device="cuda")
-                    state = model.model(input_ids=probe,
-                                        attention_mask=torch.ones_like(probe),
-                                        use_cache=False).last_hidden_state
-                    linear_cross_entropy(state, model.lm_head.weight, probe, shift=1,
-                                         reduction="mean").backward()
-                    del state, probe
-                    # Between shapes, not after all of them: each backward allocates the
-                    # head's gradient, 970 MiB at this vocabulary, and eight of those
-                    # accumulated runs the card out before the largest shape is reached.
-                    model.zero_grad(set_to_none=True)
-                    torch.cuda.empty_cache()
-            finally:
-                torch.autograd.set_multithreading_enabled(True)
-                model.zero_grad(set_to_none=True)
-                torch.cuda.synchronize()
-                torch.cuda.empty_cache()
-            print("warmed", flush=True)
+    check_optimizer(model, optimizer)
 
     sparse_stage = None
     if args.sparse_stage:
-        from indexer_kl import indexer_loss, routing_layers, watch  # noqa: F401
+        from indexer_kl import routing_layers
 
         sparse_stage = routing_layers(model)
         if not sparse_stage:
-            raise SystemExit("--sparse-stage needs a model with an indexer to align")
+            raise SystemExit("--sparse-stage needs routing layers")
         if getattr(model.config, "csa2_router_bias", True):
-            # With the fold still in place the indexer's score is a term in the logits,
-            # so the language-modeling loss has an opinion about it and the isolation
-            # cannot hold. Measured: warming an indexer in that state moves held-out the
-            # wrong way.
-            print("warning: csa2_router_bias is on, so the indexer's score still reaches "
-                  "the attention logits and the two objectives are not disjoint",
-                  flush=True)
-        print("sparse stage: %d routing layers aligned, indexer weight %.2f"
-              % (len(sparse_stage), args.indexer_weight), flush=True)
-
-    window = args.batch * args.length
-    # `--passes` is resolved after the batching plan below, not here: grouping decides
-    # how much of the cache a pass actually covers, and sizing the budget off the cache
-    # would count tokens the plan trims away.
-    # Clipping has to count a replicated parameter once rather than once per rank, or
-    # the norm it measures is inflated by the replicas and every gradient is scaled down
-    # for it. `distillkit.parallel.sync.clip_grad_norm` does this for a whole module;
-    # the sparse stage clips two disjoint parameter lists separately, so the same rule
-    # is applied per list here and the replicas are refreshed from their primary after.
-    if args.tensor_parallel:
-        _groups = list(replicated_parameter_groups(model))
-        _duplicates = {id(p) for group in _groups for p in group[1:]}
-
-        def clip(parameters, max_norm):
-            total = torch.nn.utils.clip_grad_norm_(
-                [p for p in parameters if id(p) not in _duplicates], max_norm)
-            for group in _groups:
-                if group[0].grad is not None:
-                    for replica in group[1:]:
-                        replica.grad.copy_(
-                            group[0].grad.to(replica.device, non_blocking=True))
-            return total
-    else:
-        def clip(parameters, max_norm):
-            return torch.nn.utils.clip_grad_norm_(parameters, max_norm)
+            raise SystemExit("joint sparse training requires selection-only routing")
 
     if teacher is not None:
-        # Documents are what a step is made of here and they are not all one length, so
-        # the budget cannot be divided out in advance. `window` becomes the average a
-        # step is expected to score, used only to pick a step count; the loop counts the
-        # tokens it actually scored and reports those.
-        if args.micro_tokens or args.micro_batch > 1:
-            block = model.config.csa2_block_size
-            budget = args.micro_tokens or None
-            groups = teacher._groups(args.micro_batch, block, budget)
-            per_step = sum(len(g) * w for g, w in groups) / max(len(groups), 1)
-            window = args.accumulate * per_step
-            documents = teacher.grouped(args.micro_batch, block, budget)
-            rows = [len(g) for g, _ in groups]
-            print("batching: %d groups, %d-%d rows, widths %s, %.0f tokens a forward"
-                  % (len(groups), min(rows), max(rows),
-                     sorted({w for _, w in groups}), per_step), flush=True)
-            # A pass is over what grouping keeps, not over what the cache holds: each
-            # group is cut to its shortest member and floored to the block, so sizing
-            # `--passes` off the cache would overstate the budget by the difference.
-            planned = teacher.planned_tokens(args.micro_batch, block, budget)
-            print("plan: %d of %d cached tokens (%.1f%%), %d documents dropped as "
-                  "shorter than a block, %d for losing their answer to the group width"
-                  % (planned, teacher.tokens, 100.0 * planned / max(teacher.tokens, 1),
-                     teacher.dropped_short, teacher.dropped_truncated_answer), flush=True)
-            teacher.tokens = planned
-        else:
-            window = args.accumulate * (teacher.tokens / max(len(teacher), 1))
-            documents = teacher.epochs(None)
+        # One-row and multi-row runs use the same independently fixed prefixes.
+        block = getattr(model.config, "csa2_block_size", None)
+        groups = teacher._groups(args.micro_batch, block, args.micro_tokens or None)
+        if not groups:
+            raise SystemExit("no training documents survive the sample plan")
+        corpus_targets = teacher.planned_tokens(args.micro_batch, block, args.micro_tokens or None)
+        batches = PlannedBatches(teacher, groups, args.seed)
+        shapes = sorted({(len(g), w) for g, w in groups})
+        print("plan: %d documents, %d supervised targets, %d batches, %d shapes; "
+              "dropped %d short and %d without enough answer targets"
+              % (sum(len(g) for g, _ in groups), corpus_targets, len(groups), len(shapes),
+                 teacher.dropped_short, teacher.dropped_truncated_answer), flush=True)
+    else:
+        corpus_targets = len(stream) - 1
+        batches = WindowBatches(stream, args.batch // args.accumulate, args.length, args.seed)
+        shapes = [(args.batch // args.accumulate, args.length)]
     if args.passes is not None:
-        args.tokens = int(args.passes * (teacher.tokens if teacher is not None
-                                         else stream.shape[0]))
-    steps = max(1, int(args.tokens // window))
-    generator = np.random.default_rng(args.seed)
-    history = []
-    torch.cuda.synchronize()
-    train_started = time.perf_counter()
-    # The dense stage runs the whole loop with routing open; nothing inside the loop has
-    # to know, and the evaluation inherits it so the reported loss is the stage's.
+        args.tokens = int(args.passes * corpus_targets)
+    if args.tokens < 1:
+        raise SystemExit("budget contains no supervised targets")
+
+    step_options = dict(teacher_weight=args.teacher_weight if teacher is not None else 0.0,
+                        indexer_weight=args.indexer_weight, sparse_stage=sparse_stage,
+                        kl_chunk=args.kl_chunk)
+    warmup_backward_targets = 0
+    # Warm the actual objective and recorded-attention path, not a CE-only surrogate.
+    if args.tensor_parallel:
+        examples = {}
+        if teacher is not None:
+            for group, width in groups:
+                examples.setdefault((len(group), width), (group, width))
+        print("warming %d objective shapes: %s" % (len(shapes), shapes), flush=True)
+        with torch.autograd.set_multithreading_enabled(False):
+            for rows, width in shapes:
+                if teacher is not None:
+                    group, width = examples[(rows, width)]
+                    record = teacher.read_batch(group, width)
+                else:
+                    record = {"input_ids": torch.randint(1, model.config.vocab_size,
+                                                         (rows, width), device="cuda")}
+                with dense_routing(model) if args.dense_routing else contextlib.nullcontext():
+                    warmed = backward_step(model, [record], **step_options)
+                    warmup_backward_targets += warmed["targets"]
+                model.zero_grad(set_to_none=True)
+                del record
+                synchronize(model)
+                torch.cuda.empty_cache()
+        print("warmed", flush=True)
+
+    history, scored_tokens, step, previous_seconds = [], 0, 0, 0.0
+    step_timings = []
+    if resume_state is not None:
+        progress = restore_training_state(resume_state, model, optimizer, batches)
+        scored_tokens, step = progress["targets"], progress["steps"]
+        history = progress["history"]
+        previous_seconds = progress["seconds"]
+        print("resumed at step %d, %d supervised targets" % (step, scored_tokens), flush=True)
+        del resume_state
+    if scored_tokens >= args.tokens or (args.max_steps is not None and step >= args.max_steps):
+        raise SystemExit("resume budget already exhausted; increase the total target/step limit")
+    run_args = json.loads(json.dumps(vars(args), default=str))
+    synchronize(model)
+    session_started = time.perf_counter()
+    train_started = session_started - previous_seconds
     stage = dense_routing(model) if args.dense_routing else contextlib.nullcontext()
     stage.__enter__()
-    scored_tokens = 0
-    for step in range(steps):
-        if teacher is not None:
-            # One document per micro-batch, at its own length. Nothing is stacked, so
-            # nothing is padded, and the routing each document sees while training is the
-            # routing it would see alone.
-            microbatches = [next(documents) for _ in range(args.accumulate)]
-        else:
-            starts = generator.integers(0, stream.shape[0] - args.length - 1,
-                                        size=args.batch)
-            batch = np.stack([stream[s:s + args.length] for s in starts]).astype(np.int64)
-            tokens = torch.from_numpy(batch).to("cuda", non_blocking=True)
-            microbatches = [{"input_ids": part}
-                            for part in tokens.chunk(args.accumulate)]
-        optimizer.zero_grad(set_to_none=True)
-        # One micro-batch is the ordinary path and stays bitwise what it was. More than
-        # one exists because an active gated residual does not fit otherwise: at blend 0
-        # the route short-circuits, and at blend 1 it materializes the four-branch read
-        # and write, which runs out of 24 GiB at batch 64. Accumulating keeps the
-        # *effective* batch identical across arms, so a blend comparison is a comparison
-        # of blend rather than of batch size.
-        # Weighted by the tokens each micro-batch actually scores, not by how many
-        # micro-batches there are. Every term below is a mean over its own scored
-        # positions, so dividing each by `accumulate` averages means of different
-        # denominators: a 134-token document and a 1024-token one then count the same,
-        # and the gradient depends on where the accumulation boundaries happened to
-        # fall. With `--micro-batch 1` those boundaries are single documents, whose
-        # lengths run 134 to 1024 here, and with `--micro-tokens` the row count varies
-        # with the width. Weighting by each micro-batch's share of the step's scored
-        # tokens makes the step equal to one forward over the same examples.
-        counts, step_tokens = accumulation_shares(
-            [record["input_ids"] for record in microbatches])
-        loss, indexer_cost, teacher_cost = 0.0, 0.0, 0.0
-        for record, count in zip(microbatches, counts):
-            chunk = record["input_ids"]
-            scored_tokens += count
-            share = count / step_tokens
-
-            def distil(hidden):
-                """The teacher's half of the blend, summed over the scored positions.
-
-                Divided by the same count cross entropy averaged over, so the two terms
-                are both nats per token and `--teacher-weight` is a blend rather than a
-                ratio between differently normalised numbers.
-                """
-                mask = scored_mask(chunk.shape[1], chunk.device, chunk.shape[0])
-                total = grouped_tail_kl(hidden, model.lm_head, record["topk_ids"],
-                                        record["topk_logprobs"], mask,
-                                        chunk_length=args.kl_chunk)
-                return total / max(int(mask.sum()), 1)
-
-            if sparse_stage is None:
-                hidden = model.model(input_ids=chunk,
-                                     attention_mask=torch.ones_like(chunk),
-                                     use_cache=False).last_hidden_state
-                part = linear_cross_entropy(hidden, model.lm_head.weight, chunk, shift=1,
-                                            reduction="mean")
-                if teacher is not None:
-                    loss = loss + part.detach() * share
-                    if args.teacher_weight > 0:
-                        carried = distil(hidden)
-                        teacher_cost += float(carried) * share
-                        part = ((1 - args.teacher_weight) * part
-                                + args.teacher_weight * carried)
-                    part = part * share
-                    part.backward()
-                    continue
-                part = part * share
-            else:
-                # One forward serves both losses. The attention is recorded as it is
-                # computed, which is the target, and the selection it was masked by is
-                # what the KL is restricted to -- a sparse attention has no opinion about
-                # positions it did not read.
-                seen, handles = watch(model, sparse_stage)
-                with recorded_attention(model), isolated_indexer(model):
-                    hidden = model.model(input_ids=chunk,
-                                         attention_mask=torch.ones_like(chunk),
-                                         use_cache=False).last_hidden_state
-                    targets = {i: a.last_attention for i, a in sparse_stage}
-                    chosen = {i: a.last_allowed for i, a in sparse_stage}
-                    borrowed = {i: a.bus.require_latent(a.latent_donor, i)
-                                for i, a in sparse_stage}
-                    for handle in handles:
-                        handle.remove()
-                    part = linear_cross_entropy(hidden, model.lm_head.weight, chunk,
-                                                shift=1, reduction="mean")
-                    aligned = indexer_loss(model, sparse_stage, seen, targets, borrowed,
-                                           selected=chosen)
-                    # Inside the recording context, because the head projection this
-                    # walks has to see the same forward the attention was recorded from.
-                    carried = (distil(hidden)
-                               if teacher is not None and args.teacher_weight > 0
-                               else None)
-                # Kept apart in the report as well as in the gradient: summed, the KL is
-                # an order of magnitude larger and the language-modeling loss -- the one
-                # that says whether the model is getting better -- disappears into it.
-                indexer_cost += float(aligned) * share
-                loss = loss + part.detach() * share
-                if carried is not None:
-                    # The blend is between the two terms that share parameters. The
-                    # indexer's KL is added rather than blended in, because it reaches a
-                    # disjoint set and is clipped on its own below: putting it inside the
-                    # blend would make `--teacher-weight` scale the router as well.
-                    teacher_cost += float(carried) * share
-                    part = ((1 - args.teacher_weight) * part
-                            + args.teacher_weight * carried)
-                part = (part + args.indexer_weight * aligned) * share
-                part.backward()
-                continue
-            part.backward()
-            loss = loss + part.detach()
-        if args.tensor_parallel:
-            # A replicated parameter sees only its own rank's share of the loss, so each
-            # copy holds a partial gradient and summing them is what makes the replica
-            # equivalent to the unsharded parameter. Omitting this does not raise: the
-            # norms simply train on a fraction. Measured on the sharded GatedDeltaNet in
-            # isolation, `norm.weight` comes out 44% away from the unsharded gradient
-            # without it and inside 1e-6 with it, every other parameter matching either
-            # way. The first tensor-parallel run here was trained without it.
-            sync_replicated_gradients(model)
-        if sparse_stage is None:
-            clip(model.parameters(), 1.0)
-        else:
-            # Separately, because the two objectives reach disjoint parameters and a
-            # single norm would put them back together: the indexer's KL is an order of
-            # magnitude larger than the language-modeling loss here, so clipping the whole
-            # model to one norm would scale the language model's gradient by how well the
-            # router happened to be doing. That is the coupling the isolation removes.
-            held = {id(p) for _, p in router_parameters(model)}
-            clip([p for p in model.parameters() if id(p) not in held], 1.0)
-            clip([p for _, p in router_parameters(model)], 1.0)
-        if step < args.warmup:
-            # Adam's first step moves every parameter by `lr` whatever its gradient was:
-            # the bias correction divides the first moment by the square root of the
-            # first second moment, which is the same number. From a random
-            # initialization that costs nothing. From a converted one it is destructive --
-            # `kv_a_norm.weight` is exactly 0, `index_gate` exactly 1, and the residual
-            # route's gains were set for a bitwise-exact conversion, so one uniform step
-            # of 1e-4 across 119M parameters took the 2B from 1.50 to 14.97 held-out and
-            # cost about a thousand steps to climb back out of.
-            for group in optimizer.param_groups:
-                group["lr"] = args.lr * (step + 1) / max(args.warmup, 1)
-        elif step == args.warmup:
-            for group in optimizer.param_groups:
-                group["lr"] = args.lr
-        optimizer.step()
+    while scored_tokens < args.tokens and (args.max_steps is None or step < args.max_steps):
+        microbatches = take_step(batches, args.accumulate, args.tokens - scored_tokens)
+        if not microbatches:
+            break
+        for group in optimizer.param_groups:
+            group["lr"] = (args.lr * (step + 1) / args.warmup
+                           if step < args.warmup else args.lr)
+        if step == args.benchmark_warmup_steps:
+            for device in {p.device for p in model.parameters() if p.is_cuda}:
+                torch.cuda.reset_peak_memory_stats(device)
+        synchronize(model)
+        step_started = time.perf_counter()
+        metrics = optimizer_step(model, optimizer, microbatches,
+                                 tensor_parallel=args.tensor_parallel, **step_options)
+        synchronize(model)
+        step_seconds = time.perf_counter() - step_started
+        if step >= args.benchmark_warmup_steps:
+            step_timings.append({"seconds": step_seconds, "targets": metrics["targets"]})
+        scored_tokens += metrics["targets"]
+        loss, teacher_cost, indexer_cost = metrics["loss"], metrics["teacher_kl"], metrics["indexer"]
+        finished = (args.tokens - scored_tokens < batches.next_targets()
+                    or (args.max_steps is not None and step + 1 >= args.max_steps))
+        del microbatches
         if spill.breached():
             # Set by the watcher thread the moment a poll exceeded the tolerance, so the
             # step this stops on is the first one after the breach rather than the next
@@ -975,13 +831,12 @@ def main() -> int:
                  "step": step, "history": history}, indent=2), encoding="utf-8")
             raise SystemExit("spilled %.2f GiB into system RAM at step %d; stopping"
                              % (spill.tripped_at, step))
-        if step % args.report_every == 0 or step == steps - 1:
-            torch.cuda.synchronize()
+        if step % args.report_every == 0 or finished:
+            synchronize(model)
             elapsed = time.perf_counter() - train_started
-            # Counted rather than multiplied out: documents are not all one length, so
-            # `window` is an expectation used to pick a step count and nothing else.
-            corpus = teacher.tokens if teacher is not None else stream.shape[0]
-            seen = scored_tokens if teacher is not None else (step + 1) * window
+            # Report supervised targets, never input-token estimates.
+            corpus = corpus_targets
+            seen = scored_tokens
             row = {"step": step, "tokens": seen, "passes": seen / corpus,
                    "loss": float(loss), "loss_per_original_token": float(loss) * inflation,
                    "tokens_per_second": seen / elapsed}
@@ -1000,7 +855,7 @@ def main() -> int:
             # silently skipped every evaluation of the first two distillation arms.
             if ((evaluation is not None or teacher is not None)
                     and args.evaluate_every
-                    and (step % args.evaluate_every == 0 or step == steps - 1)):
+                    and (step % args.evaluate_every == 0 or finished)):
                 row["heldout"] = evaluate()
                 row["heldout_per_original_token"] = row["heldout"] * inflation
                 if getattr(evaluate, "by_source", None):
@@ -1010,7 +865,7 @@ def main() -> int:
                             "%s %.4f" % (Path(name).name, value)
                             for name, value in sorted(evaluate.by_source.items())),
                             flush=True)
-            if args.probe_every and (step % args.probe_every == 0 or step == steps - 1):
+            if args.probe_every and (step % args.probe_every == 0 or finished):
                 row["copy"] = copy_probe(model, args.vocab, half=args.probe_half,
                                          windows=args.probe_windows, batch=args.batch)
             history.append(row)
@@ -1031,7 +886,7 @@ def main() -> int:
             # raising OOM, so a spilled run keeps reporting 100% GPU utilization while
             # throughput collapses. Stop on it rather than discovering it in the summary
             # of a run that has already burned hours.
-            row["shared_delta_gib"] = spill.drift()
+            row.update(spill.report())
             # Loss alone cannot tell a router that learned to route from one that
             # collapsed onto the blocks the local window opens for free.
             if routing:
@@ -1041,11 +896,23 @@ def main() -> int:
                                                   r["entropy"]) for r in routing),
                       flush=True)
 
+        step += 1
+        if args.save_every and step % args.save_every == 0:
+            save_training_state(args.checkpoints / ("state-step-%08d" % step),
+                                model, optimizer, batches,
+                                dict(steps=step, targets=scored_tokens, history=history,
+                                     seconds=time.perf_counter() - train_started), run_args)
+        if finished:
+            break
+
     stage.__exit__(None, None, None)
-    torch.cuda.synchronize()
+    synchronize(model)
+    steps = step
+    if not history:
+        raise SystemExit("budget is too small for the next complete microbatch")
     # Documents vary in length under a teacher cache, so the budget is what the loop
     # actually scored rather than the step count times an expected window.
-    total_scored = scored_tokens if teacher is not None else steps * window
+    total_scored = scored_tokens
     elapsed = time.perf_counter() - train_started
     spilled = spill.stop()
     report = {
@@ -1081,6 +948,16 @@ def main() -> int:
         "batch": args.batch, "length": args.length, "steps": steps,
         "accumulate": args.accumulate,
         "scored_tokens": total_scored,
+        "requested_targets": args.tokens, "unused_target_budget": args.tokens - total_scored,
+        "corpus_scored_targets": corpus_targets,
+        "step_measurements": step_timings,
+        "warmup_backward_targets": warmup_backward_targets,
+        "measured_step_tokens_per_second": (sum(r["targets"] for r in step_timings)
+                                            / sum(r["seconds"] for r in step_timings)
+                                            if step_timings else None),
+        "peak_allocated_gib_by_device": {
+            str(d): torch.cuda.max_memory_allocated(d) / 2 ** 30
+            for d in {p.device for p in model.parameters() if p.is_cuda}},
         "seconds": elapsed, "tokens_per_second": total_scored / elapsed,
         "first_loss": history[0]["loss"], "final_loss": history[-1]["loss"],
         "inflation": inflation,
@@ -1093,9 +970,11 @@ def main() -> int:
         "passes": history[-1]["passes"],
         "peak_allocated_gib": torch.cuda.max_memory_allocated() / 2 ** 30,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
-        "shared_delta_gib": spilled, "spilled": bool(spilled > 0.25),
-        "setup_seconds": train_started - started,
+        **spill.report(),
+        "setup_seconds": session_started - started,
         "history": history,
+        "run_args": run_args,
+        "heldout_sample": held_sample if teacher is not None else None,
     }
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
@@ -1121,6 +1000,9 @@ def main() -> int:
         state = consolidated_state_dict(model) if args.tensor_parallel else None
         model.save_pretrained(target, safe_serialization=True, state_dict=state)
         tokenizer.save_pretrained(target)
+        save_training_state(target / "training-state", model, optimizer, batches,
+                            dict(steps=steps, targets=scored_tokens, history=history,
+                                 seconds=elapsed), run_args)
         (target / "milestone.json").write_text(json.dumps({
             "variant": variant, "seed": args.seed,
             "architecture": report["architecture"],
@@ -1135,9 +1017,11 @@ def main() -> int:
         print("CHECKPOINT %s: %d tokens, %d steps, loss %.4f"
               % (target.name, total_scored, steps, report["final_loss"]),
               flush=True)
-    print("\nloss %.4f -> %.4f over %d tokens at %.0f tok/s, peak %.2f GiB, spill %+.2f GiB"
+    spill_text = ("%+.2f GiB" % spilled if report["spill_telemetry_valid"]
+                  else "unknown (incomplete telemetry)")
+    print("\nloss %.4f -> %.4f over %d tokens at %.0f tok/s, peak %.2f GiB, spill %s"
           % (report["first_loss"], report["final_loss"], report["scored_tokens"],
-             report["tokens_per_second"], report["peak_reserved_gib"], spilled),
+             report["tokens_per_second"], report["peak_reserved_gib"], spill_text),
           flush=True)
     print("wrote %s" % args.output)
     return 0

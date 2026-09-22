@@ -247,7 +247,7 @@ def main() -> int:
                      row["tokens_per_second"]), flush=True)
             if "copy" in row:
                 print("            %s" % format_probe(row["copy"]), flush=True)
-            row["shared_delta_gib"] = spill.drift()
+            row.update(spill.report())
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
@@ -261,6 +261,7 @@ def main() -> int:
     for name, result in endpoint.items():
         print("endpoint %-12s %s" % (name, format_probe(result)), flush=True)
 
+    spill.stop()
     report = {
         "arm": args.arm, "seed": args.seed, "vocab": args.vocab,
         "architecture": {"ratio": args.ratio, "blend": args.blend,
@@ -283,7 +284,7 @@ def main() -> int:
             "heldout_per_original_token"),
         "endpoint": endpoint,
         "peak_reserved_gib": torch.cuda.max_memory_reserved() / 2 ** 30,
-        "shared_delta_gib": spill.stop(),
+        **spill.report(),
         "setup_seconds": train_started - started,
         "history": history,
     }

@@ -153,11 +153,17 @@ comparison says nothing about calibration. Nothing raised, the loss fell from 1.
 0.7262, and only a diff against the starting checkpoint shows it.
 
 `tp_bench.py` builds its optimizer after sharding, so the throughput and memory numbers
-in `TENSOR_PARALLEL.md` are of the full thing and still stand. The 19.30 GiB peak quoted
-for this run does not: it was measured without optimizer state or gradients for the
-sharded body, so a corrected run needs its batch re-tuned rather than inherited.
+in `TENSOR_PARALLEL.md` included optimizer state for the sharded body, but used a
+different objective/step from the trainer and are not a capacity guarantee for it.
+The 19.30 GiB training peak omitted optimizer state for the replaced parameters.
+It did **not** omit their gradients: replacement shards retain `requires_grad`, and
+the stale optimizer's `zero_grad` does not clear them. Those gradients can accumulate
+and enter clipping even though the weights never update. A CPU reproduction using the
+actual sharded linear layer confirms this. Re-measure several real optimizer steps;
+do not inherit the old batch size. Historical measurements remain recorded, not corrected
+retroactively into results for the repaired trainer.
 
-**A second defect, real but inert here.** A parameter replicated
+**A second defect, with unresolved indirect impact here.** A parameter replicated
 across ranks sees only its own rank's share of the loss, so each copy holds a partial
 and `sync_replicated_gradients` has to sum them before the optimizer step. Its own
 docstring says so, `trainer.py` calls it and `tp_train.py` calls it; `smoke_train.py`
@@ -180,10 +186,11 @@ Clipping had the mirror of the same problem: `clip_grad_norm_` over `model.param
 counts a replicated parameter once per rank, inflating the norm it measures and scaling
 every gradient down for it.
 
-It did not affect this run. The 18 replicated norms were frozen by the stale optimizer
-along with the rest of the sharded body: all 18 are bitwise identical between the two
-ranks and bitwise identical to the starting checkpoint. The reduction is still required
-for any run that actually trains them, which is every corrected run from here.
+The 18 replicated norms did not update: all 18 are bitwise identical between ranks and
+to the starting checkpoint. This is not proof that their gradients were absent or inert
+in global clipping. The stale optimizer could leave them accumulated, so the indirect
+effect on updated parameters is unresolved. Reduction and model-wide gradient clearing
+are required for corrected runs.
 
 So `chatkd` is not a measurement of what chat calibration is worth after training, and
 the comparison has to be redone before anything is concluded about the calibration.

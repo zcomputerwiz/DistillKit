@@ -1,0 +1,30 @@
+{
+  "date": "2026-09-22",
+  "cause": "Windows PowerShell 5.1 inherited the PowerShell 7 module path and failed to load its diagnostics module. The previous reader suppressed the error and returned NaN.",
+  "fix": "Import the diagnostics module from the child shell's PSHOME; validate process-only JSON readings; expose errors; retain unknown coverage after missed samples; recover late baselines; sample once at shutdown.",
+  "focused_tests_passed": 89,
+  "spill_tests_passed": 23,
+  "live_check": {
+    "devices_initialized": 2,
+    "pid": 4668,
+    "elapsed_seconds": 4.605270500000188,
+    "scope": "process",
+    "valid_samples": 3,
+    "failed_reads": 0,
+    "baseline_delayed": false,
+    "baseline_gib": 0.15234375,
+    "latest_gib": 0.15234375,
+    "peak_gib": 0.15234375,
+    "shared_delta_gib": 0.0,
+    "spill_telemetry_valid": true,
+    "spilled": false,
+    "interval_seconds": 0.1,
+    "tolerance_gib": 1.0
+  },
+  "limitations": [
+    "This is a bounded live-counter check with small CUDA allocations, not a training benchmark or an induced spill test.",
+    "Shared allocation growth is a proxy, not direct proof of physical paging; sampling can miss inter-sample excursions.",
+    "Historical unavailable readings remain unknown and were not rewritten.",
+    "Pre-existing lint findings in benchmark.py, copy_train.py and sidecar_train.py are unchanged; modified telemetry code introduces no new findings."
+  ]
+}

@@ -316,7 +316,7 @@ def main() -> int:
             row = {"step": step, "tokens": seen, "loss": float(loss),
                    "loss_per_original_token": float(loss) * inflation,
                    "tokens_per_second": seen / elapsed,
-                   "shared_delta_gib": spill.drift()}
+                   **spill.report()}
             if step % args.evaluate_every == 0 or step == steps - 1:
                 row["heldout"] = evaluate()
                 row["heldout_per_original_token"] = row["heldout"] * inflation
@@ -338,6 +338,7 @@ def main() -> int:
 
     torch.cuda.synchronize()
     elapsed = time.perf_counter() - train_started
+    spill.stop()
     result = {
         "variant": variant, "devices": list(args.devices),
         "architecture": {"ratio": args.ratio, "blend": args.blend,
@@ -354,7 +355,7 @@ def main() -> int:
         "final_loss": history[-1]["loss"], "final_heldout": history[-1].get("heldout"),
         "final_copy": history[-1].get("copy"),
         "gib_per_device": history[-1]["gib_per_device"],
-        "shared_delta_gib": spill.stop(),
+        **spill.report(),
         "setup_seconds": train_started - started, "history": history,
     }
     args.output.write_text(json.dumps(result, indent=2), encoding="utf-8")

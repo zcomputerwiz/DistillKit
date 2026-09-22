@@ -80,7 +80,7 @@ def watch(model, layers):
     return seen, handles
 
 
-def indexer_loss(model, layers, seen, targets, borrowed, selected=None):
+def indexer_loss(model, layers, seen, targets, borrowed, selected=None, query_mask=None):
     """The KL of each indexer's scores against the attention over the same positions.
 
     `selected` is what makes this the sparse stage rather than the warm-up. The reference
@@ -113,7 +113,15 @@ def indexer_loss(model, layers, seen, targets, borrowed, selected=None):
         # Cross entropy against a distribution that already sums to one over the same
         # set -- `_record` masks before its softmax -- which is the KL up to the target's
         # own entropy, and that term has no gradient here.
-        total = total + -(target * predicted.nan_to_num(neginf=0.0)).sum(-1).mean()
+        per_query = -(target * predicted.nan_to_num(neginf=0.0)).sum(-1)
+        if query_mask is not None:
+            # Joint training uses exactly the CE/teacher target positions. Dense
+            # indexer-only warm-up keeps its historical all-query objective.
+            mask = query_mask.to(device=per_query.device, dtype=torch.bool)
+            if mask.shape != per_query.shape or not bool(mask.any()):
+                raise ValueError("indexer query mask must match nonempty scored positions")
+            per_query = per_query[mask]
+        total = total + per_query.mean()
     return total
 
 

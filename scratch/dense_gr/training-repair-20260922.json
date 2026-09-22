@@ -1,0 +1,98 @@
+{
+  "date": "2026-09-22",
+  "base_commit": "86209a2108f53d52f2b526b9de598851288d4785",
+  "scope": "Training correctness repair; bounded smoke checks only; historical verdicts preserved.",
+  "tests": {
+    "focused_suite_passed": 66,
+    "lint": "pass",
+    "suite": [
+      "tests/test_merged_cache.py",
+      "tests/test_grouped_tail.py",
+      "tests/test_dense_gr_training_step.py",
+      "tests/test_optimizer_tp_guard.py",
+      "tests/test_optimizers.py"
+    ]
+  },
+  "corpus_plan": {
+    "max_length": 1024,
+    "block_size": 128,
+    "min_answer_tokens": 2,
+    "documents": 13691,
+    "supervised_targets_per_pass": 6645509,
+    "configurations": [
+      {
+        "rows": 1
+      },
+      {
+        "rows": 2
+      },
+      {
+        "rows": 6
+      },
+      {
+        "input_token_budget": 6144
+      }
+    ],
+    "identical_document_prefixes": true
+  },
+  "benchmark": {
+    "report": "tp-bench-corrected-20260921.json",
+    "completed_before_crash": true,
+    "parameters": 1915249222,
+    "devices": 2,
+    "optimizer_steps": 5,
+    "real_warmup_steps": 2,
+    "measured_steps": 3,
+    "supervised_targets": 8811,
+    "measured_targets_per_second": 1412.418622557815,
+    "setup_seconds": 18.9499874,
+    "training_seconds": 7.023369899994577,
+    "peak_allocated_gib": {
+      "cuda:0": 14.157496929168701,
+      "cuda:1": 5.144514083862305
+    },
+    "home_peak_reserved_gib": 14.87109375,
+    "spill_status": "unknown (invalid Windows counter)",
+    "quality_or_efficiency_claim": false
+  },
+  "resume": {
+    "single_card_cli": {
+      "parameters": 32264006,
+      "total_optimizer_steps": 3,
+      "total_supervised_targets": 762,
+      "resumed_at_step": 1,
+      "resumed_at_targets": 254
+    },
+    "deterministic_cpu_and_fp32_bf16_bnb_tests": "bit-exact final parameters",
+    "production_gpu_bit_exact": false,
+    "resume_vs_continuous": {
+      "max_abs_weight_difference": 0.04583740234375,
+      "weight_rmse": 0.00011722470600294911,
+      "changed_elements": 5508804,
+      "elements": 32264006,
+      "final_loss_difference": 0.000009059906005859375,
+      "same_batches": true
+    },
+    "continuous_repeat_vs_continuous": {
+      "max_abs_weight_difference": 0.0457763671875,
+      "weight_rmse": 0.00011790181415981743,
+      "changed_elements": 5673117,
+      "elements": 32264006,
+      "final_loss_difference": 0.00041866302490234375,
+      "same_batches": true
+    },
+    "checkpoint_sha256": {
+      "repair-continuous-20260922": "51d66db95782c0dd7e5410af484de015d36a90f879a564d5c3830193c4e13318",
+      "repair-resumed-20260922": "4703da18adcb7afbcce1f269e63e49f2302d64b05d47d511ddd3bb3107308079",
+      "repair-continuous-repeat-20260922": "52a66197087884957e8a5bbc728dffcb26fefd3e7c99fd33a70e3b683fb9bd6a"
+    }
+  },
+  "limitations": [
+    "No corrected full-scale training/quality experiment performed.",
+    "Production GPU kernel/reduction variation is not localized; repeat-vs-resume comparisons do not establish bitwise production equivalence.",
+    "Same-layout resume only; input data and source checkpoint must remain available and immutable.",
+    "Warm shape backwards do not update weights; their setup cost is separate from optimizer targets.",
+    "Windows spill telemetry unknown, not evidence of no spill.",
+    "Historical metrics and checkpoints were not overwritten."
+  ]
+}

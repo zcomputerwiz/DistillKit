@@ -18,11 +18,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
 import threading
 import time
+import warnings
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -226,121 +228,159 @@ def _module_version(name):
 
 
 class SpillWatch:
-    """The spill check, polled off the training thread.
+    """Background, process-only shared-memory growth guard.
 
-    `shared_gpu_gib` costs 1.81 s per call because it starts a PowerShell process to read
-    a WDDM performance counter. Called from the training loop it lands right after a
-    `torch.cuda.synchronize()`, so nothing is queued for the whole 1.81 s and the GPU
-    sits at exactly 0%: measured at four dips per minute on a 13.5 s report cadence, a
-    tenth of throughput spent reading the same number over and over.
-
-    Here a daemon thread polls it and the loop reads whatever the last poll saw. The
-    reported drift is the *worst* value since the baseline rather than the latest, so a
-    spill that grows and recedes between two reads still trips the guard -- a latest-only
-    reading could miss exactly the excursion the check exists for.
-
-    The thread also owns the verdict, not just the number. It holds the tolerance and
-    sets a flag the moment a poll exceeds it, so the training loop asks a boolean rather
-    than a threshold it has to know -- one definition of "spilled" instead of one per
-    runner, and a breach is recorded when it happens rather than at whatever step the
-    next report falls on. Checking the flag is free, so the loop can ask every step.
-
-    The tolerance is a gibibyte because the counter is per process now and a reservation
-    is not a spill: a CUDA context and a compile's workspaces take a few hundred
-    megabytes of shared memory on Windows whatever the model does, and the thing worth
-    stopping for is a run whose working set no longer fits and has started being served
-    over PCIe. That shows up as growth of gibibytes, not of hundreds of megabytes.
+    Failed reads never count as zero. A late baseline permits guarding subsequent
+    growth but cannot establish that the earlier interval was spill-free. Even a
+    complete set of periodic readings can miss excursions between samples.
     """
 
     def __init__(self, interval=30.0, tolerance=1.0):
+        if not math.isfinite(interval) or interval <= 0 or not math.isfinite(tolerance) or tolerance < 0:
+            raise ValueError("spill interval must be positive and tolerance nonnegative")
         self.interval = float(interval)
         self.tolerance = float(tolerance)
-        self.baseline = float("nan")
-        self.peak = float("nan")
-        self.latest = float("nan")
-        self.polls = 0
+        self.baseline = self.peak = self.latest = float("nan")
+        self.polls = self.attempts = self.failed_reads = 0
+        self.baseline_delayed = False
+        self.last_error = None
         self.tripped_at = None
         self._tripped = threading.Event()
         self._stop = threading.Event()
         self._thread = None
+        self._stopped = False
+
+    def _sample(self):
+        value = shared_gpu_gib()
+        self.attempts += 1
+        if not math.isfinite(value) or value < 0:
+            self.failed_reads += 1
+            self.last_error = getattr(shared_gpu_gib, "last_error", None) or "invalid counter reading"
+            return
+        self.polls += 1
+        self.latest = value
+        if not math.isfinite(self.baseline):
+            self.baseline = self.peak = value
+            self.baseline_delayed = self.failed_reads > 0
+            if self.baseline_delayed:
+                warnings.warn("Spill baseline established late; the earlier interval remains unknown.",
+                              RuntimeWarning, stacklevel=2)
+        self.peak = max(self.peak, value)
+        if value - self.baseline > self.tolerance and not self._tripped.is_set():
+            self.tripped_at = value - self.baseline
+            self._tripped.set()
 
     def start(self):
-        """Read the baseline synchronously, then poll in the background."""
-        self.baseline = self.peak = self.latest = shared_gpu_gib()
-        self.polls = 1
-        self._thread = threading.Thread(target=self._poll, name="spill-watch",
-                                        daemon=True)
+        if self._thread is not None or self._stopped:
+            raise RuntimeError("a spill watcher cannot be restarted")
+        self._sample()
+        self._thread = threading.Thread(target=self._poll, name="spill-watch", daemon=True)
         self._thread.start()
         return self
 
     def _poll(self):
         while not self._stop.wait(self.interval):
-            value = shared_gpu_gib()
-            if value != value:  # a failed counter read is not evidence of a spill
-                continue
-            self.latest = value
-            self.polls += 1
-            if not self.peak >= value:
-                self.peak = value
-            if value - self.baseline > self.tolerance and not self._tripped.is_set():
-                # Recorded when it happens. The loop finds out at its next check, but
-                # the value it reports is the breach, not whatever the counter has
-                # settled back to by then.
-                self.tripped_at = value - self.baseline
-                self._tripped.set()
+            self._sample()
 
     def breached(self):
-        """Has any poll exceeded the tolerance? Free to call, so call it every step."""
         return self._tripped.is_set()
 
     def drift(self):
-        """Worst growth over the baseline seen so far, without blocking."""
+        """Observed worst growth, not a verdict about unobserved intervals."""
         return self.peak - self.baseline
 
+    def report(self):
+        complete = self.polls >= 2 and self.failed_reads == 0
+        value = self.drift()
+        return {
+            "shared_delta_gib": value if math.isfinite(value) else None,
+            "spill_telemetry_valid": complete,
+            "spilled": True if self.breached() else (False if complete else None),
+            "spill_telemetry": {
+                "scope": "process", "pid": os.getpid(),
+                "coverage": "complete" if complete else ("partial" if self.polls else "unavailable"),
+                "valid_samples": self.polls, "attempts": self.attempts,
+                "failed_reads": self.failed_reads, "baseline_delayed": self.baseline_delayed,
+                "baseline_gib": self.baseline if math.isfinite(self.baseline) else None,
+                "latest_gib": self.latest if math.isfinite(self.latest) else None,
+                "peak_gib": self.peak if math.isfinite(self.peak) else None,
+                "last_error": self.last_error, "interval_seconds": self.interval,
+                "tolerance_gib": self.tolerance,
+            },
+        }
+
     def stop(self):
+        if self._stopped:
+            return self.drift()
+        self._stopped = True
         self._stop.set()
         if self._thread is not None:
-            self._thread.join(timeout=5.0)
+            # The subprocess timeout is 10 seconds. Avoid overlapping counter reads.
+            self._thread.join(timeout=11.0)
+            if self._thread.is_alive():
+                self.failed_reads += 1
+                self.last_error = "counter thread did not stop before the deadline"
+                warnings.warn(self.last_error, RuntimeWarning, stacklevel=2)
+            else:
+                # Short checks may finish before their first background poll.
+                self._sample()
         return self.drift()
 
 
 def shared_gpu_gib():
-    """Bytes *this process* is being served from system RAM as GPU memory.
+    """Process-only WDDM shared usage in GiB; NaN + visible error on failure.
 
-    `set_per_process_memory_fraction` caps PyTorch's allocator, which is necessary but
-    not sufficient: the CUDA context, cuBLAS and Triton workspaces allocate outside it,
-    and on Windows WDDM anything over budget is paged to shared system memory and served
-    over PCIe rather than raising. nvidia-smi does not report this, so the only honest
-    check is the WDDM performance counter. A run whose shared usage climbs is measuring
-    the bus, not the model, and its numbers must be thrown away.
-
-    Per process, and that is the correction. This read the *adapter* counter, which is
-    every process on the machine: a training run was stopped at step 501 having "spilled
-    17.00 GiB" that belonged to two compiled decode benchmarks on the other card. The
-    guard was right that something was paging and wrong about whose, and a guard that
-    cannot tell those apart makes the second card unusable while the first one trains.
-
-    A process has one instance per adapter and segment, so they are summed. Falls back to
-    the adapter counter when the per-process one is unavailable, and says which it used,
-    because a silent fallback would put the old behaviour back without saying so.
+    Shared allocation is a growth proxy, not proof that bytes were physically paged.
+    Do not substitute adapter-wide usage: it includes unrelated processes and cannot
+    be compared with this process's baseline.
     """
-    instance = "pid_%d*" % os.getpid()
-    command = (
-        "$p = Get-Counter '\\GPU Process Memory(%s)\\Shared Usage' "
-        "-ErrorAction SilentlyContinue; "
-        "if ($p) { 'process ' + ($p.CounterSamples | Measure-Object "
-        "-Property CookedValue -Sum).Sum } else { "
-        "$a = Get-Counter '\\GPU Adapter Memory(*)\\Shared Usage' "
-        "-ErrorAction SilentlyContinue; "
-        "'adapter ' + ($a.CounterSamples | Measure-Object -Property CookedValue "
-        "-Maximum).Maximum }" % instance)
+    # The trailing underscore prevents pid_12* from also matching pid_123.
+    instance = "pid_%d_*" % os.getpid()
+    # Windows PowerShell can inherit PS7's PSModulePath from its parent. Import its
+    # own built-in module by absolute path; do not change policy or global settings.
+    command = r"""
+$ErrorActionPreference = 'Stop'
+try {
+    Import-Module (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Diagnostics\Microsoft.PowerShell.Diagnostics.psd1') -ErrorAction Stop
+    $counter = Get-Counter '\GPU Process Memory(INSTANCE)\Shared Usage' -ErrorAction Stop
+    $samples = @($counter.CounterSamples)
+    if ($samples.Count -eq 0) { throw 'No process GPU memory samples returned' }
+    foreach ($sample in $samples) {
+        if ($sample.Status -notin @(0, 1)) { throw "Invalid counter status: $($sample.Status)" }
+        if ([double]::IsNaN($sample.CookedValue) -or [double]::IsInfinity($sample.CookedValue) -or $sample.CookedValue -lt 0) {
+            throw 'Invalid shared-memory counter value'
+        }
+    }
+    $bytes = ($samples | Measure-Object -Property CookedValue -Sum).Sum
+    @{scope='process'; samples=$samples.Count; bytes=$bytes} | ConvertTo-Json -Compress
+} catch {
+    [Console]::Error.WriteLine($_.Exception.Message)
+    exit 1
+}
+""".replace("INSTANCE", instance)
+    shared_gpu_gib.scope = None
     try:
-        output = subprocess.run(["powershell", "-NoProfile", "-Command", command],
-                                capture_output=True, text=True, timeout=30)
-        scope, _, value = output.stdout.strip().partition(" ")
-        shared_gpu_gib.scope = scope
-        return float(value) / 2 ** 30
-    except Exception:
+        output = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
+            capture_output=True, text=True, timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if output.returncode:
+            raise RuntimeError(output.stderr.strip() or "counter subprocess exited %d" % output.returncode)
+        reading = json.loads(output.stdout)
+        if reading.get("scope") != "process" or not isinstance(reading.get("samples"), int) or reading["samples"] < 1:
+            raise ValueError("counter returned no valid process samples")
+        value = reading.get("bytes")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise ValueError("counter returned invalid shared-memory bytes")
+        shared_gpu_gib.scope = "process"
+        shared_gpu_gib.last_error = None
+        return value / 2 ** 30
+    except (OSError, subprocess.SubprocessError, ValueError, TypeError, AttributeError, RuntimeError) as exc:
+        message = "%s: %s" % (type(exc).__name__, exc)
+        if message != getattr(shared_gpu_gib, "last_error", None):
+            warnings.warn("GPU spill telemetry unavailable: " + message, RuntimeWarning, stacklevel=2)
+        shared_gpu_gib.last_error = message
         return float("nan")
 
 
@@ -510,6 +550,8 @@ def main() -> int:
     print(json.dumps(kernels), flush=True)
 
     baseline_shared = shared_gpu_gib()
+    if not math.isfinite(baseline_shared):
+        raise SystemExit("cannot size batches without a valid process spill baseline")
     print("baseline shared GPU memory: %.2f GiB (spill guard trips at +%.2f)"
           % (baseline_shared, args.spill_tolerance_gib), flush=True)
 
@@ -575,8 +617,17 @@ def main() -> int:
             row["hours_per_arm_1b"] = hours(1e9)
             row["hours_per_arm_3b"] = hours(3e9)
             spilled = row["shared_gib"] - baseline_shared
-            row["shared_delta_gib"] = spilled
+            valid = math.isfinite(spilled)
+            row["shared_delta_gib"] = spilled if valid else None
+            row["spill_telemetry_valid"] = valid
+            row["spill_scope"] = "process"
+            row["spilled"] = spilled > args.spill_tolerance_gib if valid else None
             entry["runs"].append(row)
+            if not valid:
+                row["shared_gib"] = None
+                row["spill_error"] = getattr(shared_gpu_gib, "last_error", None)
+                print("  spill counter unavailable; result unqualified, sweep stopped", flush=True)
+                break
             if spilled > args.spill_tolerance_gib:
                 print("  batch %-3d SPILLED: shared GPU memory +%.2f GiB above "
                       "baseline. Result discarded, sweep stopped."
@@ -590,7 +641,8 @@ def main() -> int:
                      row["peak_allocated_gib"], row["peak_reserved_gib"],
                      100 * row["reserved_fraction_of_vram"],
                      row["hours_per_arm_1b"], row["hours_per_arm_3b"]), flush=True)
-        best = max((r for r in entry["runs"] if not r.get("oom")),
+        best = max((r for r in entry["runs"] if not r.get("oom")
+                    and r.get("spill_telemetry_valid") and r.get("spilled") is False),
                    key=lambda r: r["tokens_per_second"], default=None)
         entry["best"] = best
         del model

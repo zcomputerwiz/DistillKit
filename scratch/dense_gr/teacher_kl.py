@@ -32,13 +32,10 @@ penalty fell 38-fold to an interval spanning zero. So this is a blend, not a rep
 and the ground-truth half is also the only term that says anything about a control token the
 teacher's top-64 did not rank.
 
-Batches are made uniform by construction rather than by padding. Padding is the thing that
-changes CSA2's routing -- where the indexer's scores tie at the top-k cutoff, which position
-wins depends on how wide the row is -- and the architecture refuses it outright. So`grouped`sorts by length, takes neighbours, and truncates them to the shortest, which costs 0.2% of
-the corpus at six rows because sorted neighbours are nearly the same length. Widths are
-floored to the block size, trading 7.7% of the tokens for 8 distinct shapes instead of 520,
-because every distinct shape is a cold Triton autotune and a cold autotune under tensor
-parallelism is where the two backward threads race.
+Batches are uniform without padding. Each document is independently capped and rounded
+down to the routing block before checking its retained answer. Equal widths are then
+batched, including remainders. Row counts and memory budgets cannot change the retained
+prefixes. Both input-token storage and supervised-target counts are reported explicitly.
 
 The group size is a token budget rather than a document count. Memory follows tokens and
 this corpus runs 134 to 1024 of them per document, so a fixed count of six makes both a
@@ -200,8 +197,7 @@ class CachedTeacher:
         #
         # The answer position is recorded per document rather than used to filter here,
         # because the length a document is finally scored at is not its cap: `grouped`
-        # truncates a batch to its shortest member and then floors that to the routing
-        # block, so a document can pass this check at 1024 and be trained at 896. The
+        # floors each document independently to the routing block. The
         # check that matters is the one `_groups` makes at the retained length.
         self.min_answer_tokens = min_answer_tokens
         self.answer_start = {}
@@ -250,7 +246,12 @@ class CachedTeacher:
         that reordering the `--teacher-cache` arguments selects the same set.
         """
         groups = self.sources()
-        total = sum(len(ids) for ids in groups.values()) or 1
+        if count < 1:
+            raise ValueError("evaluation sample count must be positive")
+        total = sum(len(ids) for ids in groups.values())
+        if not total:
+            raise ValueError("no held-out documents survive filtering")
+        count = min(count, total)
         generator = np.random.default_rng(seed)
         picked = []
         for name in sorted(groups):
@@ -270,10 +271,19 @@ class CachedTeacher:
                 if picked[index][0] == biggest:
                     picked.pop(index)
                     break
+        # Rounding may undershoot too. Fill from the most underrepresented source.
+        while len(picked) < count:
+            used = {doc for _, doc in picked}
+            counts = {name: sum(s == name for s, _ in picked) for name in groups}
+            available = [name for name in sorted(groups)
+                         if counts[name] < len(groups[name])]
+            name = max(available, key=lambda s: count * len(groups[s]) / total - counts[s])
+            remaining = sorted(set(groups[name]) - used)
+            picked.append((name, remaining[int(generator.integers(len(remaining)))]))
         return picked
 
     def cap(self, doc_id):
-        """How long this document is before any batching truncates it further."""
+        """Prefix cap before independent block rounding (never neighbor-dependent)."""
         return min(self.cache.documents[doc_id]["length"], self.max_length or 1 << 30)
 
     def _answer_start(self, doc_id, marker):
@@ -282,9 +292,10 @@ class CachedTeacher:
         return first_response(ids[:self.cap(doc_id)], marker)
 
     def _kept_answer(self, doc_id, width):
-        """Scored answer positions left once the document is cut to `width`.
+        """Conservative retained-answer count, preserving the existing filter.
 
-        The last kept position has no ground truth and is not scored, hence `width - 1`.
+        Counts supervised queries starting at the first response token. The additional
+        transition predicting that first response token is deliberately not credited.
         """
         start = self.answer_start.get(doc_id)
         return 0 if start is None else max(0, min(width, self.cap(doc_id)) - 1 - start)
@@ -323,85 +334,51 @@ class CachedTeacher:
                        for group, width in self._groups(size, block, budget)})
 
     def _groups(self, size, block=None, budget=None):
-        """Sorted neighbours, grouped so every batch costs about the same.
+        """Fix each prefix first, filter it once, then batch identical widths.
 
-        `size` is a document count and `budget` is a token count; a budget is the better
-        unit, because memory follows tokens rather than documents and this corpus runs
-        from 134 to 1024 of them per document. A fixed count of six makes a batch of six
-        128-token documents and a batch of six 1024-token documents, and only the second
-        decides whether the run fits. With a budget the wide groups get fewer rows and
-        the narrow ones more, so the widest batch is no larger than the rest.
+        `budget` limits input tokens in a forward, not supervised targets. Neither
+        it nor the row count may change the prefixes or the retained document set.
         """
-        lengths = {doc_id: self.cap(doc_id) for doc_id in self.ids}
-        ordered = sorted(self.ids, key=lambda doc_id: (lengths[doc_id], doc_id))
+        if size < 1 or (block is not None and block < 1) or (budget is not None and budget < 1):
+            raise ValueError("batch size, block and budget must be positive")
+        buckets = {}
         groups = []
         self.dropped_short = 0
         self.dropped_truncated_answer = 0
-        start = 0
-        while start < len(ordered):
-            width = lengths[ordered[start]]
+        for doc_id in sorted(self.ids):
+            width = self.cap(doc_id)
             if block:
                 width = (width // block) * block
             if width < 2:
-                # Shorter than the routing block, so flooring leaves nothing to score.
                 self.dropped_short += 1
-                start += 1
                 continue
+            if self.min_answer_tokens > 0 and self._kept_answer(doc_id, width) < self.min_answer_tokens:
+                self.dropped_truncated_answer += 1
+                continue
+            if budget is not None and width > budget:
+                raise ValueError("micro-token budget is smaller than a retained document")
+            buckets.setdefault(width, []).append(doc_id)
+        for width, members in sorted(buckets.items()):
             rows = size if budget is None else max(1, budget // width)
-            # The remainder is a smaller batch, not a discarded one. Breaking here threw
-            # away up to `rows - 1` of the longest documents in the corpus every pass,
-            # and which ones depended on the batch size, so one card and two cards were
-            # not training on the same examples.
-            group = ordered[start:start + rows]
-            start += len(group)
-            # The width is the shortest in the group -- the group is sorted -- floored
-            # above, so this is the exact length every member will be scored at. The
-            # answer check belongs here rather than at the cap, because this is shorter.
-            if self.min_answer_tokens > 0:
-                kept = [doc_id for doc_id in group
-                        if self._kept_answer(doc_id, width) >= self.min_answer_tokens]
-                self.dropped_truncated_answer += len(group) - len(kept)
-                group = kept
-            if group:
-                groups.append((group, width))
+            for start in range(0, len(members), rows):
+                groups.append((members[start:start + rows], width))
         return groups
 
     def planned_tokens(self, size, block=None, budget=None):
-        """Tokens a pass over `grouped` actually scores.
-
-        Not the same as `self.tokens`, which counts each document at its own cap: a
-        group is cut to its shortest member and floored to the routing block, so the
-        corpus a grouped run sees is smaller than the corpus the cache holds. Using the
-        larger number to size `--passes` overstates the budget by however much grouping
-        trimmed.
-        """
-        return sum(len(group) * width for group, width in self._groups(size, block, budget))
+        """Supervised targets per pass, excluding the final position of each row."""
+        return sum(len(group) * (width - 1)
+                   for group, width in self._groups(size, block, budget))
 
     def grouped(self, size, block=None, budget=None):
-        """Yield batches of `size` documents that are already the same length.
+        """Shuffle canonical equal-width batches, retaining all remainder groups.
 
-        One document per forward leaves the card at a fraction of its throughput, and the
-        obvious fix -- pad a batch to its longest member -- is the one thing this
-        architecture refuses. CSA2 routes over whole blocks and cannot express "half of
-        this block is padding", and even where it could, the indexer's top-k ties at the
-        cutoff often enough that a padded row routes differently from the same row alone.
-
-        So the batch is made uniform by construction instead: sort by length, take `size`
-        neighbours, and truncate them to the shortest. Neighbours in a sorted order are
-        close, so the truncation is small -- and it is a prefix, which causal attention
-        makes free of any mismatch with the teacher's cached targets.
-
-        The groups are shuffled between passes; the membership is not, because that is
-        what keeps a batch uniform.
-
-        `block` floors each width to a multiple of it, which trades tokens for shapes:
-        exact widths give 520 distinct lengths and 3,322,458 tokens, flooring to 128 gives
-        8 lengths and 92.3% of them. Eight shapes can be warmed before training; 520
-        cannot, and every unwarmed one is a chance for the two backward threads to race
-        Triton's autotuner. 128 is also CSA2's block size, so the widths line up with the
-        routing rather than cutting across it.
+        Block rounding bounds the shape set. No group's membership changes the width
+        or filtering decision of a document; each prefix remains causally aligned to
+        the cached teacher. The resumable trainer uses PlannedBatches for its cursor.
         """
         groups = self._groups(size, block, budget)
+        if not groups:
+            raise ValueError("no training documents survive the sample plan")
         while True:
             for index in self.generator.permutation(len(groups)):
                 group, width = groups[index]
@@ -421,7 +398,7 @@ class CachedTeacher:
                                                                    non_blocking=True),
                 "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
                                                                        non_blocking=True),
-                "doc_id": doc_ids[0]}
+                "doc_id": doc_ids[0], "doc_ids": list(doc_ids)}
 
     def read(self, doc_id):
         record = self.cache.read_document(doc_id, include_hidden_states=False)
