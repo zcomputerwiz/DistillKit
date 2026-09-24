@@ -52,16 +52,63 @@ two as one number overstates the problem:
 By source: ARC-Easy 92, ARC-Challenge 41, then a tail of MetaMathQA 3, NuminaMath-CoT 2,
 MATH 6, SciQ 1, Evol-Code 1.
 
-The 133 ARC hits are the ones already known: 145 documents in the corpus carry an ARC
-label, and this recovers 133 of them by text alone. The remaining 12 are the interesting
-ones -- math and science documents that share a run with a scored question without
-carrying a benchmark label, which no label-based filter would have caught.
+### Checked by hand: which flags are contamination, and what the screen missed
 
-This does not change any MMLU result. The 512 MMLU questions in the screen bundle were
-checked individually against the corpus earlier and none of them appear in it; these 12
-hits are against the other 13,530 MMLU test questions and the ARC test sets. It does
-mean a resample of the MMLU bank would need screening, which is what
-`q512-clean-bundle.json` and `independent_eval --decontaminate` are for.
+One shared 8- or 13-word run is weak evidence, and an earlier screen here had already
+counted similar text as contamination. So every flag was checked: `contamination_audit.py`
+finds the best-matching benchmark question for each flagged document, measures how much
+of it the document contains, and whether the answer options and the correct answer are
+there too. The twelve that were not ARC were then read one by one, because the coverage
+score gets them wrong in both directions.
+
+| verdict | ARC-Challenge test (scored) | ARC-Easy test (not scored) | MMLU test (scored) |
+| --- | --- | --- | --- |
+| contamination | 46 | 99 | 6 |
+| same problem, reworded | -- | -- | 1 |
+| not contamination | -- | 1 | 4 |
+
+**Every ARC document in the corpus is an ARC test question.** The 133 the screen flagged
+carry the question, all four options and the answer, verbatim. The corpus holds 145 ARC
+documents, and the other 12 were never screened, because their questions are 4 to 7
+words -- under the 8-word floor -- but each matches an ARC test question exactly. Those
+12 were matched on question text only, not options. With 133 of 133 screenable ones
+being full test items, the upstream mixture evidently drew its ARC rows from the test
+split. So the screen *undercounted* ARC: 46 scored ARC-Challenge questions, not 41.
+
+**Six MMLU test questions are really in the corpus.** Five are verbatim MATH problems
+that MMLU's mathematics subjects share -- `Express 0.1(7) as a common fraction`, the
+toothpaste unit-price problem, the least perfect square with three prime factors, the
+45-degree triangle with a 10-inch hypotenuse, and the point on `h(x) = g(x)^2`. The sixth
+is MetaMathQA's inversion of a remainder problem: the same question with one number
+replaced by X, and the answer, 37, stated in it. One more is the same problem reworded:
+"the remainder when 9! is divided by 10" is "the ones digit of 1 x 2 x ... x 9".
+
+**Five flags are not contamination.** Three are templated competition problems with
+different numbers and different answers -- a 45-degree triangle with an 8*sqrt(2)
+hypotenuse, the 150th Fibonacci term mod 9 against the 100th mod 4, and a ball-drawing
+game with different stakes whose answer is 15, not 3. One shares only the stem "what is
+the value of the expression". The last is the 9-word generic question "What is at the
+center of our solar system?" with different options, in a bank the eval does not score.
+It had coverage 1.00, which is why a coverage threshold is not a verdict.
+
+The verified list, with a reason for each entry, is `capture-data/run5m-contamination.json`
+-- 157 documents, 152 of them contamination or a reworded equivalent. That list, not the
+145 flags, is what to exclude if the training corpus itself is to be clean.
+
+This does not change any MMLU result. None of the seven MMLU questions with a training
+copy is in either split of `q512-bundle.json` or `q512-clean-bundle.json`, checked
+against the prompts directly. It does mean a resample of the MMLU bank would need
+screening, and that the 8-word floor has to be covered by exact-text matching.
+
+**The expanded corpus, checked under the floor.** The same gap applies to `expand.jsonl`,
+so its 9,932 documents were searched for the 1,279 scored questions under 8 words,
+verbatim. That finds 154 documents, and they show exactly why this cannot be a verdict:
+MMLU has "questions" that are one word or a fragment -- `gluten`, `inflation`,
+`theories`, `4 3` -- whose meaning lives in the options, and those words occur in any
+chat or code corpus. Requiring what the real ARC cases had -- the question plus at least
+two of its options -- leaves none. The only hit of four or more words is the stem "which
+of the following statements is true", with none of its options present. The expanded
+corpus is clean against MMLU and ARC test at every question length.
 
 ## The expansion
 
