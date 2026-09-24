@@ -1177,3 +1177,15 @@ only positive sign M has produced.
 * **Do not weight-sweep `lambda_kd` against held-out NLL.** That metric is the CE objective
   and will always prefer dropping the teacher.
 * **Hidden-state cosine stays out**, unchanged from the previous section.
+
+## Correction, 2026-09-24: these arms trained under a bf16 rounding freeze
+
+The arms here train in bfloat16 with `torch.optim.AdamW` at 1e-5 to 3e-5. An update of
+about `lr` survives rounding into a bf16 weight only when it exceeds half an ulp,
+`|w| * 2^-9`, so every weight above roughly 0.005-0.015 could not move at all. The
+"`sharpness` bit-identical for 72 steps" observation above is that rounding, not an
+Adam property -- Adam still moves a float32 weight by about `lr` a step. The learning-
+rate sweep is confounded for the same reason: raising `lr` changed which parameters
+could train, not only how far they moved. Verdicts resting on these arms should be
+re-run with compensated or float32 weights before being relied on. See
+`scratch/dense_gr/TRAINING_REPAIR.md`.

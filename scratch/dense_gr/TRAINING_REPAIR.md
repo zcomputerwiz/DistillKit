@@ -250,3 +250,38 @@ quality signal -- the stock preflight swings 1.82, 2.15, 1.64, 1.67, 1.86, 1.55.
 still build stock `AdamW8bit` on bf16 weights and have the same defect.
 
 Raw result: `kahan-probe-20260924.json`.
+
+## Audit: other silent failures of the same class -- 2026-09-24
+
+The bf16 freeze was a silent no-op: the loss fell, nothing raised, and most of the model
+could not change. This section lists the symptoms the project ran into and what could
+cause each, looking for more of that class.
+
+**The freeze was seen before and misdiagnosed.** `ple_forensics/RESULTS.md` records
+"`sharpness` sitting bit-identical for 72 steps" and explains it as AdamW "moving ~`lr`
+per element regardless of gradient size". Adam's normalization still moves a float32
+weight by about `lr` a step; bit-identical for 72 steps is the rounding signature. Those
+arms trained whole decoder layers in bf16 with `torch.optim.AdamW` at 1e-5 to 3e-5, where
+every weight above |w| = 0.005-0.015 is frozen. The same document's learning-rate sweep --
+optimum at 1e-5, "3e-5 was past the edge" -- was confounded: raising `lr` raises the
+threshold under which a weight can move at all, so the sweep changed which parameters
+trained, not only how far. Its verdicts rest on arms trained under the freeze.
+
+| symptom | cause found or candidate | status |
+| --- | --- | --- |
+| distillation "protects, not recovers"; 10M tokens moved MMLU +2.5 | bf16 freeze: 13.3% of elements trainable at lr 7.3e-6 | fixed, `KahanAdamW8bit` |
+| `sharpness` bit-identical 72 steps; forensics lr sweep optimum | the same freeze, read as an Adam property | forensics verdicts need re-running |
+| `idx` flat at 3.0-4.1 through the chat run | router frozen, and trained jointly at 7.3e-6 against the 1e-3 its warm-up used | open: give router parameters their own learning rate |
+| other trainers | `code_training/train.py` (bnb, bf16, 2e-5), `ple_forensics/*_arms.py` (torch AdamW, bf16, 1e-5-3e-5), `copy_train`, `sidecar_train`, `tp_train`, `benchmark`, `profile_step` | open: same freeze |
+| lr 7.3e-6 | chosen and only ever validated under the freeze; an update now reaches ~7x more of the model | open: re-validate |
+| 8-bit state on the tied 508M embedding | bitsandbytes recommends 32-bit state for embeddings (`StableEmbedding`, or `GlobalOptimManager.override_config(..., "optim_bits", 32)`); not used. Tied, so the head gives every row a dense gradient, which removes the main failure it addresses | open, measure; +3 GB on home |
+| latent ladder: 768 fits worse than 512 | candidate: variance of a 32K-token least-squares calibration. 256K tokens improved NLL at 384; predicts a monotone ladder at 256K | open, testable |
+| identical runs differ by up to 0.046 | gradient noise flipping bf16 roundings on elements at the boundary; should shrink to continuous differences under compensation | open, testable |
+| in-loop held-out on 12 documents swings 0.3 nats a step | sample too small to decide anything | use >= 128 documents |
+| gradient accumulation in bf16 | contributions under ~0.2% of the running sum are lost; negligible at `--accumulate 2` with comparable micro-batches | low |
+| weight decay | also frozen before; now live, 0.15% shrink over 2,000 steps at this rate | negligible |
+| teacher captured under bnb int8 | bounds target quality; not measurable locally at bf16 | unquantified |
+
+Checked and clean: the teacher KL upcasts each logit chunk itself (pinned by
+`test_bf16_outputs.py`); the indexer warm-up trains in float32 at lr 1e-3; the conversion
+solves in float64 and rounds once on write.
