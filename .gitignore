@@ -282,3 +282,7 @@ scratch/code_corpus/v2-build.log
 /scratch/csa2-eval/*.json
 /scratch/csa2-eval/*.json.partial
 /scratch/csa2-eval/*.log
+
+# Learning-rate sweep and probe checkpoints: weights stay local, reports are tracked.
+scratch/dense_gr/sweep-lr-*/
+scratch/dense_gr/checkpoints-kahan-probe/
