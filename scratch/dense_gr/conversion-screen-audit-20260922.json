@@ -1,0 +1,52 @@
+{
+  "reused_existing_screen": true,
+  "new_model_evaluation": false,
+  "confirmation_scored": false,
+  "task_sha256": "09eb04b7018d263ea0ad32413c571fa5deb62028fa1e7ff17ab98597088df832",
+  "same_ordered_questions": true,
+  "results": {
+    "source": {
+      "accuracy": 0.576171875,
+      "correct": 295,
+      "questions": 512,
+      "file": "q512-stock.mmlu.json",
+      "sha256": "cd4c62fa13812ca98c1addc3daddb6e279d1978dbdbb8dafe9053325cc6efed9"
+    },
+    "mla_only": {
+      "accuracy": 0.498046875,
+      "correct": 255,
+      "questions": 512,
+      "file": "q512-mlaonly.mmlu.json",
+      "sha256": "d9fbf9b3e4541e60da04f767740e513a723146e9f7901d39496c098f2c932f04",
+      "delta_vs_source": -0.078125,
+      "ci95_vs_source": [
+        -0.123046875,
+        -0.033203125
+      ]
+    },
+    "all_full": {
+      "accuracy": 0.490234375,
+      "correct": 251,
+      "questions": 512,
+      "file": "q512-allfull.mmlu.json",
+      "sha256": "5a12c2d45950478faed2e6f0853e7d094fad63424bab6ea69c8ffcff0c2cc394",
+      "delta_vs_source": -0.0859375,
+      "ci95_vs_source": [
+        -0.130859375,
+        -0.041015625
+      ]
+    },
+    "chat32": {
+      "accuracy": 0.546875,
+      "correct": 280,
+      "questions": 512,
+      "file": "chat32.mmlu.json",
+      "sha256": "cf057a9f7e5f5be31b7341636a3cc1f4d2d9403d0d2567b8c5b2f3deb33cc35a",
+      "delta_vs_source": -0.029296875,
+      "ci95_vs_source": [
+        -0.068359375,
+        0.009765625
+      ]
+    }
+  }
+}

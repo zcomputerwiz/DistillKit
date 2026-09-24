@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-22",
+  "purpose": "Bounded corrected two-GPU distillation and checkpoint-recovery preflight; no quality/efficiency claim",
+  "repair_commit": "9cdfcf3",
+  "source": "scratch/dense_gr/checkpoints-2b/warmed-chat32",
+  "caches": [
+    "../teacher-cache-5m",
+    "../teacher-cache-expand-chat",
+    "../teacher-cache-expand-code"
+  ],
+  "seed": 0,
+  "teacher_weight": 0.5,
+  "indexer_weight": 1,
+  "learning_rate": 0.0000073,
+  "warmup_steps": 0,
+  "prefix_cap": 1024,
+  "min_answer_tokens": 2,
+  "micro_input_tokens": 1024,
+  "accumulate": 2,
+  "target_limit_per_invocation": 32768,
+  "initial_steps": 3,
+  "total_steps": 6,
+  "invocations": [
+    "continuous to step 6",
+    "initial to step 3",
+    "resume initial to total step 6"
+  ],
+  "heldout_documents": 12,
+  "evaluate_every": 1,
+  "spill_every_seconds": 2,
+  "reload_nll_tolerance_nats": 0.002,
+  "gates": [
+    "No stale or missing optimizer parameters",
+    "Measured finite process spill telemetry; no threshold breach",
+    "Non-embedding body weights actually update",
+    "Same held-out document IDs before and after reload",
+    "Reload NLL difference <=0.002 nat aggregate and per-source",
+    "Resume restores step/data cursor/optimizer state and progresses to step 6"
+  ],
+  "prohibitions": [
+    "No architecture/hyperparameter sweep",
+    "No confirmation-set scoring",
+    "No overwrites of old checkpoints or reports",
+    "No bitwise-production-reproducibility claim"
+  ],
+  "checkpoint_roots": {
+    "initial": "scratch/dense_gr/checkpoints-preflight-20260922/initial",
+    "continuous": "scratch/dense_gr/checkpoints-preflight-20260922/continuous",
+    "resumed": "scratch/dense_gr/checkpoints-preflight-20260922/resumed"
+  }
+}

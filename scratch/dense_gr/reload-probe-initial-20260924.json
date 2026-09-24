@@ -1,0 +1,97 @@
+{
+  "checkpoint": "scratch\\dense_gr\\checkpoints-preflight-20260922\\initial\\smoke-r1-1-gr-s0-csa2",
+  "training_report": "scratch\\dense_gr\\preflight-initial-20260922.json",
+  "same_sample": true,
+  "exported_layout": "unsharded",
+  "training_layout": "tensor_parallel",
+  "targets": 6068,
+  "records": [
+    {
+      "source": "..\\teacher-cache-5m",
+      "doc_id": "11751c1420770045dce08e797a4e9083",
+      "targets": 884,
+      "nll": 2.7146053314208984
+    },
+    {
+      "source": "..\\teacher-cache-5m",
+      "doc_id": "18caa8902988182712563043e69a5a70",
+      "targets": 971,
+      "nll": 1.2095087766647339
+    },
+    {
+      "source": "..\\teacher-cache-5m",
+      "doc_id": "194cc1dd919c6e183dfb81b9bf30cf14",
+      "targets": 277,
+      "nll": 0.9136679172515869
+    },
+    {
+      "source": "..\\teacher-cache-5m",
+      "doc_id": "1986324145b8c28355366842244dcab6",
+      "targets": 1023,
+      "nll": 0.7200852632522583
+    },
+    {
+      "source": "..\\teacher-cache-expand-chat",
+      "doc_id": "tulu-3-sft:oasst1_3334",
+      "targets": 339,
+      "nll": 2.712794303894043
+    },
+    {
+      "source": "..\\teacher-cache-expand-chat",
+      "doc_id": "tulu-3-sft:oasst1_4746",
+      "targets": 216,
+      "nll": 2.0451886653900146
+    },
+    {
+      "source": "..\\teacher-cache-expand-chat",
+      "doc_id": "ultrachat:981",
+      "targets": 289,
+      "nll": 2.3724074363708496
+    },
+    {
+      "source": "..\\teacher-cache-expand-code",
+      "doc_id": "Magicoder-OSS:1620",
+      "targets": 541,
+      "nll": 1.5223712921142578
+    },
+    {
+      "source": "..\\teacher-cache-expand-code",
+      "doc_id": "Magicoder-OSS:1660",
+      "targets": 403,
+      "nll": 1.550645351409912
+    },
+    {
+      "source": "..\\teacher-cache-expand-code",
+      "doc_id": "Magicoder-OSS:820",
+      "targets": 648,
+      "nll": 1.7460877895355225
+    },
+    {
+      "source": "..\\teacher-cache-expand-code",
+      "doc_id": "self-oss-instruct:170612",
+      "targets": 270,
+      "nll": 1.627534031867981
+    },
+    {
+      "source": "..\\teacher-cache-expand-code",
+      "doc_id": "self-oss-instruct:678334",
+      "targets": 207,
+      "nll": 1.5722764730453491
+    }
+  ],
+  "before_nll": 1.6417968189570962,
+  "reloaded_nll": 1.6407011196695038,
+  "nll_delta": -0.0010956992875923444,
+  "by_source": {
+    "..\\teacher-cache-5m": 1.4465538423148274,
+    "..\\teacher-cache-expand-chat": 2.4253836135728664,
+    "..\\teacher-cache-expand-code": 1.6166617940047214
+  },
+  "source_deltas": {
+    "..\\teacher-cache-5m": -0.0009445964817766939,
+    "..\\teacher-cache-expand-chat": -0.000247288089227915,
+    "..\\teacher-cache-expand-code": -0.001672204074334216
+  },
+  "tolerance": 0.002,
+  "passed": true
+}

@@ -138,3 +138,66 @@ zero errors. No training or intentional spill was performed. The six-file focuse
 including `tests/test_spill_watch.py`, passes **89 tests** (23 spill tests). Existing
 historical measurements above remain unknown; this repair cannot recover missing samples.
 Details are in `spill-telemetry-repair-20260922.json`.
+
+## Review of `9cdfcf3`, and what the preflight left open — 2026-09-24
+
+The repair was checked against its own claims rather than taken as read. The shared step
+rejects stale, missing and duplicate optimizer parameters, clears the whole model's
+gradients, weights micro-batches by targets, normalizes the teacher KL by `B*(L-1)`,
+reduces replicas before a deduplicated clip and clips the router separately. Every
+earlier fix survived the rewrite; the ungrouped `epochs` path is gone rather than
+guarded, so every run has a finite, planned shape set and warm-up covers exactly it.
+Ten suites, 124 tests, pass with both GPUs visible.
+
+It also found what the earlier diagnosis missed: in the broken tensor-parallel run the
+orphaned body parameters still required gradients and `optimizer.zero_grad()` only
+clears its own, so their gradients accumulated for 1,663 steps and fed the clipping norm.
+
+**The reload gate had not been run.** The preflight config defines it -- the same
+held-out documents, reload within 0.002 nat in aggregate and per source -- and no report
+recorded it. `reload_probe.py` on both preflight checkpoints:
+
+| checkpoint | in-loop | reloaded | delta | worst source delta |
+| --- | --- | --- | --- | --- |
+| initial (step 3) | 1.641797 | 1.640701 | -0.001096 | -0.001672 |
+| resumed (step 6) | 1.551504 | 1.551649 | +0.000145 | +0.001358 |
+
+Both pass. The 0.012 nat gap the broken run showed between its log and its checkpoint
+does not appear under the new pipeline. The body trains: 1,915.1M of 1,915.2M parameters
+changed over six steps.
+
+## bf16 weights discard most updates
+
+That count hides the largest remaining defect. The trainer holds weights in bfloat16
+(`smoke_train.py`, `from_pretrained(..., dtype=torch.bfloat16)`) and `bnb.AdamW8bit`
+writes into them with no float32 master copy. bf16 keeps 8 significant bits, so an Adam
+step of about `lr` survives rounding only when it exceeds half an ulp, `|w| * 2^-9`. At
+lr 7.3e-6 that is `|w| < 0.002`. Measured on the single-card kd arm after ~2,000 steps,
+all MLP weights:
+
+| \|w\| | elements | changed |
+| --- | --- | --- |
+| < 2.4e-4 | 20.3M | 99.9% |
+| 2.4e-4 - 9.8e-4 | 60.5M | 99.6-99.8% |
+| 9.8e-4 - 2.0e-3 | 79.0M | 96.7% |
+| 2.0e-3 - 3.9e-3 | 148.7M | 0.7% |
+| >= 3.9e-3 | 597.4M | **0.0%** |
+
+Across the whole model the kd arm changed **13.3%** of its elements; every norm, `A_log`
+and `dt_bias` changed none, the embedding 4.1%. The six-step preflight had already reached
+11.6%, so the movable set is fixed by magnitude within a few steps and more tokens do not
+widen it. Which weights train is decided by their size, not their gradient.
+
+Every training result in this project was produced under this, including the finding that
+distillation "protects rather than recovers": most of the model could not move. It needs
+fixing before another comparison. The options, none installed as a library here
+(`torchao` and `optimi` are absent):
+
+* float32 master weights with bf16 compute -- the standard fix; costs 4 bytes a
+  parameter on top, about 3.8 GiB per card once split, and the home card carries the
+  un-split embedding;
+* stochastic rounding of the bf16 write -- unbiased, no extra memory, but needs an
+  optimizer that exposes the update, which `bnb.AdamW8bit` applies inside its kernel;
+* a bf16 Kahan compensation buffer -- 2 bytes a parameter, same constraint on the update.
+
+Raw results: `reload-probe-initial-20260924.json`, `reload-probe-resumed-20260924.json`.
