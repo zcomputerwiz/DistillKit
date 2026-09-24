@@ -54,7 +54,8 @@ from distillkit.models.qwen35.csa2 import (dense_routing,  # noqa: E402
                                            routing_report, router_parameters)
 from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
-from training_step import backward_step, check_optimizer, optimizer_step, synchronize  # noqa: E402
+from training_step import (KahanAdamW8bit, backward_step, check_optimizer,  # noqa: E402
+                           optimizer_step, synchronize)
 from training_state import (PlannedBatches, WindowBatches, read_training_state,  # noqa: E402
                             restore_training_state, save_training_state, take_step)
 
@@ -222,6 +223,11 @@ def main(argv=None) -> int:
                              "scored tokens; the tail is long-context documents whose "
                              "prompts reach 7,131 tokens. Zero keeps every document, "
                              "which is what every arm measured so far did.")
+    parser.add_argument("--no-kahan", action="store_true",
+                        help="stock AdamW8bit on the bf16 weights, which discards every "
+                             "update under half an ulp. Only for reproducing runs made "
+                             "before the compensated optimizer; at lr 7.3e-6 it freezes "
+                             "every weight with |w| >= 0.002.")
     parser.add_argument("--kl-chunk", type=int, default=256,
                         help="positions per head projection in the teacher KL, as a row "
                              "budget at batch 1. A full row is 248320 wide. It does not "
@@ -705,8 +711,13 @@ def main(argv=None) -> int:
     # Only what trains: a frozen parameter takes no gradient, and handing it to the
     # optimizer still buys it two state tensors it will never read.
     trainable = [p for p in model.parameters() if p.requires_grad]
-    optimizer = bnb.optim.AdamW8bit(trainable, lr=args.lr, betas=(0.9, 0.95),
-                                    weight_decay=0.1)
+    # Weights are bf16 and bitsandbytes rounds each update into them to nearest, so
+    # an update under half an ulp is lost every step: at lr 7.3e-6 every weight with
+    # |w| >= 0.002 was frozen, 87% of the model. Kahan compensation keeps what the
+    # rounding drops; see KahanAdamW8bit. `--no-kahan` reproduces the old runs.
+    optimizer_class = bnb.optim.AdamW8bit if args.no_kahan else KahanAdamW8bit
+    optimizer = optimizer_class(trainable, lr=args.lr, betas=(0.9, 0.95),
+                                weight_decay=0.1)
     # The failure this guards against is silent in every other way: the loss falls, no
     # tensor is missing, and only a diff against the starting checkpoint shows that most
     # of the model never moved. So the invariant is asserted rather than assumed.

@@ -201,3 +201,52 @@ fixing before another comparison. The options, none installed as a library here
 * a bf16 Kahan compensation buffer -- 2 bytes a parameter, same constraint on the update.
 
 Raw results: `reload-probe-initial-20260924.json`, `reload-probe-resumed-20260924.json`.
+
+## Kahan-compensated AdamW8bit -- 2026-09-24
+
+bitsandbytes has no supported fix. `AdamW8bit` (0.50.2) has no rounding or master-weight
+option, and its kernel receives the parameter pointer and writes the update in place,
+round-to-nearest. Stochastic rounding for its optimizers was requested in 2024 as
+bitsandbytes #1165 and is open, labelled low priority. It is not an oversight on their
+side: like `torch.optim.AdamW` it updates whatever dtype the weights are, on the standard
+mixed-precision assumption that masters stay fp32. This trainer loads straight into
+bf16, which is what exposes it.
+
+`KahanAdamW8bit` (in `training_step.py`) does what optimi does for its own optimizers.
+Each bf16 weight carries a bf16 buffer holding what rounding drops; per parameter, the
+step hands bitsandbytes' own fp32 kernel `weight + compensation`, rounds back and keeps
+the remainder. The 8-bit moments and the kernel are unchanged -- the moments do not
+depend on the parameter dtype -- and weight decay runs inside the compensated sum. It is
+the default; `--no-kahan` reproduces earlier runs.
+
+Against the same kernel on fp32 weights fed the same gradients, 200 steps:
+
+| \|w\| | compensated movement / fp32 movement | RMS error | stock bf16 movement / fp32 |
+| --- | --- | --- | --- |
+| < 1e-3 | 1.0000 | 0.00% | 1.02 |
+| 1e-3 - 1e-2 | 1.0000 | 0.01% | 0.47-0.49 |
+| 1e-2 - 1e-1 | 1.0000-1.0001 | 0.10-0.11% | **0.00** |
+| 1e-1 - 1 | 1.0037-1.0045 | 2.6-2.7% | **0.00** |
+
+Unbiased everywhere. The few percent near |w| = 1 is the limit of a bf16 buffer -- the
+residual it holds grows to half an ulp of the weight, so its own ulp approaches one step --
+and is noise around the right answer, not lost movement. That band is norm-sized
+parameters; the matrices sit at 0.002-0.05.
+
+On the real model, the preflight configuration for six steps: 99.9% of 1,915M elements
+now carry an update that rounding would have dropped, 99.8-100% in every matrix family
+and the embedding, against 11.6% for the stock optimizer at six steps and 13.3% at 2,000.
+Peak memory on the home card is **18.47 GiB against 14.16** -- the buffers, plus one
+parameter's fp32 working copy and gradient at a time, 4 GB for the 508M-row embedding.
+Chunking that one update is the lever if the batch has to grow.
+
+The 102 parameters with no buffer are all accounted for: 48 fp32 `branch_gain_delta`
+take the stock path; 48 decoder layernorms take no gradient because the gated residual
+route replaces the block norm with `branch_gain_delta` by design; 6 `index_gate`s are
+detached by the isolated-indexer policy. Held-out over six steps on 12 documents is not a
+quality signal -- the stock preflight swings 1.82, 2.15, 1.64, 1.67, 1.86, 1.55.
+
+`copy_train.py`, `sidecar_train.py`, `tp_train.py`, `benchmark.py` and `profile_step.py`
+still build stock `AdamW8bit` on bf16 weights and have the same defect.
+
+Raw result: `kahan-probe-20260924.json`.

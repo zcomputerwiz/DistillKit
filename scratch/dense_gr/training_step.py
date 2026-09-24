@@ -3,9 +3,56 @@ from __future__ import annotations
 
 import contextlib
 
+import bitsandbytes as bnb
 import torch
 
 from teacher_kl import accumulation_shares, grouped_tail_kl, scored_mask
+
+
+class KahanAdamW8bit(bnb.optim.AdamW8bit):
+    """AdamW8bit whose bf16 weights keep what rounding would discard.
+
+    bitsandbytes updates a parameter in whatever dtype it is stored in, rounding to
+    nearest inside its kernel, and it keeps no float32 master copy -- the 8-bit part
+    compresses Adam's moments, not the weights. On bf16 weights that loses every
+    update smaller than half an ulp, `|w| * 2^-9`: at lr 7.3e-6 that is every weight
+    with `|w| >= 0.002`. Measured on a 2,000-step run of this model, 13.3% of its
+    elements changed, weights above 0.0039 changed none, and no norm moved at all.
+    Stochastic rounding for these optimizers was requested upstream in 2024
+    (bitsandbytes #1165) and is not implemented.
+
+    This does what optimi does for its own optimizers: each bf16 weight carries a
+    bf16 compensation buffer holding the part of every update that rounding would
+    have dropped. Per parameter, the step runs bitsandbytes' own fp32 kernel on a
+    working copy `weight + compensation`, then rounds back and keeps the remainder.
+    Weight decay runs inside the same kernel, so it is inside the compensated sum
+    rather than rounded on its own. The 8-bit moments are unchanged -- they do not
+    depend on the parameter dtype -- and the kernel is unchanged; only the tensor
+    it is handed differs.
+
+    Costs 2 bytes a parameter for the buffer, half of float32 master weights, plus
+    one parameter's float32 working copy and gradient at a time during the step.
+    Non-bf16 parameters take the stock path.
+    """
+
+    @torch.no_grad()
+    def update_step(self, group, p, gindex, pindex):
+        if p.dtype != torch.bfloat16:
+            return super().update_step(group, p, gindex, pindex)
+        state = self.state[p]
+        if "compensation" not in state:
+            state["compensation"] = torch.zeros_like(p, memory_format=torch.contiguous_format)
+        compensation = state["compensation"]
+        low, grad = p.data, p.grad
+        p.data = low.float().add_(compensation.float())
+        p.grad = grad.float()
+        try:
+            super().update_step(group, p, gindex, pindex)
+            work = p.data
+        finally:
+            p.data, p.grad = low, grad
+        low.copy_(work)
+        compensation.copy_(work.sub_(low.float()))
 
 
 def check_optimizer(model, optimizer):
