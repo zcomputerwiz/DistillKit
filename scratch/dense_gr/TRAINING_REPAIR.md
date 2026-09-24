@@ -285,3 +285,46 @@ trained, not only how far. Its verdicts rest on arms trained under the freeze.
 Checked and clean: the teacher KL upcasts each logit chunk itself (pinned by
 `test_bf16_outputs.py`); the indexer warm-up trains in float32 at lr 1e-3; the conversion
 solves in float64 and rounds once on write.
+
+## Learning-rate sweep under compensated updates -- 2026-09-24
+
+lr 7.3e-6 was chosen, and only ever run, while the bf16 freeze decided which weights
+could move -- and under the freeze a lower rate meant fewer weights moving at all. This
+re-measures it with `KahanAdamW8bit`.
+
+Seven arms, identical but for `lr`: `warmed-chat32`, `teacher-cache-5m`, blend 0.5,
+indexer weight 1, prefix cap 1024, `--min-answer-tokens 2`, 6,144 tokens a step
+(`--micro-tokens 3072 --accumulate 2`), two cards, warm-up 20, 120 steps, 713,108 tokens,
+seed 0 -- so the same data in the same order, and every difference is paired. Scored
+afterwards in one process on 128 held-out documents (73,088 targets, prefixes floored to
+the routing block), paired bootstrap over documents, 10,000 draws.
+
+| lr | held-out NLL | vs 3.65e-6 | 95% CI |
+| --- | --- | --- | --- |
+| start (untrained) | 1.3457 | +0.5561 | [+0.4449, +0.6751] |
+| 9.1e-7 | 0.7984 | +0.0088 | [-0.0086, +0.0274] |
+| **1.83e-6** | **0.7813** | -0.0083 | [-0.0192, +0.0048] |
+| 3.65e-6 | 0.7896 | -- | -- |
+| 7.3e-6 | 0.8367 | +0.0471 | [+0.0362, +0.0585] |
+| 1.46e-5 | 0.8972 | +0.1076 | [+0.0892, +0.1251] |
+| 2.92e-5 | 0.9798 | +0.1902 | from the first pass, paired against 7.3e-6: +0.1431 |
+| 5.84e-5 | 1.2026 | +0.4130 | first pass: +0.3659 against 7.3e-6 |
+
+**The optimum is a flat basin from about 0.9e-6 to 3.65e-6**, whose three points are
+inside each other's intervals. 7.3e-6 is off it by 0.047 nats with an interval clear of
+zero, and every doubling above costs more; 5.84e-5 spikes to 1.86 training loss by step 20.
+
+The sweep is 120 steps; a full run is about fourteen times longer, and the optimum moves
+down with horizon, not up. So the long-run choice is the low half of the basin:
+**1.83e-6**, a quarter of the old rate. Caveats: one seed; held-out NLL on the capture's
+own distribution, not MMLU; the router trains at the same rate and has not been swept.
+
+Setting it up exposed one more silent failure. `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`,
+set by every run here, is not supported on Windows -- PyTorch warns and ignores it -- so
+the caching allocator fragments. The first probe at this batch died asking for 1.89 GiB,
+the embedding's float32 working copy, with 9.51 GiB reserved but unallocated. Large
+parameters are now updated in 64M-element chunks aligned to bitsandbytes' 256-element
+state blocks, which a test pins as bit-identical to one pass. Home-card peak at this
+batch: 19.46 GiB; 1,780-1,820 tokens a second.
+
+Raw results: `sweep-eval-20260924.json`, `sweep-eval-low-20260924.json`, `sweep-lr-*.json`.

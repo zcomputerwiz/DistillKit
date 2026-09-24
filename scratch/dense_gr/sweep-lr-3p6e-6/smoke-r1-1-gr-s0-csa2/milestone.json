@@ -1,0 +1,101 @@
+{
+  "variant": "r1-1-gr-s0-csa2",
+  "seed": 0,
+  "architecture": {
+    "ratio": "1:1",
+    "blend": 1.0,
+    "init_from": "scratch\\dense_gr\\checkpoints-2b\\warmed-chat32",
+    "converted": false,
+    "frozen_router": false,
+    "dense_routing": false,
+    "asymmetric": false,
+    "variant": "r1-1-gr-s0-csa2",
+    "hidden": 2048,
+    "norm_mode": "exact",
+    "layers": 24,
+    "full_attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "scored_tokens": 713108,
+  "optimizer_steps": 120,
+  "final_loss": 0.8592862784862518,
+  "final_heldout": null,
+  "final_copy": null,
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5095325203252032,
+      "selected": 0.35891693269486563,
+      "entropy": 0.9614083766937256
+    },
+    {
+      "layer": 7,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5096741615853658,
+      "selected": 0.35923367251928706,
+      "entropy": 0.9572039246559143
+    },
+    {
+      "layer": 11,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5071208079268292,
+      "selected": 0.35572043761638733,
+      "entropy": 0.9597090482711792
+    },
+    {
+      "layer": 15,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5115383638211383,
+      "selected": 0.3615614192604416,
+      "entropy": 0.9611325860023499
+    },
+    {
+      "layer": 19,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5157196392276423,
+      "selected": 0.36708649241819635,
+      "entropy": 0.9546920657157898
+    },
+    {
+      "layer": 23,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.4985893038617886,
+      "selected": 0.3445771814312317,
+      "entropy": 0.96342533826828
+    }
+  ],
+  "tokens_per_second": 1794.071467503657,
+  "peak_reserved_gib": 20.333984375
+}

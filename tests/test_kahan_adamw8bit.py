@@ -127,3 +127,30 @@ def test_the_compensation_survives_a_save_and_reload():
         fresh.step()
 
     torch.testing.assert_close(resumed.data, through.data, rtol=0, atol=0)
+
+
+@cuda
+def test_chunked_update_is_bit_identical_to_a_single_pass():
+    """Chunking is only allowed to change memory, never a single bit of the result.
+
+    The 8-bit state is quantized in independent 256-element blocks, each with its own
+    absmax, so slicing at block boundaries must reproduce the one-pass update exactly --
+    including a final chunk that is not a whole number of chunks long.
+    """
+    from training_step import KahanAdamW8bit
+
+    numel = 256 * 37 + 256 * 5            # not a multiple of the chunk below
+    start = weights(numel)
+    grads = gradients(numel, 25)
+
+    whole, whole_opt = run(KahanAdamW8bit, start, torch.bfloat16, grads)
+
+    class Chunked(KahanAdamW8bit):
+        chunk = 256 * 4                    # forces 11 chunks, the last one ragged
+
+    sliced, sliced_opt = run(Chunked, start, torch.bfloat16, grads)
+    torch.testing.assert_close(sliced.data, whole.data, rtol=0, atol=0)
+    for key in ("compensation", "state1", "state2", "absmax1", "absmax2"):
+        torch.testing.assert_close(sliced_opt.state[sliced][key],
+                                   whole_opt.state[whole][key], rtol=0, atol=0)
+    assert sliced_opt.state[sliced]["step"] == whole_opt.state[whole]["step"] == 25

@@ -35,6 +35,17 @@ class KahanAdamW8bit(bnb.optim.AdamW8bit):
     Non-bf16 parameters take the stock path.
     """
 
+    # Elements per float32 working chunk: 64M, 256 MiB. Must be a multiple of the
+    # 256-element block bitsandbytes quantizes its state in, so every chunk boundary is
+    # a block boundary and the chunked update is bit-identical to a single pass.
+    #
+    # Chunking exists because the working copy is the largest allocation in the step.
+    # For the 508M-row embedding it is 1.89 GiB each for weight and gradient, and on
+    # Windows `expandable_segments` is not supported -- PyTorch warns and ignores it --
+    # so the caching allocator fragments: a run at 6,144 tokens a step died asking for
+    # 1.89 GiB with 9.51 GiB reserved but unallocated.
+    chunk = 1 << 26
+
     @torch.no_grad()
     def update_step(self, group, p, gindex, pindex):
         if p.dtype != torch.bfloat16:
@@ -43,6 +54,8 @@ class KahanAdamW8bit(bnb.optim.AdamW8bit):
         if "compensation" not in state:
             state["compensation"] = torch.zeros_like(p, memory_format=torch.contiguous_format)
         compensation = state["compensation"]
+        if state["state1"].dtype == torch.uint8 and p.numel() > self.chunk:
+            return self._chunked_8bit_step(group, p, gindex, pindex, state, compensation)
         low, grad = p.data, p.grad
         p.data = low.float().add_(compensation.float())
         p.grad = grad.float()
@@ -53,6 +66,39 @@ class KahanAdamW8bit(bnb.optim.AdamW8bit):
             p.data, p.grad = low, grad
         low.copy_(work)
         compensation.copy_(work.sub_(low.float()))
+
+    def _chunked_8bit_step(self, group, p, gindex, pindex, state, compensation):
+        """The same kernel call bitsandbytes makes, over block-aligned slices.
+
+        Mirrors `Optimizer2State.update_step`'s 8-bit branch, with the step counter
+        advanced once for the whole parameter rather than once per slice.
+        """
+        from bitsandbytes import functional as F
+
+        if self.chunk % 256:
+            raise ValueError("chunk must be a multiple of the 256-element state block")
+        p.data = p.data.contiguous()
+        p.grad = p.grad.contiguous()
+        config = self.get_config(gindex, pindex, group)
+        state["step"] += 1
+        step = state["step"]
+        low, grad, residual = p.data.view(-1), p.grad.view(-1), compensation.view(-1)
+        first, second = state["state1"].view(-1), state["state2"].view(-1)
+        betas = config["betas"]
+        for start in range(0, low.numel(), self.chunk):
+            end = min(start + self.chunk, low.numel())
+            blocks = slice(start // 256, (end + 255) // 256)
+            work = low[start:end].float().add_(residual[start:end].float())
+            F.optimizer_update_8bit_blockwise(
+                self.optimizer_name, grad[start:end].float(), work,
+                first[start:end], second[start:end],
+                betas[0], betas[1], betas[2] if len(betas) >= 3 else 0.0,
+                config.get("alpha", 0.0), config["eps"], step, config["lr"],
+                state["qmap1"], state["qmap2"],
+                state["absmax1"][blocks], state["absmax2"][blocks],
+                config["weight_decay"], gnorm_scale=1.0, skip_zeros=config["skip_zeros"])
+            low[start:end].copy_(work)
+            residual[start:end].copy_(work.sub_(low[start:end].float()))
 
 
 def check_optimizer(model, optimizer):
