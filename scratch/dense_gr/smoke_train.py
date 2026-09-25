@@ -97,6 +97,23 @@ _INHERITED_KEYS = ("csa2_token_head_weights", "csa2_rope_index", "csa2_candidate
                    "csa2_candidate_k", "mla_content_key_norm")
 
 
+def rate_scale(step, warmup, progress, decay_fraction=0.0, floor=0.1):
+    """Multiplier on each group's peak learning rate.
+
+    Linear warm-up over `warmup` steps, then constant, then -- if `decay_fraction` is
+    set -- linear decay to `floor` over that final fraction of the token budget. Decay is
+    keyed to tokens scored, not steps, because a run's step count is only known once its
+    batching plan exists and a resumed run restores its tokens, not a schedule.
+    """
+    scale = (step + 1) / warmup if step < warmup else 1.0
+    if decay_fraction > 0:
+        start = 1.0 - decay_fraction
+        if progress > start:
+            through = min(1.0, (progress - start) / decay_fraction)
+            scale *= 1.0 - (1.0 - floor) * through
+    return scale
+
+
 def excluded_documents(path):
     """Document ids to exclude, from a bare list or from contamination_audit's records."""
     if path is None:
@@ -182,6 +199,13 @@ def main(argv=None) -> int:
                              "0.9e-6 to 3.65e-6 within noise, 7.3e-6 worse by 0.047 nats "
                              "with an interval clear of zero (TRAINING_REPAIR.md). A model "
                              "trained from scratch wants far more; pass it explicitly.")
+    parser.add_argument("--decay-fraction", type=float, default=0.0,
+                        help="decay every group's learning rate linearly over this final "
+                             "fraction of the token budget, down to --decay-floor of its "
+                             "peak. 0 keeps it constant after warm-up, as every run before "
+                             "this did.")
+    parser.add_argument("--decay-floor", type=float, default=0.1,
+                        help="fraction of the peak the decay ends at")
     parser.add_argument("--router-lr", type=float, default=9.37e-4,
                         help="peak learning rate for the CSA2 router (the indexer "
                              "projections), 512x the body's. Swept at 1x, 8x, 64x and 512x "
@@ -885,9 +909,10 @@ def main(argv=None) -> int:
         microbatches = take_step(batches, args.accumulate, args.tokens - scored_tokens)
         if not microbatches:
             break
+        scale = rate_scale(step, args.warmup, scored_tokens / max(args.tokens, 1),
+                           args.decay_fraction, args.decay_floor)
         for group in optimizer.param_groups:
-            peak = group.get("peak_lr", args.lr)
-            group["lr"] = peak * (step + 1) / args.warmup if step < args.warmup else peak
+            group["lr"] = group.get("peak_lr", args.lr) * scale
         if step == args.benchmark_warmup_steps:
             for device in {p.device for p in model.parameters() if p.is_cuda}:
                 torch.cuda.reset_peak_memory_stats(device)
