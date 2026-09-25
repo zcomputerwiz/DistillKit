@@ -367,3 +367,26 @@ it would be beyond the rate the router has ever been validated at. The adapters 
 the body's rate: no rate helped NLL, and at 512x they set back the router's alignment.
 
 Raw results: `sweep-eval-groups-20260924.json`, `router-eval-20260924.json`.
+
+## Dropped features to re-test after the freeze -- 2026-09-24
+
+Every documented verdict in the repository was checked for what it trained, in what
+precision, at what rate. A training result is suspect when bf16 weights were updated
+without compensation at a rate whose freeze threshold, `lr * 2^9`, sits inside the range
+of the weights it was meant to move.
+
+| verdict | trained | precision, rate | freeze exposure | re-test? |
+| --- | --- | --- | --- | --- |
+| PLE responsibility transfer, "branch closed, negative" (`ple_forensics`) | whole decoder-layer windows plus sidecar | bf16, torch AdamW, 1e-5 to 3e-5 | severe: frozen above \|w\| 0.005-0.015; its lr sweep confounded | **yes** |
+| GR and PLE stage-1 retrofits, "hurting text NLL" (`eval-20260910`) | sidecar, backbone frozen | bf16 -- `loader.py` loads the student in bf16 by default -- at 1e-4; 1e-3 for the lr arm | partial: frozen above \|w\| 0.05, most likely the gains near 1; checkpoints not on disk to measure | yes, if GR/PLE are still candidates, after fixing the loader |
+| Python-specialized backbone B_code (`code_training`) | whole backbone | bf16, AdamW8bit, 2e-5 | severe: frozen above \|w\| 0.01 | only if the code-domain line is reopened |
+| code residual gate and structural sidecar, "closed" (`code_gate`, `mbpp_plus`) | gates and branches | **fp32**, 3e-3 | none in the fits; their "already absorbed by B_code" premise inherits B_code's | via B_code only |
+| state sidecar, "closed" (`state_sidecar`) | sidecar | **fp32** (cast explicitly), 3e-3 | none; same B_code premise | via B_code only |
+| gate diagnosis | calibration fits | fp32 | none | no |
+| modular phase 1 / 1b, "ineffective integration" | its own package | AdamW; parameter precision not verified | unverified | check before relying on it |
+| `dense_gr.md` "measured and rejected" | nothing -- compile and CUDA-graph speed | -- | none | no |
+| conversion calibration, latent ladder, refit | least-squares solves, not gradient steps | float64 | none | no (ladder has its own candidate cause) |
+
+The main trainer is still exposed: `distillkit/models/loader.py` loads the student in
+bf16 unless `model_kwargs.torch_dtype` overrides it, and nothing there compensates the
+update. Any stage-1 re-test through `distillkit.main` needs that fixed first.
