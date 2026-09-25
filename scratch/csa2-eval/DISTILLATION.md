@@ -239,3 +239,45 @@ the remaining 6.25 points belong to the conversion rather than to anything train
 afterwards -- so the lever is the conversion itself, not more tokens of the same. Worth
 measuring before anything else: whether the gap tracks conversion quality, by screening
 the mla-only and all-full checkpoints that already exist.
+
+## The repaired run (2026-09-24): the converted model matches its source on the MMLU screen
+
+Every fix from `scratch/dense_gr/TRAINING_REPAIR.md` at once: Kahan-compensated
+AdamW8bit, so updates are no longer rounded away; body lr 1.83e-6 and router lr 9.37e-4,
+from the sweeps; micro-batches weighted by targets; the optimizer built after sharding;
+replicas reduced; the batch KL denominator fixed; 152 contaminated documents excluded;
+`--min-answer-tokens 2`. From `checkpoints-2b/warmed-chat32`, on the merged 7.5M-token
+corpus (`teacher-cache-5m` plus the expansion captures), blend 0.5, 10M tokens (1.52
+passes), two cards, 1,755 tokens a second, home-card peak 21.58 GiB against a 21.6
+allowance.
+
+| metric | source | conv chat/32K | kd (old, frozen) | **repaired** |
+| --- | --- | --- | --- | --- |
+| mmlu acc (512) | **0.5762** | 0.5469 | 0.5137 | **0.5742** |
+| nll all | 1.3094 | 1.4174 | 0.7269 | **0.7257** |
+| nll content | 1.6954 | 1.8348 | 0.8997 | **0.8879** |
+| nll layout | 0.5575 | 0.5815 | **0.3422** | 0.3876 |
+| nll control | 0.4049 | 0.4702 | **0.0586** | 0.0876 |
+
+| comparison | estimate | 95% CI |
+| --- | --- | --- |
+| repaired - source, mmlu | -0.001953 | [-0.037109, +0.033203] |
+| repaired - conv chat/32K, mmlu | +0.027344 | [-0.013672, +0.068359] |
+| repaired - kd, mmlu | +0.060547 | [+0.019531, +0.101562] |
+| repaired - source, nll | -0.5837 | [-0.8923, -0.3305] |
+
+**The MMLU gap to the source is gone:** 0.2 points with an interval centred on zero.
+The conversion alone was 2.9 points short; the frozen-optimizer kd arm ended 6.25 points
+short and is now beaten by 6.1 with an interval clear of zero. The NLL column is still
+mostly domain adaptation, as it was for kd.
+
+Held-out on the capture's own split bottomed near step 1,200 (0.8991, 1.08 passes) and
+rose to 0.9237 by the end, in all three sources, while training loss kept falling: the
+second pass is beginning to overfit. The checkpoint screened is the final one; step
+1,200 is saved as resumable state and may be slightly better.
+
+**What this does not establish.** Everything changed at once -- calibration corpus,
+optimizer precision, learning rates, data -- so the gain is not attributed to any one of
+them. The 512 questions are the screen split, extended from 256, and every decision in
+this programme has been made on it; the `confirmation` split is untouched. This is the
+result it was reserved for.
