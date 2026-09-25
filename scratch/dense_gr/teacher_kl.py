@@ -301,9 +301,20 @@ class CachedTeacher:
         return min(self.cache.documents[doc_id]["length"], self.max_length or 1 << 30)
 
     def _answer_start(self, doc_id, marker):
-        """Index of the first answer token, or None if the document has no answer."""
-        ids = self.cache.read_document(doc_id, tokens_only=True)["input_ids"]
-        return first_response(ids[:self.cap(doc_id)], marker)
+        """Index of the first answer token, or None if the document has no answer.
+
+        A document with no chat markup at all -- raw prose, a source file -- is all
+        content, so its answer starts at the first token. Without that, a general-text
+        corpus has no assistant marker anywhere and every document of it would be
+        dropped as "all prompt". The test is the turn opener, the marker's first token:
+        a chat document that opens turns but never reaches an assistant turn inside the
+        cap still has no answer.
+        """
+        ids = self.cache.read_document(doc_id, tokens_only=True)["input_ids"][:self.cap(doc_id)]
+        start = first_response(ids, marker)
+        if start is None and int(marker[0]) not in set(ids.tolist()):
+            return 0
+        return start
 
     def _kept_answer(self, doc_id, width):
         """Conservative retained-answer count, preserving the existing filter.

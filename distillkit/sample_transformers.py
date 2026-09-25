@@ -231,7 +231,9 @@ def capture_teacher(
                 ids[start:stop] = indices.cpu().numpy().astype("<u4")
                 values[start:stop] = logprobs.to(torch.float16).cpu().numpy()
                 del chunk, best, indices, logprobs
-            states = np.empty((len(tokens), len(anchor_layers), hidden_size), dtype=np.uint8)
+            # Logits-only captures (no anchors) store no hidden states; see `_layouts`.
+            states = (np.empty((len(tokens), len(anchor_layers), hidden_size), dtype=np.uint8)
+                      if anchor_layers else None)
             for compact_index, layer_index in enumerate(anchor_layers):
                 hidden = anchor_states[layer_index]
                 if hidden.shape != (1, len(tokens), hidden_size):
@@ -242,7 +244,7 @@ def capture_teacher(
             writer.append(doc_id, tokens, ids, values, states,
                           split=record.get("split", "eval" if ordinal % eval_every == 0 else "train"),
                           original_length=len(raw_tokens))
-            del result, logits, states, hidden, anchor_states
+            del result, logits, states, anchor_states
             if ordinal % 100 == 0:
                 LOG.info("Captured document %d (%s)", ordinal + 1, doc_id)
     return Path(output) / "manifest.json"
@@ -271,7 +273,7 @@ def iter_jsonl(path: str | Path, tokenizer=None, *, add_special_tokens: bool = T
 @click.option("--tokenizer", default=None)
 @click.option("--tokenizer-json", type=click.Path(exists=True, dir_okay=False), required=True,
               help="Exact tokenizer.json used to prepare input tokens; SHA256 goes in manifest.")
-@click.option("--anchor", "anchors", type=int, multiple=True, required=True)
+@click.option("--anchor", "anchors", type=int, multiple=True, required=False, help="teacher hidden_states indices to store as fp8 anchors; omit for a logits-only capture, which stores only the top-k distribution distillation reads, at about 4%% of the size")
 @click.option("--sequence-length", type=click.IntRange(min=1), default=4096, show_default=True)
 @click.option("--top-k", type=click.IntRange(min=1), default=64, show_default=True)
 @click.option("--shard-tokens", type=click.IntRange(min=1), default=65536, show_default=True)

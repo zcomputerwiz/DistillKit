@@ -60,12 +60,19 @@ def _digest(value: Any, name: str) -> str:
 
 
 def _layouts(top_k: int, anchors: int, hidden_size: int):
-    return {
+    """The arrays a shard holds. A capture with no anchor layers is logits-only: it
+    stores no hidden-state array at all, rather than a zero-width one. The distillation
+    objective reads only the top-k distribution, and the hidden states were ~96% of a
+    capture's size -- two fp8 anchors of a 5120-wide teacher are 10 KB a token against
+    384 bytes for top-64."""
+    layouts = {
         "input_ids": (np.dtype("<u4"), ()),
         "topk_ids": (np.dtype("<u4"), (top_k,)),
         "topk_logprobs": (np.dtype("<f2"), (top_k,)),
-        "hidden_states": (np.dtype("u1"), (anchors, hidden_size)),
     }
+    if anchors:
+        layouts["hidden_states"] = (np.dtype("u1"), (anchors, hidden_size))
+    return layouts
 
 
 class OfflineCacheWriter:
@@ -96,8 +103,8 @@ class OfflineCacheWriter:
         _digest(tokenizer_hash, "tokenizer_hash")
         if tokenizer_vocab_fingerprint is not None:
             _digest(tokenizer_vocab_fingerprint, "tokenizer_vocab_hash")
-        if not anchor_layers or len(set(anchor_layers)) != len(anchor_layers):
-            raise ValueError("anchor_layers must be nonempty and unique")
+        if len(set(anchor_layers)) != len(anchor_layers):
+            raise ValueError("anchor_layers must be unique; empty means logits-only")
         if any(type(i) is not int or i < 0 for i in anchor_layers):
             raise ValueError("anchor_layers must contain nonnegative hidden-state indices")
         for key, val in dict(hidden_size=hidden_size, vocab_size=vocab_size,
@@ -174,7 +181,7 @@ class OfflineCacheWriter:
         input_ids: np.ndarray,
         topk_ids: np.ndarray,
         topk_logprobs: np.ndarray,
-        hidden_states: np.ndarray,
+        hidden_states: np.ndarray | None = None,
         *,
         split: str = "train",
         original_length: int | None = None,
@@ -192,7 +199,13 @@ class OfflineCacheWriter:
         if type(original_length) is not int or original_length < len(tokens):
             raise ValueError("original_length cannot be smaller than stored token length")
         data = {"input_ids": tokens, "topk_ids": np.asarray(topk_ids),
-                "topk_logprobs": np.asarray(topk_logprobs), "hidden_states": np.asarray(hidden_states)}
+                "topk_logprobs": np.asarray(topk_logprobs)}
+        if "hidden_states" in self.layouts:
+            if hidden_states is None:
+                raise ValueError("this capture stores anchor hidden states; pass them")
+            data["hidden_states"] = np.asarray(hidden_states)
+        elif hidden_states is not None:
+            raise ValueError("this capture is logits-only; it has no anchors to store")
         for name, (dtype, shape) in self.layouts.items():
             arr = data[name]
             if arr.shape != (len(tokens), *shape):
@@ -303,7 +316,7 @@ class OfflineTeacherCache:
         if m["top_k"] > m["vocab_size"] or m["vocab_size"] > 2**32 or m["shard_tokens"] < m["sequence_length"]:
             raise ValueError("Invalid vocabulary/shard geometry")
         anchors = m["anchor_layers"]
-        if not isinstance(anchors, list) or not anchors or any(type(i) is not int or i < 0 for i in anchors) or len(set(anchors)) != len(anchors):
+        if not isinstance(anchors, list) or any(type(i) is not int or i < 0 for i in anchors) or len(set(anchors)) != len(anchors):
             raise ValueError("Invalid anchor_layers")
         self.anchor_layers = tuple(anchors)
         self.hidden_size, self.vocab_size = m["hidden_size"], m["vocab_size"]

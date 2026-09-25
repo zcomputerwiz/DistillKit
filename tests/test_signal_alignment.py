@@ -1,10 +1,10 @@
-"""End-to-end capture -> cache -> signal doc/token alignment (gate 4, synthetic).
+﻿"""End-to-end capture -> cache -> signal doc/token alignment (gate 4, synthetic).
 
 The single-pass capture (``sample_transformers.capture_teacher``) and the offline
 signal source (``OfflineHiddenStateSignalSource``) are the two ends of the teacher
 pipeline. Nothing else in the suite drives them together, so this is the regression
 gate that a freshly captured cache round-trips with the right tokens at the right
-positions, real top-k log probabilities, and correctly-layered anchor states — and
+positions, real top-k log probabilities, and correctly-layered anchor states â€” and
 that a misaligned batch is rejected rather than silently feeding shifted signals.
 
 All work is CPU-only on a tiny teacher; no GPU model load.
@@ -163,3 +163,50 @@ def test_signal_source_rejects_misaligned_tokens(tmp_path):
              "doc_id": ["a"]},
             return_hidden_states=True,
         )
+
+
+def test_a_logits_only_capture_stores_the_distribution_and_no_hidden_states(tmp_path):
+    """Capture with no anchor layers: the top-k targets are identical, nothing else is kept.
+
+    Distillation reads only the top-k distribution. Two fp8 anchors of a 5120-wide
+    teacher are 10 KB a token against 384 bytes for top-64, so a capture that keeps them
+    is ~96% hidden state the trainer never reads. The logits-only capture must store the
+    same token ids and top-k values as an anchored one of the same documents, and refuse
+    to pretend it has hidden states.
+    """
+    docs = [("a", [5, 8, 9, 3, 10, 12], "train"), ("b", [20, 6, 30, 44, 2, 7, 55], "eval")]
+    _capture(tmp_path, docs)
+    (tmp_path / "anchored").mkdir()
+    (tmp_path / "cache").rename(tmp_path / "anchored" / "cache")
+    _capture(tmp_path, docs, anchor_layers=[])
+
+    full = OfflineTeacherCache(tmp_path / "anchored" / "cache")
+    lean = OfflineTeacherCache(tmp_path / "cache")
+    assert lean.manifest["anchor_layers"] == []
+    for doc_id in ("a", "b"):
+        want = full.read_document(doc_id)
+        got = lean.read_document(doc_id)
+        assert "hidden_states" not in got
+        for key in ("input_ids", "topk_ids", "topk_logprobs"):
+            np.testing.assert_array_equal(got[key], want[key])
+    assert set(lean.document_ids("eval")) == {"b"}
+
+    size = lambda root: sum(p.stat().st_size for p in root.rglob("*") if p.is_file() and p.name != "manifest.json")
+    assert size(tmp_path / "cache") < size(tmp_path / "anchored" / "cache")
+    full.close()
+    lean.close()
+
+
+def test_the_writer_refuses_hidden_states_it_has_no_anchors_for(tmp_path):
+    from distillkit.offline_cache import OfflineCacheWriter
+
+    writer = OfflineCacheWriter(tmp_path / "lean", tokenizer_hash="ab" * 32, anchor_layers=[],
+                                hidden_size=8, vocab_size=64, sequence_length=8, top_k=4,
+                                shard_tokens=64)
+    ids = np.arange(4, dtype=np.uint32)
+    topk = np.zeros((4, 4), dtype=np.uint32)
+    values = np.full((4, 4), -1.0, dtype=np.float16)
+    with pytest.raises(ValueError, match="logits-only"):
+        writer.append("x", ids, topk, values, np.zeros((4, 1, 8), dtype=np.uint8))
+    writer.append("y", ids, topk, values)
+    writer.close()

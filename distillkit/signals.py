@@ -148,6 +148,10 @@ class OfflineHiddenStateSignalSource(SignalSource):
                 sparse_ids[row, start:end] = torch.from_numpy(cached["topk_ids"].astype(np.int64))
                 sparse_values[row, start:end] = torch.from_numpy(cached["topk_logprobs"])
                 if hidden_states is not None:
+                    if "hidden_states" not in cached:
+                        raise ValueError(
+                            "hidden-state distillation needs a capture with anchor layers; "
+                            "this one is logits-only (captured without --anchor)")
                     decoded = torch.from_numpy(cached["hidden_states"]).view(torch.float8_e4m3fn)
                     for anchor, target in enumerate(hidden_states):
                         target[row, start:end] = decoded[:, anchor, :]

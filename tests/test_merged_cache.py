@@ -112,7 +112,7 @@ def test_min_answer_tokens_drops_documents_that_are_all_prompt(tmp_path):
     # answer positions (8..14) and a length-11 one has 2.
     tokens = {"answer": [5] * 6 + MARKER + [7] * 8,
               "short": [5] * 6 + MARKER + [7] * 3,
-              "prompt": [5] * 10}
+              "prompt": [MARKER[0]] + [5] * 9}   # opens a chat turn, never answers
     path = write(tmp_path / "one", list(tokens), tokens=tokens)
     assert len(CachedTeacher(path, "train", device="cpu")) == 3
 
@@ -358,3 +358,18 @@ def test_an_exclusion_list_for_another_corpus_is_refused(tmp_path):
     path = write(tmp_path / "one", ["a", "b"])
     with pytest.raises(ValueError, match="in none of these captures"):
         CachedTeacher(path, "train", device="cpu", exclude={"a", "not-here"})
+
+
+def test_plain_text_documents_are_all_answer(tmp_path):
+    """Raw prose has no assistant marker and must not be dropped as all prompt."""
+    from teacher_kl import CachedTeacher
+
+    opener = MARKER[0]
+    tokens = {"prose": [5, 6, 7, 8] * 4,                      # no chat markup at all
+              "chat": [opener, 5, 5] + MARKER + [7] * 8,       # a real answer
+              "stuck": [opener, 5, 5, 5, 5, 5, 5, 5, 5, 5]}    # opens a turn, never answers
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    teacher = CachedTeacher(path, "train", device="cpu", answer_marker=MARKER,
+                            min_answer_tokens=2)
+    assert sorted(teacher.ids) == ["chat", "prose"]
+    assert teacher.answer_start["prose"] == 0
