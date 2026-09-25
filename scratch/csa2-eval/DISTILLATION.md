@@ -301,3 +301,24 @@ training recover 0.013 of it. The repaired model matches the source on MMLU and 
 by 0.58 nats in-domain while remaining 27% worse in perplexity on general prose: the
 training corpus repairs what it contains and nothing else. Closing this gap needs general
 text in the training corpus, not more chat.
+
+### General-text pilot (2026-09-25): half the gap closed, MMLU to watch
+
+A logits-only capture (`general_corpus.py`, no hidden states, 1.09 GB for 3.0M tokens)
+of screened FineWeb-Edu (1.80M), FineMath (0.60M) and raw Python (0.60M), cut into
+1024-token pieces, mixed about half and half with `teacher-cache-5m` as chat replay.
+Continued from the repaired checkpoint with a fresh optimizer, 5M tokens. Interrupted by
+a machine restart at step 800 of 835 and resumed from the saved state, which re-scored
+held-out at 1.3901 against 1.3897 before the restart.
+
+| checkpoint | WikiText NLL | vs source | 95% CI | MMLU (512) | in-domain NLL |
+| --- | --- | --- | --- | --- | --- |
+| source | 2.5292 | -- | -- | 0.5762 | 1.3094 |
+| repaired | 2.7671 | +0.2379 | [+0.2240, +0.2534] | 0.5742 | 0.7257 |
+| general pilot | **2.6418** | **+0.1126** | [+0.1021, +0.1247] | 0.5410 | **0.7111** |
+
+About 2.5M tokens of general text closed 53% of the general-text gap, and in-domain NLL
+improved rather than regressing. MMLU moved -0.0332 against the repaired checkpoint
+[-0.0684, +0.0020] and -0.0352 against the source [-0.0742, +0.0039]: not significant,
+but a point estimate large enough that the scale-up is designed to protect it rather
+than assume it holds.
