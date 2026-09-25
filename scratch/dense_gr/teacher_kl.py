@@ -150,8 +150,16 @@ class CachedTeacher:
     """
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
-                 max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None):
+                 max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
+                 suppress=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
+        # Token ids to take out of the teacher's answer-region targets; see
+        # `suppress_teacher_tokens`. Needs each document's answer start, which only the
+        # answer filter records.
+        if suppress is not None and min_answer_tokens <= 0:
+            raise ValueError("suppress needs min_answer_tokens > 0 so answer starts are known")
+        self.suppress = None if suppress is None else np.asarray(suppress, dtype=np.int64)
+        self.suppressed_mass = 0.0
         self.cache = (OfflineTeacherCache(paths[0]) if len(paths) == 1
                       else MergedCache(paths))
         self.device = device
@@ -417,6 +425,12 @@ class CachedTeacher:
             ids.append(np.asarray(record["input_ids"][:width], dtype=np.int64))
             targets.append(np.asarray(record["topk_ids"][:width], dtype=np.int64))
             values.append(np.asarray(record["topk_logprobs"][:width], dtype=np.float32))
+            if self.suppress is not None:
+                start = self.answer_start.get(doc_id, 0)
+                if start is not None:
+                    values[-1], removed = suppress_teacher_tokens(
+                        ids[-1], targets[-1], values[-1], self.suppress, start)
+                    self.suppressed_mass += removed
         return {"input_ids": torch.from_numpy(np.stack(ids)).to(self.device,
                                                                 non_blocking=True),
                 "topk_ids": torch.from_numpy(np.stack(targets)).to(self.device,
@@ -443,6 +457,52 @@ class CachedTeacher:
 
     def close(self):
         self.cache.close()
+
+
+def suppress_teacher_tokens(ids, topk_ids, topk_logprobs, suppressed, start):
+    """The teacher's distribution with `suppressed` tokens removed, where the text disagrees.
+
+    The teacher only scores text, but a thinking model's scores still say how it would go
+    on: on code answers that never hedge, the 27B puts 0.69% of every line start on "Wait",
+    "Actually" or "Hmm". KL toward that teaches a 2B to second-guess itself, which it then
+    cannot resolve. So in the answer, from `start` on, a row whose next *actual* token is not
+    one of `suppressed` loses those entries, and the rest -- top-k and tail alike -- is
+    divided by what is left, which keeps their proportions. A row where the text itself
+    hedges keeps the teacher's view whole, so the target never contradicts the text.
+
+    Returns the new log probabilities and the total probability mass removed.
+    """
+    rows = len(ids)
+    active = np.zeros(rows, dtype=bool)
+    first = max(int(start) - 1, 0)
+    if rows > 1 and first < rows - 1:
+        active[first:rows - 1] = ~np.isin(ids[first + 1:rows], suppressed)
+    drop = np.isin(topk_ids, suppressed) & active[:, None]
+    if not drop.any():
+        return topk_logprobs, 0.0
+    probabilities = np.exp(topk_logprobs.astype(np.float64))
+    removed = np.where(drop, probabilities, 0.0).sum(axis=1).clip(max=0.999)
+    values = topk_logprobs.astype(np.float64) - np.log1p(-removed)[:, None]
+    # The cache's own sentinel for "no probability": finite, so exp() is exactly 0 and
+    # nothing downstream multiplies an infinity by zero.
+    values[drop] = -1e4
+    return values.astype(np.float32), float(removed.sum())
+
+
+#: Sentence openers a thinking teacher uses to second-guess itself. Capitalized forms
+#: only: lowercase " actually" is ordinary prose mid-sentence.
+HEDGE_OPENERS = ("Wait", "Actually", "Hmm", "Hold")
+
+
+def hedge_token_ids(tokenizer):
+    """Every single-token spelling of `HEDGE_OPENERS`, bare and space-prefixed."""
+    found = set()
+    for word in HEDGE_OPENERS:
+        for form in (word, " " + word):
+            pieces = tokenizer(form, add_special_tokens=False)["input_ids"]
+            if len(pieces) == 1:
+                found.add(int(pieces[0]))
+    return np.array(sorted(found), dtype=np.int64)
 
 
 def grouped_tail_kl(hidden, head, target_ids, target_values, mask, chunk_length=256):

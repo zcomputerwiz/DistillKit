@@ -299,6 +299,13 @@ def main(argv=None) -> int:
                              "scored tokens; the tail is long-context documents whose "
                              "prompts reach 7,131 tokens. Zero keeps every document, "
                              "which is what every arm measured so far did.")
+    parser.add_argument("--suppress-hedges", action="store_true",
+                        help="take the teacher's hedge openers (Wait, Actually, Hmm, Hold) "
+                             "out of its answer-region targets wherever the text does not "
+                             "hedge, renormalizing the rest. The 27B puts 0.69%% of every "
+                             "line start in never-hedging code answers on them, and a 2B "
+                             "distilled on that second-guesses itself into loops. Needs "
+                             "--min-answer-tokens.")
     parser.add_argument("--no-kahan", action="store_true",
                         help="stock AdamW8bit on the bf16 weights, which discards every "
                              "update under half an ulp. Only for reproducing runs made "
@@ -759,11 +766,17 @@ def main(argv=None) -> int:
         marker = (tokenizer(ANSWER_MARKER, add_special_tokens=False)["input_ids"]
                   if args.min_answer_tokens > 0 else None)
         excluded = excluded_documents(args.exclude_documents)
+        from teacher_kl import hedge_token_ids
+
+        suppress = hedge_token_ids(tokenizer) if args.suppress_hedges else None
+        if suppress is not None:
+            print("teacher: suppressing hedge openers %s in answers"
+                  % tokenizer.convert_ids_to_tokens(suppress.tolist()), flush=True)
         teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
                                 max_length=args.teacher_max_length,
                                 answer_marker=marker,
                                 min_answer_tokens=args.min_answer_tokens,
-                                exclude=excluded)
+                                exclude=excluded, suppress=suppress)
         held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
                                      max_length=args.teacher_max_length,
                                      answer_marker=marker,
@@ -1104,6 +1117,9 @@ def main(argv=None) -> int:
         "history": history,
         "run_args": run_args,
         "heldout_sample": held_sample if teacher is not None else None,
+        "suppressed_teacher_mass": (teacher.suppressed_mass
+                                    if teacher is not None and teacher.suppress is not None
+                                    else None),
     }
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
 

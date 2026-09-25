@@ -8,19 +8,25 @@ $samples = Join-Path $Dir "samples.jsonl"
 & "$root\.venv\Scripts\python.exe" -c @"
 import json, sys
 src, dst, bench = sys.argv[1], sys.argv[2], sys.argv[3]
-with open(src, encoding='utf-8') as f, open(dst, 'w', encoding='utf-8') as out:
+with open(src, encoding='utf-8-sig') as f, open(dst, 'w', encoding='utf-8') as out:
     for line in f:
         r = json.loads(line)
-        tid = r['task_id'] if bench == 'humaneval' else 'Mbpp/%s' % r['task_id']
+        tid = str(r['task_id'])
+        if bench == 'mbpp' and not tid.startswith('Mbpp/'):
+            tid = 'Mbpp/' + tid
         out.write(json.dumps({'task_id': tid, 'solution': r['code']}) + '\n')
 "@ (Join-Path $Dir "completions.jsonl") $samples $Bench
 $name = "code-bench-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
-docker create --name $name --network none --memory 8g --pids-limit 512 --cpus 8 `
-    code-bench-sandbox evalplus.evaluate --dataset $Bench --samples /home/runner/samples.jsonl --parallel 8 | Out-Null
+# robust_eval.py rather than `evalplus.evaluate`: one process per sample, so a test that gets
+# its worker killed fails that sample instead of hanging the pool. The Docker VM here has
+# 3.9 GiB; each test is capped at 512 MiB and the whole run at two hours.
+docker create --name $name --network none --memory 3700m --pids-limit 512 --cpus 8 `
+    -e EVALPLUS_MAX_MEMORY_BYTES=536870912 code-bench-sandbox `
+    timeout 7200 python robust_eval.py run $Bench /home/runner/samples.jsonl /home/runner/results.json 3 | Out-Null
 try {
     docker cp $samples "${name}:/home/runner/samples.jsonl"
     docker start -a $name
-    docker cp "${name}:/home/runner/samples_eval_results.json" (Join-Path $Dir "eval_results.json")
+    docker cp "${name}:/home/runner/results.json" (Join-Path $Dir "eval_results.json")
 } finally {
     docker rm -f $name | Out-Null
 }

@@ -6,5 +6,7 @@ RUN pip install --no-cache-dir "evalplus==0.3.1" \
  && useradd -m runner
 USER runner
 WORKDIR /home/runner
-# Fetch both datasets into the evalplus cache now, while the build still has network.
-RUN python -c "from evalplus.data import get_human_eval_plus, get_mbpp_plus; print(len(get_human_eval_plus()), len(get_mbpp_plus()))"
+COPY --chown=runner robust_eval.py /home/runner/robust_eval.py
+# Fetch both datasets, compute the reference outputs from the canonical solutions, and
+# split them one file per task, all while the build still has network.
+RUN python robust_eval.py shard
