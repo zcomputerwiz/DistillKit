@@ -321,7 +321,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # The last forward's block selection, kept so a run can report whether its router
         # is still choosing anything. Bool at [batch, blocks, blocks] -- a few kilobytes,
         # detached, out of the graph.
-        self.last_allowed = None
+        self._last_allowed = None
+        # The token path's selection, `(positions, valid)`, which `last_allowed` expands
+        # on demand: at long context the expanded form is the `[query, key]` tensor the
+        # path exists to avoid.
+        self.last_selection = None
+        # Queries per chunk on the token path. Memory there is about `chunk * seq` per
+        # layer rather than `seq^2`; at 1024 or fewer tokens it is one chunk.
+        self.query_chunk = int(getattr(config, "csa2_query_chunk", 1024))
         self.last_candidates = None
         self.last_candidate_index = None
         # Whether the last forward selected positions or blocks. The two paths report the
@@ -418,6 +425,21 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             # every checkpoint and take no gradient.
             del self.kv_a_proj
             del self.kv_a_norm
+
+    @property
+    def last_allowed(self):
+        if self._last_allowed is None and self.last_selection is not None:
+            positions, valid = self.last_selection
+            batch, seq, _ = positions.shape
+            counts = torch.zeros(batch, seq, seq, dtype=torch.int16, device=positions.device)
+            counts.scatter_add_(-1, positions, valid.to(torch.int16))
+            self._last_allowed = counts > 0
+        return self._last_allowed
+
+    @last_allowed.setter
+    def last_allowed(self, value):
+        self._last_allowed = value
+        self.last_selection = None
 
     @property
     def latent_dim(self) -> int:
@@ -1066,6 +1088,208 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         return self._attend_gathered(hidden_states, latent, rotary, allowed, effective,
                                      index_keys, position_embeddings, query)
 
+    def _token_path(self, past_key_values) -> bool:
+        """Whether this forward takes `_forward_tokens`, the one no-cache path.
+
+        Per-token selection is what training's sparse stage records and what the llama.cpp
+        graph (`build_lid_top_k`) computes, so a whole-sequence forward -- evaluation,
+        prefill, training -- has to agree with it. The block-sparse Flex path selects
+        128-token blocks instead, and scored the scale checkpoint 0.025 nats worse on
+        WikiText than the per-token path, so it no longer runs by default. What stays on
+        the dense gathered path: a decode step (it has a cache), dense routing (the
+        warm-up's teacher), and the two options this path does not carry -- the router's
+        logit bias and the candidate hierarchy.
+        """
+        return (past_key_values is None and not self.dense_routing
+                and not self.router_bias and self.candidate_k <= 0)
+
+    def _forward_tokens(self, hidden_states, position_embeddings):
+        """Per-token routing over a whole sequence, a chunk of queries at a time.
+
+        The same function as `_forward_gathered` with no cache: each query reads the
+        top-`top_k` positions by index score plus its last `local_window`. Nothing
+        `[query, key]`-sized outlives a chunk -- the selection is kept as positions, the
+        attention of each chunk is recomputed in backward rather than stored, and the
+        indexer's target is kept only over the positions it was selected on -- so memory
+        grows with the sequence rather than its square. At 1024 tokens and the default
+        chunk that is one chunk, the computation `_forward_gathered` does.
+
+        ponytail: each chunk's attention is dense SDPA under a mask, so compute is still
+        O(seq^2); a gather over the selected positions would make it O(seq * top_k).
+        """
+        batch, seq, _ = hidden_states.shape
+        if self.mode == "full":
+            query, compressed, queries = self._project(hidden_states)
+            latent, rotary = torch.split(compressed, [self.latent, self.rope_dim], dim=-1)
+            latent = self.kv_a_norm(latent)
+            rotary = self._rope_shared(rotary, position_embeddings)
+            index_keys = self.index_keys_from(latent, rotary)
+            self.bus.publish(self.layer_idx, index_keys, latent, rotary)
+        elif self.mode == "reindex":
+            query, queries = self._project(hidden_states)
+            index_keys, borrowed, rotary = self.bus.require_latent(
+                self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
+        else:
+            query, = self._project(hidden_states)
+            _, borrowed, rotary = self.bus.require_latent(self.latent_donor, self.layer_idx)
+            latent = self.kv_adapt(borrowed)
+
+        if self.mode == "reuse":
+            positions, valid = self.bus.require_selection(self.topk_donor, self.layer_idx)
+        else:
+            index_queries, weights = self._index_queries(
+                hidden_states, queries, position_embeddings)
+            positions, valid = self._select_positions(index_queries, index_keys, weights)
+            self.bus.select(self.layer_idx, (positions, valid))
+        self.last_allowed = None
+        self.last_selection = (positions, valid)
+        self.last_token_routed = True
+        self.last_candidates = None
+
+        from transformers.models.qwen3_5.modeling_qwen3_5 import apply_rotary_pos_emb
+        query_states, gate = torch.chunk(
+            query.view(batch, seq, -1, self.head_dim * 2), 2, dim=-1)
+        gate = gate.reshape(batch, seq, -1)
+        query_states = self.q_norm(
+            query_states.view(batch, seq, -1, self.head_dim)).transpose(1, 2)
+        cos, sin = position_embeddings
+        query_states, _ = apply_rotary_pos_emb(query_states, query_states, cos, sin)
+        projected = self.kv_b_proj(latent).view(
+            batch, seq, self.num_heads, self.content_dim + self.head_dim)
+        content_key, value_states = torch.split(
+            projected, [self.content_dim, self.head_dim], dim=-1)
+        if self.k_norm is not None:
+            content_key = self.k_norm(content_key)
+        shared = rotary.unsqueeze(1).expand(batch, self.num_heads, seq, self.rope_dim)
+        key_states = torch.cat([shared, content_key.transpose(1, 2)], dim=-1)
+        value_states = value_states.transpose(1, 2)
+
+        from torch.utils.checkpoint import checkpoint
+
+        outputs, targets = [], []
+        for start in range(0, seq, self.query_chunk):
+            end = min(seq, start + self.query_chunk)
+            q, k, v = query_states[:, :, start:end], key_states[:, :, :end], value_states[:, :, :end]
+            where, ok = positions[:, start:end], valid[:, start:end]
+            if self.record_attention:
+                targets.append(self._record_chunk(q, k, where, ok, start))
+            outputs.append(checkpoint(self._attend_chunk, q, k, v, where, ok, start,
+                                      use_reentrant=False))
+        if self.record_attention:
+            self.last_attention = (positions, valid, torch.cat(targets, dim=1))
+        attn_output = torch.cat(outputs, dim=2).transpose(1, 2).reshape(batch, seq, -1)
+        return self.o_proj(attn_output * torch.sigmoid(gate)), None
+
+    def _select_positions(self, index_queries, index_keys, weights):
+        """`(positions, valid)`, `[batch, seq, top_k + local_window]`: what each query reads.
+
+        The first `top_k` columns are the top-k over every causal position, exactly as
+        `_select_tokens` takes them, and the rest are the local window, which is not spent
+        out of the budget. A top-k pick that falls inside the window is marked invalid
+        rather than kept twice, so `valid` marks the union once -- the set
+        `_select_tokens` returns as a mask. Scored a chunk of queries at a time under
+        no_grad, so the `[query, key]` scores never exist whole.
+        """
+        batch, seq = index_queries.shape[:2]
+        device = index_queries.device
+        keep = max(1, min(self.top_k, seq))
+        window = max(self.local_window, 1)
+        top = torch.zeros(batch, seq, keep, dtype=torch.long, device=device)
+        chosen = torch.zeros(batch, seq, keep, dtype=torch.bool, device=device)
+        gain = weights.permute(0, 2, 1).unsqueeze(-1).float()
+        with torch.no_grad():
+            for start in range(0, seq, self.query_chunk):
+                end = min(seq, start + self.query_chunk)
+                scores = torch.einsum("bqhd,bkd->bhqk", index_queries[:, start:end].float(),
+                                      index_keys[:, :end].float())
+                scores = (torch.relu(scores) * gain[:, :, start:end]).sum(dim=1)
+                rows = torch.arange(start, end, device=device).view(-1, 1)
+                causal = torch.arange(end, device=device).view(1, -1) <= rows
+                scores = scores.masked_fill(~causal, float("-inf"))
+                picked = scores.topk(min(keep, end), dim=-1)
+                width = picked.indices.shape[-1]
+                top[:, start:end, :width] = picked.indices
+                # A pick among -inf is a row with fewer causal positions than the budget;
+                # one inside the window is already read by the window's own columns.
+                chosen[:, start:end, :width] = ((picked.values > float("-inf"))
+                                                & (rows - picked.indices >= window))
+            rows = torch.arange(seq, device=device).view(1, -1, 1)
+            local = rows - torch.arange(window, device=device).view(1, 1, -1)
+            positions = torch.cat([top, local.clamp_min(0).expand(batch, -1, -1)], dim=-1)
+            valid = torch.cat([chosen, (local >= 0).expand(batch, -1, -1)], dim=-1)
+        return positions, valid
+
+    def _chunk_allowed(self, where, ok, end):
+        """`[batch, chunk, end]` booleans for the queries `start:` from their positions."""
+        batch, rows, _ = where.shape
+        # Added rather than scattered: an invalid column points at 0 as well, and a
+        # scatter of True and False to the same place keeps whichever lands last.
+        counts = torch.zeros(batch, rows, end, dtype=torch.int16, device=where.device)
+        counts.scatter_add_(-1, where, ok.to(torch.int16))
+        return counts > 0
+
+    def _attend_chunk(self, q, k, v, where, ok, start):
+        allowed = self._chunk_allowed(where, ok, k.shape[2])
+        mask = torch.zeros(allowed.shape, dtype=q.dtype, device=q.device)
+        mask = mask.masked_fill(~allowed, float("-inf")).unsqueeze(1)
+        return torch.nn.functional.scaled_dot_product_attention(
+            q, k, v, attn_mask=mask, scale=self.scaling)
+
+    def _record_chunk(self, q, k, where, ok, start):
+        """`_record`'s target for one chunk, kept only at the positions read.
+
+        Summed over heads and normalized over the allowed set, as `_record` does; since
+        the positions cover that set exactly once, the kept values still sum to one.
+        """
+        with torch.no_grad():
+            allowed = self._chunk_allowed(where, ok, k.shape[2])
+            scores = torch.einsum("bhqd,bhkd->bhqk", q.float(), k.float()) * self.scaling
+            scores = scores.masked_fill(~allowed.unsqueeze(1), float("-inf"))
+            pooled = scores.softmax(-1).sum(1)
+            pooled = pooled / pooled.sum(-1, keepdim=True).clamp_min(1e-9)
+            return pooled.gather(-1, where).masked_fill(~ok, 0.0)
+
+    def token_loss(self, hidden_states, index_keys, positions, valid, target,
+                   position_embeddings=None, query_mask=None):
+        """`(sum, count)` of the indexer's cross entropy against a compact target.
+
+        The selected-set KL `indexer_loss` takes over `[query, key]` scores, computed
+        only at the positions each query read, a chunk at a time with the chunk's scores
+        recomputed in backward. `index_keys` carries the gradient to the donor's key
+        projection, as the dense form's does.
+        """
+        from torch.utils.checkpoint import checkpoint
+
+        queries, weights = self._index_queries(hidden_states, None, position_embeddings)
+        batch, seq = queries.shape[:2]
+        total, count = queries.new_zeros((), dtype=torch.float32), 0
+        for start in range(0, seq, self.query_chunk):
+            end = min(seq, start + self.query_chunk)
+            rows = None if query_mask is None else query_mask[:, start:end].to(torch.bool)
+            if rows is not None and not bool(rows.any()):
+                continue
+            per_query = checkpoint(self._token_loss_chunk, queries[:, start:end],
+                                   weights[:, start:end], index_keys, positions[:, start:end],
+                                   valid[:, start:end], target[:, start:end],
+                                   use_reentrant=False)
+            if rows is not None:
+                per_query = per_query[rows]
+            total = total + per_query.sum()
+            count += per_query.numel()
+        return total, count
+
+    def _token_loss_chunk(self, queries, weights, index_keys, where, ok, target):
+        batch, rows, width = where.shape
+        flat = where + (torch.arange(batch, device=where.device) * index_keys.shape[1]).view(-1, 1, 1)
+        keys = index_keys.reshape(-1, index_keys.shape[-1])[flat.view(-1)].view(
+            batch, rows, width, -1)
+        scores = torch.einsum("bqhd,bqsd->bhqs", queries.float(), keys.float())
+        gain = weights.permute(0, 2, 1).unsqueeze(-1).float()
+        scores = (torch.relu(scores) * gain).sum(dim=1) * self.index_width ** -0.5
+        predicted = torch.log_softmax(scores.masked_fill(~ok, float("-inf")), dim=-1)
+        return -(target * predicted.masked_fill(~ok, 0.0)).sum(-1)
+
     def forward(self, hidden_states, position_embeddings, attention_mask=None,
                 past_key_values=None, **kwargs):
         batch, seq, _ = hidden_states.shape
@@ -1073,6 +1297,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             raise RuntimeError(
                 "layer %d has no SparseIndexBus; the text model injects one after it "
                 "builds its layers" % self.layer_idx)
+        if self._token_path(past_key_values):
+            return self._forward_tokens(hidden_states, position_embeddings)
+        self.last_selection = None
         if not self._blocked(seq, past_key_values):
             return self._forward_gathered(hidden_states, position_embeddings,
                                           past_key_values, kwargs.get("cache_position"))
@@ -1294,6 +1521,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
           number of eligible keys, so 1.0 is spread evenly and 0.0 is every query block
           choosing the same key block. This is the collapse detector.
         """
+        if self.last_selection is not None:
+            return self._compact_statistics()
         allowed = self.last_allowed
         if allowed is None:
             return None
@@ -1328,6 +1557,36 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             "blocks": blocks,
             "density": float(allowed.sum()) / float(reachable.expand_as(allowed).sum()),
             "selected": (float(chosen.sum()) / eligible_total) if eligible_total else 0.0,
+            "entropy": entropy,
+        }
+
+    def _compact_statistics(self):
+        """`routing_statistics` read off the token path's positions, without expanding them.
+
+        The same three numbers over the same sets: the window is `offset < local_window`,
+        a top-k pick counts as chosen only beyond it (`offset > local_window`), and the
+        positions mark the union once.
+        """
+        positions, valid = self.last_selection
+        batch, seq, _ = positions.shape
+        near = self.local_window
+        rows = torch.arange(seq, device=positions.device).view(1, -1, 1)
+        top = positions[..., :-max(near, 1)]
+        picked = valid[..., :top.shape[-1]] & (rows - top > near)
+        histogram = torch.bincount(top[picked], minlength=seq).float()
+        total = histogram.sum()
+        available = max(2, seq - near - 1)
+        entropy = 0.0
+        if total > 0:
+            share = histogram[histogram > 0] / total
+            entropy = float(-(share * share.log()).sum() / math.log(available))
+        reachable = batch * seq * (seq + 1) / 2
+        beyond = torch.arange(seq, device=positions.device) - near
+        eligible_total = float(batch * beyond.clamp_min(0).sum())
+        return {
+            "mode": self.mode, "unit": "positions", "blocks": seq,
+            "density": float(valid.sum()) / reachable,
+            "selected": float(total) / eligible_total if eligible_total else 0.0,
             "entropy": entropy,
         }
 

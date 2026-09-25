@@ -119,8 +119,13 @@ def causal_ce(model, hidden, ids):
     from cut_cross_entropy import linear_cross_entropy
 
     device = model.lm_head.weight.device
-    return linear_cross_entropy(hidden.to(device), model.lm_head.weight,
-                                ids.to(device), shift=1, reduction="mean").to(hidden.device)
+    # CCE's Triton kernels launch on the *current* device, not the tensors' own. With
+    # the head moved off home (--embedding-on away) that read another card's memory and
+    # returned a loss of exactly 0 while the teacher KL, plain torch, carried on.
+    with torch.cuda.device(device):
+        return linear_cross_entropy(hidden.to(device), model.lm_head.weight,
+                                    ids.to(device), shift=1,
+                                    reduction="mean").to(hidden.device)
 
 
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,

@@ -105,6 +105,16 @@ def indexer_loss(model, layers, seen, targets, borrowed, selected=None, query_ma
         # from itself.
         owner = model.model.layers[attention.latent_donor].self_attn
         keys = owner.index_keys_from(latent.detach(), rotary.detach())
+        if isinstance(target, tuple):
+            # The token path's compact target: `(positions, valid, target)` over the
+            # positions each query read, which is the selected set by construction.
+            summed, count = attention.token_loss(
+                hidden.detach(), keys, *target, position_embeddings=position,
+                query_mask=query_mask)
+            if query_mask is not None and not count:
+                raise ValueError("indexer query mask must match nonempty scored positions")
+            total = total + summed / max(count, 1)
+            continue
         scores, causal = attention.token_scores(
             hidden.detach(), keys, position_embeddings=position)
         where = causal if selected is None else (causal & selected[index])

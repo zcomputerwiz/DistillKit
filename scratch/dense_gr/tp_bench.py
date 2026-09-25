@@ -30,7 +30,7 @@ def trainer_arguments(argv=None):
     if args.steps < 1 or args.warmup_steps < 2:
         parser.error("need at least two real optimizer warm-up steps and one measured step")
     forbidden = {"--tensor-parallel", "--max-steps", "--benchmark-warmup-steps",
-                 "--save-every", "--resume", "--batches", "--recompute", "--embedding-on"}
+                 "--save-every", "--resume", "--batches", "--recompute"}
     if any(arg.split("=")[0] in forbidden for arg in remaining):
         parser.error("use --cards and the trainer's current batching/checkpoint-layer options")
     if not any(arg.split("=")[0] == "--output" for arg in remaining):

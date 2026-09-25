@@ -244,6 +244,13 @@ def main(argv=None) -> int:
                              "stay whole on home, because Cut Cross-Entropy never forms "
                              "the logits and needs them that way. Measure the current "
                              "training objective with tp_bench.py before sizing batches.")
+    parser.add_argument("--embedding-on", choices=("home", "away"), default="home",
+                        help="which card holds the tied embedding and head under "
+                             "--tensor-parallel. They stay whole either way, because Cut "
+                             "Cross-Entropy needs the whole head; away moves them off the "
+                             "card that also carries the residual stream. Measured at the "
+                             "scale run's shape (3072 tokens, sparse stage, Kahan): home "
+                             "peaks 19.4 / 8.8 GiB per card.")
     parser.add_argument("--micro-tokens", type=int, default=0, metavar="N",
                         help="tokens per forward, which is the better unit than documents: "
                              "memory follows tokens and this corpus runs 134 to 1024 of "
@@ -693,8 +700,11 @@ def main(argv=None) -> int:
                                     attention_mask=torch.ones_like(ids),
                                     use_cache=False).last_hidden_state
                 count = ids.shape[1] - 1
-                part = float(linear_cross_entropy(state, model.lm_head.weight, ids,
-                                                  shift=1, reduction="mean")) * count
+                head = model.lm_head.weight
+                with torch.cuda.device(head.device):
+                    part = float(linear_cross_entropy(state.to(head.device), head,
+                                                      ids.to(head.device), shift=1,
+                                                      reduction="mean")) * count
                 total += part
                 scored += count
                 row = by_source.setdefault(source, [0.0, 0])
@@ -714,8 +724,11 @@ def main(argv=None) -> int:
                                 attention_mask=torch.ones_like(chunk),
                                 use_cache=False).last_hidden_state
             count = chunk.numel() - chunk.shape[0]
-            total += float(linear_cross_entropy(state, model.lm_head.weight, chunk,
-                                                shift=1, reduction="mean")) * count
+            head = model.lm_head.weight
+            with torch.cuda.device(head.device):
+                total += float(linear_cross_entropy(state.to(head.device), head,
+                                                    chunk.to(head.device), shift=1,
+                                                    reduction="mean")) * count
             scored += count
         model.train()
         return total / max(scored, 1)
@@ -778,9 +791,10 @@ def main(argv=None) -> int:
 
         if torch.cuda.device_count() < 2:
             raise SystemExit("--tensor-parallel needs two CUDA devices")
-        shard_model(model, ["cuda:0", "cuda:1"], shard_embeddings=False)
-        print("tensor parallel: body split across two cards, head kept whole on home",
-              flush=True)
+        shard_model(model, ["cuda:0", "cuda:1"], shard_embeddings=False,
+                    embedding_device="cuda:1" if args.embedding_on == "away" else None)
+        print("tensor parallel: body split across two cards, head kept whole on %s"
+              % ("cuda:1" if args.embedding_on == "away" else "home"), flush=True)
 
     # After sharding, so that the parameters handed over are the model's current ones.
     # Only what trains: a frozen parameter takes no gradient, and handing it to the
