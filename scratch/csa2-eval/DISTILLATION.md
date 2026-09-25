@@ -322,3 +322,37 @@ improved rather than regressing. MMLU moved -0.0332 against the repaired checkpo
 [-0.0684, +0.0020] and -0.0352 against the source [-0.0742, +0.0039]: not significant,
 but a point estimate large enough that the scale-up is designed to protect it rather
 than assume it holds.
+
+### General-text scale-up (2026-09-25): two thirds of the gap closed, MMLU within noise
+
+One pass from `warmed-chat32` (not continued from the repaired model) over every cache:
+the three chat and code captures plus `teacher-cache-general-pilot` and a second, larger
+logits-only capture `teacher-cache-general-scale` (9.0M tokens, 3.26 GB, continuing past
+the pilot's documents). 29,543 documents, 17.4M supervised tokens, about 57% general
+text. Body lr 1.83e-6, router 9.37e-4, Kahan-compensated AdamW8bit, linear decay over
+the last 20% of tokens to 0.1. Peak 20.09 GiB, spill +0.09 GiB, 1,769 tok/s.
+
+Held-out moved on every source, and chat tracked the chat-only repaired run step for
+step (0.703 vs 0.703 at step 800), so the general text did not displace it:
+
+| held-out source | step 0 | step 2903 |
+| --- | --- | --- |
+| teacher-cache-5m | 1.2044 | 0.6431 |
+| expand-chat | 2.0845 | 1.4698 |
+| expand-code | 1.3414 | 0.7480 |
+| general-pilot | 2.2093 | 2.0151 |
+| general-scale | 2.3213 | 2.1447 |
+
+| checkpoint | WikiText NLL | vs source | 95% CI | MMLU (512) | in-domain NLL |
+| --- | --- | --- | --- | --- | --- |
+| source | 2.5292 | -- | -- | 0.5762 | 1.3094 |
+| repaired | 2.7671 | +0.2379 | [+0.2240, +0.2534] | 0.5742 | 0.7257 |
+| general pilot | 2.6418 | +0.1126 | [+0.1021, +0.1247] | 0.5410 | 0.7111 |
+| scale | **2.6084** | **+0.0791** | [+0.0691, +0.0909] | 0.5508 | 0.7214 |
+
+The general-text gap is down 67% from the repaired model. MMLU is -0.0254 against the
+source [-0.0684, +0.0156], -0.0234 against the repaired model [-0.0625, +0.0156] and
++0.0098 against the pilot [-0.0254, +0.0449]: all within noise, but both runs with
+general text sit about 0.02-0.03 below the chat-only model, which is a consistent
+enough direction to treat as real until the confirmation split says otherwise. The
+scale run saw about 7.5M chat tokens against the repaired run's 10M.
