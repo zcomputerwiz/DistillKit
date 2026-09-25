@@ -446,6 +446,13 @@ def main(argv=None) -> int:
         from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
 
         inherited = Qwen3_5TextConfig.from_pretrained(args.init_from)
+        if any(arg.split("=")[0] == "--csa2-top-k" for arg in argv):
+            # The one routing setting a run may change on an inherited model: top_k is a
+            # budget, not a shape, so the weights load unchanged and read more positions.
+            # The long-context stage raises it to 512, which is V4.1's own figure.
+            print("inherit: csa2_top_k %s -> %d" % (getattr(inherited, "csa2_top_k", None),
+                                                     args.csa2_top_k), flush=True)
+            inherited.csa2_top_k = args.csa2_top_k
         # The flags stop describing a model to build and start describing the one being
         # loaded, so everything downstream that reads them -- the variant tag, the guards
         # on --dense-routing and --freeze-router, the record the run writes -- is made to

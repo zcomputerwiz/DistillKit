@@ -228,11 +228,13 @@ def test_sharding_replaces_parameters_so_an_optimizer_built_first_is_stale():
     This pins the mechanism so the ordering is not quietly reintroduced.
     """
     model = _model()
-    before = {name: id(p) for name, p in model.named_parameters()}
+    # The tensors themselves, not their ids: a replaced tensor is freed, and CPython can
+    # hand its id to the replacement, which read here as "survived" now and then.
+    before = dict(model.named_parameters())
     shard_model(model, ["cpu", "cpu"], shard_embeddings=False)
     after = {id(p) for p in model.parameters()}
 
-    survived = {name for name, ident in before.items() if ident in after}
+    survived = {name for name, tensor in before.items() if id(tensor) in after}
     replaced = set(before) - survived
     assert replaced, "sharding replaced no parameters, so this hazard would not exist"
     # The ones that keep their identity are what sharding does not touch; everything a

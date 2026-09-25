@@ -159,6 +159,17 @@ def index_keys_for(layer, hidden):
     return layer.index_keys_from(layer.kv_a_norm(latent), rotary)
 
 
+def select(layer, hidden):
+    """The token path's selection for a bare layer, expanded to `[batch, query, key]`."""
+    keys = index_keys_for(layer, hidden)
+    queries, weights = layer._index_queries(hidden, None, None)
+    positions, valid = layer._select_positions(queries, keys, weights)
+    seq = hidden.shape[1]
+    counts = torch.zeros(hidden.shape[0], seq, seq, dtype=torch.int16)
+    counts.scatter_add_(-1, positions, valid.to(torch.int16))
+    return counts > 0
+
+
 @cuda
 def test_indexer_parameters_receive_gradient():
     """Top-k is discrete; without the score bias the indexer never learns anything.
@@ -190,194 +201,57 @@ def test_indexer_parameters_receive_gradient():
     assert checked == 11
 
 
-@cuda
-def test_router_learns_which_blocks_to_select():
-    """Gradient is not the claim; better top-k is. So measure the top-k, not the gradient.
-
-    The surrogate that carries the gradient is not the score that makes the selection --
-    selection uses block-pooled per-head ReLU scores under a max, the surrogate a
-    normalized per-token cosine over the head-weighted sum. Nonzero gradient therefore
-    shows the parameters move, not that the decisions improve, and those are different
-    claims.
-
-    The task is a pointer. Every key block carries a signature and every token carries a
-    copy of one block's signature, which is the block it should route to. Only the last
-    query block is scored, its target is drawn strictly outside the blocks it gets for
-    free, teacher and student are given identical local access so the target is the only
-    difference between them, and the rate is measured on batches never trained on -- so
-    the number cannot be inflated by forced blocks, impossible future targets, or
-    memorizing a fixed batch.
-    """
-    blocks, batch = 8, 32
-    seq = blocks * BLOCK
-    torch.manual_seed(0)
-    config = csa2_config(csa2_local_window=BLOCK, csa2_top_k=BLOCK, csa2_index_dim=16,
-                         csa2_index_heads=2)
-    layer = Qwen35SparseLatentAttention(config, 0, "full").cuda().float()
-    layer.bus = SparseIndexBus()
-
-    last = blocks - 1
-    # Candidates the last block must actually route to: strictly in its past, and outside
-    # the window it is handed regardless of score.
-    choices = last - layer.local_blocks
-    signature = torch.randn(blocks, config.hidden_size, device="cuda")
-    signature /= signature.norm(dim=-1, keepdim=True)
-    rows = torch.arange(batch, device="cuda")
-
-    def sample(seed):
-        generator = torch.Generator(device="cuda").manual_seed(seed)
-        hidden = torch.randn(batch, seq, config.hidden_size, device="cuda",
-                             generator=generator)
-        hidden += 4.0 * signature.repeat_interleave(BLOCK, 0).unsqueeze(0)
-        target = torch.randint(0, choices, (batch,), device="cuda", generator=generator)
-        # The pointer rides on the last block only, which is the block being scored.
-        hidden[:, last * BLOCK:] += 2.0 * signature[target].unsqueeze(1)
-        return hidden, target
-
-    cos = torch.ones(batch, seq, int(layer.rope_dim), device="cuda")
-    sin = torch.zeros_like(cos)
-
-    def forward(hidden, target, force):
-        keys = index_keys_for(layer, hidden)
-        latent, rotary = torch.split(layer.kv_a_proj(hidden),
-                                     [layer.latent, layer.rope_dim], dim=-1)
-        latent = layer.kv_a_norm(latent)
-        allowed, effective = layer.route(hidden, keys)
-        if force:
-            # Same local access as the student; the target is the only thing added, so
-            # matching the teacher means routing there and nowhere else.
-            offsets = torch.arange(blocks, device="cuda")
-            offsets = offsets.view(-1, 1) - offsets.view(1, -1)
-            allowed = ((offsets >= 0) & (offsets <= layer.local_blocks)).unsqueeze(0)
-            allowed = allowed.expand(batch, blocks, blocks).clone()
-            allowed[rows, last, target] = True
-        return layer._attend(hidden, latent, rotary, layer.block_mask(allowed),
-                             effective, keys, (cos, sin))[0]
-
-    def selection_rate(seeds):
-        """How often the last block's top-k finds the pointed-at block, on fresh data."""
-        hits = []
-        for seed in seeds:
-            hidden, target = sample(seed)
-            with torch.no_grad():
-                allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
-            hits.append(allowed[rows, last, target].float().mean().item())
-        return sum(hits) / len(hits)
-
-    indexer = [parameter for name, parameter in layer.named_parameters()
-               if name.startswith(("index_q_proj", "index_k_proj", "index_weight",
-                                   "index_gate"))]
-    for parameter in layer.parameters():
-        parameter.requires_grad_(False)
-    for parameter in indexer:
-        parameter.requires_grad_(True)
-
-    held_out = [101, 102, 103, 104]
-    before, opened = selection_rate(held_out), None
-    optimizer = torch.optim.Adam(indexer, lr=1e-2)
-    for step in range(300):
-        hidden, target = sample(step)
-        with torch.no_grad():
-            teacher = forward(hidden, target, force=True)
-        loss = (forward(hidden, target, force=False) - teacher)[:, last * BLOCK:]
-        loss = loss.pow(2).mean()
-        optimizer.zero_grad(set_to_none=True)
-        loss.backward()
-        optimizer.step()
-        opened = loss.item() if opened is None else opened
-
-    after = selection_rate(held_out)
-    chance = 1.0 / choices
-    assert after > before + 0.15, (
-        "top-k selection of the pointed-at block did not improve on held-out batches: "
-        "%.3f -> %.3f (chance %.3f)" % (before, after, chance))
-    assert after > 2.0 * chance, (
-        "selection stayed near chance: %.3f against %.3f" % (after, chance))
-
-
 @pytest.mark.parametrize("window", [1, 8, BLOCK, BLOCK + 1, 3 * BLOCK])
 def test_local_window_is_always_routed(window):
-    """Every query keeps ``local_window`` tokens of history whatever the router scores.
-
-    The diagonal block alone does not give this: a query at offset 0 of a block needs the
-    block in front of it, and top-k is free to drop that.
-    """
+    """Every query keeps its last ``local_window`` positions whatever the router scores."""
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=window)
     hidden = torch.randn(2, 6 * BLOCK, layer.config.hidden_size)
-    allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
-
-    blocks = allowed.shape[-1]
-    for query_block in range(blocks):
-        for position in (0, BLOCK // 2, BLOCK - 1):
-            earliest = max(0, query_block * BLOCK + position - window)
-            for key_block in range(earliest // BLOCK, query_block + 1):
-                assert bool(allowed[:, query_block, key_block].all()), (
-                    "window %d: query block %d lost key block %d"
-                    % (window, query_block, key_block))
+    allowed = select(layer, hidden)
+    rows = torch.arange(hidden.shape[1])
+    offsets = rows.view(-1, 1) - rows.view(1, -1)
+    window_mask = (offsets >= 0) & (offsets < window)
+    assert bool(allowed[:, window_mask].all()), "window %d not read" % window
 
 
 @pytest.mark.parametrize("scale", [1.0, 8.0])
 @pytest.mark.parametrize("window", [0, 8])
 def test_routing_does_not_depend_on_a_token_s_own_future(window, scale):
-    """Mutating a block's last token must not change what its earlier tokens may read.
+    """Mutating one token must not change what any earlier query may read.
 
-    One routing decision serves a whole block, so pooling the block's queries to make it
-    -- an amax over all of them -- lets a token's history depend on tokens that follow
-    it. The causal mask cannot undo that: it constrains what is read, not what chose it.
-
-    The mutation has to land *inside* a block. A cut at a block boundary, which is what
-    the original prefix-invariance check did, cannot see this at all. Before the fix this
-    fired on 18 of 200 mutations at ``scale`` 1.0 and 191 of 200 at 8.0.
+    One routing decision per query token, from that token's own index query against keys
+    at or before it. The old block routing made one decision per block and had to take it
+    from the block's leading query to stay causal; this checks the property directly.
     """
     torch.manual_seed(0)
-    blocks = 10
+    length = 10 * BLOCK
     layer = bare_layer(csa2_local_window=window, csa2_top_k=2 * BLOCK)
     width = layer.config.hidden_size
-    block = blocks - 1
-    victim = block * BLOCK + BLOCK - 1
-
-    for _ in range(25):
-        hidden = torch.randn(1, blocks * BLOCK, width)
-        before, _ = layer.route(hidden, index_keys_for(layer, hidden))
+    for _ in range(10):
+        victim = int(torch.randint(1, length, ()))
+        hidden = torch.randn(1, length, width)
+        before = select(layer, hidden)
         changed = hidden.clone()
         changed[:, victim] += scale * torch.randn(width)
-        after, _ = layer.route(changed, index_keys_for(layer, changed))
-        assert torch.equal(before[0, block], after[0, block]), (
-            "block %d read %s before the mutation and %s after, but every token in it "
-            "below offset %d has an unchanged prefix"
-            % (block, before[0, block].nonzero().flatten().tolist(),
-               after[0, block].nonzero().flatten().tolist(), BLOCK - 1))
-
-
-def test_block_mask_refuses_to_read_the_future():
-    """A future block passed as `full` would be attended with no mask evaluated at all."""
-    layer = bare_layer()
-    blocks = 4
-    allowed = torch.ones(1, blocks, blocks, dtype=torch.bool)
-    # `to_dense` is block-level, so the diagonal is present either way; what must not
-    # survive is any block strictly above it.
-    dense = layer.block_mask(allowed).to_dense().bool()[0, 0]
-    rows = torch.arange(blocks)
-    assert not bool(dense[rows.view(-1, 1) < rows.view(1, -1)].any())
-    assert bool(dense[rows.view(-1, 1) >= rows.view(1, -1)].all())
+        after = select(layer, changed)
+        assert torch.equal(before[0, :victim], after[0, :victim]), victim
 
 
 @cuda
 def test_routing_report_describes_the_last_forward():
     """Density alone cannot spot a collapsed router, and the entropy has to be honest.
 
-    Two traps this covers. A router that has fallen back onto the local window still
-    reports a healthy density, because the window is open regardless of score -- so
-    `selected` measures only the blocks top-k was free to choose. And entropy normalized
-    by the blocks actually used would score an even split over two blocks as a perfect
-    1.0, which is the collapse it exists to catch, so it is normalized by the blocks
-    available instead.
+    A router that has fallen back onto the local window still reports a healthy density,
+    because the window is open regardless of score -- so `selected` measures only the
+    positions top-k was free to choose. And entropy normalized by the positions actually
+    used would score an even split over two of them as a perfect 1.0, which is the
+    collapse it exists to catch, so it is normalized by the positions available instead.
     """
     from distillkit.models.qwen35.csa2 import routing_report
 
     torch.manual_seed(0)
-    model = Qwen35WidenedForCausalLM(csa2_config(csa2_top_k=2 * BLOCK)).cuda()
+    model = Qwen35WidenedForCausalLM(csa2_config(csa2_top_k=2 * BLOCK,
+                                                 csa2_router_bias=False)).cuda()
     model.eval()
     assert routing_report(model) == [], "nothing has run yet"
 
@@ -388,12 +262,12 @@ def test_routing_report_describes_the_last_forward():
     rows = routing_report(model)
     assert [r["mode"] for r in rows] == MODES
     for row in rows:
-        assert row["blocks"] == 8
+        assert row["blocks"] == 8 * BLOCK and row["unit"] == "positions"
         assert 0.0 < row["density"] < 1.0, row
         assert 0.0 < row["selected"] < 1.0, row
         assert 0.0 < row["entropy"] <= 1.0, row
 
-    # A router pinned to one key block must read as collapsed, not as healthy density.
+    # A router pinned to one key position must read as collapsed, not as healthy density.
     layer = next(m for m in model.modules()
                  if isinstance(m, Qwen35SparseLatentAttention))
     pinned = torch.zeros_like(layer.last_allowed)
@@ -442,10 +316,8 @@ def test_routing_stays_causal_and_sparse():
     torch.manual_seed(0)
     layer = bare_layer(csa2_local_window=0, csa2_top_k=BLOCK)
     hidden = torch.randn(2, 8 * BLOCK, layer.config.hidden_size)
-    allowed, _ = layer.route(hidden, index_keys_for(layer, hidden))
-
-    blocks = allowed.shape[-1]
-    rows = torch.arange(blocks)
+    allowed = select(layer, hidden)
+    rows = torch.arange(hidden.shape[1])
     causal = rows.view(-1, 1) >= rows.view(1, -1)
     assert not bool((allowed & ~causal.unsqueeze(0)).any())
     # Something has to be dropped, or the sparsity is decorative.
@@ -453,10 +325,10 @@ def test_routing_stays_causal_and_sparse():
 
 
 def test_router_columns_carry_a_bounded_cosine():
-    """The appended columns must reproduce ``index_gate * cos`` once the kernel scales.
+    """The appended columns must reproduce ``index_gate * cos`` once attention scales.
 
-    This is the whole gradient path, and it is invisible in any output: get the scaling
-    wrong and the router still trains, just against a logit shift of the wrong size.
+    This is the router bias's whole gradient path, and it is invisible in any output: get
+    the scaling wrong and the router still trains, against a logit shift of the wrong size.
     """
     torch.manual_seed(0)
     layer = bare_layer()
@@ -464,7 +336,8 @@ def test_router_columns_carry_a_bounded_cosine():
         layer.index_gate.fill_(0.7)
     hidden = torch.randn(2, 2 * BLOCK, layer.config.hidden_size)
     keys = index_keys_for(layer, hidden)
-    _, effective = layer.route(hidden, keys)
+    queries, weights = layer._index_queries(hidden, None, None)
+    effective = (queries * weights.unsqueeze(-1)).sum(dim=2)
 
     query_extra, key_extra = layer.router_columns(effective, keys)
     contributed = (query_extra @ key_extra.transpose(-1, -2)) * layer.scaling
@@ -472,146 +345,6 @@ def test_router_columns_carry_a_bounded_cosine():
         effective.unsqueeze(2), keys.unsqueeze(1), dim=-1)
     assert torch.allclose(contributed.squeeze(1), 0.7 * cosine, atol=1e-5)
     assert contributed.abs().max() <= 0.7 + 1e-5
-
-
-def test_the_tile_follows_bytes_rather_than_the_head_alone():
-    """float32 doubles every tile, so the same head that fits in bfloat16 may not.
-
-    The 2B's dense width asked 149568 of 101376 in float32 while the bfloat16 tile for the
-    same shape fit, and nothing in the rule saw it: shared memory holds bytes and the rule
-    was reading elements. The indexer's teacher runs float32, and a self-distillation runs
-    the student's own attention as that teacher, so those layers reach this path.
-    """
-    layer = bare_layer()
-    assert layer._kernel_options(256, 2)["fwd_num_stages"] == 3
-    # Same head, twice the bytes: it has to land where the wider bfloat16 head lands.
-    assert layer._kernel_options(256, 4) == layer._kernel_options(320, 2)
-    # And the widest case steps down again rather than reusing a tile that cannot fit.
-    assert layer._kernel_options(320, 4)["fwd_BLOCK_N"] == 16
-    for element_size in (2, 4):
-        for width in (256, 320):
-            options = layer._kernel_options(width, element_size)
-            assert layer.block_size % options["fwd_BLOCK_M"] == 0
-            assert layer.block_size % options["fwd_BLOCK_N"] == 0
-
-
-def test_both_halves_of_the_kernel_are_named_with_their_prefix():
-    """A bare key reaches both lowerings, so the forward would set the backward's stages.
-
-    Inductor strips `fwd_` in the forward and drops `bwd_`, and the reverse in the
-    backward -- but it leaves an unprefixed key alone in each, and its `setdefault` then
-    finds one already there. The backward's own table is what has to be overridden here:
-    on SM86 it hands a head of exactly 256 a 64x64x64x64 tile that asks 168960 of 101376,
-    while a wider one gets 16x16x16x16 and fits. A reuse layer carries no router columns,
-    so it is the narrow one, and it is the only layer that cannot compile its backward.
-    """
-    layer = bare_layer()
-    for width in (256, 320):
-        options = layer._kernel_options(width, 2)
-        assert all(k.startswith(("fwd_", "bwd_")) for k in options), options
-        assert options["bwd_BLOCK_M1"] == options["bwd_BLOCK_N1"]
-        assert layer.block_size % options["bwd_BLOCK_M1"] == 0
-    # The narrow head is the one Inductor over-sizes, so it must not be left alone.
-    assert layer._kernel_options(256, 2)["bwd_BLOCK_M1"] == 32
-    assert layer._kernel_options(320, 2)["bwd_BLOCK_M1"] == 16
-
-
-@pytest.mark.parametrize("width,stages", [(256, 3), (320, 1)])
-def test_kernel_tiles_are_chosen_rather_than_left_to_inductor(width, stages):
-    """Inductor will not pick a tile that fits, so the tile has to be picked here.
-
-    It rounds the key/query head to a power of two, then reads its tile from a table keyed
-    on the *unrounded* width without comparing the result to the device, and when the
-    result does not fit it drops the config instead of shrinking it -- the choice list
-    empties and the compile ends in "No valid triton configs". Measured against SM86's
-    101376 bytes at the real student's two widths, its defaults ask 151552 at 256 and
-    167936 at 320. The 256 case is the dense path, carrying no router columns at all.
-    """
-    layer = bare_layer()
-    options = layer._kernel_options(width)
-    assert options["fwd_num_stages"] == stages
-    # Inductor refuses outright when these do not divide the mask's block size.
-    assert layer.block_size % options["fwd_BLOCK_M"] == 0
-    assert layer.block_size % options["fwd_BLOCK_N"] == 0
-
-
-def test_the_router_columns_are_what_widens_the_kernel_tile():
-    """Sixteen columns of index buy a whole extra power of two, and that is the blocker.
-
-    At the real student's head of 256 the router's columns are not a rounding error on the
-    tile, they double it: every query and key buffer in shared memory is sized to 512 to
-    carry them. It is the reason the sparse path needs a shallower pipeline than the dense
-    one over the same head.
-    """
-    layer = bare_layer(csa2_index_dim=64)
-    head = 256
-    assert 1 << (head - 1).bit_length() == head
-    assert 1 << (head + layer.index_dim - 1).bit_length() == 2 * head
-    assert (layer._kernel_options(head)["fwd_num_stages"]
-            > layer._kernel_options(head + layer.index_dim)["fwd_num_stages"])
-
-
-def test_block_mask_matches_a_scanned_mask():
-    """`from_kv_blocks` built by hand against `create_block_mask` evaluating the rule."""
-    from torch.nn.attention.flex_attention import create_block_mask
-
-    torch.manual_seed(0)
-    layer = bare_layer()
-    blocks, batch = 6, 2
-    rows = torch.arange(blocks)
-    causal = rows.view(-1, 1) >= rows.view(1, -1)
-    allowed = (torch.rand(batch, blocks, blocks) < 0.5) & causal.unsqueeze(0)
-    allowed |= torch.eye(blocks, dtype=torch.bool).unsqueeze(0)
-
-    def mask_mod(b, h, q_idx, kv_idx):
-        return (q_idx >= kv_idx) & allowed[b, q_idx // BLOCK, kv_idx // BLOCK]
-
-    scanned = create_block_mask(mask_mod, B=batch, H=None, Q_LEN=blocks * BLOCK,
-                                KV_LEN=blocks * BLOCK, device="cpu", BLOCK_SIZE=BLOCK)
-    built = layer.block_mask(allowed)
-    assert torch.equal(built.to_dense(), scanned.to_dense())
-
-
-@cuda
-def test_sparse_kernel_matches_a_dense_reference():
-    """Output and gradients against SDPA over the same mask and the same bias.
-
-    The block mask, the full/partial split and the score bias are all only as good as
-    what the kernel does with them, and none of those are visible in a loss curve.
-    """
-    torch.manual_seed(0)
-    from torch.nn.attention.flex_attention import flex_attention
-
-    layer = bare_layer().cuda()
-    batch, blocks = 2, 4
-    seq = blocks * BLOCK
-    shape = (batch, HEADS, seq, HEAD_DIM)
-    query, key, value = (torch.randn(shape, device="cuda", dtype=torch.float32,
-                                     requires_grad=True) for _ in range(3))
-
-    rows = torch.arange(blocks, device="cuda")
-    causal = rows.view(-1, 1) >= rows.view(1, -1)
-    allowed = ((torch.rand(batch, blocks, blocks, device="cuda") < 0.5)
-               & causal.unsqueeze(0)) | torch.eye(blocks, dtype=torch.bool,
-                                                  device="cuda").unsqueeze(0)
-    sparse = torch.compile(flex_attention, dynamic=False)(
-        query, key, value, block_mask=layer.block_mask(allowed), scale=HEAD_DIM ** -0.5)
-    sparse.pow(2).sum().backward()
-    got = [t.grad.clone() for t in (query, key, value)]
-    for tensor in (query, key, value):
-        tensor.grad = None
-
-    positions = torch.arange(seq, device="cuda")
-    token_mask = ((positions.view(-1, 1) >= positions.view(1, -1)).unsqueeze(0)
-                  & allowed.repeat_interleave(BLOCK, 1).repeat_interleave(BLOCK, 2))
-    scores = query @ key.transpose(-1, -2) * HEAD_DIM ** -0.5
-    scores = scores.masked_fill(~token_mask.unsqueeze(1), float("-inf"))
-    dense = scores.softmax(-1) @ value
-    dense.pow(2).sum().backward()
-
-    assert torch.allclose(sparse, dense, atol=2e-4, rtol=2e-4)
-    for tensor, reference in zip((query, key, value), got):
-        assert torch.allclose(reference, tensor.grad, atol=2e-3, rtol=2e-3)
 
 
 def test_bus_lives_on_the_model_not_the_config():
@@ -630,31 +363,18 @@ def test_bus_lives_on_the_model_not_the_config():
 
 
 @pytest.mark.parametrize("length", [1, BLOCK + 1, BLOCK])
-def test_shapes_the_block_kernel_cannot_take_route_per_token(length):
-    """A ragged length and a decode step are ordinary cases, not refusals.
-
-    They used to raise, because a ``BlockMask`` groups queries as well as keys: a
-    one-token step computes zero query blocks and a ragged one loses its tail. The
-    reference groups only the key axis and takes its top-k per query token, so both are
-    shapes it simply routes. `_blocked` picks the path, and the kernel keeps the whole
-    query blocks it needs.
-    """
+def test_every_length_routes_per_token(length):
+    """A ragged length and a decode-sized step are ordinary cases, not refusals."""
     layer = bare_layer()
     layer.bus = SparseIndexBus()
     hidden = torch.randn(1, length, layer.config.hidden_size)
     width = int(layer.head_dim * 0.25)
     position = (torch.ones(1, length, width), torch.zeros(1, length, width))
-    assert layer._blocked(length, None) is (length == BLOCK)
-    if length == BLOCK:
-        # The blocked path is what already had coverage; running it here would only be
-        # asking CPU Inductor to build a Triton kernel, which needs a compiler this
-        # environment does not have. Which path the shape takes is the claim.
-        return
     with torch.no_grad():
         out, _ = layer.forward(hidden, position_embeddings=position)
     assert out.shape == hidden.shape
     assert layer.last_token_routed
-    # Selected positions, not blocks: the granularity is the whole point of the path.
+    # Selected positions, not blocks: the granularity the reference uses.
     assert layer.last_allowed.shape == (1, length, length)
 
 

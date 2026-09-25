@@ -67,7 +67,7 @@ def test_logits_selection_and_gradients_match_the_dense_path(monkeypatch):
 
 
 def test_the_chunked_selection_is_a_top_k_with_its_window(monkeypatch):
-    """With a small budget: every query reads its window, plus top_k by score, ties aside."""
+    """With a small budget: every query reads its window, plus its top_k positive scores."""
     model, layers = build(top_k=24)
     first = layers[0]
     grab = {}
@@ -95,15 +95,17 @@ def test_the_chunked_selection_is_a_top_k_with_its_window(monkeypatch):
             reach = causal[row]
             picked = allowed[b, row] & reach
             if int(reach.sum()) <= first.top_k:
-                assert torch.equal(picked, reach)
+                # Everything fits: all of it that scored, and the window regardless.
+                assert torch.equal(picked, reach & ((scores[b, row] > 0) | window[row]))
                 continue
             # The top-k over every causal position: the kth best score is the bar, and
             # everything strictly above it is in, whether or not the window also holds it.
             bar = scores[b, row][reach].topk(first.top_k).values[-1]
-            assert bool(picked[reach & (scores[b, row] > bar)].all()), (b, row)
-            # Beyond the window, nothing below the bar got in.
+            assert bool(picked[reach & (scores[b, row] > bar) & (scores[b, row] > 0)].all()), (b, row)
+            # Beyond the window, nothing below the bar got in, and nothing no head scored.
             outside = picked & ~window[row]
             assert bool((scores[b, row][outside] >= bar).all()), (b, row)
+            assert bool((scores[b, row][outside] > 0).all()), (b, row)
             assert int(outside.sum()) <= first.top_k
 
 
