@@ -66,6 +66,31 @@ def test_logits_selection_and_gradients_match_the_dense_path(monkeypatch):
         assert torch.allclose(token_grads[name], dense_grads[name], atol=1e-9), name
 
 
+def test_a_borrower_with_its_own_rotary_key_reads_it_on_both_paths(monkeypatch):
+    """`csa2_own_rotary`: the borrower's key carries its own rotary slice, not the donor's."""
+    torch.manual_seed(0)
+    config = csa2_config(csa2_router_bias=False, csa2_top_k=LENGTH + 10,
+                         csa2_local_window=8, csa2_query_chunk=CHUNK, csa2_own_rotary=True)
+    model = Qwen35WidenedForCausalLM(config).double()
+    borrowers = [l.self_attn for l in model.model.layers
+                 if getattr(getattr(l, "self_attn", None), "mode", "full") != "full"]
+    assert borrowers and all(hasattr(b, "kv_r_proj") for b in borrowers)
+    assert all(b.cached_numbers_per_token() == b.rope_dim for b in borrowers)
+    tokens = torch.randint(1, 64, (1, LENGTH))
+    dense_logits, dense_grads = run(model, tokens, True, monkeypatch)
+    token_logits, token_grads = run(model, tokens, False, monkeypatch)
+    assert torch.allclose(token_logits, dense_logits, atol=1e-9)
+    for b in borrowers:
+        name = next(n for n, m in model.named_modules() if m is b.kv_r_proj)
+        assert token_grads[name + ".weight"].abs().sum() > 0, name
+    # Changing only the borrowers' own rotary projection changes the output.
+    with torch.no_grad():
+        for b in borrowers:
+            b.kv_r_proj.weight.add_(1.0)
+        moved = model(input_ids=tokens, use_cache=False).logits
+    assert not torch.allclose(moved, token_logits)
+
+
 def test_the_chunked_selection_is_a_top_k_with_its_window(monkeypatch):
     """With a small budget: every query reads its window, plus its top_k positive scores."""
     model, layers = build(top_k=24)

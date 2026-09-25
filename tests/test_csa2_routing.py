@@ -586,20 +586,45 @@ def test_the_warm_up_objective_reaches_every_indexer_parameter():
     assert not missing, "the KL never reached %s" % missing
 
 
-def test_padding_is_refused():
-    """Padding is not representable per block, so it is refused rather than attended.
+@pytest.mark.parametrize("use_cache", [False, True])
+def test_a_left_padded_row_reads_what_it_reads_alone(use_cache):
+    """Batched generation left-pads; a padded row must compute what it does unpadded.
 
-    Checkpointing used to be refused alongside it, because the bus was written in forward
-    order and a recompute reads it out of order. The bus is keyed by publisher now and
-    `test_csa2_checkpoints_to_the_same_gradient_it_computes_without` pins the result.
+    Routing is per token, so padding is a set of keys nobody reads: out of the top-k,
+    out of the window, and a padded query reads only itself so its row stays finite.
+    Checked on the whole-sequence path and through the cache, a prefill and decode steps.
+    The tolerance is the rotary table's: it is built in float32, and shifting positions by
+    the padding moves logits by about 1e-7 in a model with no CSA2 at all.
     """
-    model = Qwen35WidenedForCausalLM(csa2_config())
-    tokens = torch.randint(1, 64, (2, BLOCK))
-    mask = torch.ones_like(tokens)
-    mask[0, -3:] = 0
-    with pytest.raises(ValueError, match="cannot represent padding"):
-        model.model(input_ids=tokens, attention_mask=mask, use_cache=False)
-
+    torch.manual_seed(0)
+    model = Qwen35WidenedForCausalLM(csa2_config(csa2_router_bias=False, csa2_top_k=16,
+                                                 csa2_local_window=4)).double().eval()
+    model.config.use_cache = use_cache
+    short, pad, steps = 40, 7, 3
+    alone = torch.randint(1, 64, (1, short + steps))
+    other = torch.randint(1, 64, (1, short + pad + steps))
+    padded = torch.cat([torch.full((1, pad), 3), alone[:, :short]], dim=1)
+    batch = torch.cat([padded, other[:, :short + pad]])
+    mask = torch.ones_like(batch)
+    mask[0, :pad] = 0
+    with torch.no_grad():
+        want = model(input_ids=alone, use_cache=False).logits[0]
+        if not use_cache:
+            got = model(input_ids=batch, attention_mask=mask, use_cache=False).logits
+            assert torch.isfinite(got).all()
+            assert torch.allclose(got[0, pad:], want[:short], atol=1e-6)
+            return
+        out = model(input_ids=batch, attention_mask=mask, use_cache=True)
+        assert torch.allclose(out.logits[0, pad:], want[:short], atol=1e-6)
+        cache = out.past_key_values
+        for step in range(steps):
+            token = torch.cat([alone[:, short + step:short + step + 1],
+                               other[:, short + pad + step:short + pad + step + 1]])
+            mask = torch.cat([mask, torch.ones(2, 1, dtype=mask.dtype)], dim=1)
+            out = model(input_ids=token, attention_mask=mask, past_key_values=cache,
+                        use_cache=True)
+            cache = out.past_key_values
+            assert torch.allclose(out.logits[0, -1], want[short + step], atol=1e-6), step
 
 @pytest.mark.parametrize("mla", [False, True])
 @pytest.mark.parametrize("chunk", [1, 4])

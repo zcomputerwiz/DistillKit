@@ -206,7 +206,7 @@ class SparseIndexBus:
     key and reads its donor's, and replay order stops meaning anything.
     """
 
-    __slots__ = ("latents", "selections")
+    __slots__ = ("latents", "selections", "key_padding")
 
     def __init__(self) -> None:
         self.clear()
@@ -216,6 +216,8 @@ class SparseIndexBus:
         self.latents = {}
         # layer index -> the block or token selection, written by anything that routes.
         self.selections = {}
+        # `[batch, keys]`, True where a key is real, when the batch is left-padded.
+        self.key_padding = None
 
     def publish(self, layer_idx: int, index_keys, latent, rotary) -> None:
         self.latents[layer_idx] = (index_keys, latent, rotary)
@@ -317,6 +319,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # checkpoints trained with it; a model that means to follow the reference's recipe
         # turns it off and trains the indexer by `indexer_kl.py` instead.
         self.router_bias = bool(getattr(config, "csa2_router_bias", True))
+        self.own_rotary = False
         # V4.1's hierarchical indexer was implemented on the block path and went with it.
         # A checkpoint configured for it would otherwise load and silently run without it.
         if int(getattr(config, "csa2_candidate_k", 0) or 0) > 0:
@@ -368,6 +371,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             # makes the up-projection fitted against it undo a random matrix, which costs
             # conditioning the fit has no reason to spend.
             self.kv_adapt.weight._is_hf_initialized = True
+            # Optionally the borrower keeps its own rotary key rather than reading the
+            # donor's. A converted model's layers never learned to share one -- measured
+            # cosine about 0 between layers -- and the donor's costs 35-55% of a zero-shot
+            # swap. Its own is 64 numbers a token against the latent's 384 it still
+            # borrows. Whole-sequence forwards only: decoding would need it cached.
+            self.own_rotary = bool(getattr(config, "csa2_own_rotary", False))
+            if self.own_rotary:
+                self.kv_r_proj = nn.Linear(config.hidden_size, self.rope_dim, bias=bias)
             # A borrowing layer never projects its own latent, so the inherited down
             # projection is dead weight -- 73,728 parameters per layer that would ship in
             # every checkpoint and take no gradient.
@@ -505,6 +516,9 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
 
         causal = kv_positions.view(1, 1, -1) <= q_positions.view(1, -1, 1)
         scores = scores.masked_fill(~causal, float("-inf"))
+        real = self._real_keys(index_keys.shape[1])
+        if real is not None:
+            scores = scores.masked_fill(~real.unsqueeze(1), float("-inf"))
         keep = max(1, min(self.top_k, index_keys.shape[1]))
         picked = scores.topk(keep, dim=-1)
         allowed = torch.zeros_like(scores, dtype=torch.bool)
@@ -519,7 +533,12 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         # its own immediate context produces gradients about the router rather than about
         # the architecture.
         offsets = q_positions.view(1, -1, 1) - kv_positions.view(1, 1, -1)
-        allowed |= (offsets >= 0) & (offsets < max(self.local_window, 1))
+        window = (offsets >= 0) & (offsets < max(self.local_window, 1))
+        if real is not None:
+            # A padded key is never read, and a padded query reads only itself, which
+            # keeps its row finite: its output is discarded but it still flows onward.
+            window = (window & real.unsqueeze(1)) | (offsets == 0)
+        allowed |= window
         return allowed & causal
 
     def _attend_gathered(self, hidden_states, latent, rotary, allowed, effective,
@@ -740,6 +759,13 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             latent = self.kv_adapt(borrowed)
             index_keys, queries = None, None
 
+        if self.own_rotary:
+            if past_key_values is not None:
+                raise NotImplementedError(
+                    "csa2_own_rotary is not cached yet: a borrower's own rotary key would "
+                    "need a cache slot, and decoding would read the donor's instead")
+            rotary = self._rope_shared(self.kv_r_proj(hidden_states), position_embeddings)
+
         kv_len = latent.shape[1]
         if cache_position is None:
             cache_position = torch.arange(kv_len - seq, kv_len, device=latent.device)
@@ -814,6 +840,10 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             query, = self._project(hidden_states)
             _, borrowed, rotary = self.bus.require_latent(self.latent_donor, self.layer_idx)
             latent = self.kv_adapt(borrowed)
+        if self.own_rotary:
+            # Only the attention's key reads it; a Reindex layer still scores the donor's
+            # index keys, whose position half is the donor's rotary key.
+            rotary = self._rope_shared(self.kv_r_proj(hidden_states), position_embeddings)
 
         if self.mode == "reuse":
             positions, valid = self.bus.require_selection(self.topk_donor, self.layer_idx)
@@ -877,6 +907,7 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         top = torch.zeros(batch, seq, keep, dtype=torch.long, device=device)
         chosen = torch.zeros(batch, seq, keep, dtype=torch.bool, device=device)
         gain = weights.permute(0, 2, 1).unsqueeze(-1).float()
+        real = self._real_keys(seq)
         with torch.no_grad():
             for start in range(0, seq, self.query_chunk):
                 end = min(seq, start + self.query_chunk)
@@ -886,6 +917,8 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
                 rows = torch.arange(start, end, device=device).view(-1, 1)
                 causal = torch.arange(end, device=device).view(1, -1) <= rows
                 scores = scores.masked_fill(~causal, float("-inf"))
+                if real is not None:
+                    scores = scores.masked_fill(~real[:, None, :end], float("-inf"))
                 picked = scores.topk(min(keep, end), dim=-1)
                 width = picked.indices.shape[-1]
                 top[:, start:end, :width] = picked.indices
@@ -899,8 +932,24 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
             rows = torch.arange(seq, device=device).view(1, -1, 1)
             local = rows - torch.arange(window, device=device).view(1, 1, -1)
             positions = torch.cat([top, local.clamp_min(0).expand(batch, -1, -1)], dim=-1)
-            valid = torch.cat([chosen, (local >= 0).expand(batch, -1, -1)], dim=-1)
+            inside = (local >= 0).expand(batch, -1, -1)
+            if real is not None:
+                # As in `_select_tokens`: padded keys never, a padded query only itself.
+                at = local.clamp_min(0).expand(batch, -1, -1)
+                inside = inside & (real.gather(1, at.reshape(batch, -1)).view_as(at)
+                                   | (local == rows).expand(batch, -1, -1))
+            valid = torch.cat([chosen, inside], dim=-1)
         return positions, valid
+
+    def _real_keys(self, keys):
+        """`[batch, keys]` True where a key is real, or None for an unpadded batch."""
+        real = getattr(self.bus, "key_padding", None) if self.bus is not None else None
+        if real is None:
+            return None
+        if real.shape[1] != keys:
+            raise ValueError("padding mask covers %d keys, attention has %d"
+                             % (real.shape[1], keys))
+        return real
 
     def _chunk_allowed(self, where, ok, end):
         """`[batch, chunk, end]` booleans for the queries `start:` from their positions."""
@@ -1109,5 +1158,5 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         all: it reads its donor's, which is where the second halving comes from.
         """
         if self.mode != "full":
-            return 0
+            return self.rope_dim if self.own_rotary else 0
         return self.latent + self.rope_dim

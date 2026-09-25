@@ -168,32 +168,13 @@ def pair_metrics(model, book, calibration_count):
     return rows
 
 
-class OwnRotary:
-    """A bus view for one borrower that hands it its own rotary key instead of the donor's.
-
-    The experiment behind `--own-rotary`: the borrower keeps the 64 rotary rows of its
-    down projection and caches its own rotary key, borrowing only the latent -- 86% of a
-    layer's cache saved instead of all of it. Measures how much of a swap's cost is the
-    donor's rotary key, which a converted model's layers do not share.
-    """
-
-    def __init__(self, bus, projection, owner):
-        self.bus, self.projection, self.owner, self.rotary = bus, projection, owner, None
-
-    def __getattr__(self, name):
-        return getattr(self.bus, name)
-
-    def require_latent(self, donor, layer_idx):
-        keys, latent, _ = self.bus.require_latent(donor, layer_idx)
-        return keys, latent, self.rotary
-
-
 def apply_pattern(model, pattern, book, calibration_count, own_rotary=False):
     """Swap the attention modules to `pattern`; returns an undo list."""
     order = [i for i, _ in routing(model)]
     modes = [LETTER[c] for c in pattern]
     config = copy.deepcopy(model.config)
     config.csa2_modes = modes
+    config.csa2_own_rotary = own_rotary
     undo = []
     for position, (index, mode) in enumerate(zip(order, modes)):
         old = model.model.layers[index].self_attn
@@ -208,17 +189,12 @@ def apply_pattern(model, pattern, book, calibration_count, own_rotary=False):
         dst = torch.cat([d["latent"] for d in book[index][:calibration_count]])
         with torch.no_grad():
             new.kv_adapt.weight.copy_(solve(src, dst).to(new.kv_adapt.weight))
+            if own_rotary:
+                # The borrower's own rotary rows of the down projection it no longer has.
+                new.kv_r_proj.weight.copy_(old.kv_a_proj.weight[old.latent:])
+                if old.kv_a_proj.bias is not None:
+                    new.kv_r_proj.bias.copy_(old.kv_a_proj.bias[old.latent:])
         new.eval()
-        if own_rotary:
-            view = OwnRotary(old.bus, old.kv_a_proj, old)
-            new.bus = view
-
-            def keep_rotary(module, args, kwargs, view=view, old=old):
-                hidden = kwargs.get("hidden_states", args[0] if args else None)
-                rotary = old.kv_a_proj(hidden)[..., old.latent:]
-                view.rotary = old._rope_shared(rotary, kwargs.get("position_embeddings"))
-
-            new.register_forward_pre_hook(keep_rotary, with_kwargs=True)
         model.model.layers[index].self_attn = new
         undo.append((index, old))
     return undo
@@ -230,8 +206,13 @@ def score(model, docs):
     for ids in docs:
         state = model.model(input_ids=ids, attention_mask=torch.ones_like(ids),
                             use_cache=False).last_hidden_state
-        out.append(float(linear_cross_entropy(state, model.lm_head.weight, ids, shift=1,
-                                              reduction="mean")))
+        if ids.is_cuda:
+            out.append(float(linear_cross_entropy(state, model.lm_head.weight, ids, shift=1,
+                                                  reduction="mean")))
+        else:  # CCE is Triton; the CPU takes the plain logits
+            logits = model.lm_head(state[:, :-1]).float()
+            out.append(float(torch.nn.functional.cross_entropy(
+                logits.reshape(-1, logits.shape[-1]), ids[:, 1:].reshape(-1))))
     return out
 
 
@@ -244,20 +225,23 @@ def main() -> int:
     parser.add_argument("--patterns", nargs="*", default=None,
                         help="mode letters per Full layer, F/I/U; default: every single swap")
     parser.add_argument("--skip-pairs", action="store_true")
+    parser.add_argument("--device", default="cuda",
+                        help="cpu runs float32, for when the cards are training")
     parser.add_argument("--save", nargs=2, action="append", default=[],
                         metavar=("PATTERN", "DIR"),
                         help="write the model converted to PATTERN, kv_adapt fitted, to DIR")
     parser.add_argument("--own-rotary", action="store_true",
-                        help="borrowers keep their own rotary key; see OwnRotary")
+                        help="borrowers keep their own rotary key (csa2_own_rotary)")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
+    dtype = torch.float32 if args.device == "cpu" else torch.bfloat16
     model = Qwen35WidenedForCausalLM.from_pretrained(
-        args.checkpoint, dtype=torch.bfloat16).to("cuda").eval()
-    calibration, probe = documents(tokenizer, [args.chat], args.count, args.length, "cuda")
+        args.checkpoint, dtype=dtype).to(args.device).eval()
+    calibration, probe = documents(tokenizer, [args.chat], args.count, args.length, args.device)
     count = len(calibration)
     book = capture(model, calibration)
     report = dict(checkpoint=str(args.checkpoint), calibration_docs=count,
@@ -299,10 +283,11 @@ def main() -> int:
         target = Path(target)
         if target.exists():
             raise SystemExit("refusing to overwrite %s" % target)
-        undo = apply_pattern(model, pattern.replace(",", ""), book, count)
+        undo = apply_pattern(model, pattern.replace(",", ""), book, count, args.own_rotary)
         modes = [LETTER[c] for c in pattern.replace(",", "")]
         original = list(model.config.csa2_modes)
         model.config.csa2_modes = modes
+        model.config.csa2_own_rotary = args.own_rotary
         try:
             model.save_pretrained(target, safe_serialization=True)
             tokenizer.save_pretrained(target)
@@ -313,6 +298,7 @@ def main() -> int:
             print("saved %s -> %s" % (pattern, target), flush=True)
         finally:
             model.config.csa2_modes = original
+            model.config.csa2_own_rotary = False
             for index, old in undo:
                 model.model.layers[index].self_attn = old
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")

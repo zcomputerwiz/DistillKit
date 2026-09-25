@@ -202,11 +202,9 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             bus.clear()
             if (isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2
                     and not bool(attention_mask.all())):
-                # Routing picks whole blocks; there is no way to say that half a block is
-                # padding, so padded positions would be attended to as real context.
-                raise ValueError(
-                    "CSA2 routes over whole blocks and cannot represent padding. Pack or "
-                    "truncate batches to a uniform length before the model.")
+                # Routing is per token, so a padded key is simply never read: the layers
+                # take it off the bus and keep it out of both the top-k and the window.
+                bus.key_padding = attention_mask.bool()
         use_cache = self.config.use_cache if use_cache is None else use_cache
         output_hidden_states = (getattr(self.config, "output_hidden_states", False)
                                 if output_hidden_states is None else output_hidden_states)
