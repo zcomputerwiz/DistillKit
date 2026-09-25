@@ -356,3 +356,24 @@ source [-0.0684, +0.0156], -0.0234 against the repaired model [-0.0625, +0.0156]
 general text sit about 0.02-0.03 below the chat-only model, which is a consistent
 enough direction to treat as real until the confirmation split says otherwise. The
 scale run saw about 7.5M chat tokens against the repaired run's 10M.
+
+### Correction: WikiText was scored on the block path (2026-09-25)
+
+CSA2 had two whole-sequence paths. The block-sparse FlexAttention one ran whenever a
+length divided 128 and nothing was recorded, and it routes 128-token blocks; training's
+sparse stage and the llama.cpp graph both route per token. WikiText's 1024-token windows
+took the block path, so every CSA2 row above was scored on a function neither training
+nor serving computes. Per-token routing is now the only no-cache path (`223d4fe`).
+Re-scored on it, same windows, paired against the source:
+
+| checkpoint | WikiText NLL | vs source | 95% CI | MMLU (512) | in-domain NLL |
+| --- | --- | --- | --- | --- | --- |
+| source | 2.5292 | -- | -- | 0.5762 | 1.3094 |
+| repaired | 2.7440 | +0.2148 | [+0.2042, +0.2261] | 0.5742 | 0.7254 |
+| general pilot | 2.6180 | +0.0887 | [+0.0822, +0.0958] | -- | -- |
+| scale | **2.5834** | **+0.0541** | [+0.0483, +0.0603] | 0.5508 | 0.7214 |
+
+Every CSA2 arm moves by about 0.024 and the ordering is unchanged; the scale run closed
+75% of the repaired model's general-text gap rather than 67%. MMLU and in-domain NLL are
+unchanged to four places: their prompts rarely divide 128, and a short prompt's selection
+covers every causal position either way.
