@@ -1,4 +1,4 @@
-# Three arms from the scale checkpoint, identical budget, data order and settings:
+﻿# Three arms from the scale checkpoint, identical budget, data order and settings:
 # the all-Full control, and two Reuse patterns picked by borrow_profile.py.
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $env:PYTHONPATH = "$PWD"
@@ -25,7 +25,7 @@ foreach ($name in $arms.Keys) {
         Where-Object { $_ -match 'held-out|held [0-9]|loss .*->|wrote|Traceback|Error|spilled' }
 }
 $ck = @{}
-foreach ($name in $arms.Keys) { $ck[$name] = "scratch\dense_gr\checkpoints-2b-borrow-$name\smoke-r1-1-gr-s0-csa2" }
+foreach ($name in $arms.Keys) { $ck[$name] = "scratch\dense_gr\checkpoints-2b-borrow-$name\smoke-r1-1-gr-s1-csa2" }
 "=== WikiText $(Get-Date -Format HH:mm)"
 & $py scratch\dense_gr\general_nll.py --arm "source=..\student-2b-hf" --arm "control=$($ck.control)" `
     --arm "ffuffu=$($ck.ffuffu)" --arm "fufufu=$($ck.fufufu)" --reference control `

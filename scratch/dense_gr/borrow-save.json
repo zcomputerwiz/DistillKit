@@ -1,0 +1,25 @@
+{
+  "checkpoint": "scratch\\dense_gr\\checkpoints-2b-scale\\smoke-r1-1-gr-s0-csa2",
+  "calibration_docs": 32,
+  "probe_docs": 32,
+  "baseline": {
+    "wiki": 2.7747464179992676,
+    "chat": 1.592679399996996
+  },
+  "patterns": [
+    {
+      "pattern": "FFUFFU",
+      "wiki": 0.042182281613349915,
+      "wiki_se": 0.003283737434909687,
+      "chat": 0.01472746953368187,
+      "chat_se": 0.004983844975740458
+    },
+    {
+      "pattern": "FUFUFU",
+      "wiki": 0.07064779102802277,
+      "wiki_se": 0.004634592657543716,
+      "chat": 0.05389605090022087,
+      "chat_se": 0.01213461335176713
+    }
+  ]
+}

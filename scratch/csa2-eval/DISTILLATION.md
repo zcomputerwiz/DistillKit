@@ -377,3 +377,31 @@ Every CSA2 arm moves by about 0.024 and the ordering is unchanged; the scale run
 75% of the repaired model's general-text gap rather than 67%. MMLU and in-domain NLL are
 unchanged to four places: their prompts rarely divide 128, and a short prompt's selection
 covers every causal position either way.
+
+### Layer borrowing: Reuse costs MMLU (2026-09-25)
+
+CSA2 lets a layer borrow the nearest Full layer's latent (and, in Reuse, its selection)
+instead of caching its own. `borrow_profile.py` measured the scale checkpoint's six
+layers: latents only partly shared (R^2 0.37-0.66), rotary keys unrelated (cosine about
+0; a converted model's layers never learned to share one), and a single zero-shot Reuse
+costing +0.020 to +0.029 nats on WikiText validation, layers 11 and 23 cheapest. Three
+arms then trained the same 3M tokens from the scale checkpoint (seed 1, all five caches,
+decay over the last 30%), `kv_adapt` fitted by least squares for the borrowers:
+
+| arm | cache saved | WikiText vs control | MMLU (512) | vs control | in-domain NLL |
+| --- | --- | --- | --- | --- | --- |
+| source | -- | -0.0667 | 0.5762 | -- | 1.3094 |
+| control FFFFFF | 0% | 2.5959 | **0.5684** | -- | **0.7131** |
+| FFUFFU | 33% | +0.0154 [+0.0126, +0.0183] | 0.5391 | -0.0293 [-0.0605, +0.0020] | 0.7270 |
+| FUFUFU | 50% | +0.0333 [+0.0294, +0.0373] | 0.4629 | -0.1055 [-0.1523, -0.0605] | 0.7385 |
+
+Training recovered about half of each pattern's zero-shot NLL cost, but MMLU is far more
+sensitive than NLL: three borrowers cost 10.5 points, clearly significant, for 3% more
+WikiText loss. At this size the saving is small in absolute terms -- the six attention
+layers cache 5.25 KiB a token, 672 MiB at 128K, beside a fixed 19.7 MiB of recurrent
+state -- so all six layers stay Full. Revisit only with a borrower that keeps its own
+rotary key (zero-shot cost roughly halved) and a longer repair.
+
+The control arm is itself informative: 3M more tokens at a decaying rate took MMLU from
+0.5508 to 0.5684 (the source is 0.5762) and in-domain NLL from 0.7214 to 0.7131, while
+WikiText moved from 2.5834 to 2.5959.
