@@ -150,7 +150,7 @@ class CachedTeacher:
     """
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
-                 max_length=None, answer_marker=None, min_answer_tokens=0):
+                 max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         self.cache = (OfflineTeacherCache(paths[0]) if len(paths) == 1
                       else MergedCache(paths))
@@ -177,6 +177,20 @@ class CachedTeacher:
         # The cost is corpus: 74.1% of the tokens at 1024 against 89.3% at 2048.
         self.max_length = max_length
         ids = self.cache.document_ids(split)
+        # Documents known to contain benchmark test questions, removed before anything
+        # else sees them, so no plan, sample or budget is built over them. An id that is
+        # not in any capture is an error rather than a no-op: an exclusion list for the
+        # wrong corpus would otherwise exclude nothing and report success.
+        self.excluded = 0
+        if exclude:
+            exclude = set(exclude)
+            unknown = exclude - set(self.cache.documents)
+            if unknown:
+                raise ValueError("%d excluded ids are in none of these captures, e.g. %s"
+                                 % (len(unknown), sorted(unknown)[:3]))
+            kept = [doc_id for doc_id in ids if doc_id not in exclude]
+            self.excluded = len(ids) - len(kept)
+            ids = kept
         self.ids = [doc_id for doc_id in ids
                     if self.cache.documents[doc_id]["length"] >= min_tokens]
         # Both objectives score every position but the last, so a document's system

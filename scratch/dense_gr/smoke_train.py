@@ -97,6 +97,22 @@ _INHERITED_KEYS = ("csa2_token_head_weights", "csa2_rope_index", "csa2_candidate
                    "csa2_candidate_k", "mla_content_key_norm")
 
 
+def excluded_documents(path):
+    """Document ids to exclude, from a bare list or from contamination_audit's records."""
+    if path is None:
+        return set()
+    records = json.loads(Path(path).read_text(encoding="utf-8"))
+    if all(isinstance(record, str) for record in records):
+        return set(records)
+    unknown = {record.get("verdict") for record in records} - {
+        "contamination", "equivalent", "not contamination"}
+    if unknown:
+        raise SystemExit("%s has verdicts this does not know how to treat: %s"
+                         % (path, sorted(map(str, unknown))))
+    return {record["doc_id"] for record in records
+            if record["verdict"] in ("contamination", "equivalent")}
+
+
 def _refuse_mismatched_architecture(source: Path, config) -> None:
     """Refuse to load a checkpoint whose shape disagrees with the requested config.
 
@@ -235,6 +251,13 @@ def main(argv=None) -> int:
                              "corpus and peaks within a gigabyte of the ceiling; 1024 "
                              "keeps 74.1% and leaves about three. Measured in "
                              "teacher_kl.py.")
+    parser.add_argument("--exclude-documents", type=Path, default=None,
+                        help="JSON list of cache document ids to leave out of training and "
+                             "held-out alike. Either bare ids, or records with `doc_id` and "
+                             "`verdict` as contamination_audit writes them, of which only "
+                             "`contamination` and `equivalent` are excluded -- the list "
+                             "also records flags that were checked and cleared. For "
+                             "teacher-cache-5m: ../capture-data/run5m-contamination.json.")
     parser.add_argument("--min-answer-tokens", type=int, default=0,
                         help="drop cached documents with fewer than this many assistant "
                              "tokens left inside the prefix cap. Both objectives score "
@@ -691,14 +714,20 @@ def main(argv=None) -> int:
         # this marker could be in.
         marker = (tokenizer(ANSWER_MARKER, add_special_tokens=False)["input_ids"]
                   if args.min_answer_tokens > 0 else None)
+        excluded = excluded_documents(args.exclude_documents)
         teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
                                 max_length=args.teacher_max_length,
                                 answer_marker=marker,
-                                min_answer_tokens=args.min_answer_tokens)
+                                min_answer_tokens=args.min_answer_tokens,
+                                exclude=excluded)
         held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
                                      max_length=args.teacher_max_length,
                                      answer_marker=marker,
-                                     min_answer_tokens=args.min_answer_tokens)
+                                     min_answer_tokens=args.min_answer_tokens,
+                                     exclude=excluded)
+        if excluded:
+            print("excluded as benchmark contamination: %d train, %d held-out, of %d listed"
+                  % (teacher.excluded, held_teacher.excluded, len(excluded)), flush=True)
         print("teacher: %d documents, %d tokens at a %d cap, top-%d, grouped tail, "
               "blend %.2f" % (len(teacher), teacher.tokens, args.teacher_max_length,
                               teacher.top_k, args.teacher_weight), flush=True)

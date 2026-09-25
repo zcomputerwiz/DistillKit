@@ -335,3 +335,26 @@ def test_splitting_a_step_into_microbatches_does_not_change_the_gradient(tmp_pat
         piece_logits, piece_targets = scored(state, chunk)
         (F.cross_entropy(piece_logits, piece_targets) / len(chunks)).backward()
     assert not torch.allclose(head.weight.grad, reference, rtol=1e-3, atol=1e-5)
+
+
+def test_excluded_documents_are_gone_before_anything_is_planned(tmp_path):
+    """Contaminated documents must not reach the plan, the sample or the budget."""
+    from teacher_kl import CachedTeacher
+
+    tokens = {"d%02d" % i: [5] * (16 + i) for i in range(6)}
+    path = write(tmp_path / "one", list(tokens), tokens=tokens)
+    full = CachedTeacher(path, "train", device="cpu")
+    kept = CachedTeacher(path, "train", device="cpu", exclude={"d01", "d04"})
+    assert kept.excluded == 2
+    assert sorted(kept.ids) == ["d00", "d02", "d03", "d05"]
+    assert kept.tokens == full.tokens - (16 + 1) - (16 + 4)
+    assert not {"d01", "d04"} & {d for group, _ in kept._groups(2) for d in group}
+
+
+def test_an_exclusion_list_for_another_corpus_is_refused(tmp_path):
+    """Ids that exist in no capture mean the wrong list, which would exclude nothing."""
+    from teacher_kl import CachedTeacher
+
+    path = write(tmp_path / "one", ["a", "b"])
+    with pytest.raises(ValueError, match="in none of these captures"):
+        CachedTeacher(path, "train", device="cpu", exclude={"a", "not-here"})
