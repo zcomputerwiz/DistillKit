@@ -281,3 +281,23 @@ optimizer precision, learning rates, data -- so the gain is not attributed to an
 them. The 512 questions are the screen split, extended from 256, and every decision in
 this programme has been made on it; the `confirmation` split is untouched. This is the
 result it was reserved for.
+
+### General-text NLL: the gap the chat corpus cannot close
+
+Every NLL above is scored on documents from the capture pipeline the model trains on, so
+it rewards adaptation to that distribution. `scratch/dense_gr/general_nll.py` scores 64
+fixed 1024-token windows of WikiText-103 test -- encyclopedic prose, the same windows for
+every checkpoint, paired:
+
+| checkpoint | NLL | vs source | 95% CI |
+| --- | --- | --- | --- |
+| source | 2.5292 | -- | -- |
+| conv chat/32K, untrained | 2.7800 | +0.2507 | [+0.2324, +0.2719] |
+| kd (old, frozen) | 2.8227 | +0.2935 | [+0.2798, +0.3080] |
+| repaired | 2.7671 | +0.2379 | [+0.2240, +0.2534] |
+
+The conversion costs 0.25 nats of general language modelling, and 10M tokens of chat-SFT
+training recover 0.013 of it. The repaired model matches the source on MMLU and beats it
+by 0.58 nats in-domain while remaining 27% worse in perplexity on general prose: the
+training corpus repairs what it contains and nothing else. Closing this gap needs general
+text in the training corpus, not more chat.
