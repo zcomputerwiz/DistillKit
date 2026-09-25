@@ -159,7 +159,29 @@ def main(argv=None) -> int:
     parser.add_argument("--evaluate-every", type=int, default=0,
                         help="steps between held-out evaluations; 0 disables")
     parser.add_argument("--evaluate-windows", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--lr", type=float, default=1.83e-6,
+                        help="peak learning rate for the pretrained body. 1.83e-6 is the "
+                             "low half of the flat optimum a paired sweep found for "
+                             "distilling the converted 2B under compensated updates: "
+                             "0.9e-6 to 3.65e-6 within noise, 7.3e-6 worse by 0.047 nats "
+                             "with an interval clear of zero (TRAINING_REPAIR.md). A model "
+                             "trained from scratch wants far more; pass it explicitly.")
+    parser.add_argument("--router-lr", type=float, default=9.37e-4,
+                        help="peak learning rate for the CSA2 router (the indexer "
+                             "projections), 512x the body's. Swept at 1x, 8x, 64x and 512x "
+                             "with the body fixed at 1.83e-6: the router's own objective on "
+                             "held-out documents fell monotonically, -0.628 nats at 512x "
+                             "[-0.657, -0.601] against 1x -- 2.6x the improvement 1x makes "
+                             "over the untrained start -- with held-out NLL unmoved at every "
+                             "rate. It is also about the 1e-3 the router was warmed at. "
+                             "Pass --router-lr equal to --lr to train it with the body.")
+    parser.add_argument("--adapter-lr", type=float, default=None,
+                        help="peak learning rate for the residual-route adapters "
+                             "(attn_residual / mlp_residual: W_down, W_up, W_write, "
+                             "branch_gain_delta), which were created at conversion rather "
+                             "than pretrained. Defaults to --lr: swept at 8x, 64x and 512x "
+                             "it moved held-out NLL by nothing measurable, and at 512x it "
+                             "set back the router's alignment by 0.18 nats.")
     parser.add_argument("--sparse-stage", action="store_true",
                         help="the reference's second stage: every parameter trains on the "
                              "language-modeling loss, the indexer trains on its own KL "
@@ -716,8 +738,29 @@ def main(argv=None) -> int:
     # |w| >= 0.002 was frozen, 87% of the model. Kahan compensation keeps what the
     # rounding drops; see KahanAdamW8bit. `--no-kahan` reproduces the old runs.
     optimizer_class = bnb.optim.AdamW8bit if args.no_kahan else KahanAdamW8bit
-    optimizer = optimizer_class(trainable, lr=args.lr, betas=(0.9, 0.95),
-                                weight_decay=0.1)
+    # Three groups, because the three kinds of parameter did not start from the same
+    # place. The body is pretrained and moves least; the router and the residual
+    # adapters were created at conversion -- the router warmed at 1e-3 in float32 by
+    # indexer_kl.py -- and may want another rate. Empty groups are dropped, and each
+    # carries its own peak so warm-up scales it rather than overwriting it.
+    router_ids = {id(p) for _, p in router_parameters(model)}
+    adapter_ids = {id(p) for name, p in model.named_parameters() if "_residual." in name}
+    rates = {"body": args.lr,
+             "router": args.lr if args.router_lr is None else args.router_lr,
+             "adapter": args.lr if args.adapter_lr is None else args.adapter_lr}
+    members = {"body": [], "router": [], "adapter": []}
+    for parameter in trainable:
+        kind = ("router" if id(parameter) in router_ids
+                else "adapter" if id(parameter) in adapter_ids else "body")
+        members[kind].append(parameter)
+    optimizer = optimizer_class(
+        [{"params": members[kind], "lr": rates[kind], "peak_lr": rates[kind], "name": kind}
+         for kind in ("body", "router", "adapter") if members[kind]],
+        lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    print("learning rates: " + ", ".join(
+        "%s %.3g (%.1fM)" % (group["name"], group["peak_lr"],
+                             sum(p.numel() for p in group["params"]) / 1e6)
+        for group in optimizer.param_groups), flush=True)
     # The failure this guards against is silent in every other way: the loss falls, no
     # tensor is missing, and only a diff against the starting checkpoint shows that most
     # of the model never moved. So the invariant is asserted rather than assumed.
@@ -814,8 +857,8 @@ def main(argv=None) -> int:
         if not microbatches:
             break
         for group in optimizer.param_groups:
-            group["lr"] = (args.lr * (step + 1) / args.warmup
-                           if step < args.warmup else args.lr)
+            peak = group.get("peak_lr", args.lr)
+            group["lr"] = peak * (step + 1) / args.warmup if step < args.warmup else peak
         if step == args.benchmark_warmup_steps:
             for device in {p.device for p in model.parameters() if p.is_cuda}:
                 torch.cuda.reset_peak_memory_stats(device)

@@ -1,0 +1,1548 @@
+{
+  "vocab": 248320,
+  "kept_ids": 248320,
+  "coverage": 1.0,
+  "store": "scratch\\code_training\\tokens-v2",
+  "seed": 0,
+  "architecture": {
+    "ratio": "1:1",
+    "blend": 1.0,
+    "init_from": "scratch\\dense_gr\\checkpoints-2b\\warmed-chat32",
+    "converted": false,
+    "frozen_router": false,
+    "dense_routing": false,
+    "asymmetric": false,
+    "variant": "r1-1-gr-s0-csa2",
+    "hidden": 2048,
+    "norm_mode": "exact",
+    "layers": 24,
+    "full_attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "store_tokens": 3003421492,
+  "compact_tokens": 3003421492,
+  "round_trip": true,
+  "parameters": 1915249222,
+  "liger": {
+    "swiglu": 24,
+    "rmsnorm": 61
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 120,
+  "accumulate": 2,
+  "scored_tokens": 713108,
+  "requested_targets": 3000000,
+  "unused_target_budget": 2286892,
+  "corpus_scored_targets": 2907765,
+  "step_measurements": [
+    {
+      "seconds": 4.047926700000971,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.286425499998586,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.3088360000001558,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.3234109000004537,
+      "targets": 6137
+    },
+    {
+      "seconds": 3.3268397000010737,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.0662099000001035,
+      "targets": 5616
+    },
+    {
+      "seconds": 3.313805100000536,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.101391899999726,
+      "targets": 5622
+    },
+    {
+      "seconds": 3.129964600000676,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.2545264000000316,
+      "targets": 6132
+    },
+    {
+      "seconds": 3.4362934000000678,
+      "targets": 6137
+    },
+    {
+      "seconds": 3.2951751000000513,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.3901212999990094,
+      "targets": 6138
+    },
+    {
+      "seconds": 2.9611339999992197,
+      "targets": 5241
+    },
+    {
+      "seconds": 3.3725273000000016,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.2951341999996657,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.3630021999997552,
+      "targets": 6126
+    },
+    {
+      "seconds": 2.8468689000001177,
+      "targets": 4847
+    },
+    {
+      "seconds": 3.026257400000759,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.01016189999973,
+      "targets": 5616
+    },
+    {
+      "seconds": 3.4071069000001444,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.070246400000542,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.373084900000322,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.3138490000001184,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.287081099999341,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.2771205000008194,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.4014084999998886,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.1365507999998954,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.3292105000000447,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.2789373000014166,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.314195099999779,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.340102399999523,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.408758100000341,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.411208000001352,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.2682084000007308,
+      "targets": 6124
+    },
+    {
+      "seconds": 3.349056000000928,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.34207140000035,
+      "targets": 6126
+    },
+    {
+      "seconds": 3.3312346000002435,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.351868600000671,
+      "targets": 6137
+    },
+    {
+      "seconds": 3.267204599998877,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.1682074000000284,
+      "targets": 5751
+    },
+    {
+      "seconds": 3.2940368999989005,
+      "targets": 6133
+    },
+    {
+      "seconds": 2.8885551000003034,
+      "targets": 5241
+    },
+    {
+      "seconds": 3.2818759999991016,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.341194799999357,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.3528470000001107,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.292836900000111,
+      "targets": 6134
+    },
+    {
+      "seconds": 3.33131560000038,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.137642500001675,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.1785923000006733,
+      "targets": 5754
+    },
+    {
+      "seconds": 2.892221199999767,
+      "targets": 5241
+    },
+    {
+      "seconds": 2.978382400000555,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.2988994999996066,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.2648598000014317,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.3341090000012628,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.0499556999984634,
+      "targets": 5370
+    },
+    {
+      "seconds": 3.408869799999593,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.3032080000011774,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.388510299999325,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.504938400001265,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.1974160999998276,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.067935300001409,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.4092730000011215,
+      "targets": 6137
+    },
+    {
+      "seconds": 3.1083768000007694,
+      "targets": 5749
+    },
+    {
+      "seconds": 3.035749399999986,
+      "targets": 5616
+    },
+    {
+      "seconds": 3.3592435000009573,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.32265550000011,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.3298801999990246,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.3126812999998947,
+      "targets": 6128
+    },
+    {
+      "seconds": 3.1155784000002313,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.437640399999509,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.0359513999992487,
+      "targets": 5624
+    },
+    {
+      "seconds": 3.3217358000001695,
+      "targets": 6132
+    },
+    {
+      "seconds": 3.2124370000001363,
+      "targets": 6128
+    },
+    {
+      "seconds": 3.3712295000004815,
+      "targets": 6132
+    },
+    {
+      "seconds": 3.224480600001698,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.2857959999982995,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.3612552999984473,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.2884216000002198,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.108557200001087,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.0117102000003797,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.1368275999993784,
+      "targets": 5751
+    },
+    {
+      "seconds": 3.279663100000107,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.235242599999765,
+      "targets": 6124
+    },
+    {
+      "seconds": 3.063111299999946,
+      "targets": 5624
+    },
+    {
+      "seconds": 3.3667723999988084,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.3063043000001926,
+      "targets": 6120
+    },
+    {
+      "seconds": 3.092236899999989,
+      "targets": 5616
+    },
+    {
+      "seconds": 3.402566700000534,
+      "targets": 6137
+    },
+    {
+      "seconds": 3.2699893999997585,
+      "targets": 6132
+    },
+    {
+      "seconds": 3.4024001999987377,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.0190206000006583,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.186555300000691,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.1449007999999594,
+      "targets": 5745
+    },
+    {
+      "seconds": 3.2731312999985676,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.2690641000008327,
+      "targets": 6130
+    },
+    {
+      "seconds": 3.30209350000041,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.333206200000859,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.308309099998951,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.398181200000181,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.27844019999975,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.2056945000003907,
+      "targets": 5754
+    },
+    {
+      "seconds": 3.270610300000044,
+      "targets": 6133
+    },
+    {
+      "seconds": 3.2024375000000873,
+      "targets": 5753
+    },
+    {
+      "seconds": 3.03777490000175,
+      "targets": 5620
+    },
+    {
+      "seconds": 3.357231400001183,
+      "targets": 6132
+    },
+    {
+      "seconds": 3.328133999999409,
+      "targets": 6137
+    },
+    {
+      "seconds": 2.66077359999872,
+      "targets": 4602
+    },
+    {
+      "seconds": 3.3148150999986683,
+      "targets": 6135
+    },
+    {
+      "seconds": 2.9732731000003696,
+      "targets": 5241
+    },
+    {
+      "seconds": 3.205008299999463,
+      "targets": 6128
+    },
+    {
+      "seconds": 3.1702866999985417,
+      "targets": 5749
+    },
+    {
+      "seconds": 3.2273666999990382,
+      "targets": 6128
+    },
+    {
+      "seconds": 3.060573000000659,
+      "targets": 5625
+    },
+    {
+      "seconds": 3.2316325000010693,
+      "targets": 6124
+    },
+    {
+      "seconds": 3.402155699999639,
+      "targets": 6138
+    },
+    {
+      "seconds": 3.255639800001518,
+      "targets": 6124
+    },
+    {
+      "seconds": 3.385843500000192,
+      "targets": 6135
+    },
+    {
+      "seconds": 3.352583900001264,
+      "targets": 6129
+    },
+    {
+      "seconds": 3.3353888999990886,
+      "targets": 6138
+    }
+  ],
+  "warmup_backward_targets": 32933,
+  "measured_step_tokens_per_second": 1828.1594570767556,
+  "peak_allocated_gib_by_device": {
+    "cuda:0": 19.46394109725952,
+    "cuda:1": 8.772942543029785
+  },
+  "seconds": 391.25651649999963,
+  "tokens_per_second": 1822.6098989459276,
+  "first_loss": 1.242992552734405,
+  "final_loss": 0.8480571210384369,
+  "inflation": 1.0,
+  "final_loss_per_original_token": 0.8480571210384369,
+  "final_heldout": null,
+  "final_heldout_per_original_token": null,
+  "final_copy": null,
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5103105945121951,
+      "selected": 0.3599461292897047,
+      "entropy": 0.9612346291542053
+    },
+    {
+      "layer": 7,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5083231707317073,
+      "selected": 0.3574595969672785,
+      "entropy": 0.9566121101379395
+    },
+    {
+      "layer": 11,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5063116107723578,
+      "selected": 0.3546388667198723,
+      "entropy": 0.9591692686080933
+    },
+    {
+      "layer": 15,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5112874745934959,
+      "selected": 0.3612504988028731,
+      "entropy": 0.9608040452003479
+    },
+    {
+      "layer": 19,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5164761178861789,
+      "selected": 0.36808659217877093,
+      "entropy": 0.9543386101722717
+    },
+    {
+      "layer": 23,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1024,
+      "density": 0.5015815548780488,
+      "selected": 0.34849694067571163,
+      "entropy": 0.9596917629241943
+    }
+  ],
+  "passes": 0.24524265200248302,
+  "peak_allocated_gib": 19.46394109725952,
+  "peak_reserved_gib": 20.333984375,
+  "shared_delta_gib": 0.0859375,
+  "spill_telemetry_valid": true,
+  "spilled": false,
+  "spill_telemetry": {
+    "scope": "process",
+    "pid": 27236,
+    "coverage": "complete",
+    "valid_samples": 15,
+    "attempts": 15,
+    "failed_reads": 0,
+    "baseline_delayed": false,
+    "baseline_gib": 0.076171875,
+    "latest_gib": 0.162109375,
+    "peak_gib": 0.162109375,
+    "last_error": null,
+    "interval_seconds": 30.0,
+    "tolerance_gib": 1.0
+  },
+  "setup_seconds": 31.329942300000766,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 6133,
+      "passes": 0.002109180074730936,
+      "loss": 1.242992552734405,
+      "loss_per_original_token": 1.242992552734405,
+      "tokens_per_second": 1510.7985887224916,
+      "teacher_kl": 3.0343433558872857,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5110143546747967,
+          "selected": 0.3608664205905826,
+          "entropy": 0.9536730051040649
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5043083079268292,
+          "selected": 0.35211824953445064,
+          "entropy": 0.9583432078361511
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.49774580792682926,
+          "selected": 0.3434141393987763,
+          "entropy": 0.9616900086402893
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5041069613821139,
+          "selected": 0.3517840516094706,
+          "entropy": 0.9579241871833801
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5146233485772358,
+          "selected": 0.3656391327480713,
+          "entropy": 0.9484132528305054
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5112792174796748,
+          "selected": 0.3612529928172386,
+          "entropy": 0.9498517513275146
+        }
+      ],
+      "indexer": 22.916269394423473,
+      "shared_delta_gib": 0.0,
+      "spill_telemetry_valid": false,
+      "spilled": null,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "partial",
+        "valid_samples": 1,
+        "attempts": 1,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.076171875,
+        "peak_gib": 0.076171875,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 20,
+      "tokens": 123546,
+      "passes": 0.04248830287179328,
+      "loss": 1.1378243565559387,
+      "loss_per_original_token": 1.1378243565559387,
+      "tokens_per_second": 1796.4240047526198,
+      "teacher_kl": 1.5765855312347412,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5013941819105691,
+          "selected": 0.34827996142591117,
+          "entropy": 0.952290415763855
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5037842987804878,
+          "selected": 0.35146648044692735,
+          "entropy": 0.9523991942405701
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4961852134146341,
+          "selected": 0.3413382881085395,
+          "entropy": 0.9593446850776672
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4972999237804878,
+          "selected": 0.3428637935621176,
+          "entropy": 0.9579272270202637
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5019200965447155,
+          "selected": 0.34896082734769884,
+          "entropy": 0.9545119404792786
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.49569296239837396,
+          "selected": 0.3408145450917797,
+          "entropy": 0.954602062702179
+        }
+      ],
+      "indexer": 24.376200675964355,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 4,
+        "attempts": 4,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 40,
+      "tokens": 244427,
+      "passes": 0.08406009426483915,
+      "loss": 0.8116420560599493,
+      "loss_per_original_token": 0.8116420560599493,
+      "tokens_per_second": 1810.6592227715223,
+      "teacher_kl": 0.7339747866803181,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5554120547327069,
+          "selected": 0.39424887729972474,
+          "entropy": 0.9618430137634277
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5545850586611456,
+          "selected": 0.39318955526582644,
+          "entropy": 0.9651777148246765
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5503256556245687,
+          "selected": 0.3872308688251485,
+          "entropy": 0.9691495895385742
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.556729276158624,
+          "selected": 0.3961694643633203,
+          "entropy": 0.9660176038742065
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.563458884111058,
+          "selected": 0.4053344107634362,
+          "entropy": 0.9589962959289551
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5553722394755003,
+          "selected": 0.39428282992901637,
+          "entropy": 0.9592499732971191
+        }
+      ],
+      "indexer": 23.115918666419724,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 6,
+        "attempts": 6,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 60,
+      "tokens": 362410,
+      "passes": 0.1246352439072621,
+      "loss": 1.017004155919997,
+      "loss_per_original_token": 1.017004155919997,
+      "tokens_per_second": 1812.8478125681463,
+      "teacher_kl": 0.9251075177234951,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.54799729256251,
+          "selected": 0.3840891188613646,
+          "entropy": 0.9647405743598938
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5528705141476881,
+          "selected": 0.39092151962914673,
+          "entropy": 0.9663158655166626
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5483489940011679,
+          "selected": 0.3846063305809069,
+          "entropy": 0.9687520861625671
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5498312828475872,
+          "selected": 0.3866932855280313,
+          "entropy": 0.9668375849723816
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5551283710251101,
+          "selected": 0.393895769955092,
+          "entropy": 0.9626085758209229
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 896,
+          "density": 0.5515640760205978,
+          "selected": 0.38907336484137334,
+          "entropy": 0.9551877379417419
+        }
+      ],
+      "indexer": 23.935849055508005,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 8,
+        "attempts": 8,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 80,
+      "tokens": 481238,
+      "passes": 0.16550099475026353,
+      "loss": 0.7661871827369907,
+      "loss_per_original_token": 0.7661871827369907,
+      "tokens_per_second": 1817.2064880262892,
+      "teacher_kl": 0.5841946429629343,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.6941838923556942,
+          "selected": 0.5214232204011742,
+          "entropy": 0.9604132771492004
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.6979463241029641,
+          "selected": 0.5274297486545988,
+          "entropy": 0.9598968029022217
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.6945739079563182,
+          "selected": 0.5220156555772995,
+          "entropy": 0.9613080620765686
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.6947530713728549,
+          "selected": 0.5224150715508806,
+          "entropy": 0.9605207443237305
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.7060878997659906,
+          "selected": 0.5402531035958904,
+          "entropy": 0.956608772277832
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 640,
+          "density": 0.7019391088143526,
+          "selected": 0.533787915851272,
+          "entropy": 0.9534540176391602
+        }
+      ],
+      "indexer": 21.397126835181616,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 10,
+        "attempts": 10,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 100,
+      "tokens": 601183,
+      "passes": 0.20675088942882247,
+      "loss": 0.8288103774537392,
+      "loss_per_original_token": 0.8288103774537392,
+      "tokens_per_second": 1821.277070412697,
+      "teacher_kl": 0.5808930329488888,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5069156504065041,
+          "selected": 0.3554677108273477,
+          "entropy": 0.9570814967155457
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5078544207317073,
+          "selected": 0.3568086592178771,
+          "entropy": 0.959570586681366
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5006732723577236,
+          "selected": 0.347235800744879,
+          "entropy": 0.9674806594848633
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5077877286585366,
+          "selected": 0.35667564511838257,
+          "entropy": 0.9609191417694092
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5192162093495934,
+          "selected": 0.37169709364192605,
+          "entropy": 0.9514940977096558
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.504120299796748,
+          "selected": 0.35185388401170525,
+          "entropy": 0.9587727785110474
+        }
+      ],
+      "indexer": 22.216997903574743,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 12,
+        "attempts": 12,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 119,
+      "tokens": 713108,
+      "passes": 0.24524265200248302,
+      "loss": 0.8480571210384369,
+      "loss_per_original_token": 0.8480571210384369,
+      "tokens_per_second": 1822.641812930759,
+      "teacher_kl": 0.8183093070983887,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5103105945121951,
+          "selected": 0.3599461292897047,
+          "entropy": 0.9612346291542053
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5083231707317073,
+          "selected": 0.3574595969672785,
+          "entropy": 0.9566121101379395
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5063116107723578,
+          "selected": 0.3546388667198723,
+          "entropy": 0.9591692686080933
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5112874745934959,
+          "selected": 0.3612504988028731,
+          "entropy": 0.9608040452003479
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5164761178861789,
+          "selected": 0.36808659217877093,
+          "entropy": 0.9543386101722717
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.5015815548780488,
+          "selected": 0.34849694067571163,
+          "entropy": 0.9596917629241943
+        }
+      ],
+      "indexer": 24.24237823486328,
+      "shared_delta_gib": 0.0859375,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 27236,
+        "coverage": "complete",
+        "valid_samples": 14,
+        "attempts": 14,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.162109375,
+        "peak_gib": 0.162109375,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    }
+  ],
+  "run_args": {
+    "vocab": 248320,
+    "hidden": 2048,
+    "layers": 24,
+    "ratio": "1:1",
+    "blend": 1.0,
+    "norm_mode": "exact",
+    "batch": 64,
+    "length": 1024,
+    "accumulate": 2,
+    "tokens": 3000000,
+    "passes": null,
+    "evaluate_every": 0,
+    "evaluate_windows": 64,
+    "lr": 1.83e-06,
+    "router_lr": 1.464e-05,
+    "adapter_lr": null,
+    "sparse_stage": true,
+    "teacher_cache": [
+      "..\\teacher-cache-5m"
+    ],
+    "tensor_parallel": true,
+    "micro_tokens": 3072,
+    "micro_batch": 1,
+    "teacher_weight": 0.5,
+    "teacher_max_length": 1024,
+    "min_answer_tokens": 2,
+    "no_kahan": false,
+    "kl_chunk": 64,
+    "indexer_weight": 1.0,
+    "checkpoint_layers": false,
+    "warmup": 20,
+    "report_every": 20,
+    "store": "scratch\\code_training\\tokens-v2",
+    "spill_every": 30.0,
+    "seed": 0,
+    "probe_every": 0,
+    "probe_half": 256,
+    "probe_windows": 64,
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128,
+    "mla_latent_dim": 384,
+    "checkpoints": "scratch\\dense_gr\\sweep-lr-router-x8",
+    "no_checkpoint": false,
+    "resume": null,
+    "save_every": 0,
+    "max_steps": 120,
+    "benchmark_warmup_steps": 0,
+    "init_from": "scratch\\dense_gr\\checkpoints-2b\\warmed-chat32",
+    "dense_routing": false,
+    "inherit": true,
+    "train_only": "all",
+    "freeze_router": false,
+    "asymmetric": false,
+    "convert": false,
+    "output": "scratch\\dense_gr\\sweep-lr-router-x8.json"
+  },
+  "heldout_sample": [
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "038ac833f59a65e43b9a9f278f579e92"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "038b7868299429082fc94d1d3602b85a"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "0396e6a99441fe6cdd5f66271409f503"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "039ba0fd6bd3eb4b9f05a2dfa802a551"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03a2ce07fab832e820b6bf6a413f2456"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03a8765973e1b2af3921b3384d440c37"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03af21f7f13e82aa80ff0f17754b3d6f"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03b151719c3dbe879416114fff043e48"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03b1fcb2c17f28b76d95cb95a2f52ea4"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03b3ffe62c638afbd2d835b927c30808"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03ba3c57e8b3a6cf57bebbdae634fd49"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03bae16f7ce1182b7d8e88cdf819229d"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03bdc8e1ab6c2c463bc9b32982d947ac"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03bf9669855d172a058b1275e4ccf37d"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03c4ba14f0e7a1fe6980268c31e9b0f9"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "03cdb55160954c068d26c9bbb419132a"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "116ed4fd47595278fd8e701625f822ca"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1170b58aa8a1c38005fc39be6f96a466"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "117396c1981a2da631ed94c199b6dd83"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11751c1420770045dce08e797a4e9083"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1177096ccca28b6f7bf17dc24fd145e7"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1183da901ffabb7b0949dbbab1932bbc"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11851ceee45a55ad"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "118946ab736b84d933b0eea5a5eb3752"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "118ebe1ce8bab7e2382358d2a1a05c93"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11967885bcf4da48b1bc55fd359eae41"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1196c1848358716e4ab9cd79c1ed5194"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "119738bb39fb5687c1b09ebe4228c03b"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "119e24de6694b0eada2422ea209cc721"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "119feef4973672aef050414d6d4679dc"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11a1f26f98a91d3071fd1aa9e8b29cd5"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11a92376fc81dbb618f810549fecba49"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11ae5f936b6dd85569ae386da55ec636"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11ae896581f7a8267ac6bffed7d5ab4a"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11b755e60d459070d9ad1e8bc61c14ef"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11bace3fcdb5c5aa28a682c7d33a96dd"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11c5cd5e2dbca48678523b96ae408ab5"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "11c82eaaeb4ba675942f6898b86f1392"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "189a5cf3a7fceec59f8456c755955be5"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18a05829656db51bba80cd57a56f5a48"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18a3525fab475f35ee6e74659b9ed2db"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18b2ce9b79ba4ed5e0a9bbff5c7b7b4f"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18b60c18282f6d2ceed0f2155f43e59c"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18bffea5ee636b1a66fd951f525746f8"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18caa8902988182712563043e69a5a70"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18cde3645bc60f79fe4fb4be52067ac2"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "18d1e121215aa432"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1948764442878dba0c6fdda0c51cdf5c"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "194cc1dd919c6e183dfb81b9bf30cf14"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "19502cb34f4b9d863a54f2e1760e8651"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "195400b91ab300b15e264d9eac1c68e1"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "19588f41b457ea277aa70161cd1b812f"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "195a0b012924ccb7f2a36fd91a4cf729"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "196362f86ccc9a8baac9d6743410c70f"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1963e972880826ddcd9ba875a24604f8"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "196d23d777c1ce2043c662d7539c399b"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "196dfb4efa22c217ce7638cc798e0d9c"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1981e5c0bea58969796ea7289ff136cc"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "1986324145b8c28355366842244dcab6"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "19898530f937989d6a8948967b1ae0ad"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "19983c01921fc530245a32daac9f9fb7"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "199d56193a8d97689c1811bb2592ac1e"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "199e3f2937be28273906bbc642bf5c89"
+    ],
+    [
+      "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-5m",
+      "19a00f78738f1d1909260dceca2fee8e"
+    ]
+  ]
+}

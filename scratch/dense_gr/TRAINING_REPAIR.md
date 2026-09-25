@@ -328,3 +328,42 @@ state blocks, which a test pins as bit-identical to one pass. Home-card peak at 
 batch: 19.46 GiB; 1,780-1,820 tokens a second.
 
 Raw results: `sweep-eval-20260924.json`, `sweep-eval-low-20260924.json`, `sweep-lr-*.json`.
+
+## Router and adapter learning rates -- 2026-09-24
+
+With the body at 1.83e-6, the router (6.5M parameters, the indexer projections) and the
+residual adapters (25.8M, created at conversion) were each given their own rate, one at
+a time, at 8x, 64x and 512x the body's. Same protocol as the body sweep: 120 steps, same
+data order, scored afterwards on the same 128 held-out documents. The 1x arm is the
+body sweep's 1.83e-6 arm.
+
+Held-out NLL does not respond to either, across three decades:
+
+| arm | NLL | vs 1x | 95% CI |
+| --- | --- | --- | --- |
+| 1x | 0.7813 | -- | -- |
+| router 8x / 64x / 512x | 0.7857 / 0.7803 / 0.7805 | +0.004 / -0.001 / -0.001 | all span zero |
+| adapter 8x / 64x / 512x | 0.7788 / 0.7841 / 0.7789 | -0.003 / +0.003 / -0.002 | all span zero |
+
+That is the wrong instrument for the router: at a 1024-token cap it is one input among
+many and a better choice of blocks is buried. `router_eval.py` scores the router's own
+objective -- the KL of its scores against the attention over the positions it selected,
+what training minimizes -- on the same held-out documents:
+
+| arm | router KL | vs 1x | 95% CI |
+| --- | --- | --- | --- |
+| untrained start | 23.1288 | +0.4015 | [+0.3411, +0.4629] |
+| 1x | 22.7273 | -- | -- |
+| router 8x | 22.5652 | -0.1621 | [-0.1716, -0.1529] |
+| router 64x | 22.2110 | -0.5163 | [-0.5419, -0.4942] |
+| **router 512x** | **22.0990** | **-0.6284** | [-0.6572, -0.6012] |
+| adapter 512x | 22.9091 | +0.1817 | [+0.1527, +0.2123] |
+
+**The router wants its own rate; the adapters do not.** At the body's rate the router
+improves 0.40 on the untrained start; at 512x it improves 1.03 in the same steps, with
+NLL unmoved. Returns flatten -- 64x to 512x adds 0.11 -- and 512x is about the 1e-3 the
+router was warmed at, so `--router-lr` now defaults to 9.37e-4. Higher was not tried;
+it would be beyond the rate the router has ever been validated at. The adapters stay at
+the body's rate: no rate helped NLL, and at 512x they set back the router's alignment.
+
+Raw results: `sweep-eval-groups-20260924.json`, `router-eval-20260924.json`.
