@@ -484,3 +484,27 @@ mean 1137 tokens against 544) and loop -- now as runaway enumeration: listing Co
 terms or Fibonacci numbers, with wrong arithmetic, until the cap. Only ~660K of the 3M
 tokens were thinking-format examples, and every measurement here is greedy, which Qwen's
 guidance for thinking mode advises against for exactly this failure.
+
+### Thinking-weighted finishing pass (2026-09-26)
+
+A new thinking corpus in the native format (`thinking_corpus.py`): the dataset's
+`sft_code`, `sft_math` and `sft_reasoning` configs, reasoning moved into
+`reasoning_content` so the template places it (the double think block was a rendering
+artifact: the dataset keeps `<think>` inside `content` and the template prepends its own
+empty block), de-hedged, screened, and whole documents only within the 1024-token cap --
+5,993 documents, 3.0M tokens, reasoning median 156 tokens. From `both`, 3M tokens at ~74%
+thinking format (`think-first` + this corpus) with `expand-code` for non-thinking code:
+
+| mode | bench | source | both | thinking pass |
+| --- | --- | --- | --- | --- |
+| thinking | HumanEval+ | 46.3% | 37.8% | **41.5%** (p 0.28) |
+| thinking | MBPP+ | 47.6% | 39.4% | 40.2% (p 0.006) |
+| non-thinking | HumanEval+ | 44.5% | 45.7% | 42.7% (p 0.72) |
+| non-thinking | MBPP+ | 47.6% | 47.1% | 47.6% (p 1.00) |
+
+HumanEval+ in thinking mode is now within noise of the source; answers are shorter (mean
+797 tokens against 1137) and looping among answers with code halved. MBPP+ is not: its
+failures are greedy repetition after a slip, and overthinking MBPP's under-specified tasks
+("median length of a trapezium") against a single example test. The corpus under-represents
+code reasoning -- 1,850 code documents were dropped as longer than the cap. WikiText
++0.0018 (n.s.), in-domain NLL 0.7106, MMLU 0.5605, P(hedge opener) 0.44x the source.
