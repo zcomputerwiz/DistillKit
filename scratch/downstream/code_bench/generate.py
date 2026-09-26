@@ -117,6 +117,9 @@ def main() -> int:
     parser.add_argument("--max-new-tokens", type=int, default=768)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--no-thinking", action="store_true",
+                        help="render with enable_thinking=False: the assistant turn opens on an "
+                             "empty, closed think block, the format the code captures train on")
     parser.add_argument("--compiled", action="store_true",
                         help="CompiledGreedy instead of HF generate; the CSA2 checkpoints only")
     parser.add_argument("--output", type=Path, required=True)
@@ -143,7 +146,7 @@ def main() -> int:
     end_of_text = tokenizer.eos_token_id
     prompts = [tokenizer.apply_chat_template(
         [{"role": "user", "content": render(args.bench, p)}], tokenize=False,
-        add_generation_prompt=True) for p in problems]
+        add_generation_prompt=True, enable_thinking=not args.no_thinking) for p in problems]
 
     runner, width_all = None, None
     if args.compiled:
@@ -198,7 +201,7 @@ def main() -> int:
         "max_new_tokens": args.max_new_tokens, "batch_size": args.batch_size,
         "decoding": {"do_sample": False, "greedy": True, "padding_side": "left",
                      "pad_token": "eos"},
-        "instruction_template": TEMPLATES[args.bench],
+        "instruction_template": TEMPLATES[args.bench], "thinking": not args.no_thinking,
         "mean_generated_tokens": sum(lengths) / max(len(lengths), 1),
         "median_generated_tokens": sorted(lengths)[len(lengths) // 2],
         "truncations": truncated, "elapsed_seconds": elapsed,
