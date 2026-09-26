@@ -5,6 +5,11 @@ param([Parameter(Mandatory)][string]$Dir, [Parameter(Mandatory)][ValidateSet("mb
 $ErrorActionPreference = "Stop"
 $root = "D:\DeepThought\Projects\HybridModel\DistillKit"
 $samples = Join-Path $Dir "samples.jsonl"
+# Already scored against these completions: nothing to do. Lets a queue re-run cheaply.
+$scored = Join-Path $Dir "eval_results.json"
+if ((Test-Path $scored) -and (Get-Item $scored).LastWriteTime -gt (Get-Item (Join-Path $Dir "completions.jsonl")).LastWriteTime) {
+    "already scored: $Dir"; return
+}
 & "$root\.venv\Scripts\python.exe" -c @"
 import json, sys
 src, dst, bench = sys.argv[1], sys.argv[2], sys.argv[3]

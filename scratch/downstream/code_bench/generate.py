@@ -97,6 +97,11 @@ class CompiledGreedy:
         self.position_ids = torch.zeros(batch, 1, dtype=torch.long, device=self.device)
         self.key_padding = torch.ones(batch, prompt + new, dtype=torch.bool, device=self.device)
         self.no_mask = {"full_attention": None, "linear_attention": None}
+        # The stock Qwen3.5 model has no `key_padding`: it takes the ordinary 2-D mask,
+        # held at the static cache's full length so its shape never changes. Positions not
+        # yet written lie in every query's future and the causal mask already hides them.
+        self.widened = hasattr(getattr(model, "model", None), "csa2_bus")
+        self.full_mask = torch.ones(batch, prompt + new, dtype=torch.long, device=self.device)
 
     @torch.inference_mode()
     def __call__(self, input_ids, attention_mask):
@@ -109,16 +114,18 @@ class CompiledGreedy:
                          position_ids=positions.expand(batch, -1), logits_to_keep=1)
         following = pick(out.logits[:, -1], self.sampling, self.generator)
         self.key_padding[:, :width].copy_(attention_mask.bool())
+        self.full_mask[:, :width].copy_(attention_mask)
+        masks = (dict(attention_mask=self.no_mask, key_padding=self.key_padding) if self.widened
+                 else dict(attention_mask=self.full_mask))
         produced = [following]
         finished = following == self.eos
         for index in range(self.new - 1):
             self.token.copy_(following.view(-1, 1))
             self.position.fill_(width + index)
             self.position_ids.fill_(width + index)
-            out = self.step(input_ids=self.token, attention_mask=self.no_mask,
-                            key_padding=self.key_padding, past_key_values=self.cache,
-                            use_cache=True, cache_position=self.position,
-                            position_ids=self.position_ids, logits_to_keep=1)
+            out = self.step(input_ids=self.token, past_key_values=self.cache, use_cache=True,
+                            cache_position=self.position, position_ids=self.position_ids,
+                            logits_to_keep=1, **masks)
             following = pick(out.logits[:, -1], self.sampling, self.generator).clone()
             produced.append(following)
             finished |= following == self.eos
@@ -139,13 +146,16 @@ def main() -> int:
                         help="render with enable_thinking=False: the assistant turn opens on an "
                              "empty, closed think block, the format the code captures train on")
     parser.add_argument("--compiled", action="store_true",
-                        help="CompiledGreedy instead of HF generate; the CSA2 checkpoints only")
+                        help="CompiledGreedy instead of HF generate")
     parser.add_argument("--sample", action="store_true",
                         help="Qwen's recommended thinking-mode sampling instead of greedy")
     parser.add_argument("--temperature", type=float, default=0.6)
     parser.add_argument("--top-p", type=float, default=0.95)
     parser.add_argument("--top-k", type=int, default=20)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--server", default=None,
+                        help="a llama-server URL serving this checkpoint as GGUF; the tokenizer "
+                             "still comes from --checkpoint, which renders the prompts")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     sampling = (args.temperature, args.top_p, args.top_k) if args.sample else None
@@ -161,8 +171,10 @@ def main() -> int:
         from distillkit.models import Qwen35WidenedForCausalLM as Model
     else:
         from transformers import AutoModelForCausalLM as Model
-    model = Model.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to(args.device).eval()
-    model.config.use_cache = True
+    model = None
+    if args.server is None:
+        model = Model.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to(args.device).eval()
+        model.config.use_cache = True
 
     problems = load_dataset(DATASETS[args.bench], split="test")
     if args.limit:
@@ -184,6 +196,19 @@ def main() -> int:
 
     started = time.monotonic()
     records, lengths, truncated = [], [], 0
+    if args.server is not None:
+        from llama_client import complete_all
+
+        for (text, length, cut), problem, prompt in zip(
+                complete_all(args.server, prompts, args.max_new_tokens, sampling, args.seed),
+                problems, prompts):
+            lengths.append(length)
+            truncated += int(cut)
+            records.append({"task_id": problem["task_id"],
+                            "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+                            "generated_tokens": length, "truncated": bool(cut),
+                            "raw": text, "code": extract(text)})
+        prompts = []  # the batched loop below has nothing left to do
     for start in range(0, len(prompts), args.batch_size):
         chunk = prompts[start:start + args.batch_size]
         rows = problems.select(range(start, start + len(chunk)))
@@ -235,7 +260,8 @@ def main() -> int:
         "mean_generated_tokens": sum(lengths) / max(len(lengths), 1),
         "median_generated_tokens": sorted(lengths)[len(lengths) // 2],
         "truncations": truncated, "elapsed_seconds": elapsed,
-        "tokens_per_second": sum(lengths) / elapsed}, indent=2), encoding="utf-8")
+        "tokens_per_second": sum(lengths) / elapsed,
+        "server": args.server}, indent=2), encoding="utf-8")
     with open(args.output / "completions.jsonl", "w", encoding="utf-8") as out:
         for record in records:
             out.write(json.dumps(record) + "\n")

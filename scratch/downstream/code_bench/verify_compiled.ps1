@@ -1,20 +1,20 @@
 # CompiledGreedy against HF generate on the same prompts: agreement and speed.
-param([int]$WaitFor = 0)
+param([int]$WaitFor = 0, [string]$Checkpoint = "scratch\dense_gr\checkpoints-2b-finish\smoke-r1-1-gr-s2-csa2", [string]$Tag = "")
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $env:PYTHONPATH = "$PWD"
 $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
 $env:CUDA_VISIBLE_DEVICES = "0"
 $py = ".venv\Scripts\python.exe"
 if ($WaitFor) { while (Get-Process -Id $WaitFor -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 20 } }
-$ck = "scratch\dense_gr\checkpoints-2b-finish\smoke-r1-1-gr-s2-csa2"
+$ck = $Checkpoint
 $out = "scratch\downstream\code_bench"
 foreach ($mode in @("eager", "compiled")) {
-    Remove-Item -Recurse -Force "$out\verify-$mode" -ErrorAction SilentlyContinue
+    Remove-Item -Recurse -Force "$out\verify$Tag-$mode" -ErrorAction SilentlyContinue
     # One array for every argument: a one-element array splats as a string, character by
     # character, which is how "--compiled" arrived as "- - c o m p i l e d".
     $argv = [System.Collections.Generic.List[string]]@("$out\generate.py", "--checkpoint", $ck,
         "--bench", "humaneval", "--limit", "32", "--batch-size", "32", "--max-new-tokens", "256",
-        "--output", "$out\verify-$mode")
+        "--output", "$out\verify$Tag-$mode")
     if ($mode -eq "compiled") { $argv.Add("--compiled") }
     & $py $argv 2>&1 | Select-String 'wrote|Traceback|Error'
 }

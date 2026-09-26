@@ -87,6 +87,7 @@ def main() -> int:
     parser.add_argument("--sample", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit", type=int, default=0)
+    parser.add_argument("--server", default=None, help="a llama-server URL for this checkpoint")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     self_test()
@@ -102,8 +103,10 @@ def main() -> int:
         from distillkit.models import Qwen35WidenedForCausalLM as Model
     else:
         from transformers import AutoModelForCausalLM as Model
-    model = Model.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to("cuda").eval()
-    model.config.use_cache = True
+    model = None
+    if args.server is None:
+        model = Model.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to("cuda").eval()
+        model.config.use_cache = True
     items = problems(args.bench)[:args.limit or None]
     tok.padding_side = "left"
     eos = tok.eos_token_id
@@ -118,6 +121,16 @@ def main() -> int:
                                 sampling=sampling, seed=args.seed)
     torch.manual_seed(args.seed)
     started, records = time.monotonic(), []
+    if args.server is not None:
+        from llama_client import complete_all
+
+        for (text, length, cut), (ident, question, reference) in zip(
+                complete_all(args.server, prompts, args.max_new_tokens, sampling, args.seed), items):
+            answer = boxed(text)
+            records.append(dict(id=ident, reference=reference, answer=answer,
+                                correct=correct(answer, reference), tokens=length,
+                                truncated=cut, raw=text))
+        prompts = []
     for start in range(0, len(prompts), args.batch_size):
         chunk = prompts[start:start + args.batch_size]
         if runner is None:
