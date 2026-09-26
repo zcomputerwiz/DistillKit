@@ -51,6 +51,7 @@ def main() -> int:
     parser.add_argument("--new", type=int, default=512)
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--shard", default="0/1", help="i/n: this process takes every n-th prompt")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -72,8 +73,9 @@ def main() -> int:
             prompt = prompt_of(row["text"])
             if prompt and len(tok(prompt, add_special_tokens=False)["input_ids"]) <= args.width:
                 pool.append((row["doc_id"], prompt, row.get("source"), row.get("domain")))
-    random.Random(args.seed).shuffle(pool)
-    pool = pool[:args.count]
+    random.Random(0).shuffle(pool)  # one order for every shard, so shards are disjoint
+    index, shards = (int(x) for x in args.shard.split("/"))
+    pool = pool[index::shards][:args.count]
     print("%d prompts (of those fitting %d tokens)" % (len(pool), args.width), flush=True)
 
     model = Qwen35WidenedForCausalLM.from_pretrained(args.checkpoint, dtype=torch.bfloat16).cuda().eval()
@@ -97,7 +99,7 @@ def main() -> int:
                 answer = tok.decode(new[:end], skip_special_tokens=False)
                 finished_rows += bool(done.numel())
                 tokens += end
-                out.write(json.dumps({"doc_id": "onpolicy:%s:s%d" % (doc_id, args.seed),
+                out.write(json.dumps({"doc_id": "onpolicy:%s:s%d" % (doc_id, args.seed),  # noqa: E501
                                       "text": prompt + answer, "split": "train", "source": source,
                                       "domain": domain, "finished": bool(done.numel()),
                                       "generated_tokens": end}, ensure_ascii=False) + "\n")

@@ -34,7 +34,7 @@ def digits(n):
 
 
 def add(rng):
-    a, b = (rng.randrange(10 ** (rng.randint(2, 4) - 1), 10 ** rng.randint(2, 4)) for _ in range(2))
+    a, b = (rng.randrange(10 ** (k - 1), 10 ** k) for k in (rng.randint(2, 4), rng.randint(2, 4)))
     lines, carry = [], 0
     da, db = digits(a), digits(b)
     places = ["ones", "tens", "hundreds", "thousands", "ten-thousands"]
