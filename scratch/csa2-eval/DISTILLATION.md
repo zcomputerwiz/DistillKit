@@ -436,3 +436,28 @@ that never hedge, the 27B puts 0.69% of every line start on "Wait / Actually / H
 Two fixes are built: `--suppress-hedges` removes those openers from the teacher's
 answer-region targets where the text does not hedge, and `rewrite_hedges.py` has the
 teacher rewrite the 282 hedging reasoning blocks with tool calls and answers protected.
+
+### The code regression was the thinking-mode format (2026-09-26)
+
+Every assistant turn the students trained on opens on an empty, closed think block: then
+the answer (code and chat captures) or a second block holding short reasoning (the 5M
+corpus). A thinking-mode prompt opens the turn on `<think>\n` instead, a position they had
+never trained on, and there they reason for ~1,200 tokens and fall into repetition. Two
+other causes were ruled out: the corpus's reasoning is short (median 40 tokens, 3% past the
+1024-token cap), and the teacher closes reasoning where the text does (P(`</think>`) 0.95).
+
+Hedging was a real but smaller part. From the control, 3M tokens each: `nofix` against
+`fix` (de-hedged corpus plus `--suppress-hedges`) takes the student's P(hedge opener) from
+7.2x the source to 0.86x at no cost (WikiText +0.0006, MMLU 0.5645 -> 0.5684) and MBPP+ in
+thinking mode from 39.9% to 41.5%, still 6 points under the source.
+
+In non-thinking mode -- the format the model trained on -- the gap closes. Plus pass@1 at a
+2048-token cap, both models in the same mode:
+
+| bench | source | fix | discordant | p |
+| --- | --- | --- | --- | --- |
+| MBPP+ | 47.6% | **48.9%** | 46 / 41 | 0.67 |
+| HumanEval+ | 44.5% | 40.9% | 16 / 22 | 0.42 |
+
+Answers are short again (MBPP+ mean 98 tokens, 7 truncations). `think_first.py` remixes the
+5M corpus into the native thinking format so a run trains on both conventions.
