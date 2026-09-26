@@ -299,6 +299,10 @@ def main(argv=None) -> int:
                              "scored tokens; the tail is long-context documents whose "
                              "prompts reach 7,131 tokens. Zero keeps every document, "
                              "which is what every arm measured so far did.")
+    parser.add_argument("--kl-only-caches", type=Path, nargs="+", default=None,
+                        help="captures of the student's own generations: trained on the "
+                             "teacher's KL alone, never on cross entropy, in batches of "
+                             "their own. On-policy distillation.")
     parser.add_argument("--suppress-hedges", action="store_true",
                         help="take the teacher's hedge openers (Wait, Actually, Hmm, Hold) "
                              "out of its answer-region targets wherever the text does not "
@@ -776,7 +780,11 @@ def main(argv=None) -> int:
                                 max_length=args.teacher_max_length,
                                 answer_marker=marker,
                                 min_answer_tokens=args.min_answer_tokens,
-                                exclude=excluded, suppress=suppress)
+                                exclude=excluded, suppress=suppress,
+                                kl_only=args.kl_only_caches)
+        if args.kl_only_caches:
+            print("teacher: %d documents trained on KL alone (on-policy)"
+                  % len(teacher.kl_only_ids), flush=True)
         held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
                                      max_length=args.teacher_max_length,
                                      answer_marker=marker,

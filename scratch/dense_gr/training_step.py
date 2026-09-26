@@ -162,11 +162,12 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                                      use_cache=False).last_hidden_state
                 for handle in handles:
                     handle.remove()
+                kl_only = bool(record.get("kl_only", False))
                 language = ce(model, hidden, ids)
                 objective = language
                 carried = language.new_zeros(())
                 aligned = language.new_zeros(())
-                if teacher_weight:
+                if teacher_weight or kl_only:
                     if "topk_ids" not in record:
                         raise ValueError("teacher weight requires cached targets")
                     where = model.lm_head.weight.device
@@ -175,6 +176,11 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                         record["topk_logprobs"].to(where), mask.to(where),
                         chunk_length=kl_chunk).to(hidden.device) / count
                     objective = (1 - teacher_weight) * language + teacher_weight * carried
+                    if kl_only:
+                        # The student's own text: the teacher's view only. The CE is
+                        # still reported, and is what an on-policy round should lower.
+                        language = language.detach()
+                        objective = carried
                 if sparse_stage is not None:
                     targets = {i: a.last_attention for i, a in sparse_stage}
                     chosen = {i: a.last_allowed for i, a in sparse_stage}

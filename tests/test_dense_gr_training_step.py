@@ -69,6 +69,33 @@ def test_three_real_optimizer_steps_match_across_microbatch_boundaries(teacher_w
             torch.testing.assert_close(x, y, rtol=3e-5, atol=2e-7)
 
 
+def test_kl_only_batches_take_no_cross_entropy_gradient():
+    """On-policy batches: the teacher's KL alone, whatever the blend weight says."""
+    from training_step import backward_step
+
+    torch.manual_seed(5)
+    model = TinyLM()
+    batch = records()[:1]
+    kl_only = [dict(batch[0], kl_only=True)]
+    ce_calls = []
+
+    def recording_ce(m, hidden, ids):
+        value = ce(m, hidden, ids)
+        ce_calls.append(value)
+        return value
+
+    backward_step(model, kl_only, ce=recording_ce, teacher_weight=0.0)
+    got = {n: p.grad.clone() for n, p in model.named_parameters()}
+    model.zero_grad()
+    backward_step(model, batch, ce=ce, teacher_weight=1.0)
+    want = {n: p.grad.clone() for n, p in model.named_parameters()}
+    # Identical to pure teacher KL: cross entropy contributed nothing, though it was
+    # still computed for the report.
+    for name in got:
+        torch.testing.assert_close(got[name], want[name], msg=name)
+    assert ce_calls
+
+
 def test_three_steps_of_joint_sparse_objective_match():
     from test_csa2_routing import tiny_config
     from distillkit.models import Qwen35WidenedForCausalLM

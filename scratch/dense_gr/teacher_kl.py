@@ -151,7 +151,7 @@ class CachedTeacher:
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
-                 suppress=None):
+                 suppress=None, kl_only=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         # Token ids to take out of the teacher's answer-region targets; see
         # `suppress_teacher_tokens`. Needs each document's answer start, which only the
@@ -201,6 +201,18 @@ class CachedTeacher:
             ids = kept
         self.ids = [doc_id for doc_id in ids
                     if self.cache.documents[doc_id]["length"] >= min_tokens]
+        # Captures of the student's own generations, trained toward the teacher alone:
+        # cross entropy on them would reinforce exactly the loops and slips on-policy
+        # distillation exists to correct. Batches never mix these with ordinary documents.
+        chosen = {str(Path(p).resolve()) for p in (kl_only or [])}
+        unknown = chosen - {str(Path(p).resolve()) for p in paths}
+        if unknown:
+            raise ValueError("kl_only names captures that are not being read: %s" % sorted(unknown))
+        owner = getattr(self.cache, "_owner", None)
+        self.kl_only_ids = {
+            doc_id for doc_id in self.ids
+            if (str(Path(owner[doc_id][0]).resolve()) if owner else str(Path(paths[0]).resolve()))
+            in chosen}
         # Both objectives score every position but the last, so a document's system
         # prompt and user turn are trained on exactly like its answer. That is fine
         # while the answer is in there, and the prefix cap makes it a question: a
@@ -390,8 +402,8 @@ class CachedTeacher:
                 continue
             if budget is not None and width > budget:
                 raise ValueError("micro-token budget is smaller than a retained document")
-            buckets.setdefault(width, []).append(doc_id)
-        for width, members in sorted(buckets.items()):
+            buckets.setdefault((width, doc_id in self.kl_only_ids), []).append(doc_id)
+        for (width, _), members in sorted(buckets.items()):
             rows = size if budget is None else max(1, budget // width)
             for start in range(0, len(members), rows):
                 groups.append((members[start:start + rows], width))
@@ -437,7 +449,8 @@ class CachedTeacher:
                                                                    non_blocking=True),
                 "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
                                                                        non_blocking=True),
-                "doc_id": doc_ids[0], "doc_ids": list(doc_ids)}
+                "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
+                "kl_only": doc_ids[0] in self.kl_only_ids}
 
     def read(self, doc_id):
         record = self.cache.read_document(doc_id, include_hidden_states=False)
