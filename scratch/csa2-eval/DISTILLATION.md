@@ -461,3 +461,26 @@ In non-thinking mode -- the format the model trained on -- the gap closes. Plus 
 
 Answers are short again (MBPP+ mean 98 tokens, 7 truncations). `think_first.py` remixes the
 5M corpus into the native thinking format so a run trains on both conventions.
+
+### Training on both formats: non-thinking parity, thinking mode still loops (2026-09-26)
+
+`both`: the fix arm's recipe plus `teacher-cache-think-first` (the 5M corpus remixed into
+the native thinking format, 4.4M tokens), from the control, 3M tokens. Plus pass@1 at 2048
+tokens, paired against the source in the same mode:
+
+| mode | bench | source | fix | both |
+| --- | --- | --- | --- | --- |
+| non-thinking | HumanEval+ | 44.5% | 40.9% | **45.7%** (p 0.87) |
+| non-thinking | MBPP+ | 47.6% | 48.9% | **47.1%** (p 0.91) |
+| thinking | HumanEval+ | 46.3% | 36.0% | 37.8% (p 0.08) |
+| thinking | MBPP+ | 47.6% | 41.5% | 39.4% (p 0.003) |
+
+Elsewhere `both` is level or better: P(hedge opener) 0.94x the source, WikiText 0.0047
+better than fix [-0.0073, -0.0020], MMLU 0.5684, in-domain NLL 0.7188.
+
+In non-thinking mode the model now matches the source on both benchmarks. In thinking mode
+hedging is gone (0.3-1.1 markers per 1000 words) but answers still run long (HumanEval+
+mean 1137 tokens against 544) and loop -- now as runaway enumeration: listing Collatz
+terms or Fibonacci numbers, with wrong arithmetic, until the cap. Only ~660K of the 3M
+tokens were thinking-format examples, and every measurement here is greedy, which Qwen's
+guidance for thinking mode advises against for exactly this failure.
