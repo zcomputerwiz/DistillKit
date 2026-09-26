@@ -946,9 +946,14 @@ class Qwen35SparseLatentAttention(Qwen35LatentAttention):
         real = getattr(self.bus, "key_padding", None) if self.bus is not None else None
         if real is None:
             return None
-        if real.shape[1] != keys:
+        if real.shape[1] > keys:
             raise ValueError("padding mask covers %d keys, attention has %d"
                              % (real.shape[1], keys))
+        if real.shape[1] < keys:
+            # A static cache is longer than the mask a prefill passes. Its unwritten tail
+            # lies in every query's future, so causality already excludes it; marking it
+            # real only keeps the shapes aligned.
+            real = torch.cat([real, real.new_ones(real.shape[0], keys - real.shape[1])], 1)
         return real
 
     def _chunk_allowed(self, where, ok, end):

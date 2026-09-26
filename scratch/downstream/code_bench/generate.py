@@ -54,6 +54,61 @@ def render(bench, problem):
     return TEMPLATES[bench].format(prompt=problem["prompt"])
 
 
+class CompiledGreedy:
+    """Greedy decoding behind CUDA graphs: one compile for a whole benchmark.
+
+    The recipe `dense_gr/decode_compiled.py` measured at 107.6 -> 9.1 ms a token: a
+    `StaticCache`, static input buffers written in place, an explicit `cache_position`,
+    `torch.compile(mode="reduce-overhead")`. Made batched here, with every shape fixed --
+    batch, left-padded prompt length and cache length are the same for every batch -- so
+    there is one graph, not one per batch. Prefill runs eager. A decode step passes the
+    padding as `key_padding` and no 2-D mask, so nothing inside it syncs with the host;
+    finished rows are checked every `check` steps for the same reason.
+    """
+
+    def __init__(self, model, batch, prompt, new, eos, check=16):
+        from transformers import StaticCache
+
+        self.model, self.batch, self.prompt, self.new, self.eos = model, batch, prompt, new, eos
+        self.check, self.device = check, next(model.parameters()).device
+        self.cache = StaticCache(config=model.config, max_cache_len=prompt + new,
+                                 max_batch_size=batch, device=self.device, dtype=torch.bfloat16)
+        self.step = torch.compile(model, mode="reduce-overhead", fullgraph=False)
+        self.token = torch.zeros(batch, 1, dtype=torch.long, device=self.device)
+        self.position = torch.zeros(1, dtype=torch.long, device=self.device)
+        self.position_ids = torch.zeros(batch, 1, dtype=torch.long, device=self.device)
+        self.key_padding = torch.ones(batch, prompt + new, dtype=torch.bool, device=self.device)
+        self.no_mask = {"full_attention": None, "linear_attention": None}
+
+    @torch.inference_mode()
+    def __call__(self, input_ids, attention_mask):
+        batch, width = input_ids.shape
+        assert (batch, width) == (self.batch, self.prompt), (batch, width)
+        self.cache.reset()
+        positions = torch.arange(width, device=self.device)
+        out = self.model(input_ids=input_ids, attention_mask=attention_mask,
+                         past_key_values=self.cache, use_cache=True, cache_position=positions,
+                         position_ids=positions.expand(batch, -1), logits_to_keep=1)
+        following = out.logits[:, -1].argmax(-1)
+        self.key_padding[:, :width].copy_(attention_mask.bool())
+        produced = [following]
+        finished = following == self.eos
+        for index in range(self.new - 1):
+            self.token.copy_(following.view(-1, 1))
+            self.position.fill_(width + index)
+            self.position_ids.fill_(width + index)
+            out = self.step(input_ids=self.token, attention_mask=self.no_mask,
+                            key_padding=self.key_padding, past_key_values=self.cache,
+                            use_cache=True, cache_position=self.position,
+                            position_ids=self.position_ids, logits_to_keep=1)
+            following = out.logits[:, -1].argmax(-1).clone()
+            produced.append(following)
+            finished |= following == self.eos
+            if (index + 1) % self.check == 0 and bool(finished.all()):
+                break
+        return torch.cat([input_ids, torch.stack(produced, 1)], dim=1)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
@@ -62,6 +117,8 @@ def main() -> int:
     parser.add_argument("--max-new-tokens", type=int, default=768)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--compiled", action="store_true",
+                        help="CompiledGreedy instead of HF generate; the CSA2 checkpoints only")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if (args.output / "completions.jsonl").exists():
@@ -88,17 +145,31 @@ def main() -> int:
         [{"role": "user", "content": render(args.bench, p)}], tokenize=False,
         add_generation_prompt=True) for p in problems]
 
+    runner, width_all = None, None
+    if args.compiled:
+        # Every batch left-padded to one length and filled to one size: one graph.
+        longest = max(len(tokenizer(p, add_special_tokens=False)["input_ids"]) for p in prompts)
+        width_all = -(-longest // 64) * 64
+        runner = CompiledGreedy(model, args.batch_size, width_all, args.max_new_tokens,
+                                end_of_text)
+
     started = time.monotonic()
     records, lengths, truncated = [], [], 0
     for start in range(0, len(prompts), args.batch_size):
         chunk = prompts[start:start + args.batch_size]
         rows = problems.select(range(start, start + len(chunk)))
-        tokens = tokenizer(chunk, return_tensors="pt", padding=True,
-                           add_special_tokens=False).to(args.device)
-        with torch.inference_mode():
-            output = model.generate(**tokens, max_new_tokens=args.max_new_tokens,
-                                    do_sample=False, temperature=None, top_p=None,
-                                    top_k=None, pad_token_id=end_of_text)
+        if runner is None:
+            tokens = tokenizer(chunk, return_tensors="pt", padding=True,
+                               add_special_tokens=False).to(args.device)
+            with torch.inference_mode():
+                output = model.generate(**tokens, max_new_tokens=args.max_new_tokens,
+                                        do_sample=False, temperature=None, top_p=None,
+                                        top_k=None, pad_token_id=end_of_text)
+        else:
+            filled = chunk + [chunk[0]] * (args.batch_size - len(chunk))
+            tokens = tokenizer(filled, return_tensors="pt", padding="max_length",
+                               max_length=width_all, add_special_tokens=False).to(args.device)
+            output = runner(tokens["input_ids"], tokens["attention_mask"])
         width = tokens["input_ids"].shape[1]
         for offset, problem in enumerate(rows):
             new = output[offset, width:]

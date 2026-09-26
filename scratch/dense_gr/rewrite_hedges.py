@@ -87,6 +87,8 @@ def main() -> int:
                         help="rewrite a reasoning block with at least this many hedges")
     parser.add_argument("--limit", type=int, default=0, help="documents, for a pilot")
     parser.add_argument("--batch-size", type=int, default=8)
+    parser.add_argument("--max-memory", default=None,
+                        help="per-device budget, e.g. 0=22GiB,1=12GiB")
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit("refusing to overwrite %s" % args.output)
@@ -111,6 +113,9 @@ def main() -> int:
     tokenizer.padding_side = "left"
     model = AutoModelForCausalLM.from_pretrained(
         TEACHER, device_map="auto", dtype=torch.bfloat16,
+        max_memory=({int(k) if k.isdigit() else k: v for k, v in
+                     (part.split("=") for part in args.max_memory.split(","))}
+                    if args.max_memory else None),
         quantization_config=BitsAndBytesConfig(load_in_8bit=True)).eval()
 
     results, started, generated = {}, time.monotonic(), 0

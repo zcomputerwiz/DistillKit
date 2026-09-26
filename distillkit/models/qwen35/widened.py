@@ -185,7 +185,8 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
 
     def forward(self, input_ids=None, attention_mask=None, position_ids=None,
                 past_key_values=None, inputs_embeds=None, use_cache=None,
-                output_hidden_states=None, output_attentions=None, **kwargs):
+                output_hidden_states=None, output_attentions=None, key_padding=None,
+                **kwargs):
         if (input_ids is None) == (inputs_embeds is None):
             raise ValueError("Specify exactly one of input_ids or inputs_embeds")
         if output_attentions:
@@ -200,7 +201,11 @@ class _WidenedTextModel(_WidenedWeightInit, Qwen3_5TextModel):
             # so a re-run writes its own key and reads its donor's. Order carries no
             # meaning left to break.
             bus.clear()
-            if (isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2
+            if key_padding is not None:
+                # Handed in directly by a compiled decode step, which passes no 2-D mask so
+                # that nothing below syncs with the host or builds HF's mask tensors.
+                bus.key_padding = key_padding
+            elif (isinstance(attention_mask, torch.Tensor) and attention_mask.ndim == 2
                     and not bool(attention_mask.all())):
                 # Routing is per token, so a padded key is simply never read: the layers
                 # take it off the bus and keep it out of both the top-k and the window.

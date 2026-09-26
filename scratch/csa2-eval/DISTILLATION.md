@@ -405,3 +405,34 @@ rotary key (zero-shot cost roughly halved) and a longer repair.
 The control arm is itself informative: 3M more tokens at a decaying rate took MMLU from
 0.5508 to 0.5684 (the source is 0.5762) and in-domain NLL from 0.7214 to 0.7131, while
 WikiText moved from 2.5834 to 2.5959.
+
+### Code benchmarks: an MBPP+ regression, and the hedging behind it (2026-09-25)
+
+MBPP+ (378) and HumanEval+ (164) with EvalPlus, greedy, the chat template, first fenced
+block extracted, executed in a no-network Docker sandbox (`code_bench/`; `robust_eval.py`
+reproduces the earlier stock arm exactly, 187/378). Plus pass@1, paired against the
+source, exact McNemar p:
+
+| cap | bench | source | finish | control |
+| --- | --- | --- | --- | --- |
+| 768 | HumanEval+ | 43.3% | 37.8% (p 0.23) | 37.8% |
+| 768 | MBPP+ | 47.6% | 41.0% (p 0.012) | -- |
+| 2048 | HumanEval+ | 46.3% | 42.7% (p 0.43) | 40.2% (p 0.15) |
+| 2048 | MBPP+ | 47.6% | **38.6% (p 0.001)** | **36.5% (p < 0.001)** |
+
+The distilled models write far longer answers (MBPP+ at 768: 151 truncations against 57)
+and hedge far more: 8-9 "wait / actually / let me re-read" per 1000 words where they do
+write code, against 0.8-1.7 for the source. Where both models wrote code within 768
+tokens HumanEval+ is level (52.1% vs 51.3%); MBPP+ is not (52.3% vs 58.2%). A 2048-token
+budget does not rescue it: the MBPP+ answers still without code drop from 71 to 52, and
+48 of those are degenerate repetition. Reading samples, the churn is unproductive
+second-guessing -- an arithmetic slip, then doubting the test instead of the slip.
+
+The teacher never generates, so hedging reaches the student two ways, both measured
+(`code_bench/hedge_sources.py`). Text: GLM-5.2 agent traces in the chat corpus run at
+12.6 hedges per 1000 words, the rest near zero. Teacher distribution: on code answers
+that never hedge, the 27B puts 0.69% of every line start on "Wait / Actually / Hmm"
+(0.02% on the Tulu chat), and KL carries that into a 2B that cannot resolve the doubt.
+Two fixes are built: `--suppress-hedges` removes those openers from the teacher's
+answer-region targets where the text does not hedge, and `rewrite_hedges.py` has the
+teacher rewrite the 282 hedging reasoning blocks with tool calls and answers protected.
