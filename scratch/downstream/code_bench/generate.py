@@ -41,6 +41,21 @@ TEMPLATES = {
 DATASETS = {"mbpp": "evalplus/mbppplus", "humaneval": "evalplus/humanevalplus"}
 
 
+def pick(logits, sampling, generator):
+    """Greedy when `sampling` is None, else Qwen's filtered sampling: temperature, then
+    top-k, then top-p over what top-k kept, then one draw from `generator`."""
+    if sampling is None:
+        return logits.argmax(-1)
+    temperature, top_p, top_k = sampling
+    logits = logits.float() / temperature
+    values, indices = logits.topk(top_k, dim=-1)
+    probs = values.softmax(-1)
+    cumulative = probs.cumsum(-1)
+    probs = probs.masked_fill(cumulative - probs > top_p, 0.0)
+    choice = torch.multinomial(probs / probs.sum(-1, keepdim=True), 1, generator=generator)
+    return indices.gather(-1, choice).squeeze(-1)
+
+
 def extract(text: str) -> str:
     """The first fenced block, else the raw text. No repair: a completion that does not
     parse is a result."""
@@ -66,8 +81,11 @@ class CompiledGreedy:
     finished rows are checked every `check` steps for the same reason.
     """
 
-    def __init__(self, model, batch, prompt, new, eos, check=16):
+    def __init__(self, model, batch, prompt, new, eos, check=16, sampling=None, seed=0):
         from transformers import StaticCache
+
+        self.sampling = sampling
+        self.generator = torch.Generator(device=next(model.parameters()).device).manual_seed(seed)
 
         self.model, self.batch, self.prompt, self.new, self.eos = model, batch, prompt, new, eos
         self.check, self.device = check, next(model.parameters()).device
@@ -89,7 +107,7 @@ class CompiledGreedy:
         out = self.model(input_ids=input_ids, attention_mask=attention_mask,
                          past_key_values=self.cache, use_cache=True, cache_position=positions,
                          position_ids=positions.expand(batch, -1), logits_to_keep=1)
-        following = out.logits[:, -1].argmax(-1)
+        following = pick(out.logits[:, -1], self.sampling, self.generator)
         self.key_padding[:, :width].copy_(attention_mask.bool())
         produced = [following]
         finished = following == self.eos
@@ -101,7 +119,7 @@ class CompiledGreedy:
                             key_padding=self.key_padding, past_key_values=self.cache,
                             use_cache=True, cache_position=self.position,
                             position_ids=self.position_ids, logits_to_keep=1)
-            following = out.logits[:, -1].argmax(-1).clone()
+            following = pick(out.logits[:, -1], self.sampling, self.generator).clone()
             produced.append(following)
             finished |= following == self.eos
             if (index + 1) % self.check == 0 and bool(finished.all()):
@@ -122,8 +140,15 @@ def main() -> int:
                              "empty, closed think block, the format the code captures train on")
     parser.add_argument("--compiled", action="store_true",
                         help="CompiledGreedy instead of HF generate; the CSA2 checkpoints only")
+    parser.add_argument("--sample", action="store_true",
+                        help="Qwen's recommended thinking-mode sampling instead of greedy")
+    parser.add_argument("--temperature", type=float, default=0.6)
+    parser.add_argument("--top-p", type=float, default=0.95)
+    parser.add_argument("--top-k", type=int, default=20)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    sampling = (args.temperature, args.top_p, args.top_k) if args.sample else None
     if (args.output / "completions.jsonl").exists():
         raise SystemExit("refusing to overwrite %s" % args.output)
 
@@ -154,7 +179,8 @@ def main() -> int:
         longest = max(len(tokenizer(p, add_special_tokens=False)["input_ids"]) for p in prompts)
         width_all = -(-longest // 64) * 64
         runner = CompiledGreedy(model, args.batch_size, width_all, args.max_new_tokens,
-                                end_of_text)
+                                end_of_text, sampling=sampling, seed=args.seed)
+    torch.manual_seed(args.seed)
 
     started = time.monotonic()
     records, lengths, truncated = [], [], 0
@@ -165,9 +191,11 @@ def main() -> int:
             tokens = tokenizer(chunk, return_tensors="pt", padding=True,
                                add_special_tokens=False).to(args.device)
             with torch.inference_mode():
+                decoding = (dict(do_sample=True, temperature=args.temperature,
+                                 top_p=args.top_p, top_k=args.top_k) if args.sample else
+                            dict(do_sample=False, temperature=None, top_p=None, top_k=None))
                 output = model.generate(**tokens, max_new_tokens=args.max_new_tokens,
-                                        do_sample=False, temperature=None, top_p=None,
-                                        top_k=None, pad_token_id=end_of_text)
+                                        pad_token_id=end_of_text, **decoding)
         else:
             filled = chunk + [chunk[0]] * (args.batch_size - len(chunk))
             tokens = tokenizer(filled, return_tensors="pt", padding="max_length",
@@ -199,8 +227,10 @@ def main() -> int:
         "checkpoint": str(args.checkpoint), "bench": args.bench,
         "dataset": DATASETS[args.bench], "problems": len(records),
         "max_new_tokens": args.max_new_tokens, "batch_size": args.batch_size,
-        "decoding": {"do_sample": False, "greedy": True, "padding_side": "left",
-                     "pad_token": "eos"},
+        "decoding": ({"do_sample": True, "temperature": args.temperature, "top_p": args.top_p,
+                      "top_k": args.top_k, "seed": args.seed} if args.sample else
+                     {"do_sample": False, "greedy": True}) | {"padding_side": "left",
+                                                              "pad_token": "eos"},
         "instruction_template": TEMPLATES[args.bench], "thinking": not args.no_thinking,
         "mean_generated_tokens": sum(lengths) / max(len(lengths), 1),
         "median_generated_tokens": sorted(lengths)[len(lengths) // 2],
