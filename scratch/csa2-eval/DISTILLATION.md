@@ -635,3 +635,36 @@ continuation from the thinking pass -- same schedule, cap, stripping, hedge supp
   the most. Code was 29% of the thinking pass's tokens and 16% of the rounds'. The lever
   is the mix, not unverified code: round 4 is round 2's rollouts with curriculum v3 and
   `--repeat ..\teacher-cache-expand-code=2`, putting code back near 27%.
+### Round 4 and weight blending (2026-09-27)
+
+Round 4 (round 2's rollouts, curriculum v3, `--repeat` expand-code x2, putting code back
+near 27% of the mix) did not recover code: HumanEval+ 32.7%, MBPP+ 38.2%, GSM8K thinking
+67.9%. Held-out code NLL still rose (0.733 to 0.790), as it did in the replay-only
+control, so the rise comes from how the continuation is run rather than what it is fed.
+A training-only ablation continuing the thinking pass's own recipe (`ablate_continuation.ps1`,
+arm "plain") shows only a re-warm bump that recovers (0.773, 0.791, 0.776 at the end); the
+arms isolating `--strip-effort-prompt` and the 1536 cap plus general text are pending.
+
+Blending round 2 back toward the thinking pass (`merge_weights.py`: base + alpha x update,
+alpha uniform or ramped by depth as in LiNeS) and screening on held-out code NLL and on
+GSM8K/MATH *train* problems no rollout used (`merge_proxy.py`, so the benchmarks stay a
+test): the ramps sit on the same code-for-format trade-off as uniform blends -- round 2's
+code damage is not concentrated in the shallow layers -- and half the update keeps most
+of the format fix. Of two finalists, the 0-to-0.7 ramp:
+
+| measure | source | thinking pass | round 2 | blend 0-0.7 |
+| --- | --- | --- | --- | --- |
+| HumanEval+, thinking, sampled | 43.1% | 39.4% | 34.1% | 39.4% |
+| MBPP+, thinking, sampled | 43.4% | 39.9% | 39.8% | 37.6% |
+| GSM8K, thinking, sampled | 76.0% | 70.7% | 74.4% | 73.2% |
+| GSM8K, non-thinking, greedy | 75.1% | 41.7% | 67.2% | 65.9% |
+| MATH-500, thinking, sampled | 54.2% | 47.6% | 45.6% | **50.6%** |
+| MATH-500, non-thinking, greedy | 54.8% | 40.8% | 50.0% | 46.6% |
+| MMLU | 0.5762 | 0.5605 | 0.5664 | **0.5781** |
+| arithmetic probe | 70.5% | 59.2% | 39.9% | 60.6% |
+| WikiText NLL vs thinking pass | -0.070 | 0 | +0.007 | -0.005 |
+
+The blend keeps the thinking pass's code, most of round 2's non-thinking format fix, and
+is better than both parents on MATH-500 thinking, MMLU (level with the source), the probe
+and WikiText. It keeps less of the loop fix: MATH-500 truncations are back at the thinking
+pass's level (162), GSM8K's at 44 against 54. It is the best student so far.
