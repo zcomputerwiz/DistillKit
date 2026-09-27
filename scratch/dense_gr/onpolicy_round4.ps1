@@ -20,7 +20,7 @@ $caches = @("..\teacher-cache-onpolicy-r2-clean", "..\teacher-cache-onpolicy-r2-
     "$C\exclude-onpolicy-r3.json" "$C\exclude-onpolicy-r3.json" "$C\exclude-r4.json"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $think,
     "--inherit", "--sparse-stage", "--tensor-parallel", "--embedding-on", "away", "--teacher-cache")
-foreach ($c in $caches) { $argv.Add($c) }
+foreach ($cache in $caches) { $argv.Add($cache) }
 # 1536 = the rollouts' 512 prompt + 1024 new tokens, so a clean rollout keeps its ending
 foreach ($a in @("--unlikelihood-caches", "..\teacher-cache-onpolicy-r2-loop", "--repeat", "..\teacher-cache-expand-code=2", "--strip-effort-prompt",
                  "--exclude-documents", "..\capture-data\exclude-r4.json", "--suppress-hedges",

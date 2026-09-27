@@ -52,7 +52,7 @@ $caches = @("..\teacher-cache-onpolicy-r1", "..\teacher-cache-curriculum-v2", ".
     --caches ($caches | ForEach-Object { $_ }) --output "$D\capture-data\exclude-onpolicy-r1.json"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $think,
     "--inherit", "--sparse-stage", "--tensor-parallel", "--embedding-on", "away", "--teacher-cache")
-foreach ($c in $caches) { $argv.Add($c) }
+foreach ($cache in $caches) { $argv.Add($cache) }
 foreach ($a in @("--kl-only-caches", "..\teacher-cache-onpolicy-r1", "--exclude-documents",
                  "..\capture-data\exclude-onpolicy-r1.json", "--suppress-hedges", "--teacher-weight", "0.5",
                  "--teacher-max-length", "1024", "--kl-chunk", "64", "--min-answer-tokens", "2",

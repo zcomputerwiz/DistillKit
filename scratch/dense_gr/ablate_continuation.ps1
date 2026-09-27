@@ -10,6 +10,7 @@ $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $C = "D:\DeepThought\Proj
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
 $think = "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2"
 foreach ($arm in "plain", "strip", "capgen") {
+    if (Test-Path "$root\scratch\dense_gr\train-ablate-$arm.json") { "=== $arm already done"; continue }
     $caches = @("..\teacher-cache-think-first", "..\teacher-cache-thinking", "..\teacher-cache-expand-code")
     $cap = "1024"
     if ($arm -eq "capgen") { $caches += "..\teacher-cache-general-pilot"; $cap = "1536" }
@@ -17,7 +18,7 @@ foreach ($arm in "plain", "strip", "capgen") {
         --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-ablate-$arm.json" | Out-Null
     $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $think,
         "--inherit", "--sparse-stage", "--tensor-parallel", "--embedding-on", "away", "--teacher-cache")
-    foreach ($c in $caches) { $argv.Add($c) }
+    foreach ($cache in $caches) { $argv.Add($cache) }  # not $c: PowerShell names ignore case, and $C is the data dir
     foreach ($a in @("--exclude-documents", "..\capture-data\exclude-ablate-$arm.json", "--suppress-hedges",
                      "--teacher-weight", "0.5", "--teacher-max-length", $cap, "--kl-chunk", "64",
                      "--min-answer-tokens", "2", "--micro-tokens", "3072", "--accumulate", "2",
