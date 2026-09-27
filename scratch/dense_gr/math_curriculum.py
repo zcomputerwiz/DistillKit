@@ -11,6 +11,10 @@ carries, partial products, long-division steps, one algebra move per line -- in 
 thinking format. Outsource items reason briefly that the computation is too large to trust
 by hand, call `run_python`, and answer from its result, which is computed here.
 
+Each item carries a random answer-format instruction (boxed, bare answer, "Answer:" line, or
+none, meaning plain prose) and the reply follows it; a share are non-thinking, with the worked
+steps in the reply. The non-thinking student had learned to drop `\\boxed{}` when asked for it.
+
     python scratch/dense_gr/math_curriculum.py --tokens 1500000 --output ../capture-data/math-curriculum.jsonl
 """
 from __future__ import annotations
@@ -57,11 +61,12 @@ def subtract(rng):
     da, db = digits(a), digits(b)
     for i in range(len(da)):
         x, y = da[i] - borrow, (db[i] if i < len(db) else 0)
+        paid = "%d, less the 1 borrowed, is %d; " % (da[i], x) if borrow else ""
         if x < y:
-            lines.append("Place %d: %d - %d needs a borrow: %d - %d = %d" % (i + 1, x, y, x + 10, y, x + 10 - y))
+            lines.append("Place %d: %s%d - %d needs a borrow: %d - %d = %d" % (i + 1, paid, x, y, x + 10, y, x + 10 - y))
             borrow = 1
         else:
-            lines.append("Place %d: %d - %d = %d" % (i + 1, x, y, x - y))
+            lines.append("Place %d: %s%d - %d = %d" % (i + 1, paid, x, y, x - y))
             borrow = 0
     return "Compute %d - %d." % (a, b), lines, a - b
 
@@ -140,6 +145,33 @@ def word(rng):
 
 IN_HEAD = [add, subtract, multiply, divide, fractions, percent, linear, word]
 
+# The answer format follows the prompt's instruction, and no instruction means plain prose, so
+# the model learns to obey the request rather than to box everything that looks like math.
+FORMATS = [
+    ("\n\nPut the final answer in \\boxed{}.", lambda a: "\\boxed{%s}" % a),
+    ("\n\nPlease reason step by step, and put your final answer within \\boxed{}.",
+     lambda a: "The final answer is \\boxed{%s}." % a),
+    ("\n\nReply with only the answer.", lambda a: str(a)),
+    ("\n\nEnd your reply with a line of the form 'Answer: <value>'.", lambda a: "Answer: %s" % a),
+    ("", lambda a: "The answer is %s." % a),
+]
+
+
+def formatted(messages, rng, thinking):
+    """Give the item a random answer-format instruction and a matching final reply.
+
+    Non-thinking items move the worked steps into the reply, ahead of the formatted answer."""
+    instruction, render = rng.choice(FORMATS)
+    messages[0]["content"] += instruction
+    final = messages[-1]
+    answer = final.pop("answer")
+    if thinking:
+        final["content"] = render(answer)
+    else:
+        steps = final.pop("reasoning_content")
+        final["content"] = steps + "\n\n" + render(answer)
+    return messages
+
 
 def outsourced(rng):
     kind = rng.choice(["product", "power", "prime", "sqrt", "sum"])
@@ -168,15 +200,14 @@ def outsourced(rng):
         code, why, out = "print(sum(%s))" % values, "a long column of five-digit numbers", str(sum(values))
     reason = ("This needs %s. Doing it by hand risks a slip, so I will compute it with Python "
               "and use the result." % why)
-    final = "The result is %s." % out if kind != "prime" else (
-        "%s is %sprime." % (q.split()[1], "" if out == "True" else "not "))
+    if kind == "prime":
+        out = "yes" if out == "True" else "no"
     return [{"role": "user", "content": q},
             {"role": "assistant", "content": "", "reasoning_content": reason,
              "tool_calls": [{"type": "function", "function": {"name": "run_python",
                                                               "arguments": {"code": code}}}]},
             {"role": "tool", "name": "run_python", "content": out},
-            {"role": "assistant", "content": final + " \\boxed{%s}" % out,
-             "reasoning_content": "The tool returned %s." % out}]
+            {"role": "assistant", "reasoning_content": "The tool returned %s." % out, "answer": out}]
 
 
 def main() -> int:
@@ -186,6 +217,10 @@ def main() -> int:
     parser.add_argument("--outsource-share", type=float, default=0.25)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--eval-every", type=int, default=50)
+    parser.add_argument("--non-thinking-share", type=float, default=0.4)
+    parser.add_argument("--reasoning-effort", default="medium",
+                        help="the teacher template injects a system prompt for xhigh (its default) "
+                             "and low; medium injects none, matching the student's template")
     args = parser.parse_args()
     if args.output.exists():
         raise SystemExit("refusing to overwrite %s" % args.output)
@@ -203,10 +238,18 @@ def main() -> int:
                 generator = rng.choice(IN_HEAD)
                 question, lines, answer = generator(rng)
                 messages = [{"role": "user", "content": question},
-                            {"role": "assistant", "content": "\\boxed{%s}" % answer,
-                             "reasoning_content": "\n".join(lines)}]
+                            {"role": "assistant", "reasoning_content": "\n".join(lines),
+                             "answer": answer}]
                 kind, tools = generator.__name__, None
-            text = tok.apply_chat_template(messages, tools=tools, tokenize=False)
+            thinking = rng.random() >= args.non_thinking_share
+            messages = formatted(messages, rng, thinking)
+            if not thinking:
+                for m in messages[1:-1]:  # a tool-call turn says why it calls, in the open
+                    if m["role"] == "assistant":
+                        m["content"] = m.pop("reasoning_content")
+            text = tok.apply_chat_template(messages, tools=tools, tokenize=False, enable_thinking=thinking,
+                                           reasoning_effort=args.reasoning_effort)
+            kind += "" if thinking else ":nothink"
             length = len(tok(text, add_special_tokens=False)["input_ids"])
             split = "eval" if n % args.eval_every == 0 else "train"
             out.write(json.dumps({"doc_id": "curriculum:%s:%d" % (kind, n), "text": text,

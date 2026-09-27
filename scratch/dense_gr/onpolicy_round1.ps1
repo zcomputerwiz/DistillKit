@@ -1,5 +1,6 @@
-# On-policy round 1: student rollouts, teacher capture, KL-only training with curriculum and
-# replay, then the full evaluation. Starts when the math/probe queue finishes.
+﻿# On-policy round 1: student rollouts, teacher capture, KL-only training with curriculum and
+# replay, then the full evaluation. Starts when the math/probe queue finishes. Parallel jobs
+# get their own Inductor cache: two processes compiling the same graph into one cache corrupt it.
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"
 $T = "$D\teacher-hf"; $code = "$root\scratch\downstream\code_bench"; $math = "$root\scratch\downstream\math_bench"
@@ -14,7 +15,7 @@ if (-not (Test-Path "$D\capture-data\onpolicy-r1.jsonl")) {
     $jobs = foreach ($shard in "0", "1") {
         Start-Job -ArgumentList $shard, $py, $root, $think, $D -ScriptBlock {
             param($shard, $py, $root, $think, $D)
-            $env:CUDA_VISIBLE_DEVICES = $shard; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+            $env:CUDA_VISIBLE_DEVICES = $shard; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$shard"; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
             Set-Location $root
             $argv = [System.Collections.Generic.List[string]]@("$root\scratch\dense_gr\onpolicy_rollouts.py",
                 "--checkpoint", $think, "--inputs", "$D\capture-data\thinking-code-math.jsonl",
@@ -67,7 +68,7 @@ if (-not (Test-Path "$r1\config.json")) { "training produced no checkpoint; stop
 $jobs = foreach ($gpu in "0", "1") {
     Start-Job -ArgumentList $gpu, $py, $code, $root, $r1 -ScriptBlock {
         param($gpu, $py, $code, $root, $r1)
-        $env:CUDA_VISIBLE_DEVICES = $gpu; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+        $env:CUDA_VISIBLE_DEVICES = $gpu; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
         Set-Location $root
         $work = if ($gpu -eq "0") { @("mbpp|0", "mbpp|1", "mbpp|2") } else { @("humaneval|0", "humaneval|1", "humaneval|2") }
         foreach ($item in $work) {
@@ -85,7 +86,7 @@ $jobs = foreach ($spec in @("0|gsm8k", "1|math500")) {
     Start-Job -ArgumentList $spec, $py, $math, $root, $r1 -ScriptBlock {
         param($spec, $py, $math, $root, $r1)
         $gpu, $bench = $spec -split '\|'
-        $env:CUDA_VISIBLE_DEVICES = $gpu; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+        $env:CUDA_VISIBLE_DEVICES = $gpu; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"; $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
         Set-Location $root
         $argv = [System.Collections.Generic.List[string]]@("$math\run_math.py", "--checkpoint", $r1, "--bench", $bench,
             "--compiled", "--sample", "--output", "$math\onpolicy-$bench-think-sampled")

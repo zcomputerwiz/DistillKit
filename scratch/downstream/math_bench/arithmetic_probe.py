@@ -37,7 +37,8 @@ def problems(per_cell=40, seed=0):
                     b = rng.randrange(10, 1000)  # keep products readable
                 if op == "/":
                     b = rng.randrange(2, 10 ** min(digits - 1, 3))
-                    a = b * rng.randrange(10 ** (digits - 2), 10 ** digits // b + 1)
+                    low, high = -(-10 ** (digits - 1) // b), (10 ** digits - 1) // b
+                    a = b * rng.randrange(low, high + 1)  # a has exactly `digits` digits
                 out.append((op, digits, a, b, OPS[op](a, b)))
     return out
 
