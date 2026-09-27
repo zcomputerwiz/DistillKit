@@ -1,0 +1,20 @@
+{
+  "cards": 2,
+  "length": 1024,
+  "checkpoint": "scratch/dense_gr/checkpoints-2b/warmed-scaled",
+  "parameters": 1915249222,
+  "resident": {
+    "cuda:1": 1192978976,
+    "cuda:0": 722272550
+  },
+  "rows": [
+    {
+      "batch": 8,
+      "status": "OOM",
+      "peak_gib": [
+        21.25657367706299,
+        11.538367748260498
+      ]
+    }
+  ]
+}
