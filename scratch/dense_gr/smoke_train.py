@@ -314,6 +314,8 @@ def main(argv=None) -> int:
                              "loop it is shown (~0.9 on the repeated token), so KL there "
                              "trains the loop in.")
     parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
+    parser.add_argument("--repeat", nargs="+", default=None, metavar="CAPTURE=N",
+                        help="plan every document of CAPTURE N times a pass (N >= 1)")
     parser.add_argument("--strip-effort-prompt", action="store_true",
                         help="read documents that open with the teacher template's injected "
                              "'Reasoning effort is set to xhigh' system text with it deleted. "
@@ -809,7 +811,8 @@ def main(argv=None) -> int:
                                 exclude=excluded, suppress=suppress,
                                 kl_only=args.kl_only_caches, strip_prefix=strip,
                                 unlikelihood=args.unlikelihood_caches,
-                                think_close=tokenizer.convert_tokens_to_ids("</think>"))
+                                think_close=tokenizer.convert_tokens_to_ids("</think>"),
+                                repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []))
         if args.kl_only_caches or args.unlikelihood_caches:
             print("teacher: %d documents trained on KL alone (on-policy), %d of them looping "
                   "with unlikelihood on repeats" % (len(teacher.kl_only_ids),

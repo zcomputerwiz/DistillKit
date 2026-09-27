@@ -163,7 +163,7 @@ class CachedTeacher:
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
                  suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
-                 think_close=None):
+                 think_close=None, repeat=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         if unlikelihood and (think_close is None or min_answer_tokens <= 0):
             raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
@@ -293,6 +293,16 @@ class CachedTeacher:
             self.ids = [doc_id for doc_id in self.ids
                         if self._kept_answer(doc_id, self.cap(doc_id)) >= min_answer_tokens]
             self.dropped_all_prompt = before - len(self.ids)
+        # Whole-number upsampling per capture: a document listed n times is planned n
+        # times a pass. The on-policy rounds lost HumanEval+ as math took a larger share
+        # of the mix (round 3, with fewer code rollouts, lost most), so the mix is a lever.
+        if repeat:
+            factor = {str(Path(p).resolve()): int(n) for p, n in repeat.items()}
+            unknown = set(factor) - {str(Path(p).resolve()) for p in paths}
+            if unknown or min(factor.values()) < 1:
+                raise ValueError("repeat needs captures being read and factors >= 1: %s" % repeat)
+            self.ids = [doc_id for doc_id in self.ids for _ in range(factor.get(
+                str(Path(owner[doc_id][0]).resolve()) if owner else str(Path(paths[0]).resolve()), 1))]
         self.generator = np.random.default_rng(seed)
         self.tokens = sum(self.cap(doc_id) for doc_id in self.ids)
         self.top_k = int(self.cache.manifest["top_k"])

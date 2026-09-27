@@ -606,3 +606,32 @@ Math gains, code and arithmetic losses. Two causes, both in the recipe:
 Round 3 keeps round 2's rollouts but trains only on those verified correct (plus the
 looping ones under unlikelihood), and uses curriculum v3: bare replies where only the
 answer is asked for, and negative-result subtraction.
+### Round 3 and the replay control (2026-09-27)
+
+Round 3 kept round 2's rollouts but trained only on the 1,413 verified correct (plus the
+448 looping ones under unlikelihood), with curriculum v3: bare replies where only the
+answer is asked for, and 30% negative-result subtraction. The control repeats the rounds'
+continuation from the thinking pass -- same schedule, cap, stripping, hedge suppression,
+3M tokens -- on the replayed captures alone, which no round had been compared against.
+
+| measure | thinking pass | control | round 2 | round 3 |
+| --- | --- | --- | --- | --- |
+| HumanEval+, thinking, sampled | 39.4% | 37.4% | 34.1% | 30.3% |
+| MBPP+, thinking, sampled | 39.9% | 37.8% | 39.8% | 38.6% |
+| GSM8K, thinking, sampled | 70.7% | 74.8% | 74.4% | 70.7% |
+| truncated at 2K (GSM8K / MATH-500) | 54 / 156 | 51 / 182 | 32 / 101 | 29 / 115 |
+| GSM8K, non-thinking, greedy | 41.7% | 47.5% | 67.2% | 66.3% |
+| MATH-500, non-thinking, greedy | 40.8% | 39.4% | 50.0% | 48.2% |
+| arithmetic probe | 59.2% | -- | 39.9% | 48.6% |
+
+- Round 2's GSM8K thinking gain is the continuation's, not the rollouts': the control
+  reaches 74.8%.
+- The rollouts with unlikelihood do cut looping: truncations fall ~40% against the control
+  (GSM8K 51 to 32, MATH-500 182 to 101).
+- The curriculum and non-thinking rollouts fix the non-thinking answer format: +20 points
+  on GSM8K and +10 on MATH-500 against the control.
+- Continuing costs HumanEval+ ~2 points (within noise); the rounds' additions cost 3-7
+  more, and round 3 -- fewer code rollouts, since the unverified were mostly code -- lost
+  the most. Code was 29% of the thinking pass's tokens and 16% of the rounds'. The lever
+  is the mix, not unverified code: round 4 is round 2's rollouts with curriculum v3 and
+  `--repeat ..\teacher-cache-expand-code=2`, putting code back near 27%.
