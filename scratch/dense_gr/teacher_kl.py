@@ -137,6 +137,17 @@ def first_response(ids, marker):
     return None
 
 
+def last_response(ids, marker):
+    """Index of the first token after the *last* assistant marker, or None: where a
+    rollout's own turn starts, after any earlier turns its prompt carried."""
+    marker = list(marker)
+    width = len(marker)
+    for start in range(len(ids) - width, -1, -1):
+        if list(ids[start:start + width]) == marker:
+            return start + width
+    return None
+
+
 class CachedTeacher:
     """Documents and their top-k targets, shuffled, one at a time.
 
@@ -151,8 +162,25 @@ class CachedTeacher:
 
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
-                 suppress=None, kl_only=None):
+                 suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
+                 think_close=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
+        if unlikelihood and (think_close is None or min_answer_tokens <= 0):
+            raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
+                             "min_answer_tokens > 0, which records where answers start")
+        self.think_close = think_close
+        self.answer_marker = answer_marker
+        # Text the student should not see: the teacher template's injected "Reasoning
+        # effort is set to xhigh" system text, which the student's template, the
+        # evaluations and serving never produce. `strip_prefix` is a list of
+        # `(pattern, begin, end)`: a document opening with the token ids `pattern` loses
+        # tokens [begin, end). Every remaining position keeps its target -- the teacher's
+        # view with the deleted text as context, a context distillation of it -- except
+        # position begin - 1, whose target was for a deleted token; it becomes the token
+        # that now follows it.
+        self.strip_prefix = [(np.asarray(pattern, dtype=np.int64), begin, end)
+                             for pattern, begin, end in (strip_prefix or [])]
+        self.offset = {}
         # Token ids to take out of the teacher's answer-region targets; see
         # `suppress_teacher_tokens`. Needs each document's answer start, which only the
         # answer filter records.
@@ -199,20 +227,38 @@ class CachedTeacher:
             kept = [doc_id for doc_id in ids if doc_id not in exclude]
             self.excluded = len(ids) - len(kept)
             ids = kept
+        if self.strip_prefix:
+            longest = max(len(pattern) for pattern, _, _ in self.strip_prefix)
+            for doc_id in ids:
+                head = np.asarray(self.cache.read_document(doc_id, tokens_only=True)
+                                  ["input_ids"][:longest], dtype=np.int64)
+                for pattern, begin, end in self.strip_prefix:
+                    if np.array_equal(head[:len(pattern)], pattern):
+                        self.offset[doc_id] = (begin, end)
+                        break
         self.ids = [doc_id for doc_id in ids
-                    if self.cache.documents[doc_id]["length"] >= min_tokens]
+                    if self._length(doc_id) >= min_tokens]
         # Captures of the student's own generations, trained toward the teacher alone:
         # cross entropy on them would reinforce exactly the loops and slips on-policy
         # distillation exists to correct. Batches never mix these with ordinary documents.
-        chosen = {str(Path(p).resolve()) for p in (kl_only or [])}
-        unknown = chosen - {str(Path(p).resolve()) for p in paths}
-        if unknown:
-            raise ValueError("kl_only names captures that are not being read: %s" % sorted(unknown))
         owner = getattr(self.cache, "_owner", None)
-        self.kl_only_ids = {
-            doc_id for doc_id in self.ids
-            if (str(Path(owner[doc_id][0]).resolve()) if owner else str(Path(paths[0]).resolve()))
-            in chosen}
+
+        def from_captures(named, what):
+            chosen = {str(Path(p).resolve()) for p in (named or [])}
+            unknown = chosen - {str(Path(p).resolve()) for p in paths}
+            if unknown:
+                raise ValueError("%s names captures that are not being read: %s"
+                                 % (what, sorted(unknown)))
+            return {doc_id for doc_id in self.ids
+                    if (str(Path(owner[doc_id][0]).resolve()) if owner
+                        else str(Path(paths[0]).resolve())) in chosen}
+
+        # Looping rollouts. The teacher cannot say "stop": read at a looping prefix it
+        # predicts more of the loop (~0.9 on the repeated token, `onpolicy_signal.py`),
+        # so KL there trains the loop in. Their repeated spans get unlikelihood instead
+        # (Welleck et al. 2019) and no KL; the rest of them is KL-only like any rollout.
+        self.unlikelihood_ids = from_captures(unlikelihood, "unlikelihood")
+        self.kl_only_ids = from_captures(kl_only, "kl_only") | self.unlikelihood_ids
         # Both objectives score every position but the last, so a document's system
         # prompt and user turn are trained on exactly like its answer. That is fine
         # while the answer is in there, and the prefix cap makes it a question: a
@@ -248,8 +294,7 @@ class CachedTeacher:
                         if self._kept_answer(doc_id, self.cap(doc_id)) >= min_answer_tokens]
             self.dropped_all_prompt = before - len(self.ids)
         self.generator = np.random.default_rng(seed)
-        self.tokens = sum(min(self.cache.documents[doc_id]["length"], max_length or 1 << 30)
-                          for doc_id in self.ids)
+        self.tokens = sum(self.cap(doc_id) for doc_id in self.ids)
         self.top_k = int(self.cache.manifest["top_k"])
         # `log_values: True` and `generation_temperature: 1.0` are both pinned by the
         # cache format and checked when the manifest is validated, which is what makes
@@ -316,9 +361,31 @@ class CachedTeacher:
             picked.append((name, remaining[int(generator.integers(len(remaining)))]))
         return picked
 
+    def _length(self, doc_id):
+        """The document's length as the student reads it, after any stripped prefix."""
+        begin, end = self.offset.get(doc_id, (0, 0))
+        return self.cache.documents[doc_id]["length"] - (end - begin)
+
     def cap(self, doc_id):
         """Prefix cap before independent block rounding (never neighbor-dependent)."""
-        return min(self.cache.documents[doc_id]["length"], self.max_length or 1 << 30)
+        return min(self._length(doc_id), self.max_length or 1 << 30)
+
+    def _record(self, doc_id, width=None, **kwargs):
+        """The capture's arrays for `doc_id` as the student reads them: any stripped span
+        deleted, `width` positions long (all of them when None)."""
+        record = self.cache.read_document(doc_id, **kwargs)
+        keys = [key for key in ("input_ids", "topk_ids", "topk_logprobs") if key in record]
+        if doc_id not in self.offset:
+            return {key: record[key][:width] for key in keys}
+        begin, end = self.offset[doc_id]
+        out = {key: np.concatenate([record[key][:begin], record[key][end:]]) for key in keys}
+        if begin > 0 and "topk_ids" in out:
+            # The one target that pointed into the deleted span: now the actual next
+            # token, with all its mass, so KL there is cross entropy on the kept text.
+            out["topk_ids"][begin - 1] = out["input_ids"][begin]
+            out["topk_logprobs"][begin - 1] = -1e4
+            out["topk_logprobs"][begin - 1, 0] = 0.0
+        return {key: value[:width] for key, value in out.items()}
 
     def _answer_start(self, doc_id, marker):
         """Index of the first answer token, or None if the document has no answer.
@@ -330,7 +397,7 @@ class CachedTeacher:
         a chat document that opens turns but never reaches an assistant turn inside the
         cap still has no answer.
         """
-        ids = self.cache.read_document(doc_id, tokens_only=True)["input_ids"][:self.cap(doc_id)]
+        ids = self._record(doc_id, self.cap(doc_id), tokens_only=True)["input_ids"]
         start = first_response(ids, marker)
         if start is None and int(marker[0]) not in set(ids.tolist()):
             return 0
@@ -402,8 +469,9 @@ class CachedTeacher:
                 continue
             if budget is not None and width > budget:
                 raise ValueError("micro-token budget is smaller than a retained document")
-            buckets.setdefault((width, doc_id in self.kl_only_ids), []).append(doc_id)
-        for (width, _), members in sorted(buckets.items()):
+            buckets.setdefault((width, doc_id in self.kl_only_ids,
+                                doc_id in self.unlikelihood_ids), []).append(doc_id)
+        for (width, _, _), members in sorted(buckets.items()):
             rows = size if budget is None else max(1, budget // width)
             for start in range(0, len(members), rows):
                 groups.append((members[start:start + rows], width))
@@ -431,38 +499,48 @@ class CachedTeacher:
 
     def read_batch(self, doc_ids, width):
         """One batch, every row exactly `width` long, nothing padded."""
-        ids, targets, values = [], [], []
+        ids, targets, values, repeats = [], [], [], []
         for doc_id in doc_ids:
-            record = self.cache.read_document(doc_id, include_hidden_states=False)
-            ids.append(np.asarray(record["input_ids"][:width], dtype=np.int64))
-            targets.append(np.asarray(record["topk_ids"][:width], dtype=np.int64))
-            values.append(np.asarray(record["topk_logprobs"][:width], dtype=np.float32))
+            record = self._record(doc_id, width, include_hidden_states=False)
+            ids.append(np.asarray(record["input_ids"], dtype=np.int64))
+            targets.append(np.asarray(record["topk_ids"], dtype=np.int64))
+            values.append(np.asarray(record["topk_logprobs"], dtype=np.float32))
             if self.suppress is not None:
                 start = self.answer_start.get(doc_id, 0)
                 if start is not None:
                     values[-1], removed = suppress_teacher_tokens(
                         ids[-1], targets[-1], values[-1], self.suppress, start)
                     self.suppressed_mass += removed
-        return {"input_ids": torch.from_numpy(np.stack(ids)).to(self.device,
-                                                                non_blocking=True),
-                "topk_ids": torch.from_numpy(np.stack(targets)).to(self.device,
-                                                                   non_blocking=True),
-                "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
-                                                                       non_blocking=True),
-                "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
-                "kl_only": doc_ids[0] in self.kl_only_ids}
+            if doc_id in self.unlikelihood_ids:
+                turn = last_response(ids[-1], self.answer_marker)
+                repeats.append(loop_tokens(ids[-1], len(ids[-1]) if turn is None else turn,
+                                           self.think_close))
+        batch = {"input_ids": torch.from_numpy(np.stack(ids)).to(self.device,
+                                                                 non_blocking=True),
+                 "topk_ids": torch.from_numpy(np.stack(targets)).to(self.device,
+                                                                    non_blocking=True),
+                 "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
+                                                                        non_blocking=True),
+                 "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
+                 "kl_only": doc_ids[0] in self.kl_only_ids}
+        if repeats:
+            # Position t predicts token t + 1, so a repeated token at t + 1 is a
+            # negative at t; the last position predicts nothing.
+            negative = np.zeros((len(ids), width), dtype=bool)
+            negative[:, :-1] = np.stack(repeats)[:, 1:]
+            batch["negative"] = torch.from_numpy(negative).to(self.device, non_blocking=True)
+        return batch
 
     def read(self, doc_id):
-        record = self.cache.read_document(doc_id, include_hidden_states=False)
-        end = self.max_length or len(record["input_ids"])
+        record = self._record(doc_id, self.max_length, include_hidden_states=False)
         ids = torch.from_numpy(
-            np.asarray(record["input_ids"][:end], dtype=np.int64)).unsqueeze(0)
+            np.asarray(record["input_ids"], dtype=np.int64)).unsqueeze(0)
         target_ids = torch.from_numpy(
-            np.asarray(record["topk_ids"][:end], dtype=np.int64)).unsqueeze(0)
+            np.asarray(record["topk_ids"], dtype=np.int64)).unsqueeze(0)
         # fp16 log probabilities widen to fp32 exactly; the divergence has no business
         # being differenced at fp16 spacing over a 248320-wide vocabulary.
         values = torch.from_numpy(
-            np.asarray(record["topk_logprobs"][:end], dtype=np.float32)).unsqueeze(0)
+            np.asarray(record["topk_logprobs"], dtype=np.float32)).unsqueeze(0)
         return {"input_ids": ids.to(self.device, non_blocking=True),
                 "topk_ids": target_ids.to(self.device, non_blocking=True),
                 "topk_logprobs": values.to(self.device, non_blocking=True),
@@ -500,6 +578,56 @@ def suppress_teacher_tokens(ids, topk_ids, topk_logprobs, suppressed, start):
     # nothing downstream multiplies an infinity by zero.
     values[drop] = -1e4
     return values.astype(np.float32), float(removed.sum())
+
+
+def repeated_tokens(ids, start, n=16, count=3):
+    """Tokens from `start` on that belong to the `count`-th or later occurrence of an n-gram.
+
+    One repeat is often legitimate -- the code from the thinking copied into the answer,
+    an equation restated -- and an 8-gram, second-occurrence rule flags 39% of rollouts
+    that finished cleanly. A loop is the same stretch coming back again and again. Every
+    token of a matching n-gram is marked, not only its last, so a loop is penalized from
+    the token where it starts copying rather than n - 1 tokens in."""
+    marked = np.zeros(len(ids), dtype=bool)
+    seen = {}
+    for end in range(max(start, 0) + n, len(ids) + 1):
+        gram = tuple(ids[end - n:end].tolist())
+        seen[gram] = seen.get(gram, 0) + 1
+        if seen[gram] >= count:
+            marked[end - n:end] = True
+    return marked
+
+
+def loop_tokens(ids, start, close):
+    """`repeated_tokens` over the stretch where a repeat means a loop.
+
+    With a thought, that is the thought alone: an answer restating the result the thinking
+    checked -- "49413 - 46817 = 2596" a third time -- is the answer, and pushing it down
+    teaches the model not to state what it verified. Without one (a non-thinking reply,
+    whose think block is empty) it is the whole reply."""
+    after = np.nonzero(np.asarray(ids[start:]) == close)[0]
+    end = start + int(after[0]) if len(after) else len(ids)
+    if end - start <= 4:  # "<think>\n\n</think>": no thought
+        return repeated_tokens(ids, start)
+    marked = repeated_tokens(ids[:end], start)
+    return np.concatenate([marked, np.zeros(len(ids) - end, dtype=bool)])
+
+
+def unlikelihood_loss(hidden, head, ids, negative, chunk=128):
+    """Summed -log(1 - p(next token)) over `negative` positions.
+
+    Rows are projected in chunks: a 248320-wide fp32 row is 1 MB, and a looping micro
+    batch has hundreds of negatives."""
+    positions = negative.nonzero()
+    total = hidden.new_zeros((), dtype=torch.float32)
+    for begin in range(0, len(positions), chunk):
+        at = positions[begin:begin + chunk]
+        state = hidden[at[:, 0], at[:, 1]]
+        logits = head(state).float()
+        wanted = ids[at[:, 0], at[:, 1] + 1]
+        p = (logits.gather(-1, wanted[:, None]).squeeze(-1) - logits.logsumexp(-1)).exp()
+        total = total - torch.log1p(-p.clamp(max=1 - 1e-6)).sum()
+    return total
 
 
 #: Sentence openers a thinking teacher uses to second-guess itself. Capitalized forms

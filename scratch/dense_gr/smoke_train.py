@@ -66,6 +66,10 @@ FULL_VOCABULARY = 248_320
 # What opens an assistant turn in the capture's chat template. Used only to find where
 # a document stops being prompt; see --min-answer-tokens.
 ANSWER_MARKER = "<|im_start|>assistant"
+#: What the teacher (Qwen3.8) template injects as the system turn whenever thinking is on.
+EFFORT_PROMPT = ("Reasoning effort is set to xhigh. Please think carefully through the task, "
+                 "validate key assumptions, consider plausible alternatives, and prioritize "
+                 "correctness, consistency, and clarity in the final answer.")
 
 
 # The fields that decide whether a checkpoint's weights mean anything in this config.
@@ -303,6 +307,18 @@ def main(argv=None) -> int:
                         help="captures of the student's own generations: trained on the "
                              "teacher's KL alone, never on cross entropy, in batches of "
                              "their own. On-policy distillation.")
+    parser.add_argument("--unlikelihood-caches", type=Path, nargs="+", default=None,
+                        help="captures of looping rollouts: KL-only like --kl-only-caches, "
+                             "except that tokens repeating an earlier 8-gram get "
+                             "unlikelihood, -log(1 - p), and no KL. The teacher endorses a "
+                             "loop it is shown (~0.9 on the repeated token), so KL there "
+                             "trains the loop in.")
+    parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
+    parser.add_argument("--strip-effort-prompt", action="store_true",
+                        help="read documents that open with the teacher template's injected "
+                             "'Reasoning effort is set to xhigh' system text with it deleted. "
+                             "The student's template, the evaluations and serving never "
+                             "produce it; the teacher's targets keep it as context.")
     parser.add_argument("--suppress-hedges", action="store_true",
                         help="take the teacher's hedge openers (Wait, Actually, Hmm, Hold) "
                              "out of its answer-region targets wherever the text does not "
@@ -776,20 +792,36 @@ def main(argv=None) -> int:
         if suppress is not None:
             print("teacher: suppressing hedge openers %s in answers"
                   % tokenizer.convert_ids_to_tokens(suppress.tolist()), flush=True)
+        strip = None
+        if args.strip_effort_prompt:
+            # Two shapes: the effort text is the whole system turn (delete the turn), or
+            # it heads a dataset's own system prompt, "\n\n" between (delete it and the
+            # break, keeping the turn).
+            encode = lambda text: tokenizer(text, add_special_tokens=False)["input_ids"]
+            header, effort = encode("<|im_start|>system\n"), encode(EFFORT_PROMPT)
+            whole = encode("<|im_start|>system\n%s<|im_end|>\n" % EFFORT_PROMPT)
+            heading = header + effort + encode("\n\n")
+            strip = [(whole, 0, len(whole)), (heading, len(header), len(heading))]
         teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
                                 max_length=args.teacher_max_length,
                                 answer_marker=marker,
                                 min_answer_tokens=args.min_answer_tokens,
                                 exclude=excluded, suppress=suppress,
-                                kl_only=args.kl_only_caches)
-        if args.kl_only_caches:
-            print("teacher: %d documents trained on KL alone (on-policy)"
-                  % len(teacher.kl_only_ids), flush=True)
+                                kl_only=args.kl_only_caches, strip_prefix=strip,
+                                unlikelihood=args.unlikelihood_caches,
+                                think_close=tokenizer.convert_tokens_to_ids("</think>"))
+        if args.kl_only_caches or args.unlikelihood_caches:
+            print("teacher: %d documents trained on KL alone (on-policy), %d of them looping "
+                  "with unlikelihood on repeats" % (len(teacher.kl_only_ids),
+                                                    len(teacher.unlikelihood_ids)), flush=True)
+        if strip is not None:
+            print("teacher: xhigh effort prompt stripped from %d documents"
+                  % len(teacher.offset), flush=True)
         held_teacher = CachedTeacher(args.teacher_cache, "eval", seed=args.seed,
                                      max_length=args.teacher_max_length,
                                      answer_marker=marker,
                                      min_answer_tokens=args.min_answer_tokens,
-                                     exclude=excluded)
+                                     exclude=excluded, strip_prefix=strip)
         if excluded:
             print("excluded as benchmark contamination: %d train, %d held-out, of %d listed"
                   % (teacher.excluded, held_teacher.excluded, len(excluded)), flush=True)
@@ -904,7 +936,7 @@ def main(argv=None) -> int:
 
     step_options = dict(teacher_weight=args.teacher_weight if teacher is not None else 0.0,
                         indexer_weight=args.indexer_weight, sparse_stage=sparse_stage,
-                        kl_chunk=args.kl_chunk)
+                        kl_chunk=args.kl_chunk, unlikelihood_weight=args.unlikelihood_weight)
     warmup_backward_targets = 0
     # Warm the actual objective and recorded-attention path, not a CE-only surrogate.
     if args.tensor_parallel:
@@ -992,6 +1024,8 @@ def main(argv=None) -> int:
                    "tokens_per_second": seen / elapsed}
             if teacher is not None:
                 row["teacher_kl"] = teacher_cost
+                if teacher.unlikelihood_ids:
+                    row["unlikelihood"] = metrics["unlikelihood"]
             # Read before the probe and the held-out pass. Both run their own forward at
             # their own sequence length, and the layers keep only the last routing they
             # computed -- reading after them reports the probe's 512-token routing, where

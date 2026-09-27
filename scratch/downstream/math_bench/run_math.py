@@ -88,9 +88,14 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--server", default=None, help="a llama-server URL for this checkpoint")
+    parser.add_argument("--presence", type=float, default=0.0,
+                        help="presence penalty on generated tokens (compiled path only)")
+    parser.add_argument("--system", default=None, help="a system prompt ahead of the question")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     self_test()
+    if args.presence and not args.compiled:
+        raise SystemExit("--presence needs --compiled")
     if (args.output / "results.json").exists():
         raise SystemExit("refusing to overwrite %s" % args.output)
     sampling = (0.6, 0.95, 20) if args.sample else None
@@ -110,7 +115,8 @@ def main() -> int:
     items = problems(args.bench)[:args.limit or None]
     tok.padding_side = "left"
     eos = tok.eos_token_id
-    prompts = [tok.apply_chat_template([{"role": "user", "content": PROMPT.format(problem=q)}],
+    system = [{"role": "system", "content": args.system}] if args.system else []
+    prompts = [tok.apply_chat_template(system + [{"role": "user", "content": PROMPT.format(problem=q)}],
                                        tokenize=False, add_generation_prompt=True,
                                        enable_thinking=not args.no_thinking) for _, q, _ in items]
     runner = width_all = None
@@ -118,7 +124,7 @@ def main() -> int:
         longest = max(len(tok(p, add_special_tokens=False)["input_ids"]) for p in prompts)
         width_all = -(-longest // 64) * 64
         runner = CompiledGreedy(model, args.batch_size, width_all, args.max_new_tokens, eos,
-                                sampling=sampling, seed=args.seed)
+                                sampling=sampling, seed=args.seed, presence=args.presence)
     torch.manual_seed(args.seed)
     started, records = time.monotonic(), []
     if args.server is not None:

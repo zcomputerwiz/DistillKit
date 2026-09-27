@@ -70,9 +70,12 @@ def main() -> int:
             row = json.loads(line)
             if row.get("split", "train") != "train" or row["doc_id"] in skip:
                 continue
-            prompt = prompt_of(row["text"])
+            # A prepared prompt (`rollout_prompts.py`) is used as it stands, with any
+            # reference answer carried through for the classifier.
+            prompt = row["prompt"] if "prompt" in row else prompt_of(row["text"])
             if prompt and len(tok(prompt, add_special_tokens=False)["input_ids"]) <= args.width:
-                pool.append((row["doc_id"], prompt, row.get("source"), row.get("domain")))
+                pool.append((row["doc_id"], prompt, row.get("source"), row.get("domain"),
+                             row.get("reference")))
     random.Random(0).shuffle(pool)  # one order for every shard, so shards are disjoint
     index, shards = (int(x) for x in args.shard.split("/"))
     pool = pool[index::shards][:args.count]
@@ -87,12 +90,12 @@ def main() -> int:
     with open(args.output, "w", encoding="utf-8") as out:
         for start in range(0, len(pool), args.batch_size):
             chunk = pool[start:start + args.batch_size]
-            texts = [p for _, p, _, _ in chunk]
+            texts = [p for _, p, _, _, _ in chunk]
             filled = texts + [texts[0]] * (args.batch_size - len(texts))
             batch = tok(filled, return_tensors="pt", padding="max_length", max_length=args.width,
                         add_special_tokens=False).to("cuda")
             output = runner(batch["input_ids"], batch["attention_mask"])
-            for offset, (doc_id, prompt, source, domain) in enumerate(chunk):
+            for offset, (doc_id, prompt, source, domain, reference) in enumerate(chunk):
                 new = output[offset, args.width:]
                 done = (new == eos).nonzero()
                 end = int(done[0]) + 1 if done.numel() else int(new.numel())
@@ -102,7 +105,9 @@ def main() -> int:
                 out.write(json.dumps({"doc_id": "onpolicy:%s:s%d" % (doc_id, args.seed),  # noqa: E501
                                       "text": prompt + answer, "split": "train", "source": source,
                                       "domain": domain, "finished": bool(done.numel()),
-                                      "generated_tokens": end}, ensure_ascii=False) + "\n")
+                                      "generated_tokens": end, "prompt_chars": len(prompt),
+                                      "reference": reference},
+                                     ensure_ascii=False) + "\n")
                 written += 1
             print("%d/%d rollouts  %.0f s  %.0f tok/s  finished %.0f%%"
                   % (written, len(pool), time.monotonic() - started,

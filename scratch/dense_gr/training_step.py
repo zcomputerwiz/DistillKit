@@ -6,7 +6,7 @@ import contextlib
 import bitsandbytes as bnb
 import torch
 
-from teacher_kl import accumulation_shares, grouped_tail_kl, scored_mask
+from teacher_kl import accumulation_shares, grouped_tail_kl, scored_mask, unlikelihood_loss
 
 
 class KahanAdamW8bit(bnb.optim.AdamW8bit):
@@ -129,7 +129,7 @@ def causal_ce(model, hidden, ids):
 
 
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
-                  sparse_stage=None, kl_chunk=256, ce=causal_ce):
+                  sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
@@ -142,7 +142,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
     counts, total = accumulation_shares([r["input_ids"] for r in records])
     if not records or any(n <= 0 for n in counts):
         raise ValueError("an optimizer step needs nonempty causal targets")
-    result = dict(loss=0.0, teacher_kl=0.0, indexer=0.0, objective=0.0, targets=sum(counts))
+    result = dict(loss=0.0, teacher_kl=0.0, indexer=0.0, unlikelihood=0.0, objective=0.0,
+                  targets=sum(counts))
     for record, count in zip(records, counts):
         ids = record["input_ids"]
         mask = scored_mask(ids.shape[1], ids.device, ids.shape[0])
@@ -167,20 +168,30 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 objective = language
                 carried = language.new_zeros(())
                 aligned = language.new_zeros(())
+                repelled = language.new_zeros(())
                 if teacher_weight or kl_only:
                     if "topk_ids" not in record:
                         raise ValueError("teacher weight requires cached targets")
                     where = model.lm_head.weight.device
+                    kl_mask = mask
+                    negative = record.get("negative")
+                    if negative is not None:
+                        # A looping rollout: no KL on its repeated spans, where the
+                        # teacher endorses the loop; unlikelihood pushes them down instead.
+                        kl_mask = mask & ~negative.to(mask.device)
+                        repelled = unlikelihood_loss(
+                            hidden.to(where), model.lm_head, ids.to(where),
+                            negative.to(where)).to(hidden.device) / count
                     carried = grouped_tail_kl(
                         hidden.to(where), model.lm_head, record["topk_ids"].to(where),
-                        record["topk_logprobs"].to(where), mask.to(where),
+                        record["topk_logprobs"].to(where), kl_mask.to(where),
                         chunk_length=kl_chunk).to(hidden.device) / count
                     objective = (1 - teacher_weight) * language + teacher_weight * carried
                     if kl_only:
                         # The student's own text: the teacher's view only. The CE is
                         # still reported, and is what an on-policy round should lower.
                         language = language.detach()
-                        objective = carried
+                        objective = carried + unlikelihood_weight * repelled
                 if sparse_stage is not None:
                     targets = {i: a.last_attention for i, a in sparse_stage}
                     chosen = {i: a.last_allowed for i, a in sparse_stage}
@@ -192,7 +203,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
             share = count / total
             (objective * share).backward()
             for name, value in (("loss", language), ("teacher_kl", carried),
-                                ("indexer", aligned), ("objective", objective)):
+                                ("indexer", aligned), ("unlikelihood", repelled),
+                                ("objective", objective)):
                 result[name] += float(value.detach()) * share
         finally:
             for handle in handles:

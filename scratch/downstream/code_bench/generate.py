@@ -81,10 +81,14 @@ class CompiledGreedy:
     finished rows are checked every `check` steps for the same reason.
     """
 
-    def __init__(self, model, batch, prompt, new, eos, check=16, sampling=None, seed=0):
+    def __init__(self, model, batch, prompt, new, eos, check=16, sampling=None, seed=0,
+                 presence=0.0):
         from transformers import StaticCache
 
         self.sampling = sampling
+        # vLLM-style presence penalty: a flat cut to the logit of every token the row has
+        # already generated (prompt tokens are exempt). Qwen suggests 0-2 against loops.
+        self.presence = presence
         self.generator = torch.Generator(device=next(model.parameters()).device).manual_seed(seed)
 
         self.model, self.batch, self.prompt, self.new, self.eos = model, batch, prompt, new, eos
@@ -112,7 +116,16 @@ class CompiledGreedy:
         out = self.model(input_ids=input_ids, attention_mask=attention_mask,
                          past_key_values=self.cache, use_cache=True, cache_position=positions,
                          position_ids=positions.expand(batch, -1), logits_to_keep=1)
-        following = pick(out.logits[:, -1], self.sampling, self.generator)
+        seen = torch.zeros(batch, out.logits.shape[-1], dtype=torch.bool, device=self.device)
+
+        def choose(logits):
+            if self.presence:
+                logits = logits.float() - self.presence * seen
+            chosen = pick(logits, self.sampling, self.generator).clone()
+            seen.scatter_(1, chosen.view(-1, 1), True)
+            return chosen
+
+        following = choose(out.logits[:, -1])
         self.key_padding[:, :width].copy_(attention_mask.bool())
         self.full_mask[:, :width].copy_(attention_mask)
         masks = (dict(attention_mask=self.no_mask, key_padding=self.key_padding) if self.widened
@@ -126,7 +139,7 @@ class CompiledGreedy:
             out = self.step(input_ids=self.token, past_key_values=self.cache, use_cache=True,
                             cache_position=self.position, position_ids=self.position_ids,
                             logits_to_keep=1, **masks)
-            following = pick(out.logits[:, -1], self.sampling, self.generator).clone()
+            following = choose(out.logits[:, -1])
             produced.append(following)
             finished |= following == self.eos
             if (index + 1) % self.check == 0 and bool(finished.all()):
