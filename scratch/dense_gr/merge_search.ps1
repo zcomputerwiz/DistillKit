@@ -26,13 +26,14 @@ foreach ($spec in $specs) {
 $half = [Math]::Ceiling($arms.Count / 2)
 $jobs = foreach ($gpu in 0, 1) {
     $mine = if ($gpu -eq 0) { $arms[0..($half - 1)] } else { $arms[$half..($arms.Count - 1)] }
-    Start-Job -ArgumentList $gpu, $py, $root, $out, (,$mine) -ScriptBlock {
+    # One ";"-joined string: an array argument arrives in the job flattened into one string
+    Start-Job -ArgumentList $gpu, $py, $root, $out, ($mine -join ";") -ScriptBlock {
         param($gpu, $py, $root, $out, $mine)
         $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
         $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
         Set-Location $root
         $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\merge_proxy.py")
-        foreach ($arm in $mine) { $argv.Add($arm) }
+        foreach ($arm in $mine -split ";") { $argv.Add($arm) }
         $argv.Add("--output"); $argv.Add("$out\proxy-gpu$gpu.json")
         & $py $argv *> "$out\proxy-gpu$gpu.log"
     }
