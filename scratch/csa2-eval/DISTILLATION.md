@@ -563,3 +563,46 @@ conditioned on a looping prefix predicts more of it, so KL on looping rollouts t
 loop in. Teacher-scored on-policy distillation cannot remove loops by itself -- the signal
 has to come from outside the teacher's continuation (masking repeated positions,
 unlikelihood on them, or training only on rollouts that finished cleanly).
+### On-policy round 2 (2026-09-27)
+
+Round 1's lesson applied: sort rollouts before training (`classify_rollouts.py`). From the
+thinking pass, 6,283 prompts rendered as served (`rollout_prompts.py`: the injected xhigh
+text deleted, 40% non-thinking, 3,000 GSM8K/MATH *train* problems with checkable
+answers), 1,024 new tokens (83% finished). Clean -- finished, no loop, correct where
+checkable -- 4,163, trained as ordinary documents; looping 448, trained KL-only with
+unlikelihood on tokens of a 16-gram's third or later occurrence inside the thought (an
+8-gram, second-occurrence rule flagged 39% of rollouts that finished cleanly: code copied
+from the thought into the answer, restated equations) and no KL there; 1,672 cut or wrong
+dropped. `--strip-effort-prompt` deletes the xhigh text from the student's side of every
+replayed capture; the one target pointing into the deleted span becomes the actual next
+token. Curriculum v2 (answer-format instructions, 40% non-thinking).
+
+| measure | source | thinking pass | round 2 |
+| --- | --- | --- | --- |
+| GSM8K, thinking, sampled | 76.0% | 70.7% | **74.4%** (32 truncated against 54) |
+| GSM8K, non-thinking, greedy | 75.1% | 41.7% | **67.2%** (72 unboxed against 525) |
+| MATH-500, thinking, sampled | 54.2% | 47.6% | 45.6% |
+| MATH-500, non-thinking, greedy | 54.8% | 40.8% | **50.0%** |
+| HumanEval+, thinking, sampled | 43.1% | 39.4% | 34.1% (-8.9 [-13.8, -3.9]) |
+| MBPP+, thinking, sampled | 43.4% | 39.9% | 39.8% |
+| arithmetic probe (first number) | 70.5% | 59.2% | 39.9% |
+| MMLU | 0.5762 | 0.5605 | 0.5664 |
+| WikiText NLL vs thinking pass | -0.070 | 0 | +0.007 |
+
+Math gains, code and arithmetic losses. Two causes, both in the recipe:
+
+- HumanEval+ wrote code as often (144-148 of 164 per seed either way) but wrong more
+  often, and thinking-mode hedge markers rose from 1.0-1.3 to 2.3-2.7 per 1000 words.
+  "Clean" meant only finished and loop-free wherever no answer could be checked, so 2,746
+  unverified rollouts -- mostly code, which the student passes ~40% of the time -- were
+  trained with cross entropy, hedges and all.
+- The probe's collapse is mostly instruction-following: asked for "only the number", the
+  model now restates the problem first (an operand is the first number in 140 of 200
+  products), because curriculum v2's non-thinking "only the answer" items showed working
+  before the answer. Scored on the last number it is 52% against the thinking pass's 59%,
+  still worse on subtraction, especially with a negative result (19 of 98 against 47):
+  the curriculum never generated one, and the model answered 36 - 92 with "-92".
+
+Round 3 keeps round 2's rollouts but trains only on those verified correct (plus the
+looping ones under unlikelihood), and uses curriculum v3: bare replies where only the
+answer is asked for, and negative-result subtraction.

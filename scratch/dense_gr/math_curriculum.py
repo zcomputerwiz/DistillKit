@@ -57,6 +57,17 @@ def add(rng):
 def subtract(rng):
     a = rng.randrange(100, 100000)
     b = rng.randrange(10, a)
+    if rng.random() < 0.3:
+        # A negative result: the larger minus the smaller, then the sign. Without these the
+        # drilled model answered 36 - 92 with "-92".
+        _, lines, answer = subtract_columns(a, b)
+        return ("Compute %d - %d." % (b, a),
+                ["%d is smaller than %d, so compute %d - %d and make it negative." % (b, a, a, b)]
+                + lines + ["%d - %d = -%d" % (b, a, answer)], -answer)
+    return subtract_columns(a, b)
+
+
+def subtract_columns(a, b):
     lines, borrow = [], 0
     da, db = digits(a), digits(b)
     for i in range(len(da)):
@@ -147,29 +158,34 @@ IN_HEAD = [add, subtract, multiply, divide, fractions, percent, linear, word]
 
 # The answer format follows the prompt's instruction, and no instruction means plain prose, so
 # the model learns to obey the request rather than to box everything that looks like math.
-FORMATS = [
-    ("\n\nPut the final answer in \\boxed{}.", lambda a: "\\boxed{%s}" % a),
+FORMATS = [  # (instruction, reply, whether the reply may show working)
+    ("\n\nPut the final answer in \\boxed{}.", lambda a: "\\boxed{%s}" % a, True),
     ("\n\nPlease reason step by step, and put your final answer within \\boxed{}.",
-     lambda a: "The final answer is \\boxed{%s}." % a),
-    ("\n\nReply with only the answer.", lambda a: str(a)),
-    ("\n\nEnd your reply with a line of the form 'Answer: <value>'.", lambda a: "Answer: %s" % a),
-    ("", lambda a: "The answer is %s." % a),
+     lambda a: "The final answer is \\boxed{%s}." % a, True),
+    ("\n\nReply with only the answer.", lambda a: str(a), False),
+    ("\n\nReply with only the number.", lambda a: str(a), False),
+    ("\n\nEnd your reply with a line of the form 'Answer: <value>'.", lambda a: "Answer: %s" % a, True),
+    ("", lambda a: "The answer is %s." % a, True),
 ]
 
 
 def formatted(messages, rng, thinking):
     """Give the item a random answer-format instruction and a matching final reply.
 
-    Non-thinking items move the worked steps into the reply, ahead of the formatted answer."""
-    instruction, render = rng.choice(FORMATS)
-    messages[0]["content"] += instruction
+    Non-thinking items move the worked steps into the reply, ahead of the formatted answer,
+    unless the instruction asks for the answer alone: v2 showed steps there, and the model
+    learned to open "only the number" replies by restating the problem."""
+    instruction, render, working = rng.choice(FORMATS)
     final = messages[-1]
     answer = final.pop("answer")
+    if "only the number" in instruction and not str(answer).lstrip("-").isdigit():
+        instruction, render, working = FORMATS[2]  # "only the answer": "7 remainder 3", "yes"
+    messages[0]["content"] += instruction
     if thinking:
         final["content"] = render(answer)
     else:
         steps = final.pop("reasoning_content")
-        final["content"] = steps + "\n\n" + render(answer)
+        final["content"] = (steps + "\n\n" if working else "") + render(answer)
     return messages
 
 
