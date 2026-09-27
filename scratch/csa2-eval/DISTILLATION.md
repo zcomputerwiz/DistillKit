@@ -508,3 +508,58 @@ failures are greedy repetition after a slip, and overthinking MBPP's under-speci
 ("median length of a trapezium") against a single example test. The corpus under-represents
 code reasoning -- 1,850 code documents were dropped as longer than the cap. WikiText
 +0.0018 (n.s.), in-domain NLL 0.7106, MMLU 0.5605, P(hedge opener) 0.44x the source.
+
+### Sampled thinking, math, and on-policy round 1 (2026-09-26/27)
+
+Thinking mode with Qwen's recommended sampling (temperature 0.6, top-p 0.95, top-k 20),
+three seeds, per-problem mean with a bootstrap interval: the thinking pass trails the
+source by 3.7 points on HumanEval+ (39.4% against 43.1%, [-8.7, +1.4]) and 3.5 on MBPP+
+(39.9% against 43.4%, [-6.7, -0.3]). The source was run through the official llama.cpp
+b11205 binaries on a bf16 GGUF (`convert_hf_to_gguf.py --no-mtp`), about 11x faster than
+HF `generate`.
+
+Math (`math_bench/run_math.py`, last `\boxed{}` scored by `math_verify`):
+
+| bench | mode | source | thinking pass |
+| --- | --- | --- | --- |
+| GSM8K | thinking, sampled | 76.0% | 70.7% (54 truncated against 13) |
+| GSM8K | non-thinking, greedy | 75.1% | 41.7% (67.6% scored on the last number) |
+| MATH-500 | thinking, sampled | 54.2% | 47.6% |
+| MATH-500 | non-thinking, greedy | 54.8% | 40.8% |
+
+Non-thinking GSM8K is mostly format: 525 replies end "The final answer is $26." instead of
+boxing it (the source leaves 9 unboxed). All our math data was thinking-format, so nothing
+showed a non-thinking reply following a format instruction. `math_curriculum.py` now gives
+every item a random answer-format instruction (boxed, bare, "Answer:" line, or none for
+prose) with a reply that follows it, 40% of items non-thinking.
+
+The teacher's (Qwen3.8) chat template injects a system prompt -- "Reasoning effort is set
+to xhigh ... consider plausible alternatives ..." -- whenever thinking is enabled, unless
+`reasoning_effort="medium"`. Every corpus rendered with it carries that prompt
+(`think-first`, `thinking-code-math`, `agent-tools`, the first curriculum); the student
+template, the evaluations and llama.cpp serving never add it. Curriculum v2 is rendered at
+medium.
+
+On-policy round 1: 3,000 thinking-mode rollouts from the thinking pass (sampled, 512
+prompt + 512 new tokens, 60% finished), captured by the teacher and trained on KL alone,
+with curriculum v2 and replay of the earlier captures, 3M tokens:
+
+| measure | source | thinking pass | round 1 |
+| --- | --- | --- | --- |
+| HumanEval+, thinking, sampled | 43.1% | 39.4% | 30.3% (-12.8 [-18.1, -7.7]) |
+| MBPP+, thinking, sampled | 43.4% | 39.9% | 40.5% |
+| GSM8K, thinking, sampled | 76.0% | 70.7% | 69.1% (184 truncated) |
+| MATH-500, thinking, sampled | 54.2% | 47.6% | 44.2% (220 truncated) |
+| arithmetic probe, bare answer | 70.5% | 59.2% | 52.6% |
+| MMLU | 0.5762 | 0.5605 | 0.5742 |
+| WikiText NLL vs thinking pass | -0.070 | 0 | +0.011 |
+
+Round 1 is a regression and is not adopted: answers got longer (GSM8K mean 649 tokens
+against 430 and the source's 207) and looped more. `onpolicy_signal.py` shows why. Read at
+the student's own positions, the teacher endorses the loop: inside repeated stretches it
+gives the student's repeated token ~0.90 and agrees with it as top-1 93% of the time, 0.86
+at the loop's onset, with ~0.0001 on `</think>`. That is in-context copying; a teacher
+conditioned on a looping prefix predicts more of it, so KL on looping rollouts trains the
+loop in. Teacher-scored on-policy distillation cannot remove loops by itself -- the signal
+has to come from outside the teacher's continuation (masking repeated positions,
+unlikelihood on them, or training only on rollouts that finished cleanly).

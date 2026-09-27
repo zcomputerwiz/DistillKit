@@ -1,4 +1,4 @@
-﻿# On-policy round 1: student rollouts, teacher capture, KL-only training with curriculum and
+# On-policy round 1: student rollouts, teacher capture, KL-only training with curriculum and
 # replay, then the full evaluation. Starts when the math/probe queue finishes. Parallel jobs
 # get their own Inductor cache: two processes compiling the same graph into one cache corrupt it.
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
@@ -27,14 +27,15 @@ if (-not (Test-Path "$D\capture-data\onpolicy-r1.jsonl")) {
         }
     }
     $jobs | Wait-Job | Receive-Job
-    Get-Content "$D\capture-data\onpolicy-r1-0.jsonl", "$D\capture-data\onpolicy-r1-1.jsonl" |
-        Set-Content "$D\capture-data\onpolicy-r1.jsonl" -Encoding utf8
+    # Join as bytes: PowerShell 5.1 reads these as ANSI and writes a BOM the capture rejects
+    & $py -c "import sys; open(sys.argv[1], 'wb').write(b''.join(open(p, 'rb').read() for p in sys.argv[2:]))" `
+        "$D\capture-data\onpolicy-r1.jsonl" "$D\capture-data\onpolicy-r1-0.jsonl" "$D\capture-data\onpolicy-r1-1.jsonl"
     Get-Content "$D\capture-data\onpolicy-r1-0.log", "$D\capture-data\onpolicy-r1-1.log" | Select-String "rollouts" | Select-Object -Last 2
 }
 
 "=== capture $(Get-Date -Format HH:mm)"
 $env:CUDA_VISIBLE_DEVICES = "0,1"
-foreach ($spec in @("onpolicy-r1|teacher-cache-onpolicy-r1", "math-curriculum|teacher-cache-curriculum")) {
+foreach ($spec in @("onpolicy-r1|teacher-cache-onpolicy-r1", "math-curriculum-v2|teacher-cache-curriculum-v2")) {
     $jsonl, $cache = $spec -split '\|'
     if (Test-Path "$D\$cache\manifest.json") { continue }
     & $py -m distillkit.sample_transformers --model $T --tokenizer-json "$T\tokenizer.json" `
@@ -45,7 +46,7 @@ foreach ($spec in @("onpolicy-r1|teacher-cache-onpolicy-r1", "math-curriculum|te
 Remove-Item Env:\CUDA_VISIBLE_DEVICES
 
 "=== train $(Get-Date -Format HH:mm)"
-$caches = @("..\teacher-cache-onpolicy-r1", "..\teacher-cache-curriculum", "..\teacher-cache-thinking",
+$caches = @("..\teacher-cache-onpolicy-r1", "..\teacher-cache-curriculum-v2", "..\teacher-cache-thinking",
             "..\teacher-cache-think-first", "..\teacher-cache-expand-code", "..\teacher-cache-general-pilot")
 & $py scratch\dense_gr\exclusion_for.py --master "$D\capture-data\exclude-broken-tools.json" `
     --caches ($caches | ForEach-Object { $_ }) --output "$D\capture-data\exclude-onpolicy-r1.json"
