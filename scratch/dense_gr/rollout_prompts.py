@@ -35,6 +35,15 @@ def without_effort(text):
     return text.replace("<|im_start|>system\n%s\n\n" % EFFORT, "<|im_start|>system\n", 1)
 
 
+def with_effort(text):
+    """The document as the teacher template renders it in thinking mode: the effort text
+    heading its system turn (its own prompt after a blank line), or as the whole turn."""
+    header = "<|im_start|>system\n"
+    if text.startswith(header):
+        return header + EFFORT + "\n\n" + text[len(header):]
+    return header + EFFORT + "<|im_end|>\n" + text
+
+
 def opening(thinking):
     return TURN + ("<think>\n" if thinking else "<think>\n\n</think>\n\n")
 
@@ -50,6 +59,10 @@ def main() -> int:
     parser.add_argument("--non-thinking-share", type=float, default=0.4)
     parser.add_argument("--width", type=int, default=512)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--keep-effort", action="store_true",
+                        help="render as the teacher template does, effort text in thinking mode "
+                             "only; for a student served with that template. Stripping it from "
+                             "training raised held-out code NLL (ablate_continuation.ps1).")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -101,6 +114,8 @@ def main() -> int:
             if len(rows) - before >= int(count):
                 break
             thinking = rng.random() >= args.non_thinking_share
+            if args.keep_effort and thinking:
+                head = with_effort(head)
             add(doc_id, head + opening(thinking), None, Path(path).stem, thinking)
 
     rng.shuffle(rows)
@@ -112,7 +127,8 @@ def main() -> int:
         key = "%s/%s" % (row["source"], "think" if row["thinking"] else "nothink")
         counts[key] = counts.get(key, 0) + 1
     print("wrote %d prompts: %s" % (len(rows), json.dumps(counts, sort_keys=True)))
-    assert not any(EFFORT in row["prompt"] for row in rows)
+    # Exactly the thinking prompts carry the effort text when kept, and none otherwise.
+    assert all((EFFORT in row["prompt"]) == (args.keep_effort and row["thinking"]) for row in rows)
     return 0
 
 

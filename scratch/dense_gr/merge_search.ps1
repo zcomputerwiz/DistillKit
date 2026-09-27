@@ -1,11 +1,11 @@
-# Blends of the thinking pass (base) with a tuned round, screened on train-split and held-out
+# Blends of a base (default: the thinking pass) with a tuned round, screened on train-split and held-out
 # proxies (merge_proxy.py) -- never the benchmarks, which only the finalists see.
-#   powershell -File merge_search.ps1 <tuned checkpoint> <tag>
-param([Parameter(Mandatory)][string]$Tuned, [Parameter(Mandatory)][string]$Tag)
+#   powershell -File merge_search.ps1 -Tuned <checkpoint> -Tag <name> [-Base <checkpoint>]
+param([Parameter(Mandatory)][string]$Tuned, [Parameter(Mandatory)][string]$Tag, [string]$Base = "")
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
-$think = "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2"
+$think = if ($Base) { $Base } else { "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2" }
 $out = "$root\scratch\dense_gr\merges-$Tag"
 New-Item -ItemType Directory -Force $out | Out-Null
 # name | uniform alpha, or shallow,deep ramp
