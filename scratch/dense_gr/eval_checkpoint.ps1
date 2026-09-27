@@ -11,8 +11,8 @@ $think = "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-c
 $r2 = $Checkpoint
 "=== code, sampled thinking, 3 seeds $(Get-Date -Format HH:mm)"
 $jobs = foreach ($gpu in "0", "1") {
-    Start-Job -ArgumentList $gpu, $py, $code, $root, $r2 -ScriptBlock {
-        param($gpu, $py, $code, $root, $r2)
+    Start-Job -ArgumentList $gpu, $py, $code, $root, $r2, $Tag -ScriptBlock {
+        param($gpu, $py, $code, $root, $r2, $Tag)  # a job sees only what it is passed
         $env:CUDA_VISIBLE_DEVICES = $gpu; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
         $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
         Set-Location $root
@@ -29,8 +29,8 @@ $jobs = foreach ($gpu in "0", "1") {
 $jobs | Wait-Job | Receive-Job
 "=== math $(Get-Date -Format HH:mm)"
 $jobs = foreach ($spec in @("0|gsm8k", "1|math500")) {
-    Start-Job -ArgumentList $spec, $py, $math, $root, $r2 -ScriptBlock {
-        param($spec, $py, $math, $root, $r2)
+    Start-Job -ArgumentList $spec, $py, $math, $root, $r2, $Tag -ScriptBlock {
+        param($spec, $py, $math, $root, $r2, $Tag)
         $gpu, $bench = $spec -split '\|'
         $env:CUDA_VISIBLE_DEVICES = $gpu; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
         $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
