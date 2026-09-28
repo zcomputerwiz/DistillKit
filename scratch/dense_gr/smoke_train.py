@@ -67,6 +67,53 @@ FULL_VOCABULARY = 248_320
 # What opens an assistant turn in the capture's chat template. Used only to find where
 # a document stops being prompt; see --min-answer-tokens.
 ANSWER_MARKER = "<|im_start|>assistant"
+
+
+class PairSource:
+    """Preference pairs from `ref_logprobs.py`, shuffled and cycled, as step records.
+
+    Each side is right-padded to a multiple of `block`: causal attention means padding
+    after the response changes nothing before it, and a handful of widths is a handful
+    of kernel shapes to warm rather than a cold autotune per pair."""
+
+    def __init__(self, path, pad, block=256, seed=0, device="cuda"):
+        self.rows = [json.loads(line) for line in open(path, encoding="utf-8")]
+        if not self.rows:
+            raise SystemExit("no pairs in %s" % path)
+        self.pad, self.block, self.device = pad, block, device
+        self.generator = np.random.default_rng(seed)
+        self.order = []
+
+    def _width(self, length):
+        return -(-length // self.block) * self.block
+
+    def widths(self):
+        return sorted({self._width(len(r[side + "_ids"])) for r in self.rows for side in ("chosen", "rejected")})
+
+    def _record(self, row):
+        record = {"pair": True}
+        for side in ("chosen", "rejected"):
+            ids = row[side + "_ids"]
+            padded = ids + [self.pad] * (self._width(len(ids)) - len(ids))
+            record[side + "_ids"] = torch.tensor([padded], device=self.device)
+            record[side + "_start"], record[side + "_end"] = row[side + "_start"], len(ids)
+            record["ref_" + side] = row["ref_" + side]
+        return record
+
+    def take(self, count):
+        out = []
+        for _ in range(count):
+            if not self.order:
+                self.order = list(self.generator.permutation(len(self.rows)))
+            out.append(self._record(self.rows[self.order.pop()]))
+        return out
+
+    def dummy(self, width, vocab):
+        ids = torch.randint(1, vocab, (1, width), device=self.device)
+        half = width // 2
+        return {"pair": True, "chosen_ids": ids, "rejected_ids": ids.clone(), "chosen_start": half,
+                "rejected_start": half, "chosen_end": width, "rejected_end": width,
+                "ref_chosen": 0.0, "ref_rejected": 0.0}
 #: What the teacher (Qwen3.8) template injects as the system turn whenever thinking is on.
 EFFORT_PROMPT = ("Reasoning effort is set to xhigh. Please think carefully through the task, "
                  "validate key assumptions, consider plausible alternatives, and prioritize "
@@ -315,6 +362,13 @@ def main(argv=None) -> int:
                              "loop it is shown (~0.9 on the repeated token), so KL there "
                              "trains the loop in.")
     parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
+    parser.add_argument("--pairs", type=Path, default=None,
+                        help="preference pairs with reference log-probs (ref_logprobs.py): "
+                             "DPO plus cross entropy on the chosen side, mixed into every step")
+    parser.add_argument("--pairs-per-step", type=int, default=2)
+    parser.add_argument("--pair-weight", type=float, default=0.5)
+    parser.add_argument("--dpo-beta", type=float, default=0.1)
+    parser.add_argument("--pair-sft-weight", type=float, default=0.2)
     parser.add_argument("--ce-only-caches", type=Path, nargs="+", default=None,
                         help="captures trained on cross entropy alone, no teacher KL: the "
                              "student's own shortest correct rollouts, which KL toward a "
@@ -953,7 +1007,15 @@ def main(argv=None) -> int:
 
     step_options = dict(teacher_weight=args.teacher_weight if teacher is not None else 0.0,
                         indexer_weight=args.indexer_weight, sparse_stage=sparse_stage,
-                        kl_chunk=args.kl_chunk, unlikelihood_weight=args.unlikelihood_weight)
+                        kl_chunk=args.kl_chunk, unlikelihood_weight=args.unlikelihood_weight,
+                        pair_weight=args.pair_weight, dpo_beta=args.dpo_beta,
+                        pair_sft_weight=args.pair_sft_weight)
+    pairs = None
+    if args.pairs is not None:
+        pairs = PairSource(args.pairs, tokenizer.pad_token_id or tokenizer.eos_token_id, seed=args.seed)
+        print("pairs: %d from %s, %d per step, weight %.2f, beta %.2f, widths %s"
+              % (len(pairs.rows), args.pairs, args.pairs_per_step, args.pair_weight, args.dpo_beta,
+                 pairs.widths()), flush=True)
     warmup_backward_targets = 0
     # Warm the actual objective and recorded-attention path, not a CE-only surrogate.
     if args.tensor_parallel:
@@ -975,6 +1037,12 @@ def main(argv=None) -> int:
                     warmup_backward_targets += warmed["targets"]
                 model.zero_grad(set_to_none=True)
                 del record
+                synchronize(model)
+                torch.cuda.empty_cache()
+            for width in pairs.widths() if pairs is not None else []:
+                # Each padded pair width is a shape of its own; warm it single-threaded too.
+                backward_step(model, [pairs.dummy(width, model.config.vocab_size)], **step_options)
+                model.zero_grad(set_to_none=True)
                 synchronize(model)
                 torch.cuda.empty_cache()
         print("warmed", flush=True)
@@ -1000,6 +1068,8 @@ def main(argv=None) -> int:
         microbatches = take_step(batches, args.accumulate, args.tokens - scored_tokens)
         if not microbatches:
             break
+        if pairs is not None:
+            microbatches = microbatches + pairs.take(args.pairs_per_step)
         scale = rate_scale(step, args.warmup, scored_tokens / max(args.tokens, 1),
                            args.decay_fraction, args.decay_floor)
         for group in optimizer.param_groups:
@@ -1043,6 +1113,9 @@ def main(argv=None) -> int:
                 row["teacher_kl"] = teacher_cost
                 if teacher.unlikelihood_ids:
                     row["unlikelihood"] = metrics["unlikelihood"]
+            for name in ("dpo", "dpo_margin", "chosen_logp"):
+                if name in metrics:
+                    row[name] = metrics[name]
             # Read before the probe and the held-out pass. Both run their own forward at
             # their own sequence length, and the layers keep only the last routing they
             # computed -- reading after them reports the probe's 512-token routing, where

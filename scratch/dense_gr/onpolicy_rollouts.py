@@ -52,6 +52,9 @@ def main() -> int:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--shard", default="0/1", help="i/n: this process takes every n-th prompt")
+    parser.add_argument("--greedy", action="store_true",
+                        help="greedy decoding, which loops more than Qwen's sampling and is a "
+                             "common serving choice; ids end :greedy instead of :s<seed>")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
@@ -85,7 +88,7 @@ def main() -> int:
     model.config.use_cache = True
     eos = tok.eos_token_id
     runner = CompiledGreedy(model, args.batch_size, args.width, args.new, eos,
-                            sampling=(0.6, 0.95, 20), seed=args.seed)
+                            sampling=None if args.greedy else (0.6, 0.95, 20), seed=args.seed)
     started, written, tokens, finished_rows = time.monotonic(), 0, 0, 0
     with open(args.output, "w", encoding="utf-8") as out:
         for start in range(0, len(pool), args.batch_size):
@@ -102,7 +105,7 @@ def main() -> int:
                 answer = tok.decode(new[:end], skip_special_tokens=False)
                 finished_rows += bool(done.numel())
                 tokens += end
-                out.write(json.dumps({"doc_id": "onpolicy:%s:s%d" % (doc_id, args.seed),  # noqa: E501
+                out.write(json.dumps({"doc_id": "onpolicy:%s:%s" % (doc_id, "greedy" if args.greedy else "s%d" % args.seed),  # noqa: E501
                                       "text": prompt + answer, "split": "train", "source": source,
                                       "domain": domain, "finished": bool(done.numel()),
                                       "generated_tokens": end, "prompt_chars": len(prompt),

@@ -128,19 +128,59 @@ def causal_ce(model, hidden, ids):
                                     reduction="mean").to(hidden.device)
 
 
+def response_logprob(model, hidden, ids, start, end):
+    """Summed log p of tokens `start:end` given everything before them, one row.
+
+    Through Cut Cross-Entropy, so a 248,320-wide row of logits is never formed -- the
+    same reason the causal loss uses it -- and it carries gradients. Scored over the whole
+    (right-padded) row and masked, so the kernel sees the row's width, not the response's:
+    one shape per padded width rather than a cold autotune per pair."""
+    from cut_cross_entropy import linear_cross_entropy
+
+    device = model.lm_head.weight.device
+    with torch.cuda.device(device):
+        losses = linear_cross_entropy(hidden.to(device), model.lm_head.weight, ids.to(device),
+                                      shift=1, reduction="none")
+    return -losses[..., start - 1:end - 1].sum().to(hidden.device)
+
+
+def preference_loss(model, pair, *, beta, sft_weight, logprob=response_logprob):
+    """DPO for one (chosen, rejected) pair against precomputed reference log-probs, plus
+    cross entropy on the chosen response (RPO-style): with plausible, easy-to-separate
+    negatives, DPO alone can lower the chosen answer's likelihood along with the loop's.
+
+    Returns (objective, dpo, margin, chosen mean log p)."""
+    sides = {}
+    for side in ("chosen", "rejected"):
+        ids = pair[side + "_ids"]
+        hidden = model.model(input_ids=ids, attention_mask=torch.ones_like(ids),
+                             use_cache=False).last_hidden_state
+        sides[side] = logprob(model, hidden, ids, pair[side + "_start"], pair[side + "_end"])
+    margin = beta * ((sides["chosen"] - pair["ref_chosen"]) - (sides["rejected"] - pair["ref_rejected"]))
+    dpo = -torch.nn.functional.logsigmoid(margin)
+    tokens = pair["chosen_end"] - pair["chosen_start"]
+    chosen_mean = sides["chosen"] / tokens
+    return dpo - sft_weight * chosen_mean, dpo, margin, chosen_mean
+
+
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
-                  sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0):
+                  sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0,
+                  pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
     The injected CE callable is only for CPU correctness tests; production uses CCE.
+    Preference-pair records (`pair`) are left out of the token accounting and add
+    `pair_weight` times their mean preference objective.
     """
     from distillkit.models.qwen35.csa2 import isolated_indexer, recorded_attention
 
-    if not 0 <= teacher_weight <= 1 or indexer_weight < 0:
+    if not 0 <= teacher_weight <= 1 or indexer_weight < 0 or pair_weight < 0:
         raise ValueError("invalid objective weights")
+    pairs = [r for r in records if r.get("pair")]
+    records = [r for r in records if not r.get("pair")]
     counts, total = accumulation_shares([r["input_ids"] for r in records])
-    if not records or any(n <= 0 for n in counts):
+    if not (records or pairs) or any(n <= 0 for n in counts):
         raise ValueError("an optimizer step needs nonempty causal targets")
     result = dict(loss=0.0, teacher_kl=0.0, indexer=0.0, unlikelihood=0.0, objective=0.0,
                   targets=sum(counts))
@@ -213,6 +253,16 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
         finally:
             for handle in handles:
                 handle.remove()
+    if pairs and pair_weight:
+        for name in ("dpo", "dpo_margin", "chosen_logp"):
+            result[name] = 0.0
+        for pair in pairs:
+            objective, dpo, margin, chosen_mean = preference_loss(
+                model, pair, beta=dpo_beta, sft_weight=pair_sft_weight, logprob=logprob)
+            (objective * pair_weight / len(pairs)).backward()
+            result["dpo"] += float(dpo.detach()) / len(pairs)
+            result["dpo_margin"] += float(margin.detach()) / len(pairs)
+            result["chosen_logp"] += float(chosen_mean.detach()) / len(pairs)
     return result
 
 
