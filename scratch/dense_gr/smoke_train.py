@@ -316,6 +316,10 @@ def main(argv=None) -> int:
     parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
     parser.add_argument("--repeat", nargs="+", default=None, metavar="CAPTURE=N",
                         help="plan every document of CAPTURE N times a pass (N >= 1)")
+    parser.add_argument("--strip-effort-nonthinking", action="store_true",
+                        help="--strip-effort-prompt, but only where the final reply has an "
+                             "empty think block (non-thinking mode) or there is no reply: "
+                             "every document as the teacher template, served, renders it.")
     parser.add_argument("--strip-effort-prompt", action="store_true",
                         help="read documents that open with the teacher template's injected "
                              "'Reasoning effort is set to xhigh' system text with it deleted. "
@@ -794,8 +798,8 @@ def main(argv=None) -> int:
         if suppress is not None:
             print("teacher: suppressing hedge openers %s in answers"
                   % tokenizer.convert_ids_to_tokens(suppress.tolist()), flush=True)
-        strip = None
-        if args.strip_effort_prompt:
+        strip = nonthinking = None
+        if args.strip_effort_prompt or args.strip_effort_nonthinking:
             # Two shapes: the effort text is the whole system turn (delete the turn), or
             # it heads a dataset's own system prompt, "\n\n" between (delete it and the
             # break, keeping the turn).
@@ -804,12 +808,15 @@ def main(argv=None) -> int:
             whole = encode("<|im_start|>system\n%s<|im_end|>\n" % EFFORT_PROMPT)
             heading = header + effort + encode("\n\n")
             strip = [(whole, 0, len(whole)), (heading, len(header), len(heading))]
+            if args.strip_effort_nonthinking:
+                nonthinking = (encode(ANSWER_MARKER), encode("\n<think>\n\n</think>"))
         teacher = CachedTeacher(args.teacher_cache, "train", seed=args.seed,
                                 max_length=args.teacher_max_length,
                                 answer_marker=marker,
                                 min_answer_tokens=args.min_answer_tokens,
                                 exclude=excluded, suppress=suppress,
                                 kl_only=args.kl_only_caches, strip_prefix=strip,
+                                strip_nonthinking=nonthinking,
                                 unlikelihood=args.unlikelihood_caches,
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
                                 repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []))
@@ -824,7 +831,8 @@ def main(argv=None) -> int:
                                      max_length=args.teacher_max_length,
                                      answer_marker=marker,
                                      min_answer_tokens=args.min_answer_tokens,
-                                     exclude=excluded, strip_prefix=strip)
+                                     exclude=excluded, strip_prefix=strip,
+                                     strip_nonthinking=nonthinking)
         if excluded:
             print("excluded as benchmark contamination: %d train, %d held-out, of %d listed"
                   % (teacher.excluded, held_teacher.excluded, len(excluded)), flush=True)

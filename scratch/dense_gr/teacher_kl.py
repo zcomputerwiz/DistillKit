@@ -163,7 +163,7 @@ class CachedTeacher:
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
                  suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
-                 think_close=None, repeat=None):
+                 think_close=None, repeat=None, strip_nonthinking=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         if unlikelihood and (think_close is None or min_answer_tokens <= 0):
             raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
@@ -227,13 +227,24 @@ class CachedTeacher:
             kept = [doc_id for doc_id in ids if doc_id not in exclude]
             self.excluded = len(ids) - len(kept)
             ids = kept
+        # `strip_nonthinking = (marker, empty)` limits stripping to documents whose final
+        # assistant turn (after the ids `marker`) opens with the ids `empty`, an empty think
+        # block, or that have no assistant turn: the teacher template injects the effort
+        # text only in thinking mode, yet the 5m, expand-code and expand-chat captures were
+        # rendered in thinking mode around non-thinking replies, so they carry it where the
+        # served template never would. Stripping thinking documents too raised held-out
+        # code NLL (ablate_continuation.ps1); this renders every document as served.
         if self.strip_prefix:
-            longest = max(len(pattern) for pattern, _, _ in self.strip_prefix)
             for doc_id in ids:
-                head = np.asarray(self.cache.read_document(doc_id, tokens_only=True)
-                                  ["input_ids"][:longest], dtype=np.int64)
+                tokens = np.asarray(self.cache.read_document(doc_id, tokens_only=True)
+                                    ["input_ids"], dtype=np.int64)
+                if strip_nonthinking is not None:
+                    marker, empty = strip_nonthinking
+                    turn = last_response(tokens, marker)
+                    if turn is not None and list(tokens[turn:turn + len(empty)]) != list(empty):
+                        continue
                 for pattern, begin, end in self.strip_prefix:
-                    if np.array_equal(head[:len(pattern)], pattern):
+                    if np.array_equal(tokens[:len(pattern)], pattern):
                         self.offset[doc_id] = (begin, end)
                         break
         self.ids = [doc_id for doc_id in ids

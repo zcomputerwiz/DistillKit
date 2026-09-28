@@ -65,7 +65,9 @@ def held_nll(model, tokenizer, cache, count=64):
     heading = header + effort + encode("\n\n")
     held = CachedTeacher(cache, "eval", device="cuda", max_length=1024,
                          answer_marker=encode(ANSWER_MARKER), min_answer_tokens=2,
-                         strip_prefix=[(whole, 0, len(whole)), (heading, len(header), len(heading))])
+                         strip_prefix=[(whole, 0, len(whole)), (heading, len(header), len(heading))],
+                         # as served: the effort text only where the reply thinks
+                         strip_nonthinking=(encode(ANSWER_MARKER), encode("\n<think>\n\n</think>")))
     total = scored = 0.0
     for doc_id in sorted(held.ids)[:count]:
         ids = held.read(doc_id)["input_ids"]

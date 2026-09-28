@@ -24,6 +24,11 @@ $jobs = foreach ($gpu in "0", "1") {
                 "--compiled", "--output", "$code\$Tag-$bench-2k-sampled-s$seed")
             & $py $argv *> "$code\$Tag-$bench-2k-sampled-s$seed.log"
         }
+        # Non-thinking, greedy: the mode the selective effort stripping is about
+        $bench = if ($gpu -eq "0") { "mbpp" } else { "humaneval" }
+        $argv = [System.Collections.Generic.List[string]]@("$code\generate.py", "--checkpoint", $r2, "--bench", $bench,
+            "--max-new-tokens", "2048", "--batch-size", "64", "--no-thinking", "--compiled", "--output", "$code\$Tag-$bench-2k-nt")
+        & $py $argv *> "$code\$Tag-$bench-2k-nt.log"
     }
 }
 $jobs | Wait-Job | Receive-Job
@@ -64,7 +69,7 @@ $s = "C:\Users\Owner\AppData\Local\Temp\claude\D--DeepThought-Projects-HybridMod
 & $py "$s\mmlu_table.py" "source=scratch/csa2-eval/q512-stock.mmlu.json" "think=scratch/csa2-eval/thinking-pass.mmlu.json" "onpolicy2=scratch/csa2-eval/onpolicy-r2.mmlu.json" `
     "$Tag=scratch/csa2-eval/$Tag.mmlu.json"
 "=== sandbox $(Get-Date -Format HH:mm)"
-foreach ($d in Get-ChildItem $code -Directory -Filter "$Tag-*-2k-sampled-s*") {
+foreach ($d in @(Get-ChildItem $code -Directory -Filter "$Tag-*-2k-sampled-s*") + @(Get-ChildItem $code -Directory -Filter "$Tag-*-2k-nt")) {
     $bench = if ($d.Name -match "humaneval") { "humaneval" } else { "mbpp" }
     powershell -NoProfile -ExecutionPolicy Bypass -File "$code\run_docker.ps1" $d.FullName $bench *> "$($d.FullName)\sandbox.log"
 }
@@ -72,6 +77,10 @@ foreach ($bench in "humaneval", "mbpp") {
     "== thinking, sampled, $bench, 3 seeds"
     & $py "$code\sampled_compare.py" "source=$code\source-$bench-2k-sampled" "think=$code\think-$bench-2k-sampled" "control=$code\control-$bench-2k-sampled" "onpolicy2=$code\onpolicy2-$bench-2k-sampled" `
         "$Tag=$code\$Tag-$bench-2k-sampled"
+}
+foreach ($bench in "humaneval", "mbpp") {
+    "== non-thinking, greedy, $bench"
+    & $py "$code\compare.py" "source=$code\source-$bench-2k-nt" "think=$code\think-$bench-2k-nt" "$Tag=$code\$Tag-$bench-2k-nt"
 }
 "== looping (MBPP+ seed 0)"
 & $py "$code\no_code_audit.py" "$code\source-mbpp-2k-sampled-s0" "$code\think-mbpp-2k-sampled-s0" "$code\onpolicy2-mbpp-2k-sampled-s0" "$code\$Tag-mbpp-2k-sampled-s0"
