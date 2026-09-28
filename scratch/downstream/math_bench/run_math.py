@@ -91,6 +91,8 @@ def main() -> int:
     parser.add_argument("--presence", type=float, default=0.0,
                         help="presence penalty on generated tokens (compiled path only)")
     parser.add_argument("--system", default=None, help="a system prompt ahead of the question")
+    parser.add_argument("--reasoning-effort", default=None,
+                        help="passed to the chat template (the teacher's takes low, medium, xhigh)")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     self_test()
@@ -118,7 +120,9 @@ def main() -> int:
     system = [{"role": "system", "content": args.system}] if args.system else []
     prompts = [tok.apply_chat_template(system + [{"role": "user", "content": PROMPT.format(problem=q)}],
                                        tokenize=False, add_generation_prompt=True,
-                                       enable_thinking=not args.no_thinking) for _, q, _ in items]
+                                       enable_thinking=not args.no_thinking,
+                                       **({"reasoning_effort": args.reasoning_effort}
+                                          if args.reasoning_effort else {})) for _, q, _ in items]
     runner = width_all = None
     if args.compiled:
         longest = max(len(tok(p, add_special_tokens=False)["input_ids"]) for p in prompts)

@@ -668,3 +668,43 @@ The blend keeps the thinking pass's code, most of round 2's non-thinking format 
 is better than both parents on MATH-500 thinking, MMLU (level with the source), the probe
 and WikiText. It keeps less of the loop fix: MATH-500 truncations are back at the thinking
 pass's level (162), GSM8K's at 44 against 54. It is the best student so far.
+### The effort prompt, round 5/5b, and the teacher's template (2026-09-27/28)
+
+Continuation ablations from the thinking pass (`ablate_continuation.ps1`), held-out code
+NLL on the whole expand-code eval split (`code_nll_full.py`, 292 documents): continuing the
+thinking pass's own recipe +0.003, adding the 1536 cap and general text +0.005, adding
+`--strip-effort-prompt` +0.057 (the control +0.053, round 2 +0.045, the round-2 blend
++0.018). Every capture rendered with the teacher's template carries the injected effort
+text in thinking mode, including -- it turned out -- the 5m (5,521 documents), expand-code
+(5,825) and expand-chat (4,107) corpora, which were rendered in thinking mode around
+non-thinking replies (an empty think block). Served non-thinking prompts never carry it.
+Stripping it everywhere breaks the thinking documents' mode marker; keeping it everywhere
+(round 5) trains non-thinking code on a prompt serving never sends (served-format code NLL
+0.765 -> 0.848). `--strip-effort-nonthinking` deletes it only where the final reply opens
+with an empty think block, so every document reads as the template serves it.
+
+The teacher's chat template is the student's plus that injection (and `reasoning_effort`
+low/medium/xhigh); the student adopts it. The trainer had been saving the source model's
+template over it (fixed: checkpoints keep their init's `chat_template.jinja`).
+
+Round 5b: from the round-2 blend (teacher template), round-2 recipe with prompts rendered as
+served (`rollout_prompts.py --keep-effort`), curriculum v4 (v3 at the template's default
+effort), selective stripping; blended back 0-to-0.7 by depth:
+
+| measure | source | thinking pass | round-2 blend (teacher template) | round-5b blend |
+| --- | --- | --- | --- | --- |
+| HumanEval+, thinking, sampled | 43.1% | 39.4% | 39.8% | 36.0% |
+| MBPP+, thinking, sampled | 43.4% | 39.9% | 40.5% | 40.4% |
+| HumanEval+ (plus), non-thinking, greedy | 44.5% | 42.7% | -- | 43.3% |
+| MBPP+ (plus), non-thinking, greedy | 47.6% | 47.6% | -- | 47.4% |
+| GSM8K, thinking, sampled | 76.0% | 70.7% | 72.2% | **76.9%** |
+| GSM8K, non-thinking, greedy | 75.1% | 41.7% | 65.9% | 68.8% |
+| MATH-500, thinking, sampled | 54.2% | 47.6% | 47.8% | 47.0% (186 truncated) |
+| MATH-500, non-thinking, greedy | 54.8% | 40.8% | 46.6% | 47.0% |
+| MMLU | 0.5762 | 0.5605 | 0.5781 | 0.5703 |
+| arithmetic probe | 70.5% | 59.2% | 60.6% | 61.0% |
+
+GSM8K thinking reaches the source; non-thinking code is at source parity (the 0.7 uniform
+blend is above it: HumanEval+ 45.1%, MBPP+ 48.7%, MMLU 0.582). Thinking-mode code falls and
+thinking runs long (GSM8K mean 494 tokens against the source's 207): the xhigh text asks for
+"consider plausible alternatives", and the student learned it as its thinking style.
