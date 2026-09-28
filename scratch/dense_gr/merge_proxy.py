@@ -131,12 +131,14 @@ def main() -> int:
         row["math_think"] = sum(correct(boxed(t.split("</think>")[-1]), r)
                                 for t, (_, r) in zip(texts, math)) / len(math)
         row["math_truncated"] = sum(cut)
+        row["math_chars"] = int(sum(len(t) for t in texts) / len(texts))  # thinking length
         results[name] = row
         args.output.write_text(json.dumps(results, indent=1))
         print("%-14s code nll %.4f  thinking nll %.4f  gsm8k nothink %.1f%% (unboxed %d)  "
-              "math think %.1f%% (truncated %d)" % (name, row["code_nll"], row["thinking_nll"],
-                                                    100 * row["gsm8k_nothink"], row["gsm8k_unboxed"],
-                                                    100 * row["math_think"], row["math_truncated"]), flush=True)
+              "math think %.1f%% (truncated %d, mean %d chars)" % (
+                  name, row["code_nll"], row["thinking_nll"], 100 * row["gsm8k_nothink"],
+                  row["gsm8k_unboxed"], 100 * row["math_think"], row["math_truncated"],
+                  row["math_chars"]), flush=True)
         del model
         torch.cuda.empty_cache()
     return 0

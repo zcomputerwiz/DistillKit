@@ -164,12 +164,16 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 for handle in handles:
                     handle.remove()
                 kl_only = bool(record.get("kl_only", False))
+                # The student's own shortest correct rollouts: its text alone. The teacher
+                # thinks at length, and KL toward it at every position of a brief thought
+                # pulls against closing it.
+                ce_only = bool(record.get("ce_only", False))
                 language = ce(model, hidden, ids)
                 objective = language
                 carried = language.new_zeros(())
                 aligned = language.new_zeros(())
                 repelled = language.new_zeros(())
-                if teacher_weight or kl_only:
+                if (teacher_weight or kl_only) and not ce_only:
                     if "topk_ids" not in record:
                         raise ValueError("teacher weight requires cached targets")
                     where = model.lm_head.weight.device

@@ -56,6 +56,21 @@ def test_unlikelihood_matches_brute_force():
     torch.testing.assert_close(unlikelihood_loss(hidden, head, ids, negative, chunk=2), want)
 
 
+def test_ce_only_batches_take_no_teacher_gradient():
+    from training_step import backward_step
+
+    torch.manual_seed(5)
+    model = TinyLM()
+    batch = records()[:1]
+    result = backward_step(model, [dict(batch[0], ce_only=True)], ce=ce, teacher_weight=0.5)
+    got = {n: p.grad.clone() for n, p in model.named_parameters()}
+    assert result["teacher_kl"] == 0.0
+    model.zero_grad()
+    backward_step(model, batch, ce=ce, teacher_weight=0.0)
+    for name, grad in got.items():
+        torch.testing.assert_close(grad, dict(model.named_parameters())[name].grad, msg=name)
+
+
 def test_looping_batch_takes_no_kl_on_repeats_and_pushes_them_down():
     from training_step import backward_step
 

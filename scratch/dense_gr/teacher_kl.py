@@ -163,7 +163,7 @@ class CachedTeacher:
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
                  suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
-                 think_close=None, repeat=None, strip_nonthinking=None):
+                 think_close=None, repeat=None, strip_nonthinking=None, ce_only=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         if unlikelihood and (think_close is None or min_answer_tokens <= 0):
             raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
@@ -270,6 +270,9 @@ class CachedTeacher:
         # (Welleck et al. 2019) and no KL; the rest of them is KL-only like any rollout.
         self.unlikelihood_ids = from_captures(unlikelihood, "unlikelihood")
         self.kl_only_ids = from_captures(kl_only, "kl_only") | self.unlikelihood_ids
+        self.ce_only_ids = from_captures(ce_only, "ce_only")
+        if self.ce_only_ids & self.kl_only_ids:
+            raise ValueError("a capture cannot be both ce_only and kl_only")
         # Both objectives score every position but the last, so a document's system
         # prompt and user turn are trained on exactly like its answer. That is fine
         # while the answer is in there, and the prefix cap makes it a question: a
@@ -490,9 +493,9 @@ class CachedTeacher:
                 continue
             if budget is not None and width > budget:
                 raise ValueError("micro-token budget is smaller than a retained document")
-            buckets.setdefault((width, doc_id in self.kl_only_ids,
-                                doc_id in self.unlikelihood_ids), []).append(doc_id)
-        for (width, _, _), members in sorted(buckets.items()):
+            buckets.setdefault((width, doc_id in self.kl_only_ids, doc_id in self.unlikelihood_ids,
+                                doc_id in self.ce_only_ids), []).append(doc_id)
+        for (width, _, _, _), members in sorted(buckets.items()):
             rows = size if budget is None else max(1, budget // width)
             for start in range(0, len(members), rows):
                 groups.append((members[start:start + rows], width))
@@ -543,7 +546,8 @@ class CachedTeacher:
                  "topk_logprobs": torch.from_numpy(np.stack(values)).to(self.device,
                                                                         non_blocking=True),
                  "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
-                 "kl_only": doc_ids[0] in self.kl_only_ids}
+                 "kl_only": doc_ids[0] in self.kl_only_ids,
+                 "ce_only": doc_ids[0] in self.ce_only_ids}
         if repeats:
             # Position t predicts token t + 1, so a repeated token at t + 1 is a
             # negative at t; the last position predicts nothing.

@@ -315,6 +315,10 @@ def main(argv=None) -> int:
                              "loop it is shown (~0.9 on the repeated token), so KL there "
                              "trains the loop in.")
     parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
+    parser.add_argument("--ce-only-caches", type=Path, nargs="+", default=None,
+                        help="captures trained on cross entropy alone, no teacher KL: the "
+                             "student's own shortest correct rollouts, which KL toward a "
+                             "teacher that thinks at length would lengthen again")
     parser.add_argument("--repeat", nargs="+", default=None, metavar="CAPTURE=N",
                         help="plan every document of CAPTURE N times a pass (N >= 1)")
     parser.add_argument("--strip-effort-nonthinking", action="store_true",
@@ -818,6 +822,7 @@ def main(argv=None) -> int:
                                 exclude=excluded, suppress=suppress,
                                 kl_only=args.kl_only_caches, strip_prefix=strip,
                                 strip_nonthinking=nonthinking,
+                                ce_only=args.ce_only_caches,
                                 unlikelihood=args.unlikelihood_caches,
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
                                 repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []))
