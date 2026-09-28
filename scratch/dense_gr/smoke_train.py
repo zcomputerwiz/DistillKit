@@ -21,6 +21,7 @@ import argparse
 import contextlib
 import importlib.metadata as metadata
 import json
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -1198,6 +1199,11 @@ def main(argv=None) -> int:
         state = consolidated_state_dict(model) if args.tensor_parallel else None
         model.save_pretrained(target, safe_serialization=True, state_dict=state)
         tokenizer.save_pretrained(target)
+        # The tokenizer is the source model's, but the chat template is part of how the
+        # checkpoint is served: a student initialized from one that adopted the teacher's
+        # template (which injects the effort text in thinking mode) must keep it.
+        if args.init_from and (Path(args.init_from) / "chat_template.jinja").exists():
+            shutil.copy2(Path(args.init_from) / "chat_template.jinja", target / "chat_template.jinja")
         save_training_state(target / "training-state", model, optimizer, batches,
                             dict(steps=steps, targets=scored_tokens, history=history,
                                  seconds=elapsed), run_args)
