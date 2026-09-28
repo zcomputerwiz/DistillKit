@@ -708,3 +708,9 @@ GSM8K thinking reaches the source; non-thinking code is at source parity (the 0.
 blend is above it: HumanEval+ 45.1%, MBPP+ 48.7%, MMLU 0.582). Thinking-mode code falls and
 thinking runs long (GSM8K mean 494 tokens against the source's 207): the xhigh text asks for
 "consider plausible alternatives", and the student learned it as its thinking style.
+Reasoning effort at serving time (the round-5b blend, thinking, sampled; accuracy /
+truncated / mean tokens): GSM8K xhigh 76.9% / 61 / 494, low 74.8% / 40 / 425, medium (no
+system prompt) 75.6% / 49 / 492; MATH-500 xhigh 47.0% / 186 / 1177, low 48.6% / 169 / 1100,
+medium 49.2% / 183 / 1172. The effort text moves length by 7-14% and accuracy within noise:
+the long thinking is learned, not prompted -- plausibly from the teacher's targets, which
+put little mass on closing the thought at any one position.
