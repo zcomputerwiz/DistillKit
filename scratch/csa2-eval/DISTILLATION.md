@@ -799,3 +799,34 @@ Contaminated problems are easier for everyone (the source scores ~6 points highe
 so the inflation is modest. Future rounds exclude `exclude-master-v2.json` (the previous
 master plus the 503 contaminated documents, the 61 unparsable-code traces and the 48
 reference disagreements, 2,169 ids), and `eval_checkpoint.ps1` reports the clean scores.
+### Round 8: verified code; the DPO failure mode on near-identical pairs (2026-09-29)
+
+KodCode-V1 problems (pytest suites, benchmark similarity under 0.8; `code_prompts.py`)
+joined the served-format prompts; code rollouts ran against their tests in a network-less,
+mount-less sandbox (`verify_code.py`, `Dockerfile.verify`): 2,236 of 7,495 passed. Round 8
+(from the round 6+7 combination) ran DPO on 2,880 pairs, two thirds of them wrong-vs-right
+(failed tests, wrong math). It degraded the model broadly -- GSM8K non-thinking 74.6% ->
+52.3% unblended, thinking NLL 0.560 -> 0.614 -- and its trace shows why: the margins stayed
+near zero and went negative, the DPO loss spiked to 2.0, and the chosen answers' likelihood
+fell with the rejected (-0.20 -> -0.44 per token), the likelihood displacement DPO shows on
+near-identical pairs. Round 7's loop pairs separated at once (margins 8-58).
+
+Round 8b, same base and rollouts: DPO on the 964 loop and truncation pairs only, and the
+shortest test-passing solution of 1,085 KodCode problems as cross-entropy-only positives.
+Blended 0-to-0.7 by depth (math on clean problems, `clean_rescore.py`):
+
+| measure | source | round-6 blend | round 6+7 | round-8b blend |
+| --- | --- | --- | --- | --- |
+| GSM8K thinking, clean (mean tokens, truncated) | 75.4% (207, 13) | 73.2% (476, 66) | 71.5% (370, 24) | 74.5% (320, 3) |
+| GSM8K non-thinking, clean | 73.9% | 68.1% | 70.6% | 68.5% |
+| MATH-500 thinking, clean (mean tokens, truncated) | 53.5% (836, 121) | 47.7% (1131, 175) | 49.7% (963, 118) | 48.2% (873, 86) |
+| MATH-500 non-thinking, clean | 53.3% | 47.5% | 49.2% | 49.7% |
+| HumanEval+ / MBPP+, thinking, sampled | 43.1% / 43.4% | 36.8% / 41.3% | 34.6% / 39.9% | 37.6% / 44.4% |
+| HumanEval+ / MBPP+ (plus), non-thinking | 44.5% / 47.6% | 44.5% / 47.6% | 40.9% / 46.8% | 40.9% / 46.6% |
+| MMLU / probe | 0.5762 / 70.5% | 0.5684 / 60.5% | 0.5742 / 58.2% | 0.5781 / 59.5% |
+
+Thinking mode is now near the source: MATH-500 truncations below the source's at similar
+length, 3 truncated GSM8K answers, MBPP+ thinking above the source for the first time. Non-
+thinking code stays where round 7 left it; the round-6 blend keeps source parity there.
+DPO belongs on pairs that separate cleanly (loops, truncation); correctness comes better
+from the model's own verified solutions as plain positives.
