@@ -737,3 +737,32 @@ now keeps the chat template it was initialized with.
 
 Non-thinking code is at the source. The round-6 blend is the best student so far; thinking
 is shorter but still more than twice the source's length.
+### Round 7: DPO on the model's own loops, and task arithmetic (2026-09-29)
+
+Pairs from the round-5b blend's own rollouts at served settings (`build_pairs.py`: round 6's
+four samples per prompt plus a greedy pass): the prompt's shortest acceptable rollout over
+its looping (1,214) or truncated (1,025) ones. Every negative is the model's own; on a
+sample it rates its loops *more* likely per token than its chosen answers (-0.16 to -0.22
+against -0.24). Reference log-probs precomputed (`ref_logprobs.py`); two pairs per step,
+DPO (beta 0.1) plus cross entropy on the chosen side (0.2), each side right-padded to a
+multiple of 256; replay as round 6. Over 12 smoke steps the margin rose 0.06 -> 1.52 with
+the chosen log-prob steady. Alone, round 7 cut MATH train truncations 127 -> 82.
+
+Rounds 6 and 7 share a base, so their updates add (`merge_weights.py --also`): base +
+ramp(0, 0.7) x round 6 + a x round 7.
+
+| measure | source | round-6 blend | + round 7 ramp 0-0.7 | + round 7 x 0.7 |
+| --- | --- | --- | --- | --- |
+| GSM8K, thinking (mean tokens, truncated) | 76.0% (207, 13) | 75.1% (476, 66) | 72.7% (370, 24) | 73.5% (333, 4) |
+| GSM8K, non-thinking | 75.1% | 69.5% | 71.6% | 70.1% |
+| MATH-500, thinking (mean tokens, truncated) | 54.2% (836, 121) | 49.8% (1131, 175) | 51.6% (963, 118) | 48.6% (951, 98) |
+| MATH-500, non-thinking | 54.8% | 48.4% | 50.4% | 46.8% |
+| HumanEval+ / MBPP+, thinking, sampled | 43.1% / 43.4% | 36.8% / 41.3% | 34.6% / 39.9% | 36.8% / 39.2% |
+| HumanEval+ / MBPP+ (plus), non-thinking | 44.5% / 47.6% | 44.5% / 47.6% | 40.9% / 46.8% | 40.9% / 46.6% |
+| MMLU / probe | 0.5762 / 70.5% | 0.5684 / 60.5% | 0.5742 / 58.2% | 0.5840 / 46.0% |
+
+DPO on the model's own loops is the most effective loop fix so far: GSM8K thinking 22-30%
+shorter with 64-94% fewer truncations, MATH-500 truncations down a third, and the ramp
+combination has the best MATH-500 of any student in both modes. Code pays for it (non-
+thinking HumanEval+ 44.5% -> 40.9%, p 0.38 but in the same direction everywhere): the pairs
+come from math and general prompts, with nothing verified on the code side.
