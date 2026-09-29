@@ -15,7 +15,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import smoke_train  # noqa: E402,F401  (its triton-windows version shim, which Cut Cross-Entropy needs)
 import torch  # noqa: E402
 
 

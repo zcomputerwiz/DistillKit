@@ -36,7 +36,7 @@ if (-not (Test-Path "$C\pairs-r7.jsonl")) {
 }
 if (-not (Test-Path "$C\pairs-r7-ref.jsonl")) {
     $env:CUDA_VISIBLE_DEVICES = "0"
-    & $py scratch\dense_gr\ref_logprobs.py --reference $base --pairs "$C\pairs-r7.jsonl" --output "$C\pairs-r7-ref.jsonl" 2>$null
+    & $py scratch\dense_gr\ref_logprobs.py --reference $base --pairs "$C\pairs-r7.jsonl" --output "$C\pairs-r7-ref.jsonl" 2>&1 | Where-Object { $_ -match 'pairs with|Traceback|Error' }
     Remove-Item Env:\CUDA_VISIBLE_DEVICES
 }
 
@@ -58,7 +58,7 @@ function Train([string]$tag, [string[]]$extra) {
                      "--checkpoints", "scratch\dense_gr\checkpoints-2b-onpolicy-$tag",
                      "--output", "scratch\dense_gr\train-2b-onpolicy-$tag.json")) { $argv.Add($a) }
     foreach ($a in $extra) { $argv.Add($a) }
-    & $py $argv 2>&1 | Where-Object { $_ -match 'pairs:|stripped|plan:|held-out|loss .*->|step |Traceback|Error|spilled' }
+    & $py $argv 2>&1 | Where-Object { $_ -match 'pairs:|no pairs|stripped|plan:|held-out|loss .*->|step |Traceback|Error|spilled|SystemExit' }
 }
 
 "=== smoke: 12 steps with pairs $(Get-Date -Format HH:mm)"
