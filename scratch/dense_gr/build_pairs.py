@@ -1,11 +1,11 @@
 """Preference pairs from several rollouts per prompt: shortest good answer over a failure.
 
-Chosen: the prompt's shortest acceptable rollout (correct where a reference answer exists,
-else finished and loop-free), as in `select_shortest.py`. Rejected: rollouts of the same
-prompt that loop (`loop_tokens` share >= --loop-share) or ran out of tokens without
-finishing. Every side is the current model's own sample at served settings, so every
-negative is one it plausibly produces -- the failures users would see, not ones induced
-by a broken prompt.
+Chosen: the prompt's shortest acceptable rollout (correct where a reference answer exists or
+its code passes its tests, else finished and loop-free), as in `select_shortest.py`.
+Rejected: rollouts of the same prompt that loop (`loop_tokens` share >= --loop-share),
+were checked and wrong (failed tests, wrong math answer), or ran out of tokens. Every side
+is the current model's own sample at served settings, so every negative is one it
+plausibly produces -- the failures users would see, not ones induced by a broken prompt.
 
     python scratch/dense_gr/build_pairs.py ../capture-data/onpolicy-r6.jsonl ../capture-data/greedy-r6.jsonl \\
         --output ../capture-data/pairs-r7.jsonl
@@ -53,12 +53,16 @@ def main() -> int:
             if row.get("reference") is not None:
                 verdict = bool(row["finished"]) and correct(boxed(response.split("</think>")[-1]),
                                                             row["reference"])
+            if row.get("verified") is not None:  # code, run against its tests (verify_code.py)
+                verdict = row["verified"] == "passed"
             if share >= args.loop_share:
                 kind = "looping"
             elif not row["finished"]:
                 kind = "cut"
             elif share == 0 and verdict is not False:
                 kind = "good"
+            elif verdict is False:
+                kind = "wrong"
             else:
                 kind = "other"
             key = re.sub(r":s\d+$|:greedy$", "", row["doc_id"])
@@ -67,8 +71,8 @@ def main() -> int:
     pairs, kinds = [], {}
     for key, group in groups.items():
         good = sorted((n, r) for k, n, r in group["rows"] if k == "good")
-        bad = [(k, r) for k, n, r in group["rows"] if k == "looping"]
-        bad += [(k, r) for k, n, r in group["rows"] if k == "cut"]
+        # Loops first, then checked-wrong answers (failed tests, wrong math), then truncations
+        bad = [(k, r) for want in ("looping", "wrong", "cut") for k, n, r in group["rows"] if k == want]
         if not good or not bad:
             continue
         for index, (kind, rejected) in enumerate(bad[:args.max_rejected]):

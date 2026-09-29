@@ -1,0 +1,9 @@
+# Sandbox for running pytest suites against untrusted model completions (verified code
+# rollouts). Built with network to install pytest; run with --network none and no host
+# mounts -- files go in and out with `docker cp` (see verify_code.py).
+FROM python:3.11-slim
+RUN pip install --no-cache-dir "pytest==8.3.3" \
+ && useradd -m runner
+USER runner
+WORKDIR /home/runner
+COPY --chown=runner verify_runner.py /home/runner/verify_runner.py
