@@ -766,3 +766,36 @@ shorter with 64-94% fewer truncations, MATH-500 truncations down a third, and th
 combination has the best MATH-500 of any student in both modes. Code pays for it (non-
 thinking HumanEval+ 44.5% -> 40.9%, p 0.38 but in the same direction everywhere): the pairs
 come from math and general prompts, with nothing verified on the code side.
+### Auditing the replay corpora; GSM8K / MATH-500 contamination (2026-09-29)
+
+The on-policy rollouts were checked (math answers against references, code against tests),
+but the replay corpora -- most of every round's tokens -- never were. `trace_audit.py`
+reads the teacher's own view of each trace from the captures: mean agreement flags style
+more than error, and even at the final answer the lowest-agreement NuminaMath traces
+spot-checked were correct (formatting). `math_reference_check.py` matches each math trace's
+question to its source set and compares final answers: MetaMathQA 2,352/2,352 agree,
+Orca-Math 99.2%, NuminaMath (1.5's curated answers) 94.9% -- the 48 disagreements mostly
+formatting ("B" against "\text{B: ...}"), a few real. 61 traces carry a Python block that
+does not parse (26 Magicoder, 30 agent-trace fragments, 5 others). Of the code corpora,
+self-oss-instruct is `bigcode/self-oss-instruct-sc2-exec-filter-50k`, execution-validated
+by its authors; Magicoder OSS-Instruct is not (GPT-3.5 solutions, no execution check).
+
+The GSM8K and MATH questions that matched no *train* split were from the test sets
+(`math_contamination.py`): 187 "gsm8k" traces in thinking-code-math and 62 in think-first
+are GSM8K test questions, 84 are MATH-500, and the round-5/6 rollout prompts cut from
+those corpora carry them too -- 251 of 1,319 GSM8K test and 102 of 500 MATH-500 problems.
+The benchmark screen predates GSM8K and MATH-500 joining the evaluation. Rescored on the
+problems no training document contains (`clean_rescore.py`), every conclusion holds but
+the students' standing drops about a point:
+
+| measure (clean problems) | source | best student | gap, clean | gap, all |
+| --- | --- | --- | --- | --- |
+| GSM8K, thinking | 75.4% | 75.3% (round-5b blend) | -0.1 | +0.9 |
+| GSM8K, non-thinking | 73.9% | 70.6% (round 6+7) | -3.3 | -3.5 |
+| MATH-500, thinking | 53.5% | 49.7% (round 6+7) | -3.8 | -2.6 |
+| MATH-500, non-thinking | 53.3% | 49.2% (round 6+7) | -4.1 | -4.4 |
+
+Contaminated problems are easier for everyone (the source scores ~6 points higher on them),
+so the inflation is modest. Future rounds exclude `exclude-master-v2.json` (the previous
+master plus the 503 contaminated documents, the 61 unparsable-code traces and the 48
+reference disagreements, 2,169 ids), and `eval_checkpoint.ps1` reports the clean scores.

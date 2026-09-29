@@ -95,4 +95,6 @@ for bench in ('gsm8k', 'math500'):
                 s = json.load(open(p))['summary']
                 print('%-8s %-15s %-9s accuracy %.1f%%  no answer %d  truncated %d  mean %d tok' % (bench, mode, name, 100 * s['accuracy'], s['no_answer'], s['truncated'], s['mean_tokens']))
 "@
+"== math on problems no training document contains (clean_rescore.py)"
+& $py "$math\clean_rescore.py" --corpora "$D\capture-data\thinking-code-math.jsonl" "$D\capture-data\think-first-5m.jsonl" "$D\capture-data\prompts-r5.jsonl" --tags source think $Tag 2>&1 | Where-Object { $_ -match 'gsm8k|math500' }
 "=== done $(Get-Date -Format HH:mm)"
