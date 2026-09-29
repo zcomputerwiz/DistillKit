@@ -714,3 +714,26 @@ system prompt) 75.6% / 49 / 492; MATH-500 xhigh 47.0% / 186 / 1177, low 48.6% / 
 medium 49.2% / 183 / 1172. The effort text moves length by 7-14% and accuracy within noise:
 the long thinking is learned, not prompted -- plausibly from the teacher's targets, which
 put little mass on closing the thought at any one position.
+### Round 6: brevity by shortest-of-four (2026-09-28)
+
+From the round-5b blend: four rollouts per served-format prompt, the shortest acceptable
+one per prompt (`select_shortest.py`: median 233 tokens against 284 over every acceptable
+rollout, 5,338 prompts) trained on cross entropy alone (`--ce-only-caches`: KL toward a
+teacher that thinks at length would lengthen them again), 1,684 looping rollouts under
+unlikelihood, replay with selective stripping; blended back 0-to-0.7 by depth. The trainer
+now keeps the chat template it was initialized with.
+
+| measure | source | round-5b blend | round-6 blend |
+| --- | --- | --- | --- |
+| HumanEval+ (plus), non-thinking, greedy | 44.5% | 43.3% | 44.5% |
+| MBPP+ (plus), non-thinking, greedy | 47.6% | 47.4% | 47.6% |
+| HumanEval+, thinking, sampled | 43.1% | 36.0% | 36.8% |
+| MBPP+, thinking, sampled | 43.4% | 40.4% | 41.3% |
+| GSM8K, thinking, sampled (mean tokens) | 76.0% (207) | 76.9% (494) | 75.1% (476) |
+| GSM8K, non-thinking, greedy | 75.1% | 68.8% | 69.5% |
+| MATH-500, thinking, sampled (truncated) | 54.2% (121) | 47.0% (186) | 49.8% (175) |
+| MATH-500, non-thinking, greedy | 54.8% | 47.0% | 48.4% |
+| MMLU / probe | 0.5762 / 70.5% | 0.5703 / 61.0% | 0.5684 / 60.5% |
+
+Non-thinking code is at the source. The round-6 blend is the best student so far; thinking
+is shorter but still more than twice the source's length.

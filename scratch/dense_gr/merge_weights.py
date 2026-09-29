@@ -43,6 +43,9 @@ def main():
     parser.add_argument("--alpha", type=float, default=None)
     parser.add_argument("--shallow", type=float, default=None)
     parser.add_argument("--deep", type=float, default=None)
+    parser.add_argument("--also", nargs="*", default=[], metavar="PATH:SHALLOW:DEEP",
+                        help="more tuned checkpoints from the same base, each update added with its "
+                             "own depth ramp (task arithmetic): base + sum of alpha_i x update_i")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if (args.alpha is None) == (args.shallow is None or args.deep is None):
@@ -52,16 +55,21 @@ def main():
         raise SystemExit("refusing to overwrite %s" % args.output)
     layers = json.loads((args.base / "config.json").read_text())["num_hidden_layers"]
     merged = {}
+    extra = [(Path(p), float(s), float(d)) for p, s, d in (spec.rsplit(":", 2) for spec in args.also)]
     with safe_open(args.base / "model.safetensors", "pt") as base, \
             safe_open(args.tuned / "model.safetensors", "pt") as tuned:
-        if set(base.keys()) != set(tuned.keys()):
+        others = [(safe_open(p / "model.safetensors", "pt"), s, d) for p, s, d in extra]
+        if any(set(base.keys()) != set(h.keys()) for h in [tuned] + [h for h, _, _ in others]):
             raise SystemExit("the checkpoints hold different tensors")
         for name in base.keys():
-            a, b = base.get_tensor(name), tuned.get_tensor(name)
-            if a.shape != b.shape:
-                raise SystemExit("%s differs in shape" % name)
-            alpha = alpha_for(name, layers, shallow, deep)
-            merged[name] = (a.float() + alpha * (b.float() - a.float())).to(a.dtype)
+            a = base.get_tensor(name).float()
+            total = a.clone()
+            for handle, s, d in [(tuned, shallow, deep)] + others:
+                b = handle.get_tensor(name).float()
+                if a.shape != b.shape:
+                    raise SystemExit("%s differs in shape" % name)
+                total += alpha_for(name, layers, s, d) * (b - a)
+            merged[name] = total.to(base.get_tensor(name).dtype)
         metadata = base.metadata()
     args.output.mkdir(parents=True)
     save_file(merged, args.output / "model.safetensors", metadata=metadata)
@@ -69,7 +77,8 @@ def main():
         if item.is_file() and item.suffix in (".json", ".jinja") and item.name != "milestone.json":
             shutil.copy2(item, args.output / item.name)
     (args.output / "merge.json").write_text(json.dumps(
-        {"base": str(args.base), "tuned": str(args.tuned), "shallow": shallow, "deep": deep},
+        {"base": str(args.base), "tuned": str(args.tuned), "shallow": shallow, "deep": deep,
+         "also": [[str(p), s, d] for p, s, d in extra]},
         indent=1))
     print("merged %d tensors, alpha %.2f (shallow) to %.2f (deep) -> %s"
           % (len(merged), shallow, deep, args.output))
