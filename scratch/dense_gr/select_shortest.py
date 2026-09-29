@@ -6,7 +6,8 @@ trajectory -- correct where a reference answer exists, otherwise finished and lo
 -- is rejection sampling with a length preference: the same model, taught which of its
 own ways of answering to prefer.
 
-- chosen: per prompt, the shortest acceptable rollout (by generated tokens)
+- chosen: per prompt, the shortest acceptable rollout (by generated tokens); code must
+  have passed its tests (`verified`, from verify_code.py)
 - looping: every rollout whose thought (or non-thinking reply) loops (`loop_tokens`),
   for unlikelihood
 - prompts with no acceptable rollout contribute nothing but their loops
@@ -40,6 +41,8 @@ def main() -> int:
     parser.add_argument("--chosen", type=Path, required=True)
     parser.add_argument("--looping", type=Path, required=True)
     parser.add_argument("--loop-share", type=float, default=0.05)
+    parser.add_argument("--verified-only", action="store_true",
+                        help="only rollouts whose code was run against tests (verify_code.py)")
     args = parser.parse_args()
     for path in (args.chosen, args.looping):
         if path.exists():
@@ -51,6 +54,8 @@ def main() -> int:
     groups, looping = {}, []
     for line in open(args.rollouts, encoding="utf-8"):
         row = json.loads(line)
+        if args.verified_only and row.get("verified") is None:
+            continue
         generated = row["text"][row["prompt_chars"]:]
         ids = np.asarray(tok(generated, add_special_tokens=False)["input_ids"])
         share = float(loop_tokens(ids, 0, close).mean()) if len(ids) else 0.0
@@ -58,11 +63,13 @@ def main() -> int:
         if row.get("reference") is not None:
             verdict = bool(row["finished"]) and correct(boxed(generated.split("</think>")[-1]),
                                                         row["reference"])
+        if row.get("verified") is not None:  # code, run against its tests
+            verdict = row["verified"] == "passed"
         row.update(loop_share=share, correct=verdict)
         if share >= args.loop_share:
             looping.append(row)
             continue
-        prompt = re.sub(r":s\d+$", "", row["doc_id"])
+        prompt = re.sub(r":s\d+$|:greedy$", "", row["doc_id"])
         acceptable = row["finished"] and share == 0 and verdict is not False
         groups.setdefault(prompt, []).append((acceptable, row))
     chosen, all_lengths, kept_lengths = [], [], []
