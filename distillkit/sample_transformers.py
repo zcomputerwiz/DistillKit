@@ -141,10 +141,11 @@ def load_text_teacher(
         if max_memory is None and torch.cuda.device_count() == 2:
             # Split the layers by compute, not memory: the memory split put 26 layers on the
             # first card and 38 plus the head on the second, which then set the pace (first
-            # card 64% busy, second 99%). The head counts as its matmul's weights.
+            # card 64% busy, second 99%). Counting the head as its matmul's weights gave
+            # 34/30 and overshot (96% / 76%), so it is left out: an even split of the layers.
             costs = [sum(m.weight_q.numel() for m in layer.modules() if hasattr(m, "weight_q"))
                      for layer in model.model.layers]
-            half, total, first = (sum(costs) + model.lm_head.weight.numel()) / 2, 0, 0
+            half, total, first = sum(costs) / 2, 0, 0
             for first, cost in enumerate(costs):
                 if total + cost / 2 > half:
                     break
@@ -578,6 +579,12 @@ def main(model, revision, input_jsonl, source_metadata, output, tokenizer, token
                                 max_memory=max_memory, local_files_only=local_files_only,
                                 attn_implementation=attn_implementation,
                                 weight_only_int8=weight_only_int8)
+    for index in range(torch.cuda.device_count()):
+        # Under WDDM an allocation past the card spills to system memory instead of failing;
+        # a cap makes the caching allocator free and retry, or fail into the fallback below.
+        total = torch.cuda.get_device_properties(index).total_memory
+        torch.cuda.set_per_process_memory_fraction(min(1.0, 22.5 * 2**30 / total), index)
+
     def capture(overlap, batch_tokens):
         return capture_teacher(
             teacher, iter_jsonl(input_jsonl, tok, add_special_tokens=add_special_tokens), output,
