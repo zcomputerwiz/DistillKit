@@ -900,3 +900,20 @@ took for loops ("Second crate: base 3x4, height 6. Total 12." line after line, e
 different). Training the model off its own content there taught it to wander. loop_start now
 requires a whole period copied verbatim and tries each candidate n-gram in turn; round 9b
 rebuilds the rows that way and trains at weight 0.3, stopping at chosen_win 0.25.
+Round 9b (rows rebuilt with the verbatim rule: 2,218 flagged, 680 rows; weight 0.3; stopped
+at chosen_win 0.25 after about 70 steps):
+
+| arm | code NLL | thinking NLL | GSM8K non-thinking | MATH think (truncated, mean chars) |
+| --- | --- | --- | --- | --- |
+| base | 0.7784 | 0.5492 | 70.7% | 43.0% (104, 1641) |
+| round 9b, unblended | 0.8256 | 0.5729 | 68.8% | 36.3% (119, 1801) |
+| round 9b, ramp 0-0.7 | 0.8045 | 0.5609 | 71.1% | 44.1% (107, 1661) |
+
+Still damage (held-out thinking +0.026, code +0.031 in 70 steps) and still longer, more
+truncated thoughts. The cleaner rows show why FTPO does not transfer here: the rejected
+tokens are the chant words of a rambling thought (" Need" x55, " If", "Let", " Could") and
+the alternatives are more of the same (" Could", " Need", " But") -- these loops are a
+reasoning state, not a surface string, and swapping the opener moves the loop rather than
+ending it. Antidoom's loops (creative writing, exact phrases) are the surface kind. A
+one-position preference on a 2B model also moves far more per step than the whole-response
+DPO of round 8b. FTPO is dropped; round 8b's DPO with the depth ramp stays the loop method.
