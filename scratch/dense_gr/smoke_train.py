@@ -390,6 +390,10 @@ def main(argv=None) -> int:
     parser.add_argument("--lr-depth-ramp", type=float, nargs=2, default=None, metavar=("SHALLOW", "DEEP"),
                         help="scale the body's learning rate from SHALLOW at the first layer to "
                              "DEEP at the last (the embedding takes SHALLOW, the final norm DEEP)")
+    parser.add_argument("--lr-scale", action="append", default=None, metavar="REGEX=FACTOR",
+                        help="multiply the body rate of parameters whose names match, e.g. "
+                             "'linear_attn\\.(A_log|dt_bias|in_proj_a)=0.1': DeltaNet's decay gates "
+                             "hold its long-range memory (SpectralShift, arXiv 2609.14320)")
     parser.add_argument("--pairs-per-step", type=int, default=2)
     parser.add_argument("--pair-weight", type=float, default=0.5)
     parser.add_argument("--dpo-beta", type=float, default=0.1)
@@ -1005,7 +1009,9 @@ def main(argv=None) -> int:
         members[kind].append(parameter)
     groups = [{"params": members[kind], "lr": rates[kind], "peak_lr": rates[kind], "name": kind}
               for kind in ("router", "adapter") if members[kind]]
-    if args.lr_depth_ramp is None:
+    scaled = [(re.compile(spec.rsplit("=", 1)[0]), float(spec.rsplit("=", 1)[1]))
+              for spec in args.lr_scale or []]
+    if args.lr_depth_ramp is None and not scaled:
         groups.insert(0, {"params": members["body"], "lr": rates["body"], "peak_lr": rates["body"],
                           "name": "body"})
     else:
@@ -1013,15 +1019,20 @@ def main(argv=None) -> int:
         # lr x (shallow + (deep - shallow) l / (L-1)), the embedding at the shallow end and
         # the final norm at the deep one. Blends showed the loop fix carried by the deep
         # layers; here the layers keep adapting to each other while the shallow ones move
-        # less, which a blend stitched together afterwards cannot do.
-        shallow, deep = args.lr_depth_ramp
+        # less, which a blend stitched together afterwards cannot do. `--lr-scale` then
+        # multiplies the parameters whose names match each pattern.
+        shallow, deep = args.lr_depth_ramp or (1.0, 1.0)
         depth = model.config.num_hidden_layers
         names = {id(p): n for n, p in model.named_parameters()}
         by_scale = {}
         for parameter in members["body"]:
-            found = re.search(r"\.layers\.(\d+)\.", names[id(parameter)])
+            name = names[id(parameter)]
+            found = re.search(r"\.layers\.(\d+)\.", name)
             scale = (shallow + (deep - shallow) * int(found.group(1)) / (depth - 1) if found
-                     else deep if ".norm." in names[id(parameter)] else shallow)
+                     else deep if ".norm." in name else shallow)
+            for pattern, factor in scaled:
+                if pattern.search(name):
+                    scale *= factor
             by_scale.setdefault(round(scale, 6), []).append(parameter)
         for scale, params in sorted(by_scale.items()):
             groups.append({"params": params, "lr": args.lr * scale, "peak_lr": args.lr * scale,
