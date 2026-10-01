@@ -163,15 +163,40 @@ def preference_loss(model, pair, *, beta, sft_weight, logprob=response_logprob):
     return dpo - sft_weight * chosen_mean, dpo, margin, chosen_mean
 
 
+def ftpo_loss(logits, row, *, clip=2.0, tether=0.4, target_tether=0.05, tau=1.5):
+    """Final-token preference (antidoom's FTPO) at one position, from its full logit row.
+
+    Each chosen alternative should beat the rejected loop-start token by `clip` logits; a
+    pair that does contributes nothing more, so a separated row stops pulling. Two MSE
+    tethers to the reference's logits keep the rest of the distribution where it was:
+    `tether` over the reference's top-k minus the targets, and a looser `target_tether`
+    on the targets beyond `tau` logits of movement.
+
+    Returns (objective, mean margin, fraction of chosen that beat the rejected)."""
+    chosen, rejected = row["chosen"], row["rejected"]
+    margins = logits[chosen] - logits[rejected]
+    preference = (torch.nn.functional.softplus(-margins) * (margins < clip)).mean()
+    ref_ids, ref_logits = row["ref_ids"], row["ref_logits"]
+    targets = torch.cat([chosen, rejected.view(1)])
+    rest = ~torch.isin(ref_ids, targets)
+    drift = (logits[ref_ids] - ref_logits)[rest].pow(2).mean()
+    moved = (logits[targets] - row["ref_target_logits"]).abs()
+    target_drift = (moved - tau).clamp(min=0).pow(2).mean()
+    objective = preference + tether * drift + target_tether * target_drift
+    return objective, margins.mean(), (margins > 0).float().mean()
+
+
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                   sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0,
-                  pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob):
+                  pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob,
+                  ftpo_options=None):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
     The injected CE callable is only for CPU correctness tests; production uses CCE.
     Preference-pair records (`pair`) are left out of the token accounting and add
-    `pair_weight` times their mean preference objective.
+    `pair_weight` times their mean preference objective; FTPO rows (`ftpo`, also `pair`)
+    likewise, with `ftpo_options` passed to `ftpo_loss`.
     """
     from distillkit.models.qwen35.csa2 import isolated_indexer, recorded_attention
 
@@ -253,6 +278,23 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
         finally:
             for handle in handles:
                 handle.remove()
+    ftpo = [p for p in pairs if p.get("ftpo")]
+    pairs = [p for p in pairs if not p.get("ftpo")]
+    if ftpo and pair_weight:
+        for name in ("ftpo", "ftpo_margin", "chosen_win"):
+            result[name] = 0.0
+        for row in ftpo:
+            ids = row["input_ids"]
+            hidden = model.model(input_ids=ids, attention_mask=torch.ones_like(ids),
+                                 use_cache=False).last_hidden_state
+            where = model.lm_head.weight.device
+            # Back beside the row's targets: with --embedding-on away the head is on the other card.
+            logits = model.lm_head(hidden[0, row["position"]].to(where)).float().to(ids.device)
+            objective, margin, win = ftpo_loss(logits, row, **(ftpo_options or {}))
+            (objective * pair_weight / len(ftpo)).backward()
+            result["ftpo"] += float(objective.detach()) / len(ftpo)
+            result["ftpo_margin"] += float(margin.detach()) / len(ftpo)
+            result["chosen_win"] += float(win) / len(ftpo)
     if pairs and pair_weight:
         for name in ("dpo", "dpo_margin", "chosen_logp"):
             result[name] = 0.0

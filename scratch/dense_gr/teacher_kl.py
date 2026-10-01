@@ -638,6 +638,27 @@ def loop_tokens(ids, start, close):
     return np.concatenate([marked, np.zeros(len(ids) - end, dtype=bool)])
 
 
+def loop_start(ids, start, close, n=16, count=3):
+    """The token where a loop `loop_tokens` finds began copying, or None.
+
+    The loop is the first n-gram seen `count` times; its period is the distance between
+    its first two occurrences. Walking back from the second occurrence while each token
+    equals the one a period earlier finds the first token of the copy -- the point where
+    the model chose to repeat rather than go on, which FTPO trains against."""
+    ids = np.asarray(ids)
+    marked = loop_tokens(ids, start, close)
+    if not marked.any():
+        return None
+    first = int(np.argmax(marked))
+    gram = ids[first:first + n]
+    hits = [i for i in range(start, first + 1) if np.array_equal(ids[i:i + n], gram)]
+    period = hits[1] - hits[0]
+    at = hits[1]
+    while at - 1 - period >= start and ids[at - 1] == ids[at - 1 - period]:
+        at -= 1
+    return at
+
+
 def unlikelihood_loss(hidden, head, ids, negative, chunk=128):
     """Summed -log(1 - p(next token)) over `negative` positions.
 

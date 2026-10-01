@@ -89,9 +89,27 @@ class PairSource:
         return -(-length // self.block) * self.block
 
     def widths(self):
-        return sorted({self._width(len(r[side + "_ids"])) for r in self.rows for side in ("chosen", "rejected")})
+        sides = ("prefix",) if self.ftpo else ("chosen", "rejected")
+        return sorted({self._width(len(r[side + "_ids"])) for r in self.rows for side in sides})
+
+    @property
+    def ftpo(self):
+        return "prefix_ids" in self.rows[0]
+
+    def _ftpo_record(self, ids, position, rejected, chosen, ref_ids, ref_logits, ref_targets):
+        tensor = lambda values, dtype=torch.long: torch.tensor(values, dtype=dtype, device=self.device)
+        padded = ids + [self.pad] * (self._width(len(ids)) - len(ids))
+        return {"pair": True, "ftpo": True, "input_ids": tensor([padded]), "position": position,
+                "rejected": tensor(rejected), "chosen": tensor(chosen), "ref_ids": tensor(ref_ids),
+                "ref_logits": tensor(ref_logits, torch.float32),
+                "ref_target_logits": tensor(ref_targets, torch.float32)}
 
     def _record(self, row):
+        if self.ftpo:
+            # A row from ftpo_rows.py: the prefix ends just before the rejected token.
+            return self._ftpo_record(row["prefix_ids"], len(row["prefix_ids"]) - 1, row["rejected"],
+                                     row["chosen"], row["ref_ids"], row["ref_logits"],
+                                     row["ref_target_logits"])
         record = {"pair": True}
         for side in ("chosen", "rejected"):
             ids = row[side + "_ids"]
@@ -110,6 +128,9 @@ class PairSource:
         return out
 
     def dummy(self, width, vocab):
+        if self.ftpo:
+            return self._ftpo_record(list(range(1, width + 1)), width - 1, 1, [2, 3], list(range(4, 68)),
+                                     [0.0] * 64, [0.0] * 3)
         ids = torch.randint(1, vocab, (1, width), device=self.device)
         half = width // 2
         return {"pair": True, "chosen_ids": ids, "rejected_ids": ids.clone(), "chosen_start": half,
@@ -373,6 +394,14 @@ def main(argv=None) -> int:
     parser.add_argument("--pair-weight", type=float, default=0.5)
     parser.add_argument("--dpo-beta", type=float, default=0.1)
     parser.add_argument("--pair-sft-weight", type=float, default=0.2)
+    # --pairs may instead hold FTPO rows (ftpo_rows.py); these shape training_step.ftpo_loss.
+    parser.add_argument("--ftpo-clip", type=float, default=2.0)
+    parser.add_argument("--ftpo-tether", type=float, default=0.4)
+    parser.add_argument("--ftpo-target-tether", type=float, default=0.05)
+    parser.add_argument("--ftpo-tau", type=float, default=1.5)
+    parser.add_argument("--stop-chosen-win", type=float, default=None,
+                        help="finish once FTPO's chosen_win, averaged over the last 20 steps, "
+                             "reaches this (antidoom stops at 0.15-0.3)")
     parser.add_argument("--ce-only-caches", type=Path, nargs="+", default=None,
                         help="captures trained on cross entropy alone, no teacher KL: the "
                              "student's own shortest correct rollouts, which KL toward a "
@@ -1033,7 +1062,9 @@ def main(argv=None) -> int:
                         indexer_weight=args.indexer_weight, sparse_stage=sparse_stage,
                         kl_chunk=args.kl_chunk, unlikelihood_weight=args.unlikelihood_weight,
                         pair_weight=args.pair_weight, dpo_beta=args.dpo_beta,
-                        pair_sft_weight=args.pair_sft_weight)
+                        pair_sft_weight=args.pair_sft_weight,
+                        ftpo_options=dict(clip=args.ftpo_clip, tether=args.ftpo_tether,
+                                          target_tether=args.ftpo_target_tether, tau=args.ftpo_tau))
     pairs = None
     if args.pairs is not None:
         pairs = PairSource(args.pairs, tokenizer.pad_token_id or tokenizer.eos_token_id, seed=args.seed)
@@ -1072,7 +1103,7 @@ def main(argv=None) -> int:
         print("warmed", flush=True)
 
     history, scored_tokens, step, previous_seconds = [], 0, 0, 0.0
-    step_timings = []
+    step_timings, wins = [], []
     if resume_state is not None:
         progress = restore_training_state(resume_state, model, optimizer, batches)
         scored_tokens, step = progress["targets"], progress["steps"]
@@ -1113,6 +1144,13 @@ def main(argv=None) -> int:
         loss, teacher_cost, indexer_cost = metrics["loss"], metrics["teacher_kl"], metrics["indexer"]
         finished = (args.tokens - scored_tokens < batches.next_targets()
                     or (args.max_steps is not None and step + 1 >= args.max_steps))
+        if "chosen_win" in metrics:
+            # Measured before each step's update, on rows mostly not yet trained on.
+            wins.append(metrics["chosen_win"])
+            if args.stop_chosen_win is not None and len(wins) >= 20 \
+                    and np.mean(wins[-20:]) >= args.stop_chosen_win:
+                print("chosen_win %.3f over the last 20 steps: stopping" % np.mean(wins[-20:]), flush=True)
+                finished = True
         del microbatches
         if spill.breached():
             # Set by the watcher thread the moment a poll exceeded the tolerance, so the
@@ -1137,9 +1175,13 @@ def main(argv=None) -> int:
                 row["teacher_kl"] = teacher_cost
                 if teacher.unlikelihood_ids:
                     row["unlikelihood"] = metrics["unlikelihood"]
-            for name in ("dpo", "dpo_margin", "chosen_logp"):
+            for name in ("dpo", "dpo_margin", "chosen_logp", "ftpo", "ftpo_margin", "chosen_win"):
                 if name in metrics:
                     row[name] = metrics[name]
+            if "chosen_win" in metrics:
+                print("            ftpo %.4f  margin %+.3f  chosen_win %.3f (last 20 steps %.3f)"
+                      % (metrics["ftpo"], metrics["ftpo_margin"], metrics["chosen_win"],
+                         np.mean(wins[-20:])), flush=True)
             # Read before the probe and the held-out pass. Both run their own forward at
             # their own sequence length, and the layers keep only the last routing they
             # computed -- reading after them reports the probe's 512-token routing, where

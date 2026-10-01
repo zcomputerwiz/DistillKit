@@ -853,3 +853,24 @@ blend is the best all-round student (non-thinking code near source parity, MMLU 
 the source, GSM8K thinking at parity on clean problems); the ramp is the thinking-mode one.
 `--lr-depth-ramp SHALLOW DEEP` ramps the body's learning rate by depth during training,
 where the layers keep adapting to one another; round 8c repeats round 8b with 0.1 -> 1.0.
+### Round 8c: the depth ramp during training (2026-09-30)
+
+Round 8b exactly -- base, data, pairs, seed -- with `--lr-depth-ramp 0.1 1.0`. Same screen
+against the same base (train-split and held-out proxies; GSM8K non-thinking and MATH think
+are proxy subsets, not the benchmarks):
+
+| arm | code NLL | thinking NLL | GSM8K non-thinking | MATH think (truncated) |
+| --- | --- | --- | --- | --- |
+| base (r7 ramp 0-70) | 0.7834 | 0.5508 | 74.6% | 38.7% (104) |
+| round 8b, unblended | 0.8158 | 0.5715 | 62.1% | 37.1% (61) |
+| round 8c, unblended | 0.8090 | 0.5638 | 69.1% | 38.3% (76) |
+| round 8b, uniform 0.5 | 0.8001 | 0.5560 | 68.8% | 43.8% (83) |
+| round 8c, uniform 0.5 | 0.7948 | 0.5539 | 70.7% | 44.9% (89) |
+| round 8b, ramp 0-0.7 | 0.7877 | 0.5521 | 70.3% | 46.1% (78) |
+| round 8c, ramp 0-0.7 | 0.7874 | 0.5533 | 69.5% | 46.9% (90) |
+
+Unblended, the ramp forgets markedly less (non-thinking GSM8K 69.1% against 62.1%, both
+NLLs lower) for a slightly smaller truncation cut (76 against 61). Every uniform blend of 8c
+beats the same blend of 8b; the depth-ramped blends are a wash, as expected -- blending by
+depth after the fact already did what the ramp does. The ramp stays on for later rounds.
+The trainer run died once at step 0 to a Windows Update restart and was rerun whole.
