@@ -21,6 +21,7 @@ import argparse
 import contextlib
 import importlib.metadata as metadata
 import json
+import re
 import shutil
 import sys
 import time
@@ -365,6 +366,9 @@ def main(argv=None) -> int:
     parser.add_argument("--pairs", type=Path, default=None,
                         help="preference pairs with reference log-probs (ref_logprobs.py): "
                              "DPO plus cross entropy on the chosen side, mixed into every step")
+    parser.add_argument("--lr-depth-ramp", type=float, nargs=2, default=None, metavar=("SHALLOW", "DEEP"),
+                        help="scale the body's learning rate from SHALLOW at the first layer to "
+                             "DEEP at the last (the embedding takes SHALLOW, the final norm DEEP)")
     parser.add_argument("--pairs-per-step", type=int, default=2)
     parser.add_argument("--pair-weight", type=float, default=0.5)
     parser.add_argument("--dpo-beta", type=float, default=0.1)
@@ -951,10 +955,30 @@ def main(argv=None) -> int:
         kind = ("router" if id(parameter) in router_ids
                 else "adapter" if id(parameter) in adapter_ids else "body")
         members[kind].append(parameter)
-    optimizer = optimizer_class(
-        [{"params": members[kind], "lr": rates[kind], "peak_lr": rates[kind], "name": kind}
-         for kind in ("body", "router", "adapter") if members[kind]],
-        lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
+    groups = [{"params": members[kind], "lr": rates[kind], "peak_lr": rates[kind], "name": kind}
+              for kind in ("router", "adapter") if members[kind]]
+    if args.lr_depth_ramp is None:
+        groups.insert(0, {"params": members["body"], "lr": rates["body"], "peak_lr": rates["body"],
+                          "name": "body"})
+    else:
+        # The body's rate ramped by depth, as merge_weights ramps a blend: layer l at
+        # lr x (shallow + (deep - shallow) l / (L-1)), the embedding at the shallow end and
+        # the final norm at the deep one. Blends showed the loop fix carried by the deep
+        # layers; here the layers keep adapting to each other while the shallow ones move
+        # less, which a blend stitched together afterwards cannot do.
+        shallow, deep = args.lr_depth_ramp
+        depth = model.config.num_hidden_layers
+        names = {id(p): n for n, p in model.named_parameters()}
+        by_scale = {}
+        for parameter in members["body"]:
+            found = re.search(r"\.layers\.(\d+)\.", names[id(parameter)])
+            scale = (shallow + (deep - shallow) * int(found.group(1)) / (depth - 1) if found
+                     else deep if ".norm." in names[id(parameter)] else shallow)
+            by_scale.setdefault(round(scale, 6), []).append(parameter)
+        for scale, params in sorted(by_scale.items()):
+            groups.append({"params": params, "lr": args.lr * scale, "peak_lr": args.lr * scale,
+                           "name": "body x%.3f" % scale})
+    optimizer = optimizer_class(groups, lr=args.lr, betas=(0.9, 0.95), weight_decay=0.1)
     print("learning rates: " + ", ".join(
         "%s %.3g (%.1fM)" % (group["name"], group["peak_lr"],
                              sum(p.numel() for p in group["params"]) / 1e6)
