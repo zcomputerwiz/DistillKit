@@ -53,6 +53,24 @@ def _skip_packed_check():
     modeling_flash_attention_utils._is_packed_sequence = lambda position_ids, batch_size: False
 
 
+def _serialize_autotune():
+    """Triton's autotuner keeps the arguments being tuned on the instance (``nargs``), so
+    two capture workers tuning one kernel for a new shape clobber each other ("'NoneType'
+    object is not a mapping"). One lock around it; a tuned launch holds it only briefly."""
+    from triton.runtime import autotuner
+
+    if getattr(autotuner.Autotuner.run, "serialized", False):
+        return
+    lock, run = threading.RLock(), autotuner.Autotuner.run
+
+    def serialized(self, *args, **kwargs):
+        with lock:
+            return run(self, *args, **kwargs)
+
+    serialized.serialized = True
+    autotuner.Autotuner.run = serialized
+
+
 
 def text_causal_lm_class(config):
     """Select explicit Qwen text classes before allocating any model weights.
@@ -411,6 +429,7 @@ def capture_teacher(
         else:
             # The teacher is split across the cards by layer, so one document at a time
             # leaves each card idle while the other works; written in input order.
+            _serialize_autotune()
             pending = deque()
             with ThreadPoolExecutor(overlap) as pool:
                 for job in jobs():
