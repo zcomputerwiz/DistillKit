@@ -95,6 +95,9 @@ def verdicts_of(row):
 
 def collect(args):
     verdicts, excluded, seen = Counter(), [], set()
+    # A second judge's verdict ({"id", "final_correct"}) decides the documents it saw.
+    second = {r["id"]: r["final_correct"] for path in args.second or []
+              for r in map(json.loads, open(path, encoding="utf-8"))}
     for path in args.responses:
         for row in map(json.loads, open(path, encoding="utf-8")):
             for doc_id, verdict in verdicts_of(row):
@@ -111,6 +114,9 @@ def collect(args):
                          and verdict.get("severity", "major") == "major")
                 broken = any(word in issues for word in ("truncated", "garbled"))
                 verdicts["final " + str(verdict.get("final_correct"))] += 1
+                if doc_id in second:
+                    wrong, broken = second[doc_id] == "no", False
+                    verdicts["second " + second[doc_id]] += 1
                 if wrong or broken:
                     excluded.append({"id": doc_id, "issues": verdict.get("issues")})
                     verdicts["excluded"] += 1
@@ -134,6 +140,7 @@ def main():
     c.add_argument("--responses", type=Path, nargs="+", required=True)
     c.add_argument("--output", type=Path, required=True)
     c.add_argument("--confidence", type=float, default=0.8)
+    c.add_argument("--second", type=Path, nargs="*", default=None, help="second-judge verdicts that overrule")
     args = parser.parse_args()
     (build if args.command == "build" else collect)(args)
 

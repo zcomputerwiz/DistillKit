@@ -39,5 +39,5 @@ foreach ($pair in @(@("tools-responses.jsonl", "tools.jsonl"), @("tools2-respons
     & $py scratch\frontier\tool_tasks.py verify --responses "$F\$($pair[0])" --output "$F\$($pair[1])"
 }
 & $py scratch\frontier\judge_docs.py collect --responses "$F\judge-responses.jsonl" "$F\judge-batched-responses.jsonl" `
-    --output ..\capture-data\exclude-judged.json
+    --second "$F\codex-crosscheck\judge-codex.jsonl" --output ..\capture-data\exclude-judged.json
 "=== done $(Get-Date -Format 'MM-dd HH:mm')"
