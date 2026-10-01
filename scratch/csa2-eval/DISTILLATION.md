@@ -830,3 +830,26 @@ length, 3 truncated GSM8K answers, MBPP+ thinking above the source for the first
 thinking code stays where round 7 left it; the round-6 blend keeps source parity there.
 DPO belongs on pairs that separate cleanly (loops, truncation); correctness comes better
 from the model's own verified solutions as plain positives.
+### Blending rounds 6 and 8b; where the skills sit by depth (2026-09-29/30)
+
+Blends from the round-6 blend (base) to the round-8b blend (tuned), clean-subset math:
+
+| measure | source | round-6 blend | round-8b blend | ramp 0-1 (shallow r6, deep r8b) | uniform 0.5 |
+| --- | --- | --- | --- | --- | --- |
+| HumanEval+ / MBPP+ (plus), non-thinking | 44.5 / 47.6 | 44.5 / 47.6 | 40.9 / 46.6 | 38.4 / 46.6 | 43.3 / 47.9 |
+| HumanEval+ / MBPP+, thinking, sampled | 43.1 / 43.4 | 36.8 / 41.3 | 37.6 / 44.4 | 39.2 / 41.8 | 37.6 / 40.6 |
+| GSM8K thinking, clean (truncated) | 75.4% (13) | 73.2% (66) | 74.5% (3) | 75.6% (11) | 75.3% (16) |
+| GSM8K non-thinking, clean | 73.9% | 68.1% | 68.5% | 68.2% | 69.7% |
+| MATH-500 thinking, clean (truncated) | 53.5% (121) | 47.7% (175) | 48.2% (86) | 49.5% (98) | 48.7% (129) |
+| MATH-500 non-thinking, clean | 53.3% | 47.5% | 49.7% | 48.7% | 47.7% |
+| MMLU / probe | 0.5762 / 70.5% | 0.5684 / 60.5% | 0.5781 / 59.5% | 0.5723 / 61.0% | 0.5762 / 61.0% |
+
+The loop fix lives in the deep layers: taking only round 8b's deep layers keeps it (98 and
+11 truncations), diluting them uniformly loses part of it. Non-thinking code does not live
+in the shallow layers: round 6's shallow layers under round 8b's deep ones give worse
+non-thinking HumanEval+ (38.4%) than either parent, while the uniform blend restores it
+(43.3%) -- it needs the layers coordinated across depth, which splicing breaks. The uniform
+blend is the best all-round student (non-thinking code near source parity, MMLU equal to
+the source, GSM8K thinking at parity on clean problems); the ramp is the thinking-mode one.
+`--lr-depth-ramp SHALLOW DEEP` ramps the body's learning rate by depth during training,
+where the layers keep adapting to one another; round 8c repeats round 8b with 0.1 -> 1.0.
