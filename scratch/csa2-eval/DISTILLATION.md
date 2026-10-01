@@ -917,3 +917,41 @@ reasoning state, not a surface string, and swapping the opener moves the loop ra
 ending it. Antidoom's loops (creative writing, exact phrases) are the surface kind. A
 one-position preference on a 2B model also moves far more per step than the whole-response
 DPO of round 8b. FTPO is dropped; round 8b's DPO with the depth ramp stays the loop method.
+### Long context: where we stand and what limited us (2026-10-01)
+
+**The student still reads long context.** `long_context_probe.py`, 24 llama.cpp source
+documents at 32K (code NLL by position) and pass-key retrieval at 10/50/90% depth:
+
+| code NLL vs source, by position | 512 | 4K | 8K | 16K | 32K |
+| --- | --- | --- | --- | --- | --- |
+| thinking pass (before on-policy rounds) | +0.066 | +0.079 | +0.095 | +0.095 | +0.105 |
+| round-6/8b blend (u50) | +0.067 | +0.083 | +0.108 | +0.113 | +0.126 |
+
+Pass-key: 100% for all three at 4K-32K. NLL still falls with position for every model; the
+gap to the source widens with distance, mostly from conversion and the early passes, with
+the short (<= 1.5K) on-policy rounds adding about 0.02 at 32K.
+
+**Capture limits, and a teacher-noise finding.**
+- `capture_teacher` materialized full logits ([seq, 248320], 16 GB at 32K): now body, then
+  the head a chunk at a time.
+- At 32K fla's gated-delta intermediates and the gated norm ran out of memory: long calls
+  now run in head groups (exact), and `--prefill-chunk` feeds the document in segments with
+  the cache carried -- at the kernel noise floor against one forward on the 2B (KL 1.29e-3
+  vs 1.08e-3 between FlashAttention and SDPA). 32K captures run at about 1K tok/s.
+- **LLM.int8 makes the teacher's targets depend on the document's length**: it routes
+  activation columns with any outlier anywhere in the input through fp16. The 27B read the
+  same 8K positions with 8K and 16K inputs and agreed on the top-1 token 78-80% of the time
+  (|d logp| 0.15). On the 2B, LLM.int8 sits at KL 2.8e-2 from bf16 against 4.7e-3 for
+  per-channel int8 weights with bf16 activations (`--no-int8 --weight-only-int8`), which on
+  the 27B agrees 95% across lengths (|d logp| 0.05). Every capture so far used LLM.int8.
+
+**Training fits 32K.** `long_memory_probe.ps1`, tensor parallel, every layer checkpointed,
+no sparse stage (the CSA2 token path keeps memory linear; the sparse stage's recorded
+attention does not): peak 8.6 GiB at 8K (1,435 tok/s), 11.5 at 16K (1,365), 17.7 at 32K
+(1,143), no spill. Assistant-only masks (`--assistant-only-caches`) keep harness system
+prompts, user turns and tool output out of both losses.
+
+**Agent traces as rendered.** SmolDataEnvs (Qwen3.8-27B in Claude Code, OpenCode, Codex,
+mini-swe-agent): median 16.8K / 7.4K / 8.2K / 2.5K tokens, assistant completions median
+76-240. The template keeps every turn's reasoning across tool rounds (DeepSeek-V4's
+interleaved thinking); OpenCode turns carry none, so they render empty think blocks.
