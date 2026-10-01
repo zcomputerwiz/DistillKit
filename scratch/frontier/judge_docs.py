@@ -120,6 +120,11 @@ def collect(args):
                 if wrong or broken:
                     excluded.append({"id": doc_id, "issues": verdict.get("issues")})
                     verdicts["excluded"] += 1
+    # Second-judge "no" verdicts on documents the first judge never saw (e.g. targeted audits).
+    for doc_id, final in second.items():
+        if doc_id not in seen and final == "no":
+            excluded.append({"id": doc_id, "issues": ["second judge"]})
+            verdicts["excluded"] += 1
     args.output.write_text(json.dumps(sorted(e["id"] for e in excluded), indent=0), encoding="utf-8")
     args.output.with_suffix(".detail.jsonl").write_text("".join(json.dumps(e) + "\n" for e in excluded),
                                                        encoding="utf-8")
