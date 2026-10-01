@@ -11,6 +11,7 @@ import contextlib
 import json
 import logging
 import threading
+import time
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -207,6 +208,7 @@ def capture_teacher(
     logit_chunk_tokens: int = 512,
     prefill_chunk: int | None = None,
     overlap: int = 1,
+    batch_tokens: int | None = None,
 ):
     """Capture one unpadded prefix per document; existing split labels win.
 
@@ -224,6 +226,8 @@ def capture_teacher(
         raise ValueError("logit_chunk_tokens must be positive")
     if type(overlap) is not int or overlap < 1:
         raise ValueError("overlap must be positive")
+    if batch_tokens and anchor_layers:
+        raise ValueError("batch_tokens captures logits only")
     if prefill_chunk and anchor_layers:
         raise ValueError("prefill_chunk captures logits only; anchors need one whole forward")
     config = model.config.get_text_config() if hasattr(model.config, "get_text_config") else model.config
@@ -238,7 +242,47 @@ def capture_teacher(
     device = _input_device(model)
     model.eval()
     _skip_packed_check()
-    def run(ordinal, record):
+    def project(hidden, store, offset):
+        # The head a chunk at a time: the full [seq, vocab] logits are 32 GB in fp32 at
+        # 32K positions. Results stay on the head's card until fetched: one host wait a
+        # forward instead of three a chunk.
+        for start in range(0, hidden.shape[1], logit_chunk_tokens):
+            stop = min(start + logit_chunk_tokens, hidden.shape[1])
+            chunk = model.lm_head(hidden[:, start:stop])[0].float()
+            if chunk.shape[-1] != vocab_size:
+                raise ValueError("Teacher logits must cover the full vocabulary")
+            if "ids" not in store:
+                store["ids"] = torch.empty((store["length"], top_k), dtype=torch.int32, device=chunk.device)
+                store["values"] = torch.empty((store["length"], top_k), dtype=torch.float16, device=chunk.device)
+                store["finite"] = []
+            store["finite"].append(torch.isfinite(chunk).all())
+            best, indices = torch.topk(chunk, k=top_k, dim=-1)
+            store["values"][offset + start:offset + stop] = best - torch.logsumexp(chunk, dim=-1, keepdim=True)
+            store["ids"][offset + start:offset + stop] = indices
+
+    def fetch(store, what):
+        # Copy into pinned memory and poll an event, sleeping: a blocking copy spins in
+        # the CUDA driver while holding the GIL, which stalls the other worker's launches.
+        device = store["ids"].device
+        if device.type != "cuda":
+            if not torch.stack(store["finite"]).all():
+                raise ValueError(f"Nonfinite teacher logits for {what}")
+            return store["ids"].numpy().view("<u4"), store["values"].numpy()
+        host = {name: torch.empty(store[name].shape, dtype=store[name].dtype, pin_memory=True)
+                for name in ("ids", "values")}
+        finite = torch.empty((), dtype=torch.bool, pin_memory=True)
+        finite.copy_(torch.stack(store["finite"]).all(), non_blocking=True)
+        for name, tensor in host.items():
+            tensor.copy_(store[name], non_blocking=True)
+        done = torch.cuda.Event()
+        done.record(torch.cuda.current_stream(device))
+        while not done.query():
+            time.sleep(0.0002)
+        if not finite:
+            raise ValueError(f"Nonfinite teacher logits for {what}")
+        return host["ids"].numpy().view("<u4"), host["values"].numpy()
+
+    def prepare(ordinal, record):
         doc_id = record.get("doc_id", str(ordinal))
         if not isinstance(doc_id, str):
             doc_id = str(doc_id)
@@ -252,29 +296,13 @@ def capture_teacher(
             raise ValueError(f"Document {doc_id!r} contains IDs outside teacher vocabulary")
         if "attention_mask" in record and not np.all(np.asarray(record["attention_mask"]) == 1):
             raise ValueError("Capture inputs must be unpadded, unpacked documents")
+        split = record.get("split", "eval" if ordinal % eval_every == 0 else "train")
+        return doc_id, tokens, split, len(raw_tokens)
+
+    def run(ordinal, record):
+        doc_id, tokens, split, original_length = prepare(ordinal, record)
         input_ids = torch.from_numpy(tokens).pin_memory().to(device, non_blocking=True).unsqueeze(0)
-        # Results stay on the head's card until the document is done: one host wait a
-        # document instead of three a chunk.
-        out_ids = out_values = None
-        finite = []
-
-        def project(hidden, offset):
-            # The head a chunk at a time: the full [seq, vocab] logits are 32 GB in
-            # fp32 at 32K positions.
-            nonlocal out_ids, out_values
-            for start in range(0, hidden.shape[1], logit_chunk_tokens):
-                stop = min(start + logit_chunk_tokens, hidden.shape[1])
-                chunk = model.lm_head(hidden[:, start:stop])[0].float()
-                if chunk.shape[-1] != vocab_size:
-                    raise ValueError("Teacher logits must cover the full vocabulary")
-                if out_ids is None:
-                    out_ids = torch.empty((len(tokens), top_k), dtype=torch.int32, device=chunk.device)
-                    out_values = torch.empty((len(tokens), top_k), dtype=torch.float16, device=chunk.device)
-                finite.append(torch.isfinite(chunk).all())
-                best, indices = torch.topk(chunk, k=top_k, dim=-1)
-                out_values[offset + start:offset + stop] = best - torch.logsumexp(chunk, dim=-1, keepdim=True)
-                out_ids[offset + start:offset + stop] = indices
-
+        store = {"length": len(tokens)}
         if prefill_chunk and len(tokens) > prefill_chunk:
             # Segments with the cache carried between them -- attention KV and the
             # DeltaNet states -- so activations are a segment's, not the document's.
@@ -287,7 +315,7 @@ def capture_teacher(
                 out = model.model(input_ids=input_ids[:, start:start + prefill_chunk],
                                   past_key_values=cache, use_cache=True, return_dict=True)
                 cache = out.past_key_values
-                project(out.last_hidden_state, start)
+                project(out.last_hidden_state, store, start)
                 del out
             del cache
             hidden, anchor_states = None, {}
@@ -298,10 +326,8 @@ def capture_teacher(
                 anchor_states = dict(tap.captured)
             if hidden.shape[:2] != (1, len(tokens)):
                 raise ValueError("Teacher hidden states must cover every input position")
-            project(hidden, 0)
-        if not torch.stack(finite).all():
-            raise ValueError(f"Nonfinite teacher logits for document {doc_id!r}")
-        ids, values = out_ids.cpu().numpy().view("<u4"), out_values.cpu().numpy()
+            project(hidden, store, 0)
+        ids, values = fetch(store, f"document {doc_id!r}")
         if set(anchor_states) != set(anchor_layers):
             missing = sorted(set(anchor_layers) - set(anchor_states))
             raise ValueError(f"Teacher did not produce anchor states {missing}")
@@ -315,8 +341,44 @@ def capture_teacher(
             if not torch.isfinite(hidden).all() or hidden.abs().max() > torch.finfo(torch.float8_e4m3fn).max:
                 raise ValueError(f"Anchor {layer_index} overflows unscaled float8_e4m3fn")
             states[:, compact_index, :] = hidden[0].to(torch.float8_e4m3fn).view(torch.uint8).cpu().numpy()
-        split = record.get("split", "eval" if ordinal % eval_every == 0 else "train")
-        return ordinal, doc_id, tokens, ids, values, states, split, len(raw_tokens)
+        return ordinal, doc_id, tokens, ids, values, states, split, original_length
+
+    def run_batch(job):
+        # Short documents right-padded into one forward: causal attention, the short
+        # convolutions and the DeltaNet recurrence never look ahead, so the padding after
+        # a document leaves its positions as they are, and the per-layer launch cost is
+        # paid once for the batch.
+        docs = [(ordinal, *prepare(ordinal, record)) for ordinal, record in job]
+        lengths = [len(tokens) for _, _, tokens, _, _ in docs]
+        padded = np.zeros((len(docs), max(lengths)), dtype=np.int64)
+        for row, (_, _, tokens, _, _) in enumerate(docs):
+            padded[row, :len(tokens)] = tokens
+        input_ids = torch.from_numpy(padded).pin_memory().to(device, non_blocking=True)
+        hidden = model.model(input_ids=input_ids, use_cache=False, return_dict=True).last_hidden_state
+        hidden = torch.cat([hidden[row, :n] for row, n in enumerate(lengths)])[None]
+        store = {"length": sum(lengths)}
+        project(hidden, store, 0)
+        ids, values = fetch(store, "documents %s" % [doc_id for _, doc_id, *_ in docs])
+        bounds = np.cumsum([0] + lengths)
+        return [(ordinal, doc_id, tokens, ids[a:b], values[a:b], None, split, original_length)
+                for (ordinal, doc_id, tokens, split, original_length), a, b in zip(docs, bounds, bounds[1:])]
+
+    def run_job(job):
+        return [run(*job[0])] if len(job) == 1 else run_batch(job)
+
+    def jobs():
+        # Consecutive documents share a forward while the padded batch stays within
+        # batch_tokens; longer ones go alone. Input order is kept.
+        job, longest = [], 0
+        for ordinal, record in enumerate(documents):
+            length = min(len(record["input_ids"]), sequence_length)
+            if job and (len(job) + 1) * max(longest, length) > (batch_tokens or 0):
+                yield job
+                job, longest = [], 0
+            job.append((ordinal, record))
+            longest = max(longest, length)
+        if job:
+            yield job
 
     def write(result):
         ordinal, doc_id, tokens, ids, values, states, split, original_length = result
@@ -326,7 +388,7 @@ def capture_teacher(
 
     streams = threading.local()
 
-    def overlapped(ordinal, record):
+    def overlapped(job):
         # Each worker on its own CUDA streams, so one document's half of the layers on
         # one card runs while another document's half runs on the other card.
         if not hasattr(streams, "all"):
@@ -335,7 +397,7 @@ def capture_teacher(
             stack.enter_context(torch.inference_mode())  # thread-local, like the streams
             for stream in streams.all:
                 stack.enter_context(torch.cuda.stream(stream))
-            return run(ordinal, record)
+            return run_job(job)
 
     with OfflineCacheWriter(
         output, tokenizer_hash=tokenizer_hash, tokenizer_vocab_fingerprint=tokenizer_vocab_fingerprint,
@@ -343,19 +405,22 @@ def capture_teacher(
         sequence_length=sequence_length, top_k=top_k, shard_tokens=shard_tokens, metadata=provenance,
     ) as writer, torch.inference_mode():
         if overlap == 1:
-            for ordinal, record in enumerate(documents):
-                write(run(ordinal, record))
+            for job in jobs():
+                for result in run_job(job):
+                    write(result)
         else:
             # The teacher is split across the cards by layer, so one document at a time
             # leaves each card idle while the other works; written in input order.
             pending = deque()
             with ThreadPoolExecutor(overlap) as pool:
-                for ordinal, record in enumerate(documents):
-                    pending.append(pool.submit(overlapped, ordinal, record))
+                for job in jobs():
+                    pending.append(pool.submit(overlapped, job))
                     if len(pending) > overlap:
-                        write(pending.popleft().result())
+                        for result in pending.popleft().result():
+                            write(result)
                 while pending:
-                    write(pending.popleft().result())
+                    for result in pending.popleft().result():
+                        write(result)
     return Path(output) / "manifest.json"
 
 
@@ -400,11 +465,13 @@ def iter_jsonl(path: str | Path, tokenizer=None, *, add_special_tokens: bool = T
               help="positions projected to the vocabulary at once (fp32 logits: 1 GB per 1024)")
 @click.option("--overlap", type=click.IntRange(min=1), default=2, show_default=True,
               help="documents in flight at once, so the cards of a layer-split teacher overlap")
+@click.option("--batch-tokens", type=click.IntRange(min=0), default=8192, show_default=True,
+              help="pad short consecutive documents into one forward up to this many positions (0: one at a time)")
 @click.option("--local-files-only/--allow-download", default=True, show_default=True)
 @click.option("--add-special-tokens/--no-add-special-tokens", default=True)
 def main(model, revision, input_jsonl, source_metadata, output, tokenizer, tokenizer_json,
          anchors, sequence_length, top_k, shard_tokens, eval_every, int8, weight_only_int8, device_map,
-         max_memory, attn_implementation, prefill_chunk, logit_chunk_tokens, overlap, local_files_only, add_special_tokens):
+         max_memory, attn_implementation, prefill_chunk, logit_chunk_tokens, overlap, batch_tokens, local_files_only, add_special_tokens):
     """Capture aligned log probabilities and FP8 teacher anchors in one pass."""
     from transformers import AutoTokenizer
 
@@ -427,29 +494,30 @@ def main(model, revision, input_jsonl, source_metadata, output, tokenizer, token
                                 max_memory=max_memory, local_files_only=local_files_only,
                                 attn_implementation=attn_implementation,
                                 weight_only_int8=weight_only_int8)
-    def capture(overlap):
+    def capture(overlap, batch_tokens):
         return capture_teacher(
             teacher, iter_jsonl(input_jsonl, tok, add_special_tokens=add_special_tokens), output,
             tokenizer_hash=file_sha256(tokenizer_json), tokenizer_vocab_fingerprint=tokenizer_vocab_hash(tok),
             anchor_layers=list(anchors), sequence_length=sequence_length, top_k=top_k,
             shard_tokens=shard_tokens, eval_every=eval_every, metadata=metadata,
             prefill_chunk=prefill_chunk, logit_chunk_tokens=logit_chunk_tokens, overlap=overlap,
+            batch_tokens=(batch_tokens or None) if not anchors else None,
         )
 
     manifest = None
     try:
-        manifest = capture(overlap)
+        manifest = capture(overlap, batch_tokens)
     except Exception:
-        if overlap == 1:
+        if overlap == 1 and not batch_tokens:
             raise
-        # Two documents in flight hold twice the activations; rather than lose a queued
-        # capture, start it again one at a time (outputs are identical either way).
-        LOG.exception("Overlapped capture failed; retrying one document at a time")
+        # Overlap and batching hold more activations; rather than lose a queued capture,
+        # start it again one document at a time.
+        LOG.exception("Overlapped or batched capture failed; retrying one document at a time")
     if manifest is None:
         if Path(output).exists():
             Path(output).rename(f"{output}.overlap-failed")
         torch.cuda.empty_cache()
-        manifest = capture(1)
+        manifest = capture(1, 0)
     click.echo(str(manifest))
 
 

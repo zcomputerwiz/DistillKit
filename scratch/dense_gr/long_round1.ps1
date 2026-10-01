@@ -12,9 +12,11 @@ $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Proj
 $C = "$D\capture-data"
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
 $base = "$root\scratch\dense_gr\merges-r6r8b\u50"
-$agent = "..\teacher-cache-agent-smol"
+# The agent capture was stopped at a third and its finished shards salvaged (-a); the rest
+# was captured again with documents overlapped across the cards (-b).
+$agentA = "..\teacher-cache-agent-smol-a"; $agentB = "..\teacher-cache-agent-smol-b"
 $code = "..\teacher-cache-r8-code-short-w8"
-$caches = @($agent, $code, "..\teacher-cache-curriculum-v4-w8", "..\teacher-cache-thinking-w8",
+$caches = @($agentA, $agentB, $code, "..\teacher-cache-curriculum-v4-w8", "..\teacher-cache-thinking-w8",
             "..\teacher-cache-think-first-w8", "..\teacher-cache-expand-code-w8", "..\teacher-cache-general-pilot-w8")
 foreach ($cache in $caches) {
     if (-not (Test-Path "$D\$($cache.Substring(3))\manifest.json")) { "missing capture $cache; stopping"; exit 1 }
@@ -25,7 +27,7 @@ foreach ($cache in $caches) {
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $base,
     "--inherit", "--tensor-parallel", "--embedding-on", "away", "--checkpoint-layers", "--teacher-cache")
 foreach ($c2 in $caches) { $argv.Add($c2) }
-foreach ($a in @("--assistant-only-caches", $agent, "--ce-only-caches", $code,
+foreach ($a in @("--assistant-only-caches", $agentA, $agentB, "--ce-only-caches", $code,
                  "--lr-scale", "linear_attn\.(A_log|dt_bias|in_proj_a)=0.1", "--strip-effort-nonthinking",
                  "--exclude-documents", "..\capture-data\exclude-long-r1.json", "--suppress-hedges",
                  "--teacher-weight", "0.5", "--teacher-max-length", "32768", "--kl-chunk", "64",

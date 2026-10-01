@@ -18,7 +18,8 @@ function Capture([string]$source, [string]$cache, [int]$length) {
     if (Test-Path "$D\$cache\manifest.json") { "captured $cache $(Get-Date -Format HH:mm)" } else { "capture FAILED: $cache" }
 }
 
-Capture "$C\agent-smol.jsonl" "teacher-cache-agent-smol" 32768
+# The agent traces were stopped at a third, salvaged and finished separately
+# (salvage_capture.py, agent_rest_then_r1.ps1).
 foreach ($name in "curriculum-v4", "thinking", "think-first", "expand-code", "general-pilot", "r8-code-short") {
     $source = "$C\recapture-$name.jsonl"
     if (-not (Test-Path $source)) { & $py scratch\dense_gr\export_capture_inputs.py "$D\teacher-cache-$name" $source }
