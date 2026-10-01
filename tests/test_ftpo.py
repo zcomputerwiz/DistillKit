@@ -40,6 +40,18 @@ def test_loop_start_ignores_one_restatement_and_the_answer():
     assert loop_start(answer, 1, CLOSE) is None
 
 
+def test_loop_start_ignores_an_enumeration():
+    prompt = [50]
+    shared = list(range(10, 28))  # 18 tokens every item repeats
+    ids = prompt + [1]
+    for item in range(30, 36):  # the item varies, so no copy spans a whole period
+        ids += [item] + shared
+    assert loop_start(ids, 1, CLOSE) is None
+    # The same lines, one repeated verbatim, are a loop.
+    ids += ([35] + shared) * 2
+    assert loop_start(ids, 1, CLOSE) is not None
+
+
 def test_first_readable_skips_whitespace_tokens():
     readable = lambda t: t >= 10
     assert first_readable([1, 2, 3, 15], 1, readable) == 3

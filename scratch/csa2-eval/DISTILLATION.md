@@ -874,3 +874,29 @@ NLLs lower) for a slightly smaller truncation cut (76 against 61). Every uniform
 beats the same blend of 8b; the depth-ramped blends are a wash, as expected -- blending by
 depth after the fact already did what the ramp does. The ramp stays on for later rounds.
 The trainer run died once at step 0 to a Windows Update restart and was rerun whole.
+### Round 9: FTPO after antidoom -- a failure, and why (2026-10-01)
+
+Liquid4All/antidoom trains only the token where a loop starts: the rejected token is the
+first readable token of the repeated segment, the chosen tokens the model's own
+alternatives there, with an MSE tether to the reference's logits for everything else and the
+preference switched off past a margin. Here (`ftpo_rows.py`, `training_step.ftpo_loss`):
+`teacher_kl.loop_start` finds where a loop's copy began; a row is kept only where the base
+itself gives the rejected token p >= 0.3; up to three alternatives with p >= 0.02, words
+only, never a hedge opener; antidoom's frequency flattening; tether over the reference's
+top 512. 24,922 new served-format prompts, greedy rollouts of the round-6/8b blend, plus the
+rounds 5-8 rollouts: 84,235 rollouts, 8,764 flagged, 2,121 rows. Four rows a step at weight
+1.0 into round 8c's replay and depth ramp; it stopped at chosen_win 0.31 after 165 steps.
+
+| arm | code NLL | thinking NLL | GSM8K non-thinking | MATH think (truncated) |
+| --- | --- | --- | --- | --- |
+| base (r6/r8b uniform 0.5) | 0.7784 | 0.5492 | 70.7% | 43.0% (104) |
+| round 9, unblended | 0.8542 | 0.6076 | 71.1% | 27.7% (140) |
+| round 9, uniform 0.3 | 0.7896 | 0.5544 | 69.5% | 39.5% (108) |
+
+Held-out NLL rose 0.06 on thinking and code in 165 steps -- four times round 8c's drift over
+its whole run -- and truncations went up, not down. The rows were the problem: 72% were
+mid-sentence decisions (" BC" rejected for " BD"), most from enumerations the 16-gram rule
+took for loops ("Second crate: base 3x4, height 6. Total 12." line after line, each item
+different). Training the model off its own content there taught it to wander. loop_start now
+requires a whole period copied verbatim and tries each candidate n-gram in turn; round 9b
+rebuilds the rows that way and trains at weight 0.3, stopping at chosen_win 0.25.

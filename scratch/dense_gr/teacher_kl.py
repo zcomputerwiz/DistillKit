@@ -639,24 +639,40 @@ def loop_tokens(ids, start, close):
 
 
 def loop_start(ids, start, close, n=16, count=3):
-    """The token where a loop `loop_tokens` finds began copying, or None.
+    """The token where a loop began copying, or None; over the stretch `loop_tokens` reads.
 
-    The loop is the first n-gram seen `count` times; its period is the distance between
-    its first two occurrences. Walking back from the second occurrence while each token
+    A candidate is an n-gram seen `count` times; its period is the distance between its
+    first two occurrences. Walking back from the second occurrence while each token
     equals the one a period earlier finds the first token of the copy -- the point where
-    the model chose to repeat rather than go on, which FTPO trains against."""
+    the model chose to repeat rather than go on, which FTPO trains against.
+
+    A loop copies a whole period verbatim. An enumeration -- "Second crate: base 3x4,
+    height 6. Total 12." line after line -- shares long spans too, but its copy breaks at
+    every item, and an alternative there changes content rather than ends a loop; such a
+    candidate is passed over for the next."""
     ids = np.asarray(ids)
-    marked = loop_tokens(ids, start, close)
-    if not marked.any():
-        return None
-    first = int(np.argmax(marked))
-    gram = ids[first:first + n]
-    hits = [i for i in range(start, first + 1) if np.array_equal(ids[i:i + n], gram)]
-    period = hits[1] - hits[0]
-    at = hits[1]
-    while at - 1 - period >= start and ids[at - 1] == ids[at - 1 - period]:
-        at -= 1
-    return at
+    after = np.nonzero(ids[start:] == close)[0]
+    end = start + int(after[0]) if len(after) else len(ids)
+    if end - start <= 4:  # "<think>\n\n</think>": no thought, so the whole reply
+        end = len(ids)
+    seen, tried = {}, set()
+    for s in range(start, end - n + 1):
+        gram = ids[s:s + n].tobytes()
+        hits = seen.setdefault(gram, [])
+        hits.append(s)
+        if len(hits) < count or gram in tried:
+            continue
+        tried.add(gram)
+        period = hits[1] - hits[0]
+        at = hits[1]
+        while at - 1 - period >= start and ids[at - 1] == ids[at - 1 - period]:
+            at -= 1
+        run = at
+        while run < end and ids[run] == ids[run - period]:
+            run += 1
+        if run - at >= max(period, n):
+            return at
+    return None
 
 
 def unlikelihood_loss(hidden, head, ids, negative, chunk=128):
