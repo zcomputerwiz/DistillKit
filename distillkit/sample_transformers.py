@@ -417,6 +417,22 @@ def capture_teacher(
                 stack.enter_context(torch.cuda.stream(stream))
             return run_job(job)
 
+    def pace(_module, _args, output):
+        # A kernel launch that finds its card's queue full blocks while holding the GIL,
+        # which starves the other worker's card. So a worker runs at most two layers ahead
+        # of its card, and waits by polling an event while sleeping (GIL released).
+        if not hasattr(streams, "all"):
+            return
+        hidden = output[0] if isinstance(output, tuple) else output
+        done = torch.cuda.Event()
+        done.record(torch.cuda.current_stream(hidden.device))
+        ahead = streams.__dict__.setdefault("ahead", deque())
+        ahead.append(done)
+        while len(ahead) > 2:
+            while not ahead[0].query():
+                time.sleep(0.0005)
+            ahead.popleft()
+
     with OfflineCacheWriter(
         output, tokenizer_hash=tokenizer_hash, tokenizer_vocab_fingerprint=tokenizer_vocab_fingerprint,
         anchor_layers=anchor_layers, hidden_size=hidden_size, vocab_size=vocab_size,
@@ -430,16 +446,21 @@ def capture_teacher(
             # The teacher is split across the cards by layer, so one document at a time
             # leaves each card idle while the other works; written in input order.
             _serialize_autotune()
+            hooks = [layer.register_forward_hook(pace) for layer in model.model.layers]
             pending = deque()
-            with ThreadPoolExecutor(overlap) as pool:
-                for job in jobs():
-                    pending.append(pool.submit(overlapped, job))
-                    if len(pending) > overlap:
+            try:
+                with ThreadPoolExecutor(overlap) as pool:
+                    for job in jobs():
+                        pending.append(pool.submit(overlapped, job))
+                        if len(pending) > overlap:
+                            for result in pending.popleft().result():
+                                write(result)
+                    while pending:
                         for result in pending.popleft().result():
                             write(result)
-                while pending:
-                    for result in pending.popleft().result():
-                        write(result)
+            finally:
+                for hook in hooks:
+                    hook.remove()
     return Path(output) / "manifest.json"
 
 
