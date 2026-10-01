@@ -131,7 +131,6 @@ def load_text_teacher(
         from .weight_only_int8 import quantize_linears
 
         LOG.info("weight-only int8: %d linear layers quantized", quantize_linears(model))
-        # Balanced, so each card keeps the same room for a long document's activations.
         budget = max_memory or get_balanced_memory(
             model, max_memory={i: "20GiB" for i in range(torch.cuda.device_count())},
             no_split_module_classes=list(model._no_split_modules))
@@ -139,6 +138,22 @@ def load_text_teacher(
                                           no_split_module_classes=list(model._no_split_modules))
         if any(str(device) in ("cpu", "disk") for device in placement.values()):
             raise RuntimeError(f"weight-only int8 teacher does not fit the cards: {placement}")
+        if max_memory is None and torch.cuda.device_count() == 2:
+            # Split the layers by compute, not memory: the memory split put 26 layers on the
+            # first card and 38 plus the head on the second, which then set the pace (first
+            # card 64% busy, second 99%). The head counts as its matmul's weights.
+            costs = [sum(m.weight_q.numel() for m in layer.modules() if hasattr(m, "weight_q"))
+                     for layer in model.model.layers]
+            half, total, first = (sum(costs) + model.lm_head.weight.numel()) / 2, 0, 0
+            for first, cost in enumerate(costs):
+                if total + cost / 2 > half:
+                    break
+                total += cost
+            for name in placement:
+                if name.startswith("model.layers."):
+                    placement[name] = 0 if int(name.split(".")[2]) < first else 1
+            LOG.info("weight-only int8: %d layers on the first card, %d on the second",
+                     first, len(costs) - first)
         model = dispatch_model(model, device_map=placement)
     return model.eval()
 
