@@ -8,6 +8,7 @@ class. Prepared JSONL records may supply input_ids, doc_id, and train/eval split
 from __future__ import annotations
 
 import contextlib
+import itertools
 import json
 import logging
 import threading
@@ -415,7 +416,32 @@ def capture_teacher(
             stack.enter_context(torch.inference_mode())  # thread-local, like the streams
             for stream in streams.all:
                 stack.enter_context(torch.cuda.stream(stream))
-            return run_job(job)
+            try:
+                return run_job(job)
+            finally:
+                release_card()
+
+    # One worker on a card's layers at a time. Without this both workers enter the first
+    # card together, share it, leave it together and leave it idle: lock-step, no pipeline.
+    # With it the second worker trails by a card. A worker holds at most one card's lock.
+    card_locks, entry_layers = {}, {}
+    previous = None
+    for index, layer in enumerate(model.model.layers):
+        card = next(itertools.chain(layer.parameters(), layer.buffers())).device
+        if card != previous:
+            card_locks.setdefault(card, threading.Lock())
+            entry_layers[index] = card
+        previous = card
+
+    def release_card():
+        held = streams.__dict__.pop("card", None)
+        if held is not None:
+            card_locks[held].release()
+
+    def enter_card(card):
+        release_card()
+        card_locks[card].acquire()
+        streams.card = card
 
     def pace(_module, _args, output):
         # A kernel launch that finds its card's queue full blocks while holding the GIL,
@@ -447,6 +473,9 @@ def capture_teacher(
             # leaves each card idle while the other works; written in input order.
             _serialize_autotune()
             hooks = [layer.register_forward_hook(pace) for layer in model.model.layers]
+            hooks += [model.model.layers[index].register_forward_pre_hook(
+                lambda _module, _args, card=card: enter_card(card) if hasattr(streams, "all") else None)
+                for index, card in entry_layers.items()]
             pending = deque()
             try:
                 with ThreadPoolExecutor(overlap) as pool:
