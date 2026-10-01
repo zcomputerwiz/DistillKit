@@ -115,16 +115,22 @@ def check_optimizer(model, optimizer):
         raise ValueError("trainable parameters missing from optimizer: " + ", ".join(missing[:6]))
 
 
-def causal_ce(model, hidden, ids):
+def causal_ce(model, hidden, ids, supervised=None):
+    """Mean next-token cross entropy; with `supervised` ([rows, length], position t scores
+    token t + 1), only over the supervised positions."""
     from cut_cross_entropy import linear_cross_entropy
 
     device = model.lm_head.weight.device
+    targets = ids
+    if supervised is not None:
+        targets = ids.clone()
+        targets[:, 1:][~supervised[:, :-1]] = -100  # CCE's ignore_index
     # CCE's Triton kernels launch on the *current* device, not the tensors' own. With
     # the head moved off home (--embedding-on away) that read another card's memory and
     # returned a loss of exactly 0 while the teacher KL, plain torch, carried on.
     with torch.cuda.device(device):
         return linear_cross_entropy(hidden.to(device), model.lm_head.weight,
-                                    ids.to(device), shift=1,
+                                    targets.to(device), shift=1,
                                     reduction="mean").to(hidden.device)
 
 
@@ -205,13 +211,20 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
     pairs = [r for r in records if r.get("pair")]
     records = [r for r in records if not r.get("pair")]
     counts, total = accumulation_shares([r["input_ids"] for r in records])
+    # Agent traces score only the assistant's turns; their share is what they score.
+    counts = [int(r["supervised"][:, :-1].sum()) if "supervised" in r else n
+              for r, n in zip(records, counts)]
+    total = max(sum(counts), 1)
     if not (records or pairs) or any(n <= 0 for n in counts):
         raise ValueError("an optimizer step needs nonempty causal targets")
     result = dict(loss=0.0, teacher_kl=0.0, indexer=0.0, unlikelihood=0.0, objective=0.0,
                   targets=sum(counts))
     for record, count in zip(records, counts):
         ids = record["input_ids"]
-        mask = scored_mask(ids.shape[1], ids.device, ids.shape[0])
+        mask = queries = scored_mask(ids.shape[1], ids.device, ids.shape[0])
+        supervised = record.get("supervised")
+        if supervised is not None:
+            mask = mask & supervised.to(mask.device)
         handles = []
         context = contextlib.nullcontext()
         if sparse_stage is not None:
@@ -233,7 +246,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 # thinks at length, and KL toward it at every position of a brief thought
                 # pulls against closing it.
                 ce_only = bool(record.get("ce_only", False))
-                language = ce(model, hidden, ids)
+                language = (ce(model, hidden, ids) if supervised is None
+                            else ce(model, hidden, ids, supervised=supervised))
                 objective = language
                 carried = language.new_zeros(())
                 aligned = language.new_zeros(())
@@ -267,7 +281,7 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                     borrowed = {i: a.bus.require_latent(a.latent_donor, i)
                                 for i, a in sparse_stage}
                     aligned = indexer_loss(model, sparse_stage, seen, targets, borrowed,
-                                           selected=chosen, query_mask=mask)
+                                           selected=chosen, query_mask=queries)  # every query routes
                     objective = objective + indexer_weight * aligned
             share = count / total
             (objective * share).backward()

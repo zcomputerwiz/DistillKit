@@ -402,6 +402,9 @@ def main(argv=None) -> int:
     parser.add_argument("--stop-chosen-win", type=float, default=None,
                         help="finish once FTPO's chosen_win, averaged over the last 20 steps, "
                              "reaches this (antidoom stops at 0.15-0.3)")
+    parser.add_argument("--assistant-only-caches", type=Path, nargs="+", default=None,
+                        help="captures (agent traces) scored only on the assistant's own turns: "
+                             "no loss on harness system prompts, user turns or tool output")
     parser.add_argument("--ce-only-caches", type=Path, nargs="+", default=None,
                         help="captures trained on cross entropy alone, no teacher KL: the "
                              "student's own shortest correct rollouts, which KL toward a "
@@ -832,10 +835,22 @@ def main(argv=None) -> int:
                                     attention_mask=torch.ones_like(ids),
                                     use_cache=False).last_hidden_state
                 count = ids.shape[1] - 1
+                targets = ids
+                if doc_id in held_teacher.assistant_only_ids:
+                    # Agent traces: held out on the assistant's turns, as they are trained.
+                    from teacher_kl import assistant_tokens
+
+                    inside = torch.from_numpy(assistant_tokens(
+                        ids[0].cpu().numpy(), held_teacher.answer_marker, held_teacher.turn_close))
+                    targets = ids.clone()
+                    targets[0, ~inside.to(ids.device)] = -100
+                    count = int(inside[1:].sum())
+                    if not count:
+                        continue
                 head = model.lm_head.weight
                 with torch.cuda.device(head.device):
                     part = float(linear_cross_entropy(state.to(head.device), head,
-                                                      ids.to(head.device), shift=1,
+                                                      targets.to(head.device), shift=1,
                                                       reduction="mean")) * count
                 total += part
                 scored += count
@@ -882,7 +897,7 @@ def main(argv=None) -> int:
         # speaks -- the remapped case is refused above, so there is no second space
         # this marker could be in.
         marker = (tokenizer(ANSWER_MARKER, add_special_tokens=False)["input_ids"]
-                  if args.min_answer_tokens > 0 else None)
+                  if args.min_answer_tokens > 0 or args.assistant_only_caches else None)
         excluded = excluded_documents(args.exclude_documents)
         from teacher_kl import hedge_token_ids
 
@@ -910,6 +925,8 @@ def main(argv=None) -> int:
                                 kl_only=args.kl_only_caches, strip_prefix=strip,
                                 strip_nonthinking=nonthinking,
                                 ce_only=args.ce_only_caches,
+                                assistant_only=args.assistant_only_caches,
+                                turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"),
                                 unlikelihood=args.unlikelihood_caches,
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
                                 repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []))
@@ -925,7 +942,9 @@ def main(argv=None) -> int:
                                      answer_marker=marker,
                                      min_answer_tokens=args.min_answer_tokens,
                                      exclude=excluded, strip_prefix=strip,
-                                     strip_nonthinking=nonthinking)
+                                     strip_nonthinking=nonthinking,
+                                     assistant_only=args.assistant_only_caches,
+                                     turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"))
         if excluded:
             print("excluded as benchmark contamination: %d train, %d held-out, of %d listed"
                   % (teacher.excluded, held_teacher.excluded, len(excluded)), flush=True)

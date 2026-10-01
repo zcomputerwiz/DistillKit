@@ -148,6 +148,30 @@ def last_response(ids, marker):
     return None
 
 
+def assistant_tokens(ids, marker, close):
+    """Tokens inside assistant turns: after each `marker` run, through its `close` token.
+
+    An agent trace is mostly what the model never writes -- a harness system prompt of
+    thousands of tokens, repeated in every trace, and tool output. Scoring those trains
+    the student to recite boilerplate and predict tool results; ARTIST (arXiv 2505.01441)
+    masks tool output for the same reason. The turn's own close is the model's to write,
+    so it stays in."""
+    ids = np.asarray(ids)
+    inside = np.zeros(len(ids), dtype=bool)
+    marker = np.asarray(marker)
+    width, at = len(marker), 0
+    while at <= len(ids) - width:
+        if ids[at] == marker[0] and np.array_equal(ids[at:at + width], marker):
+            start = at + width
+            closes = np.nonzero(ids[start:] == close)[0]
+            end = start + int(closes[0]) + 1 if len(closes) else len(ids)
+            inside[start:end] = True
+            at = end
+        else:
+            at += 1
+    return inside
+
+
 class CachedTeacher:
     """Documents and their top-k targets, shuffled, one at a time.
 
@@ -163,7 +187,8 @@ class CachedTeacher:
     def __init__(self, path, split="train", device="cuda", seed=0, min_tokens=2,
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
                  suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
-                 think_close=None, repeat=None, strip_nonthinking=None, ce_only=None):
+                 think_close=None, repeat=None, strip_nonthinking=None, ce_only=None,
+                 assistant_only=None, turn_close=None):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         if unlikelihood and (think_close is None or min_answer_tokens <= 0):
             raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
@@ -273,6 +298,11 @@ class CachedTeacher:
         self.ce_only_ids = from_captures(ce_only, "ce_only")
         if self.ce_only_ids & self.kl_only_ids:
             raise ValueError("a capture cannot be both ce_only and kl_only")
+        # Agent traces: only the assistant's own turns are scored (`assistant_tokens`).
+        self.assistant_only_ids = from_captures(assistant_only, "assistant_only")
+        if self.assistant_only_ids and (not answer_marker or turn_close is None):
+            raise ValueError("assistant_only needs answer_marker and turn_close (the <|im_end|> id)")
+        self.turn_close = turn_close
         # Both objectives score every position but the last, so a document's system
         # prompt and user turn are trained on exactly like its answer. That is fine
         # while the answer is in there, and the prefix cap makes it a question: a
@@ -548,6 +578,15 @@ class CachedTeacher:
                  "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
                  "kl_only": doc_ids[0] in self.kl_only_ids,
                  "ce_only": doc_ids[0] in self.ce_only_ids}
+        if any(doc_id in self.assistant_only_ids for doc_id in doc_ids):
+            # Position t is scored when the token it predicts, t + 1, is the assistant's.
+            supervised = np.zeros((len(ids), width), dtype=bool)
+            for row, (doc_id, tokens) in enumerate(zip(doc_ids, ids)):
+                if doc_id in self.assistant_only_ids:
+                    supervised[row, :-1] = assistant_tokens(tokens, self.answer_marker, self.turn_close)[1:]
+                else:
+                    supervised[row, :-1] = True
+            batch["supervised"] = torch.from_numpy(supervised).to(self.device, non_blocking=True)
         if repeats:
             # Position t predicts token t + 1, so a repeated token at t + 1 is a
             # negative at t; the last position predicts nothing.

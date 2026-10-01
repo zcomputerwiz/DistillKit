@@ -65,6 +65,7 @@ def load_text_teacher(
     device_map: str | dict = "auto",
     max_memory: dict | None = None,
     local_files_only: bool = True,
+    attn_implementation: str | None = None,
 ):
     from transformers import AutoConfig, BitsAndBytesConfig
 
@@ -74,6 +75,8 @@ def load_text_teacher(
                   device_map=device_map, dtype=torch.bfloat16, output_loading_info=True)
     if max_memory is not None:
         kwargs["max_memory"] = max_memory
+    if attn_implementation:
+        kwargs["attn_implementation"] = attn_implementation
     if int8:
         kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
     model, info = cls.from_pretrained(model_path, **kwargs)
@@ -210,12 +213,13 @@ def capture_teacher(
                 raise ValueError("Capture inputs must be unpadded, unpacked documents")
             input_ids = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0)
             with _AnchorTap(model, anchor_layers) as tap:
-                result = model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
-                               use_cache=False, return_dict=True)
+                # The body alone, then the head a chunk at a time: the full [seq, vocab]
+                # logits are 16 GB in bf16 at 32K positions, against 2 GiB free per card.
+                hidden = model.model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
+                                     use_cache=False, return_dict=True).last_hidden_state
                 anchor_states = dict(tap.captured)
-            logits = result.logits
-            if logits.shape != (1, len(tokens), vocab_size):
-                raise ValueError("Teacher logits must cover every unshifted input position and the full vocabulary")
+            if hidden.shape[:2] != (1, len(tokens)):
+                raise ValueError("Teacher hidden states must cover every input position")
             if set(anchor_states) != set(anchor_layers):
                 missing = sorted(set(anchor_layers) - set(anchor_states))
                 raise ValueError(f"Teacher did not produce anchor states {missing}")
@@ -223,7 +227,9 @@ def capture_teacher(
             values = np.empty((len(tokens), top_k), dtype="<f2")
             for start in range(0, len(tokens), logit_chunk_tokens):
                 stop = min(start + logit_chunk_tokens, len(tokens))
-                chunk = logits[0, start:stop].float()
+                chunk = model.lm_head(hidden[:, start:stop])[0].float()
+                if chunk.shape[-1] != vocab_size:
+                    raise ValueError("Teacher logits must cover the full vocabulary")
                 if not torch.isfinite(chunk).all():
                     raise ValueError(f"Nonfinite teacher logits for document {doc_id!r}")
                 best, indices = torch.topk(chunk, k=top_k, dim=-1)
@@ -244,7 +250,7 @@ def capture_teacher(
             writer.append(doc_id, tokens, ids, values, states,
                           split=record.get("split", "eval" if ordinal % eval_every == 0 else "train"),
                           original_length=len(raw_tokens))
-            del result, logits, states, anchor_states
+            del hidden, states, anchor_states
             if ordinal % 100 == 0:
                 LOG.info("Captured document %d (%s)", ordinal + 1, doc_id)
     return Path(output) / "manifest.json"
@@ -281,11 +287,14 @@ def iter_jsonl(path: str | Path, tokenizer=None, *, add_special_tokens: bool = T
 @click.option("--int8/--no-int8", default=True, show_default=True)
 @click.option("--device-map", default="auto", show_default=True, help="Accelerate device-map strategy or JSON mapping.")
 @click.option("--max-memory", default=None, help='JSON memory budgets, e.g. {"0":"20GiB","1":"20GiB","cpu":"32GiB"}.')
+@click.option("--attn-implementation", default=None, help="e.g. flash_attention_2 for long captures; default is transformers' choice (SDPA)")
+@click.option("--attn-implementation", default=None,
+              help="e.g. flash_attention_2 for long captures; default is transformers' choice (SDPA)")
 @click.option("--local-files-only/--allow-download", default=True, show_default=True)
 @click.option("--add-special-tokens/--no-add-special-tokens", default=True)
 def main(model, revision, input_jsonl, source_metadata, output, tokenizer, tokenizer_json,
          anchors, sequence_length, top_k, shard_tokens, eval_every, int8, device_map,
-         max_memory, local_files_only, add_special_tokens):
+         max_memory, attn_implementation, local_files_only, add_special_tokens):
     """Capture aligned log probabilities and FP8 teacher anchors in one pass."""
     from transformers import AutoTokenizer
 
@@ -299,12 +308,13 @@ def main(model, revision, input_jsonl, source_metadata, output, tokenizer, token
         device_map = json.loads(device_map)
     if max_memory:
         max_memory = {int(k) if k.isdigit() else k: v for k, v in json.loads(max_memory).items()}
-    metadata = {"model": model, "revision": revision, "int8": int8,
+    metadata = {"model": model, "revision": revision, "int8": int8, "attn_implementation": attn_implementation,
                 "input_jsonl_sha256": file_sha256(input_jsonl), "add_special_tokens": add_special_tokens}
     if source_metadata:
         metadata["source"] = json.loads(Path(source_metadata).read_text(encoding="utf-8"))
     teacher = load_text_teacher(model, revision=revision, int8=int8, device_map=device_map,
-                                max_memory=max_memory, local_files_only=local_files_only)
+                                max_memory=max_memory, local_files_only=local_files_only,
+                                attn_implementation=attn_implementation)
     manifest = capture_teacher(
         teacher, iter_jsonl(input_jsonl, tok, add_special_tokens=add_special_tokens), output,
         tokenizer_hash=file_sha256(tokenizer_json), tokenizer_vocab_fingerprint=tokenizer_vocab_hash(tok),
