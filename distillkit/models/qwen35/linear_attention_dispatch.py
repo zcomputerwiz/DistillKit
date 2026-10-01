@@ -63,6 +63,40 @@ def _is_cuda(*args) -> bool:
     return False
 
 
+#: Tokens times heads one fused gated-delta call may take before its heads are split
+#: into groups. fla's chunk kernel holds several [tokens, heads, 64]-sized intermediates
+#: at once: the 27B teacher, int8 across two 24 GB cards, ran out inside it at 32K
+#: tokens with 21.4 GiB allocated, and captured 16K fine.
+HEAD_SPLIT_TOKENS = int(__import__("os").environ.get("DISTILLKIT_HEAD_SPLIT_TOKENS", 16384 * 32))
+
+
+def _head_split(fused):
+    """`fused` over groups of heads when the sequence is long. Heads never interact in a
+    gated delta rule, so the result is the same; only the intermediates are smaller."""
+    import torch
+
+    @functools.wraps(fused)
+    def call(query, key, value, g, beta, *args, initial_state=None, **kwargs):
+        tokens, heads = value.shape[1], value.shape[2]
+        groups = 1
+        while tokens * heads // groups > HEAD_SPLIT_TOKENS and heads % (groups * 2) == 0:
+            groups *= 2
+        if groups == 1:
+            return fused(query, key, value, g, beta, *args, initial_state=initial_state, **kwargs)
+        size = heads // groups
+        outputs, states = [], []
+        for start in range(0, heads, size):
+            part = slice(start, start + size)
+            out, state = fused(query[:, :, part], key[:, :, part], value[:, :, part], g[:, :, part],
+                               beta[:, :, part], *args,
+                               initial_state=None if initial_state is None else initial_state[:, part],
+                               **kwargs)
+            outputs.append(out)
+            states.append(state)
+        return torch.cat(outputs, dim=2), (None if states[0] is None else torch.cat(states, dim=1))
+    return call
+
+
 def install_device_aware_linear_attention() -> list[str]:
     """Patch qwen3_5's linear-attention ops to pick an implementation per call.
 
@@ -79,6 +113,9 @@ def install_device_aware_linear_attention() -> list[str]:
         if torch_impl is None or torch_impl is fused:
             # No wrapper means no fused implementation was bound; nothing to guard.
             continue
+
+        if name == "torch_chunk_gated_delta_rule":
+            fused = _head_split(fused)
 
         def make(fused=fused, torch_impl=torch_impl, name=name):
             @functools.wraps(torch_impl)

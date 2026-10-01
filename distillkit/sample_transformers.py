@@ -66,14 +66,20 @@ def load_text_teacher(
     max_memory: dict | None = None,
     local_files_only: bool = True,
     attn_implementation: str | None = None,
+    weight_only_int8: bool = False,
 ):
+    """`int8` is bitsandbytes' LLM.int8; `weight_only_int8` keeps activations in bf16 so a
+    position's targets do not depend on the rest of the document (`weight_only_int8.py`)."""
     from transformers import AutoConfig, BitsAndBytesConfig
 
+    if int8 and weight_only_int8:
+        raise ValueError("choose one of int8 (LLM.int8) and weight_only_int8")
     config = AutoConfig.from_pretrained(model_path, revision=revision, local_files_only=local_files_only)
     cls, text_config = text_causal_lm_class(config)
     kwargs = dict(config=text_config, revision=revision, local_files_only=local_files_only,
-                  device_map=device_map, dtype=torch.bfloat16, output_loading_info=True)
-    if max_memory is not None:
+                  device_map={"": "cpu"} if weight_only_int8 else device_map,
+                  dtype=torch.bfloat16, output_loading_info=True)
+    if max_memory is not None and not weight_only_int8:
         kwargs["max_memory"] = max_memory
     if attn_implementation:
         kwargs["attn_implementation"] = attn_implementation
@@ -84,6 +90,23 @@ def load_text_teacher(
         raise RuntimeError(f"Teacher text checkpoint did not load exactly: {info}")
     if any("visual" in name or "vision_tower" in name for name, _ in model.named_modules()):
         raise RuntimeError("Teacher loader unexpectedly instantiated vision modules")
+    if weight_only_int8:
+        # Quantized on the CPU, then spread over the cards whole decoder layers at a time.
+        from accelerate import dispatch_model, infer_auto_device_map
+        from accelerate.utils import get_balanced_memory
+
+        from .weight_only_int8 import quantize_linears
+
+        LOG.info("weight-only int8: %d linear layers quantized", quantize_linears(model))
+        # Balanced, so each card keeps the same room for a long document's activations.
+        budget = max_memory or get_balanced_memory(
+            model, max_memory={i: "20GiB" for i in range(torch.cuda.device_count())},
+            no_split_module_classes=list(model._no_split_modules))
+        placement = infer_auto_device_map(model, max_memory=budget,
+                                          no_split_module_classes=list(model._no_split_modules))
+        if any(str(device) in ("cpu", "disk") for device in placement.values()):
+            raise RuntimeError(f"weight-only int8 teacher does not fit the cards: {placement}")
+        model = dispatch_model(model, device_map=placement)
     return model.eval()
 
 
@@ -169,8 +192,12 @@ def capture_teacher(
     tokenizer_vocab_fingerprint: str | None = None,
     metadata: dict[str, Any] | None = None,
     logit_chunk_tokens: int = 64,
+    prefill_chunk: int | None = None,
 ):
     """Capture one unpadded prefix per document; existing split labels win.
+
+    ``prefill_chunk`` feeds a longer document in segments with the cache carried
+    between them; logits-only captures (no anchors) only.
 
     Anchor indices refer to the exact ``output.hidden_states`` tuple, including
     its index-0 embedding state. Log probabilities are normalized over the
@@ -181,6 +208,8 @@ def capture_teacher(
         raise ValueError("eval_every must be at least 2")
     if type(logit_chunk_tokens) is not int or logit_chunk_tokens < 1:
         raise ValueError("logit_chunk_tokens must be positive")
+    if prefill_chunk and anchor_layers:
+        raise ValueError("prefill_chunk captures logits only; anchors need one whole forward")
     config = model.config.get_text_config() if hasattr(model.config, "get_text_config") else model.config
     hidden_size, vocab_size = config.hidden_size, config.vocab_size
     if any(type(i) is not int or i < 0 or i > config.num_hidden_layers for i in anchor_layers):
@@ -212,31 +241,51 @@ def capture_teacher(
             if "attention_mask" in record and not np.all(np.asarray(record["attention_mask"]) == 1):
                 raise ValueError("Capture inputs must be unpadded, unpacked documents")
             input_ids = torch.tensor(tokens, dtype=torch.long, device=device).unsqueeze(0)
-            with _AnchorTap(model, anchor_layers) as tap:
-                # The body alone, then the head a chunk at a time: the full [seq, vocab]
-                # logits are 16 GB in bf16 at 32K positions, against 2 GiB free per card.
-                hidden = model.model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
-                                     use_cache=False, return_dict=True).last_hidden_state
-                anchor_states = dict(tap.captured)
-            if hidden.shape[:2] != (1, len(tokens)):
-                raise ValueError("Teacher hidden states must cover every input position")
+            ids = np.empty((len(tokens), top_k), dtype="<u4")
+            values = np.empty((len(tokens), top_k), dtype="<f2")
+
+            def project(hidden, offset):
+                # The head a chunk at a time: the full [seq, vocab] logits are 16 GB in
+                # bf16 at 32K positions, against 2 GiB free per card.
+                for start in range(0, hidden.shape[1], logit_chunk_tokens):
+                    stop = min(start + logit_chunk_tokens, hidden.shape[1])
+                    chunk = model.lm_head(hidden[:, start:stop])[0].float()
+                    if chunk.shape[-1] != vocab_size:
+                        raise ValueError("Teacher logits must cover the full vocabulary")
+                    if not torch.isfinite(chunk).all():
+                        raise ValueError(f"Nonfinite teacher logits for document {doc_id!r}")
+                    best, indices = torch.topk(chunk, k=top_k, dim=-1)
+                    logprobs = best - torch.logsumexp(chunk, dim=-1, keepdim=True)
+                    ids[offset + start:offset + stop] = indices.cpu().numpy().astype("<u4")
+                    values[offset + start:offset + stop] = logprobs.to(torch.float16).cpu().numpy()
+
+            if prefill_chunk and len(tokens) > prefill_chunk:
+                # Segments with the cache carried between them -- attention KV and the
+                # DeltaNet states -- so activations are a segment's, not the document's.
+                # Measured against one forward on the 2B source at 8K in 2K segments:
+                # KL 1.29e-3 nats, against 1.08e-3 between FlashAttention and SDPA.
+                from transformers import DynamicCache
+
+                cache = DynamicCache(config=config)
+                for start in range(0, len(tokens), prefill_chunk):
+                    out = model.model(input_ids=input_ids[:, start:start + prefill_chunk],
+                                      past_key_values=cache, use_cache=True, return_dict=True)
+                    cache = out.past_key_values
+                    project(out.last_hidden_state, start)
+                    del out
+                del cache
+                hidden, anchor_states = None, {}
+            else:
+                with _AnchorTap(model, anchor_layers) as tap:
+                    hidden = model.model(input_ids=input_ids, attention_mask=torch.ones_like(input_ids),
+                                         use_cache=False, return_dict=True).last_hidden_state
+                    anchor_states = dict(tap.captured)
+                if hidden.shape[:2] != (1, len(tokens)):
+                    raise ValueError("Teacher hidden states must cover every input position")
+                project(hidden, 0)
             if set(anchor_states) != set(anchor_layers):
                 missing = sorted(set(anchor_layers) - set(anchor_states))
                 raise ValueError(f"Teacher did not produce anchor states {missing}")
-            ids = np.empty((len(tokens), top_k), dtype="<u4")
-            values = np.empty((len(tokens), top_k), dtype="<f2")
-            for start in range(0, len(tokens), logit_chunk_tokens):
-                stop = min(start + logit_chunk_tokens, len(tokens))
-                chunk = model.lm_head(hidden[:, start:stop])[0].float()
-                if chunk.shape[-1] != vocab_size:
-                    raise ValueError("Teacher logits must cover the full vocabulary")
-                if not torch.isfinite(chunk).all():
-                    raise ValueError(f"Nonfinite teacher logits for document {doc_id!r}")
-                best, indices = torch.topk(chunk, k=top_k, dim=-1)
-                logprobs = best - torch.logsumexp(chunk, dim=-1, keepdim=True)
-                ids[start:stop] = indices.cpu().numpy().astype("<u4")
-                values[start:stop] = logprobs.to(torch.float16).cpu().numpy()
-                del chunk, best, indices, logprobs
             # Logits-only captures (no anchors) store no hidden states; see `_layouts`.
             states = (np.empty((len(tokens), len(anchor_layers), hidden_size), dtype=np.uint8)
                       if anchor_layers else None)
@@ -285,16 +334,19 @@ def iter_jsonl(path: str | Path, tokenizer=None, *, add_special_tokens: bool = T
 @click.option("--shard-tokens", type=click.IntRange(min=1), default=65536, show_default=True)
 @click.option("--eval-every", type=click.IntRange(min=2), default=20, show_default=True)
 @click.option("--int8/--no-int8", default=True, show_default=True)
+@click.option("--weight-only-int8", is_flag=True, default=False,
+              help="int8 weights, bf16 activations, instead of LLM.int8 (pass --no-int8 with it)")
 @click.option("--device-map", default="auto", show_default=True, help="Accelerate device-map strategy or JSON mapping.")
 @click.option("--max-memory", default=None, help='JSON memory budgets, e.g. {"0":"20GiB","1":"20GiB","cpu":"32GiB"}.')
-@click.option("--attn-implementation", default=None, help="e.g. flash_attention_2 for long captures; default is transformers' choice (SDPA)")
 @click.option("--attn-implementation", default=None,
               help="e.g. flash_attention_2 for long captures; default is transformers' choice (SDPA)")
+@click.option("--prefill-chunk", type=click.IntRange(min=1), default=None,
+              help="feed longer documents in segments of this many tokens, cache carried (logits-only)")
 @click.option("--local-files-only/--allow-download", default=True, show_default=True)
 @click.option("--add-special-tokens/--no-add-special-tokens", default=True)
 def main(model, revision, input_jsonl, source_metadata, output, tokenizer, tokenizer_json,
-         anchors, sequence_length, top_k, shard_tokens, eval_every, int8, device_map,
-         max_memory, attn_implementation, local_files_only, add_special_tokens):
+         anchors, sequence_length, top_k, shard_tokens, eval_every, int8, weight_only_int8, device_map,
+         max_memory, attn_implementation, prefill_chunk, local_files_only, add_special_tokens):
     """Capture aligned log probabilities and FP8 teacher anchors in one pass."""
     from transformers import AutoTokenizer
 
@@ -309,17 +361,20 @@ def main(model, revision, input_jsonl, source_metadata, output, tokenizer, token
     if max_memory:
         max_memory = {int(k) if k.isdigit() else k: v for k, v in json.loads(max_memory).items()}
     metadata = {"model": model, "revision": revision, "int8": int8, "attn_implementation": attn_implementation,
+                "prefill_chunk": prefill_chunk, "weight_only_int8": weight_only_int8,
                 "input_jsonl_sha256": file_sha256(input_jsonl), "add_special_tokens": add_special_tokens}
     if source_metadata:
         metadata["source"] = json.loads(Path(source_metadata).read_text(encoding="utf-8"))
     teacher = load_text_teacher(model, revision=revision, int8=int8, device_map=device_map,
                                 max_memory=max_memory, local_files_only=local_files_only,
-                                attn_implementation=attn_implementation)
+                                attn_implementation=attn_implementation,
+                                weight_only_int8=weight_only_int8)
     manifest = capture_teacher(
         teacher, iter_jsonl(input_jsonl, tok, add_special_tokens=add_special_tokens), output,
         tokenizer_hash=file_sha256(tokenizer_json), tokenizer_vocab_fingerprint=tokenizer_vocab_hash(tok),
         anchor_layers=list(anchors), sequence_length=sequence_length, top_k=top_k,
         shard_tokens=shard_tokens, eval_every=eval_every, metadata=metadata,
+        prefill_chunk=prefill_chunk,
     )
     click.echo(str(manifest))
 
