@@ -31,10 +31,17 @@ def read_key(path):
     return text.split("=", 1)[1].strip().strip('"') if "=" in text.splitlines()[0] else text.splitlines()[0].strip()
 
 
+#: Set when the provider says the day's quota is spent: everything still queued returns at
+#: once instead of retrying into the limit (OpenRouter's free stealth tier: 1,000 a day).
+EXHAUSTED = threading.Event()
+
+
 def call(request, key, model, endpoint, retries=8, timeout=600):
     body = {"model": model, **{k: v for k, v in request.items() if k != "id"}}
     data = json.dumps(body).encode("utf-8")
     for attempt in range(retries):
+        if EXHAUSTED.is_set():
+            return {"id": request["id"], "error": "daily quota exhausted"}
         req = urllib.request.Request(endpoint, data=data, headers={
             "Authorization": "Bearer " + key, "Content-Type": "application/json"})
         try:
@@ -49,6 +56,9 @@ def call(request, key, model, endpoint, retries=8, timeout=600):
                     "finish_reason": choice.get("finish_reason"), "usage": reply.get("usage")}
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")[:500]
+            if error.code == 429 and "per-day" in detail:
+                EXHAUSTED.set()
+                return {"id": request["id"], "error": "daily quota exhausted"}
             if error.code in (429, 500, 502, 503, 504) and attempt < retries - 1:
                 time.sleep(min(120, 2 ** attempt) + random.random())
                 continue
@@ -100,6 +110,9 @@ def main():
                              tally["completion"], tally["cost"], time.time() - started), flush=True)
                 if "error" in row and tally["error"] <= 3:
                     print("error on %s: %s" % (row["id"], row["error"][:300]), flush=True)
+    if EXHAUSTED.is_set():
+        print("daily quota exhausted; rerun after the reset to continue", flush=True)
+        raise SystemExit(3)
 
 
 if __name__ == "__main__":

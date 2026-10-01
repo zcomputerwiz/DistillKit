@@ -36,25 +36,42 @@ Return only JSON: {"items": [{"type": str, "question": str, "answer": str, \
 "evidence": [{"file": str, "quote": str}]}]}"""
 
 
+MULTI = INSTRUCTIONS.replace("The document below is a dump", "Each document below (in <document id=...> tags) is a dump").replace(
+    "Write exactly 8 questions:", "For EACH document separately, write exactly 8 questions about that document alone:").replace(
+    'Return only JSON: {"items": [{', 'Return only JSON: {"documents": [{"doc_id": the document id, "items": [{').replace(
+    '"evidence": [{"file": str, "quote": str}]}]}', '"evidence": [{"file": str, "quote": str}]}]}]}')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docs", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--effort", default="medium")
+    parser.add_argument("--per-request", type=int, default=1)
+    parser.add_argument("--done", type=Path, default=None, help="earlier responses: skip documents they answered")
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    count = 0
+    done = set()
+    if args.done:
+        done = {r["id"] for r in map(json.loads, open(args.done, encoding="utf-8")) if "error" not in r}
+    docs = [d for d in map(json.loads, open(args.docs, encoding="utf-8")) if d["doc_id"] not in done]
     with open(args.output, "w", encoding="utf-8") as out:
-        for line in open(args.docs, encoding="utf-8"):
-            doc = json.loads(line)
+        for start in range(0, len(docs), args.per_request):
+            group = docs[start:start + args.per_request]
+            if len(group) == 1:
+                system, body, request_id = INSTRUCTIONS, "<document>\n%s</document>" % group[0]["text"], group[0]["doc_id"]
+            else:
+                # Several documents a request: the free tier allows 1,000 requests a day.
+                system = MULTI
+                body = "\n\n".join('<document id="%s">\n%s</document>' % (d["doc_id"], d["text"]) for d in group)
+                request_id = "qa-batch:" + "|".join(d["doc_id"] for d in group)
             out.write(json.dumps({
-                "id": doc["doc_id"],
-                "messages": [{"role": "system", "content": INSTRUCTIONS},
-                             {"role": "user", "content": "<document>\n%s</document>" % doc["text"]}],
-                "max_tokens": 12000, "reasoning": {"effort": args.effort},
+                "id": request_id,
+                "messages": [{"role": "system", "content": system}, {"role": "user", "content": body}],
+                "max_tokens": 12000 * len(group), "reasoning": {"effort": args.effort},
                 "response_format": {"type": "json_object"}}) + "\n")
-            count += 1
-    print("%d requests -> %s" % (count, args.output))
+    print("%d documents (%d done) in %d requests -> %s"
+          % (len(docs), len(done), -(-len(docs) // args.per_request), args.output))
 
 
 if __name__ == "__main__":

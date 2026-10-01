@@ -60,7 +60,7 @@ INSTRUCTIONS = """You write training conversations that teach a small assistant 
 Domain: {domain}
 Scenario: {scenario}
 
-Write 4 different conversations for this domain and scenario. For each:
+Write {count} different conversations for this domain and scenario. For each:
 - "tools": 2 to 6 realistic function schemas in OpenAI format ({{"type": "function", "function": {{"name", \
 "description", "parameters": JSON Schema object with "properties" and "required"}}}}), including some tools the \
 conversation does not need. For the python scenario, include {{"name": "python", "parameters": {{"type": \
@@ -78,23 +78,41 @@ Return only JSON: {{"conversations": [{{"tools": [...], "messages": [...]}}]}}""
 TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict}
 
 
+def first_run_pairs():
+    """The (domain, scenario) behind each id of the first run: seed 0, three repeats."""
+    rng = random.Random(0)
+    pairs = list(itertools.product(DOMAINS, SCENARIOS)) * 3
+    rng.shuffle(pairs)
+    return pairs
+
+
 def build(args):
     rng = random.Random(args.seed)
-    pairs = list(itertools.product(DOMAINS, SCENARIOS)) * args.repeats
+    covered = set()
+    if args.done:
+        # Pairs the first run already answered; the free tier allows 1,000 requests a day.
+        first = first_run_pairs()
+        for row in map(json.loads, open(args.done, encoding="utf-8")):
+            if "error" not in row:
+                covered.add(first[int(row["id"].split(":")[1])])
+    pairs = [p for p in itertools.product(DOMAINS, SCENARIOS) if p not in covered] * args.repeats
     rng.shuffle(pairs)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", encoding="utf-8") as out:
         for index, (domain, scenario) in enumerate(pairs):
             out.write(json.dumps({
-                "id": "tools:%d:%s" % (index, scenario),
-                "messages": [{"role": "user", "content": INSTRUCTIONS.format(domain=domain, scenario=SCENARIOS[scenario])}],
-                "max_tokens": 16000, "temperature": 1.0, "reasoning": {"effort": "low"},
+                "id": "%s:%d:%s" % (args.prefix, index, scenario),
+                "messages": [{"role": "user", "content": INSTRUCTIONS.format(
+                    domain=domain, scenario=SCENARIOS[scenario], count=args.per_request)}],
+                "max_tokens": 5000 * args.per_request, "temperature": 1.0, "reasoning": {"effort": "low"},
                 "response_format": {"type": "json_object"}}) + "\n")
-    print("%d requests (%d domains x %d scenarios x %d) -> %s"
-          % (len(pairs), len(DOMAINS), len(SCENARIOS), args.repeats, args.output))
+    print("%d requests (%d pairs already covered, %d a request) -> %s"
+          % (len(pairs), len(covered), args.per_request, args.output))
 
 
 def value_ok(value, schema):
+    if not isinstance(schema, dict):
+        return False  # a malformed schema: nothing to check the call against
     kind = schema.get("type")
     if isinstance(kind, list):
         return any(value_ok(value, dict(schema, type=k)) for k in kind)
@@ -141,15 +159,20 @@ def call_problem(call, tools):
 
 
 def conversation_problem(conversation, scenario):
-    tools = {t.get("function", {}).get("name"): t.get("function", {}) for t in conversation.get("tools") or []
-             if isinstance(t, dict)}
-    messages = conversation.get("messages") or []
+    raw_tools, messages = conversation.get("tools") or [], conversation.get("messages") or []
+    if not isinstance(raw_tools, list) or not isinstance(messages, list) \
+            or not all(isinstance(t, dict) and isinstance(t.get("function"), dict) for t in raw_tools) \
+            or not all(isinstance(m, dict) for m in messages):
+        return "shape"
+    tools = {t["function"].get("name"): t["function"] for t in raw_tools}
     if not tools or not messages or messages[0].get("role") != "user" or messages[-1].get("role") != "assistant":
         return "shape"
     calls, ids = 0, set()
     for message in messages:
         if message.get("role") == "assistant":
             for call in message.get("tool_calls") or []:
+                if not isinstance(call, dict):
+                    return "shape"
                 problem = call_problem(call, tools)
                 if problem:
                     return problem
@@ -177,7 +200,10 @@ def verify(args):
                 outcomes["unparsable or failed"] += 1
                 continue
             for index, conversation in enumerate(conversations):
-                problem = conversation_problem(conversation, scenario) if isinstance(conversation, dict) else "shape"
+                try:
+                    problem = conversation_problem(conversation, scenario) if isinstance(conversation, dict) else "shape"
+                except (AttributeError, TypeError, KeyError):
+                    problem = "shape"  # malformed in some way the checks above did not anticipate
                 outcomes[problem or "ok"] += 1
                 if problem is None:
                     kept[scenario] += 1
@@ -193,6 +219,9 @@ def main():
     b = sub.add_parser("build")
     b.add_argument("--output", type=Path, required=True)
     b.add_argument("--repeats", type=int, default=3)
+    b.add_argument("--per-request", type=int, default=4)
+    b.add_argument("--done", type=Path, default=None, help="first-run responses: skip the pairs they answered")
+    b.add_argument("--prefix", default="tools")
     b.add_argument("--seed", type=int, default=0)
     v = sub.add_parser("verify")
     v.add_argument("--responses", type=Path, required=True)

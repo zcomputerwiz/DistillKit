@@ -56,36 +56,46 @@ def check(item, files, whole):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--docs", type=Path, required=True)
-    parser.add_argument("--responses", type=Path, required=True)
+    parser.add_argument("--responses", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     docs = {d["doc_id"]: d for d in map(json.loads, open(args.docs, encoding="utf-8"))}
     outcomes, kept_types, kept_docs = Counter(), Counter(), 0
     with open(args.output, "w", encoding="utf-8") as out:
-        for row in map(json.loads, open(args.responses, encoding="utf-8")):
-            if "error" in row or row["id"] not in docs:
+        for row in (json.loads(l) for path in args.responses for l in open(path, encoding="utf-8")):
+            if "error" in row:
                 outcomes["request failed"] += 1
                 continue
             try:
-                items = json.loads(re.sub(r"^```(json)?|```$", "", row["content"].strip()))["items"]
+                reply = json.loads(re.sub(r"^```(json)?|```$", "", row["content"].strip()))
+                # One document a request ({"items"}) or several ({"documents": [{"doc_id", "items"}]}).
+                groups = ([(row["id"], reply["items"])] if "items" in reply
+                          else [(d["doc_id"], d["items"]) for d in reply["documents"]])
             except (ValueError, KeyError, TypeError, AttributeError):
                 outcomes["unparsable response"] += 1
                 continue
-            text = docs[row["id"]]["text"]
-            files, whole = files_of(text), SPACE.sub(" ", text)
-            kept = []
-            for item in items:
-                verdict = check(item, files, whole)
-                outcomes[verdict] += 1
-                if verdict == "ok":
-                    kept.append({k: item[k] for k in ("type", "question", "answer", "evidence") if k in item})
-                    kept_types[item.get("type")] += 1
-            if kept:
-                kept_docs += 1
-                out.write(json.dumps({"doc_id": row["id"], "items": kept}) + "\n")
+            for doc_id, items in groups:
+                if doc_id not in docs:
+                    outcomes["unknown document"] += 1
+                    continue
+                kept_docs += write_kept(out, doc_id, items, docs[doc_id]["text"], outcomes, kept_types)
     print("outcomes: %s" % dict(outcomes.most_common()))
     print("kept %d questions over %d documents: %s" % (sum(kept_types.values()), kept_docs, dict(kept_types)))
 
+
+def write_kept(out, doc_id, items, text, outcomes, kept_types):
+    """Check one document's items, write the ones that hold; 1 if any did."""
+    files, whole = files_of(text), SPACE.sub(" ", text)
+    kept = []
+    for item in items if isinstance(items, list) else []:
+        verdict = check(item, files, whole)
+        outcomes[verdict] += 1
+        if verdict == "ok":
+            kept.append({k: item[k] for k in ("type", "question", "answer", "evidence") if k in item})
+            kept_types[item.get("type")] += 1
+    if kept:
+        out.write(json.dumps({"doc_id": doc_id, "items": kept}) + "\n")
+    return int(bool(kept))
 
 if __name__ == "__main__":
     main()
