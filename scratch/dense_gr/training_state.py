@@ -10,6 +10,17 @@ import numpy as np
 import torch
 
 
+def position_weight(record):
+    """A record's per-position loss weights, or None when every position weighs 1. An
+    older record's boolean `supervised` mask is the 0/1 case. The loss and the budget
+    both read weights through here, so they always charge the same thing."""
+    if "weight" in record:
+        return record["weight"]
+    if "supervised" in record:
+        return record["supervised"].float()
+    return None
+
+
 class PlannedBatches:
     def __init__(self, teacher, groups, seed):
         if not groups:
@@ -20,6 +31,11 @@ class PlannedBatches:
         cache = getattr(teacher, "cache", None)
         captures = getattr(cache, "caches", [cache])
         identity = dict(groups=groups, manifests=[getattr(c, "manifest", None) for c in captures])
+        # The loss weights are part of the plan too: a resume against changed answer spans,
+        # weight, padding or masks would charge and optimize a different objective.
+        weights = getattr(teacher, "weight_identity", None)
+        if weights is not None:
+            identity["weights"] = weights()
         self.fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
 
     def state_dict(self):
@@ -89,7 +105,7 @@ def take_step(batches, accumulate, remaining):
             break
         records.append(record)
         ids = record["input_ids"]
-        weight = record.get("weight")
+        weight = position_weight(record)
         remaining -= float(weight[:, :-1].sum()) if weight is not None else ids.numel() - ids.shape[0]
     return records
 

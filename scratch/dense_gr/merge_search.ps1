@@ -11,14 +11,22 @@ New-Item -ItemType Directory -Force $out | Out-Null
 # name | uniform alpha, or shallow,deep ramp
 $specs = @("u30|0.3", "u50|0.5", "u70|0.7", "ramp0-100|0,1", "ramp25-100|0.25,1", "ramp50-100|0.5,1", "ramp0-70|0,0.7")
 $arms = [System.Collections.Generic.List[string]]@("think=$think", "tuned=$Tuned")
+# A merge already on disk is reused only if it was made from these two checkpoints.
+$same = { param($x, $y) [IO.Path]::GetFullPath($x).TrimEnd('\') -ieq [IO.Path]::GetFullPath($y).TrimEnd('\') }
 foreach ($spec in $specs) {
     $name, $a = $spec -split '\|'
-    if (-not (Test-Path "$out\$name\model.safetensors")) {
+    if (Test-Path "$out\$name\model.safetensors") {
+        $made = Get-Content "$out\$name\merge.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
+        if (-not $made -or -not (& $same $made.base $think) -or -not (& $same $made.tuned $Tuned)) {
+            "stale merge $out\$name (made from other checkpoints); move it aside or use another -Tag"; exit 1
+        }
+    } else {
         $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\merge_weights.py", "--base", $think,
             "--tuned", $Tuned, "--output", "$out\$name")
         if ($a -match ',') { $s, $d = $a -split ','; $argv.Add("--shallow"); $argv.Add($s); $argv.Add("--deep"); $argv.Add($d) }
         else { $argv.Add("--alpha"); $argv.Add($a) }
         & $py $argv
+        if ($LASTEXITCODE -ne 0) { "merge $name failed (exit $LASTEXITCODE)"; exit 1 }
     }
     $arms.Add("$name=$out\$name")
 }
@@ -36,8 +44,11 @@ $jobs = foreach ($gpu in 0, 1) {
         foreach ($arm in $mine -split ";") { $argv.Add($arm) }
         $argv.Add("--output"); $argv.Add("$out\proxy-gpu$gpu.json")
         & $py $argv *> "$out\proxy-gpu$gpu.log"
+        if ($LASTEXITCODE -ne 0) { throw "merge_proxy on gpu $gpu failed (exit $LASTEXITCODE)" }
     }
 }
 $jobs | Wait-Job | Receive-Job
+if ($jobs | Where-Object { $_.State -ne "Completed" }) { "blend screen failed; see $out\proxy-gpu*.log"; exit 1 }
 Get-Content "$out\proxy-gpu0.log", "$out\proxy-gpu1.log" | Select-String "code nll|Traceback|Error"
 "=== done $(Get-Date -Format HH:mm)"
+exit 0

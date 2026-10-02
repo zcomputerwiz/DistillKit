@@ -94,3 +94,53 @@ def test_causal_ce_weights_match_plain_torch():
         assert got == pytest.approx(ref, rel=2e-3)
         plain = float(causal_ce(model, hidden, ids))
         assert plain == pytest.approx(float(masked_ce(model, hidden, ids)), rel=2e-3)
+
+
+def test_unlikelihood_honors_position_weights():
+    """A weighted mean is invariant to scaling every weight (Codex review r2b finding 2)."""
+    from test_assistant_mask import masked_ce
+    from test_dense_gr_training_step import TinyLM
+    from training_step import backward_step
+
+    torch.manual_seed(0)
+    model = TinyLM()
+    ids = torch.randint(0, 32, (1, 10))
+    negative = torch.zeros(1, 10, dtype=torch.bool)
+    negative[0, 4] = True
+    common = dict(input_ids=ids, negative=negative, kl_only=True,
+                  topk_ids=torch.arange(4).expand(1, 10, 4).clone(), topk_logprobs=torch.full((1, 10, 4), -1.5))
+    one = backward_step(model, [dict(common, weight=torch.ones(1, 10))], ce=masked_ce,
+                        teacher_weight=0.5, unlikelihood_weight=1.0)
+    model.zero_grad()
+    four = backward_step(model, [dict(common, weight=torch.full((1, 10), 4.0))], ce=masked_ce,
+                         teacher_weight=0.5, unlikelihood_weight=1.0)
+    assert one["unlikelihood"] > 0
+    assert four["unlikelihood"] == pytest.approx(one["unlikelihood"], rel=1e-5)
+    assert four["teacher_kl"] == pytest.approx(one["teacher_kl"], rel=1e-5)
+
+
+def test_resume_fingerprint_covers_the_weights(tmp_path):
+    from training_state import PlannedBatches
+
+    a = teacher(tmp_path / "a", {"a": [[5, 8]]})
+    b = teacher(tmp_path / "b", {"a": [[6, 8]]})
+    groups = a._groups(4)
+    assert groups == b._groups(4)
+    assert PlannedBatches(a, groups, 0).fingerprint != PlannedBatches(b, groups, 0).fingerprint
+
+
+def test_take_step_charges_a_legacy_mask_like_the_loss():
+    from training_state import take_step
+
+    supervised = torch.zeros(1, 10, dtype=torch.bool)
+    supervised[0, 2:5] = True
+
+    class One:  # admits a record when its 3 masked targets fit, as PlannedBatches.take does
+        def take(self, remaining):
+            if remaining < 3:
+                return None
+            return dict(input_ids=torch.zeros(1, 10, dtype=torch.long), supervised=supervised)
+
+    # Two records of 3 charged targets each fit a remaining budget of 6; charging the raw
+    # 9 positions would have stopped after one.
+    assert len(take_step(One(), 3, 6)) == 2

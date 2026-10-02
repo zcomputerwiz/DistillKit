@@ -1145,15 +1145,23 @@ def main(argv=None) -> int:
               % (len(pairs.rows), args.pairs, args.pairs_per_step, args.pair_weight, args.dpo_beta,
                  pairs.widths()), flush=True)
     warmup_backward_targets = 0
-    # Warm the actual objective and recorded-attention path, not a CE-only surrogate.
+    warmed_shapes = set()
+    # Warm the actual objective and recorded-attention path, not a CE-only surrogate. Only
+    # the largest shape up front, so running out of memory shows at once; every other
+    # shape's first training step runs single-threaded instead (below). Warming all of
+    # them first cost a discarded forward and backward per shape: with documents padded to
+    # the block, 342 shapes and 8M input tokens before round 2's first update.
     if args.tensor_parallel:
         examples = {}
         if teacher is not None:
             for group, width in groups:
                 examples.setdefault((len(group), width), (group, width))
-        print("warming %d objective shapes: %s" % (len(shapes), shapes), flush=True)
+        largest = [max(shapes, key=lambda shape: shape[0] * shape[1])]
+        print("warming the largest of %d objective shapes, %s; the rest on first use"
+              % (len(shapes), largest[0]), flush=True)
+        warmed_shapes.update(largest)
         with torch.autograd.set_multithreading_enabled(False):
-            for rows, width in shapes:
+            for rows, width in largest:
                 if teacher is not None:
                     group, width = examples[(rows, width)]
                     record = teacher.read_batch(group, width)
@@ -1207,8 +1215,16 @@ def main(argv=None) -> int:
                 torch.cuda.reset_peak_memory_stats(device)
         synchronize(model)
         step_started = time.perf_counter()
-        metrics = optimizer_step(model, optimizer, microbatches,
-                                 tensor_parallel=args.tensor_parallel, **step_options)
+        # A shape's first step runs single-threaded, which is all the warm-up pass did for
+        # it -- its kernels autotune without the two cards' backward threads racing -- but
+        # the gradients are kept rather than thrown away.
+        fresh = {tuple(r["input_ids"].shape) for r in microbatches} - warmed_shapes
+        quiet = (torch.autograd.set_multithreading_enabled(False) if args.tensor_parallel and fresh
+                 else contextlib.nullcontext())
+        with quiet:
+            metrics = optimizer_step(model, optimizer, microbatches,
+                                     tensor_parallel=args.tensor_parallel, **step_options)
+        warmed_shapes |= fresh
         synchronize(model)
         step_seconds = time.perf_counter() - step_started
         if step >= args.benchmark_warmup_steps:

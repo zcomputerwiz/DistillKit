@@ -33,20 +33,30 @@ from capture_inputs import F, qa_conversation, split_of  # noqa: E402
 from long_context_probe import TOKENIZER  # noqa: E402
 
 
-def conversations(tokenizer, max_length, with_document=True):
-    """Held-out QA conversations: (doc_id, ids, [(start, stop)] answer-body spans), rendered
-    by capture_inputs.qa_conversation -- the same code that built the captured inputs."""
+def conversations(tokenizer, max_length, exclude=()):
+    """Held-out QA conversations, rendered by capture_inputs.qa_conversation -- the same
+    code that built the captured inputs -- in pairs: with the document, and the same
+    retained turns (questions and reference answers) without it.
+
+    Returns {"document": [...], "no_document": [...]}, each a list of
+    (doc_id, ids, [(start, stop)] answer-body spans), in the same order.
+    """
     docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
-    seen, out = set(), []
+    seen, full, control = set(), [], []
     for row in map(json.loads, open(F / "frontier" / "qa-code.jsonl", encoding="utf-8")):
-        if row["doc_id"] in seen or split_of(row["doc_id"]) != "eval":
+        if row["doc_id"] in seen or split_of(row["doc_id"]) != "eval" or "qa:" + row["doc_id"] in exclude:
             continue
         seen.add(row["doc_id"])
-        ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]] if with_document else None,
-                                     max_length)
-        if spans:
-            out.append((row["doc_id"], ids, [tuple(span) for span in spans]))
-    return out
+        ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]], max_length)
+        if not spans:
+            continue
+        kept = row["items"][:len(spans)]
+        bare, bare_spans = qa_conversation(tokenizer, kept, None, max_length)
+        if len(bare_spans) != len(spans):
+            raise SystemExit("control for %s kept %d of %d turns" % (row["doc_id"], len(bare_spans), len(spans)))
+        full.append((row["doc_id"], ids, [tuple(x) for x in spans]))
+        control.append((row["doc_id"], bare, [tuple(x) for x in bare_spans]))
+    return {"document": full, "no_document": control}
 
 
 @torch.no_grad()
@@ -79,6 +89,8 @@ def main():
     parser.add_argument("--arm", action="append", required=True, help="name=checkpoint; the first is the reference")
     parser.add_argument("--max-length", type=int, default=32768)
     parser.add_argument("--limit", type=int, default=0, help="first N conversations only (smoke tests)")
+    parser.add_argument("--exclude", nargs="*", type=Path, default=[],
+                        help="JSON lists of document ids to leave out (the run's exclusions)")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -87,14 +99,16 @@ def main():
     from distillkit.models import Qwen35WidenedForCausalLM
 
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER)
-    sets = {"document": conversations(tokenizer, args.max_length),
-            "no_document": conversations(tokenizer, args.max_length, with_document=False)}
+    exclude = {i for path in args.exclude for i in json.load(open(path, encoding="utf-8"))}
+    sets = conversations(tokenizer, args.max_length, exclude)
     if args.limit:
         sets = {k: v[:args.limit] for k, v in sets.items()}
-    print("held-out conversations: %d, answer tokens %d" % (
-        len(sets["document"]), sum(b - a for _, _, s in sets["document"] for a, b in s)), flush=True)
+    print("held-out conversations: %d (%d ids on the exclusion lists), answer tokens %d" % (
+        len(sets["document"]), len(exclude), sum(b - a for _, _, s in sets["document"] for a, b in s)), flush=True)
     dtype = torch.float32 if args.device == "cpu" else torch.bfloat16
-    report = dict(arms={}, conversations=[d for d, _, _ in sets["document"]])
+    report = dict(arms={}, excluded=sorted(exclude), max_length=args.max_length,
+                  documents=[dict(doc_id=d, answers=len(s), answer_tokens=sum(b - a for a, b in s))
+                             for d, _, s in sets["document"]])
     per_doc = {}
     for arm in args.arm:
         name, path = arm.split("=", 1)
@@ -111,6 +125,9 @@ def main():
                              close_nll=totals[2] / max(totals[3], 1))
         row["context_benefit"] = row["no_document"]["answer_nll"] - row["document"]["answer_nll"]
         report["arms"][name] = row
+        for entry, with_doc, without in zip(report["documents"], per_doc[name, "document"],
+                                            per_doc[name, "no_document"]):
+            entry[name] = dict(document=with_doc, no_document=without)
         print("%-12s answer NLL with document %.4f, without %.4f (benefit %.4f); close NLL %.4f"
               % (name, row["document"]["answer_nll"], row["no_document"]["answer_nll"],
                  row["context_benefit"], row["document"]["close_nll"]), flush=True)

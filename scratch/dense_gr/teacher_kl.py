@@ -576,6 +576,19 @@ class CachedTeacher:
                 weight[first:last] = self.answer_weight
         return weight
 
+    def weight_identity(self):
+        """A digest of everything the loss weights depend on beyond the groups."""
+        import hashlib
+        import json
+
+        payload = dict(answer_weight=self.answer_weight, pad_blocks=self.pad_blocks,
+                       spans=sorted((d, [[int(p) for p in s] for s in spans]) for d, spans in self.spans.items()),
+                       assistant_only=sorted(self.assistant_only_ids),
+                       offsets=sorted((d, [int(p) for p in span]) for d, span in self.offset.items()),
+                       marker=[int(t) for t in self.answer_marker or []],
+                       close=None if self.turn_close is None else int(self.turn_close))
+        return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+
     def weighted(self, doc_id):
         """Whether a document needs a weight row (else every position weighs 1)."""
         return doc_id in self.assistant_only_ids or doc_id in self.spans
@@ -790,11 +803,14 @@ def loop_start(ids, start, close, n=16, count=3):
     return None
 
 
-def unlikelihood_loss(hidden, head, ids, negative, chunk=128):
-    """Summed -log(1 - p(next token)) over `negative` positions.
+def unlikelihood_loss(hidden, head, ids, negative, chunk=128, weight=None):
+    """Summed -log(1 - p(next token)) over `negative` positions, each times its position
+    weight when `weight` is given (zero-weight negatives drop out), like every other term.
 
     Rows are projected in chunks: a 248320-wide fp32 row is 1 MB, and a looping micro
     batch has hundreds of negatives."""
+    if weight is not None:
+        negative = negative & (weight > 0)
     positions = negative.nonzero()
     total = hidden.new_zeros((), dtype=torch.float32)
     for begin in range(0, len(positions), chunk):
@@ -803,7 +819,10 @@ def unlikelihood_loss(hidden, head, ids, negative, chunk=128):
         logits = head(state).float()
         wanted = ids[at[:, 0], at[:, 1] + 1]
         p = (logits.gather(-1, wanted[:, None]).squeeze(-1) - logits.logsumexp(-1)).exp()
-        total = total - torch.log1p(-p.clamp(max=1 - 1e-6)).sum()
+        penalty = -torch.log1p(-p.clamp(max=1 - 1e-6))
+        if weight is not None:
+            penalty = penalty * weight[at[:, 0], at[:, 1]].float()
+        total = total + penalty.sum()
     return total
 
 

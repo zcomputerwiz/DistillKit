@@ -10,7 +10,8 @@
 #    CSA2 indexer keeps its selection (pass-key is already 100% to 32K) and memory is linear
 #  - DeltaNet decay gates at a tenth of the rate (SpectralShift): they hold the long memory
 #  - replay keeps short-context skills (ProLong keeps ~40% short data)
-# Then the long-context probe, a blend screen against the base, and the full suite.
+# Then the long-context probe, the held-out QA answers and a blend screen against the base;
+# the finalists' benchmark suite is a separate, explicit step after choosing a blend.
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"
 $C = "$D\capture-data"
@@ -48,9 +49,10 @@ foreach ($c2 in $caches) { $argv.Add($c2) }
 # Codex review (codex-review-r2/REVIEW.md): scored uniformly, QA would be 48% of the scored
 # tokens but under 1% of it answers. The answers (structural spans from capture_inputs.py,
 # with their closing <|im_end|>) weigh 16 to the document's 1, about an eighth of a QA
-# document's loss; the budget counts weight. Repeats then give roughly 26% agents / 31% QA /
-# 2% tools / 41% replay. Padding to the block multiple keeps the final turns that flooring
-# cut (28% of tool turns).
+# document's loss and ~3.5% of all weight; the budget counts weight. With the repeats the
+# plan is 24.9% agents / 28.7% QA / 1.9% tools / 44.6% replay by weight, ~20.7M forward
+# tokens for the 8M (Codex's seed-22 simulation, codex-review-r2b). Padding to the block
+# multiple keeps the final turns flooring cut (28% of tool turns) and short replay documents.
 foreach ($a in @("--assistant-only-caches", $agentA, $agentB, $tools, "--ce-only-caches", $code,
                  "--repeat", "$agentA=3", "$agentB=3", "$tools=4", "$code=2", "..\teacher-cache-curriculum-v4-w8=2",
                  "..\teacher-cache-thinking-w8=2", "..\teacher-cache-think-first-w8=2",
@@ -77,8 +79,9 @@ if (-not (Test-Path "$tuned\config.json")) { "training produced no checkpoint; s
 Check "long-context probe"
 "=== held-out QA answers $(Get-Date -Format HH:mm)"
 & $py scratch\frontier\qa_answer_eval.py --arm "long1-u50=$base" --arm "long2=$tuned" `
-    --output scratch\csa2-eval\qa-answers-long2.json
+    --exclude "$C\exclude-long-r2.json" --output scratch\csa2-eval\qa-answers-long2.json
 Check "QA answer eval"
 "=== blend screen against the base $(Get-Date -Format HH:mm)"
 & .\scratch\dense_gr\merge_search.ps1 -Tuned $tuned -Tag long2 -Base $base
+Check "blend screen"
 "=== done $(Get-Date -Format HH:mm)"

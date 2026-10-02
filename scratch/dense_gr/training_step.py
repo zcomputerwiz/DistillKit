@@ -7,6 +7,7 @@ import bitsandbytes as bnb
 import torch
 
 from teacher_kl import accumulation_shares, grouped_tail_kl, scored_mask, unlikelihood_loss
+from training_state import position_weight
 
 
 class KahanAdamW8bit(bnb.optim.AdamW8bit):
@@ -113,16 +114,6 @@ def check_optimizer(model, optimizer):
                if p.requires_grad and id(p) not in held_ids]
     if missing:
         raise ValueError("trainable parameters missing from optimizer: " + ", ".join(missing[:6]))
-
-
-def position_weight(record):
-    """A record's per-position loss weights, or None when every position weighs 1. An
-    older record's boolean `supervised` mask is the 0/1 case."""
-    if "weight" in record:
-        return record["weight"]
-    if "supervised" in record:
-        return record["supervised"].float()
-    return None
 
 
 def causal_ce(model, hidden, ids, weight=None):
@@ -277,8 +268,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                         # teacher endorses the loop; unlikelihood pushes them down instead.
                         kl_mask = mask * ~negative.to(mask.device)
                         repelled = unlikelihood_loss(
-                            hidden.to(where), model.lm_head, ids.to(where),
-                            negative.to(where)).to(hidden.device) / count
+                            hidden.to(where), model.lm_head, ids.to(where), negative.to(where),
+                            weight=None if weight is None else weight.to(where)).to(hidden.device) / count
                     carried = grouped_tail_kl(
                         hidden.to(where), model.lm_head, record["topk_ids"].to(where),
                         record["topk_logprobs"].to(where), kl_mask.to(where),
