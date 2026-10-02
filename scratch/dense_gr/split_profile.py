@@ -325,15 +325,19 @@ def main() -> int:
                     name: mean_se([d["splits"][str(s)][key][name] for d in docs
                                    if d["domain"] == domain and name in d["splits"][str(s)].get(key, {})])
                     for name in ("all",) + tuple(b[0] for b in BINS)}
-            w, c = out["%s_wiki" % key], out["%s_captures" % key]
-            print("split %2d  %-12s dNLL  wiki: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | "
-                  "captures: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f"
-                  % (s, key, w["all"][0], w["first"][0], w["2-8"][0], w["33+"][0],
-                     c["all"][0], c["first"][0], c["2-8"][0], c["33+"][0]), flush=True)
-        print("split %2d  map/skipped params %.2f" % (s, out["map_parameters"] / out["skipped_layer_parameters"]),
-              flush=True)
     hooks.remove()
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    def show(cell):  # a long tail can leave a domain with no filled document: n/a
+        return "  ".join("%s %s" % (name, "n/a" if cell[name][0] is None else "%+.4f" % cell[name][0])
+                         for name in ("all", "first", "2-8", "33+"))
+    for s in args.splits:
+        out = report["splits"][s]
+        for key in sorted(k[:-5] for k in out if k.endswith("_wiki")):
+            print("split %2d  %-14s dNLL  wiki: %s | captures: %s"
+                  % (s, key, show(out[key + "_wiki"]), show(out[key + "_captures"])), flush=True)
+        print("split %2d  map/skipped params %.2f" % (s, out["map_parameters"] / out["skipped_layer_parameters"]),
+              flush=True)
     return 0
 
 
