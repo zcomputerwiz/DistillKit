@@ -8,13 +8,16 @@ $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHON
 $think = if ($Base) { $Base } else { "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2" }
 $out = "$root\scratch\dense_gr\merges-$Tag"
 New-Item -ItemType Directory -Force $out | Out-Null
-# name | uniform alpha, or shallow,deep ramp
-$specs = @("u30|0.3", "u50|0.5", "u70|0.7", "ramp0-100|0,1", "ramp25-100|0.25,1", "ramp50-100|0.5,1", "ramp0-70|0,0.7")
+# name | uniform alpha, or shallow,deep ramp [| extra merge_weights flag]
+# qk: the tuned run with its attention layers' query/key maps from the base (QK-Restore,
+# arXiv 2606.11052) -- long-range routing kept, the rest of the update whole.
+$specs = @("u30|0.3", "u50|0.5", "u70|0.7", "ramp0-100|0,1", "ramp25-100|0.25,1", "ramp50-100|0.5,1", "ramp0-70|0,0.7",
+           "qk|1|--restore-qk")
 $arms = [System.Collections.Generic.List[string]]@("think=$think", "tuned=$Tuned")
 # A merge already on disk is reused only if it was made from these two checkpoints.
 $same = { param($x, $y) [IO.Path]::GetFullPath($x).TrimEnd('\') -ieq [IO.Path]::GetFullPath($y).TrimEnd('\') }
 foreach ($spec in $specs) {
-    $name, $a = $spec -split '\|'
+    $name, $a, $flag = $spec -split '\|'
     if (Test-Path "$out\$name\model.safetensors") {
         $made = Get-Content "$out\$name\merge.json" -Raw -ErrorAction SilentlyContinue | ConvertFrom-Json
         if (-not $made -or -not (& $same $made.base $think) -or -not (& $same $made.tuned $Tuned)) {
@@ -25,6 +28,7 @@ foreach ($spec in $specs) {
             "--tuned", $Tuned, "--output", "$out\$name")
         if ($a -match ',') { $s, $d = $a -split ','; $argv.Add("--shallow"); $argv.Add($s); $argv.Add("--deep"); $argv.Add($d) }
         else { $argv.Add("--alpha"); $argv.Add($a) }
+        if ($flag) { $argv.Add($flag) }
         & $py $argv
         if ($LASTEXITCODE -ne 0) { "merge $name failed (exit $LASTEXITCODE)"; exit 1 }
     }
