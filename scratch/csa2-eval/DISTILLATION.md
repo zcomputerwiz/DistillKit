@@ -955,3 +955,18 @@ prompts, user turns and tool output out of both losses.
 mini-swe-agent): median 16.8K / 7.4K / 8.2K / 2.5K tokens, assistant completions median
 76-240. The template keeps every turn's reasoning across tool rounds (DeepSeek-V4's
 interleaved thinking); OpenCode turns carry none, so they render empty think blocks.
+**Old targets against the int8-weight recapture (2026-10-01).** 150 documents a cache,
+LLM.int8 captures against the weight-only int8 recaptures of the same tokens: top-1 agreement
+0.948 (thinking), 0.960 (think-first), 0.949 (curriculum-v4); KL(new || old) 0.049-0.059 nats
+a position, against ~1e-3 for bf16 kernel noise. One position in twenty had a different top
+token in every earlier round's targets.
+
+**Capture throughput.** The 27B teacher is split across the two 3090s by layer, so one
+document at a time left each card idle while the other worked. Now (sample_transformers):
+two documents in flight on per-thread streams, a lock per card so they pipeline instead of
+entering each card together, workers paced two layers ahead (a launch into a full queue
+blocks holding the GIL), short documents right-padded into 8K-position batches, results
+fetched once a forward, layers split evenly (the memory split gave 26/38), allocator capped
+at 22.5 GiB (WDDM spills silently past the card). Short documents (~200 tokens) 290 -> 640
+tok/s, ~500-900-token documents ~800-960 tok/s; both cards ~94% busy. The agent capture was
+stopped at a third and its finished shards salvaged (salvage_capture.py).
