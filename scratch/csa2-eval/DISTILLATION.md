@@ -994,3 +994,26 @@ The gap to the source at 32K falls from +0.126 to +0.083 (blends +0.093 / +0.097
 logp -0.18 at 32K (base -0.35). Short screen: code NLL and math flat (u50 blend math 45.7%,
 gsm8k 71.9%; ramp0-70 best code NLL 0.7711); thinking NLL +0.012 for the raw round, about
 flat for the blends.
+
+## Split-prefill preflight (2026-10-02)
+
+`split_profile.py` on long1-u50, no training: centered ridge maps from the residual stream at
+the split (both branches) fill every upper layer's cache inputs for old prompt tokens
+(gated-delta pre-convolution q/k/v and a, b; latent attention's kv_a before its norm and
+RoPE), the last `tail` prompt tokens and the continuation run the full stack. Change in
+continuation NLL against an exact prefill, WikiText windows (prompt 3/4 of the window):
+
+| split (layers skipped) | 2K window, tail 1 / 512 | 8K window, tail 1 / 512 / 2048 / 4096 |
+|---|---|---|
+| 19 (4) | +0.001 / -0.001 | +0.004 / +0.003 / +0.002 / +0.001 |
+| 15 (8) | +0.009 / +0.005 | +0.012 / +0.009 / +0.004 / +0.003 |
+| 11 (12) | +0.035 / +0.016 | +0.037 / +0.026 / +0.015 / +0.007 |
+
+Chat/agent/code captures behave alike where they are long enough (2K, tail 512: split 15
++0.002, split 11 +0.002). A mean-only fill costs +0.12 to +0.87, so the maps carry the
+state; anchors every 256 tokens add nothing on top of a tail. The damage concentrates in
+the first tokens after the boundary (split 15, 8K, tail 1: first token +0.03 wiki / +0.15
+captures), which the exact tail removes; four times the prompt length moves the all-token
+cost by ~+0.003 at split 15, so the approximation does not compound badly over longer
+recurrences. Dense maps cost a third of the parameters they replace, so a trained
+projector should be low-rank. Results: scratch/csa2-eval/split-profile-u50*.json (local).
