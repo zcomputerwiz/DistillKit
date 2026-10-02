@@ -6,7 +6,9 @@ Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $F = "..\capture-data\frontier"
 $jobs = @(@("qa-code2-requests.jsonl", "qa-code2-responses.jsonl"),
           @("tools2-requests.jsonl", "tools2-responses.jsonl"),
-          @("judge-batched-requests.jsonl", "judge-batched-responses.jsonl"))
+          @("judge-batched-requests.jsonl", "judge-batched-responses.jsonl"),
+          # 16 more questions per long document, none repeating the first 8 (qa_requests --avoid)
+          @("qa-more-requests.jsonl", "qa-more-responses.jsonl"))
 $end = Get-Date "2026-10-05 23:59"
 function NextReset { $u = (Get-Date).ToUniversalTime().Date.AddDays(1).AddMinutes(1); $u.ToLocalTime() }
 while ((Get-Date) -lt $end) {
@@ -35,6 +37,8 @@ while ((Get-Date) -lt $end) {
 "=== verify $(Get-Date -Format 'MM-dd HH:mm')"
 & $py scratch\frontier\qa_verify.py --docs ..\capture-data\long-docs-code.jsonl `
     --responses "$F\qa-code-responses.jsonl" "$F\qa-code2-responses.jsonl" --output "$F\qa-code.jsonl"
+& $py scratch\frontier\qa_verify.py --docs ..\capture-data\long-docs-code.jsonl `
+    --responses "$F\qa-more-responses.jsonl" --output "$F\qa-more.jsonl"
 foreach ($pair in @(@("tools-responses.jsonl", "tools.jsonl"), @("tools2-responses.jsonl", "tools2.jsonl"))) {
     & $py scratch\frontier\tool_tasks.py verify --responses "$F\$($pair[0])" --output "$F\$($pair[1])"
 }
