@@ -1218,7 +1218,8 @@ def main(argv=None) -> int:
         # A shape's first step runs single-threaded, which is all the warm-up pass did for
         # it -- its kernels autotune without the two cards' backward threads racing -- but
         # the gradients are kept rather than thrown away.
-        fresh = {tuple(r["input_ids"].shape) for r in microbatches} - warmed_shapes
+        # DPO pair records (chosen_ids / rejected_ids) are warmed up front by width.
+        fresh = {tuple(r["input_ids"].shape) for r in microbatches if "input_ids" in r} - warmed_shapes
         quiet = (torch.autograd.set_multithreading_enabled(False) if args.tensor_parallel and fresh
                  else contextlib.nullcontext())
         with quiet:
