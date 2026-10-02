@@ -14,7 +14,7 @@ from pathlib import Path
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--master", type=Path, required=True)
+    parser.add_argument("--master", type=Path, nargs="+", required=True, help="lists to combine")
     parser.add_argument("--caches", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -23,7 +23,7 @@ def main():
         manifest = json.loads((cache / "manifest.json").read_text(encoding="utf-8"))
         for shard in manifest["shards"]:
             held.update(shard["doc_ids"])
-    master = set(json.load(open(args.master, encoding="utf-8")))
+    master = {i for path in args.master for i in json.load(open(path, encoding="utf-8"))}
     kept = sorted(master & held)
     json.dump(kept, open(args.output, "w"), indent=1)
     print("%d of %d excluded ids are in these captures -> %s" % (len(kept), len(master), args.output))

@@ -21,7 +21,13 @@ $caches = @($agentA, $agentB, $code, "..\teacher-cache-curriculum-v4-w8", "..\te
 foreach ($cache in $caches) {
     if (-not (Test-Path "$D\$($cache.Substring(3))\manifest.json")) { "missing capture $cache; stopping"; exit 1 }
 }
-& $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" `
+# Answers both judges call wrong (frontier judge + Codex; first-judge-only where Codex has
+# not looked yet), rebuilt now so it takes every Codex verdict written by the start.
+$F = "$C\frontier"
+& $py scratch\frontier\judge_docs.py collect --responses "$F\judge-responses.jsonl" "$F\judge-batched-responses.jsonl" `
+    --second "$F\codex-crosscheck\judge-codex.jsonl" "$F\codex-missing\judge-missing.jsonl" `
+    "$F\codex-crosscheck2\judge-codex.jsonl" --output "$C\exclude-judged.json"
+& $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" `
     --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r1.json"
 "=== train $(Get-Date -Format HH:mm)"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $base,
