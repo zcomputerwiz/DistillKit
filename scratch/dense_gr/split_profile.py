@@ -8,20 +8,31 @@ state exactly; a latent-attention layer its `kv_a_proj` output, the latent and t
 key before its own norm and RoPE (borrow_profile: rotary keys do not transfer between
 layers, so the target layer positions them itself). Decoding then runs the whole stack.
 
-Two measurements, no training -- ridge maps from the split's residual stream (both
-branches), fitted on calibration text, bound how good a start a trained projector gets:
+Two measurements, no training -- centered ridge maps from the split's residual stream
+(both branches), fitted on calibration text, give a first look at how good a start a
+trained projector gets (not a bound on it):
 
-* **R^2** of each predicted input on held-out text, per part (q, k, v, a, b; latent,
-  rotary).
+* **reconstruction** of each predicted input on held-out text, per part (q, k, v, a, b;
+  latent, rotary): R^2 about the held-out means, and skill against the calibration mean.
 * **continuation NLL**, the decision: each held-out document's first 3/4 is the prompt,
-  its upper layers filled from the maps, and the last quarter is scored against an exact
-  prefill, paired per document. Errors compound through the stack and the recurrences, so
-  this, not R^2, is what a split has to pass (borrow_sweep: the best pattern by isolated
-  reconstruction came fourth once assembled). A mean-only fill (the maps' intercepts) is
-  the floor, and an identity fill checks the wiring (must be 0).
+  its upper layers filled from the maps, and the rest is scored per token against an exact
+  prefill, by distance from the boundary (first token, 2-8, 9-32, 33+), paired per
+  document. Errors compound through the stack and the recurrences, so this, not R^2, is
+  what a split has to pass (borrow_sweep: the best pattern by isolated reconstruction came
+  fourth once assembled). The boundary follows KV Prediction: fills cover the prompt up to
+  its second-to-last token, and the last prompt token runs the full stack once reading
+  them, so the first continuation token's loss is the one a real split prefill gets.
+  A mean-only fill (calibration means) is a baseline; an identity fill checks the wiring,
+  and every fill asserts that each target was intercepted.
 
-Also the arithmetic of the payoff: a dense map costs (4096+1) x outputs per token, which
-is set against the parameters of the layers it replaces.
+The whole-sequence emulation equals a real split prefill for every continuation position
+(Codex review, codex-review-split/REVIEW.md): the gated-delta z gate and all residual and
+hyper-connection work are token-local, and CSA2 derives keys, values and index keys from
+the filled latent. It is a mathematical, not a kernel-level, equivalence; a cached-decode
+parity check belongs with the real implementation.
+
+Also the arithmetic of the payoff: a dense map costs (4096+1) x outputs per token, set
+against the parameters of the layers it replaces (not a latency estimate).
 
     python scratch/dense_gr/split_profile.py --checkpoint scratch/dense_gr/merges-long1/u50 \\
         --splits 11 15 19 --output scratch/csa2-eval/split-profile-u50.json
@@ -42,7 +53,7 @@ from borrow_profile import documents  # noqa: E402  (imports smoke_train's shims
 from distillkit.models import Qwen35WidenedForCausalLM  # noqa: E402
 
 RIDGE = 1e-4
-GDN_PARTS = ("q", "k", "v")
+BINS = (("first", 0, 1), ("2-8", 1, 8), ("9-32", 8, 32), ("33+", 32, None))
 
 
 def targets(model, split):
@@ -74,7 +85,7 @@ class Hooks:
     def __init__(self, model, splits):
         self.model, self.splits = model, splits
         self.mode, self.prompt, self.maps, self.means, self.split = "off", 0, {}, {}, None
-        self.stream, self.outputs = {}, {}
+        self.stream, self.outputs, self.filled = {}, {}, set()
         self.handles = []
         for s in splits:
             self.handles.append(model.model.layers[s].register_forward_hook(self._stream(s)))
@@ -119,6 +130,7 @@ class Hooks:
                         else self.means[name].to(x.device).expand(p, -1))
             output = output.clone()
             output[0, :p] = fill.to(output.dtype)
+            self.filled.add(name)
         return output
 
     def remove(self):
@@ -134,10 +146,19 @@ def forward(model, ids):
 
 
 @torch.no_grad()
-def continuation_nll(model, state, ids, prompt):
-    hidden = state[0, prompt - 1:-1].float()
-    logits = model.lm_head(hidden.to(model.lm_head.weight.dtype)).float()
-    return float(torch.nn.functional.cross_entropy(logits, ids[0, prompt:]))
+def continuation_losses(model, state, ids, prompt):
+    """Per-token NLL of ids[prompt:], from the states at prompt-1 .. -2."""
+    logits = model.lm_head(state[0, prompt - 1:-1]).float()
+    return torch.nn.functional.cross_entropy(logits, ids[0, prompt:], reduction="none").cpu()
+
+
+def mean_se(values):
+    if not values:
+        return [None, None]
+    mean = sum(values) / len(values)
+    if len(values) < 2:
+        return [mean, None]
+    return [mean, (sum((v - mean) ** 2 for v in values) / (len(values) - 1) / len(values)) ** 0.5]
 
 
 def main() -> int:
@@ -156,96 +177,140 @@ def main() -> int:
     tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
     dtype = torch.float32 if args.device == "cpu" else torch.bfloat16
     model = Qwen35WidenedForCausalLM.from_pretrained(args.checkpoint, dtype=dtype).to(args.device).eval()
+    depth = len(model.model.layers)
+    if len(set(args.splits)) != len(args.splits) or not all(0 <= s < depth - 1 for s in args.splits):
+        raise SystemExit("splits must be distinct layer indices below the last layer")
+    if not 0 < args.prompt_share < 1:
+        raise SystemExit("--prompt-share must be between 0 and 1")
     calibration, probe = documents(tokenizer, [args.chat], args.count, args.length, args.device)
+    # documents() gives `count` WikiText windows then `count` chat documents in each set;
+    # with too few chat documents the halves would mislabel, so refuse.
+    if len(calibration) != 2 * args.count or len(probe) != 2 * args.count:
+        raise SystemExit("expected %d calibration and probe documents, got %d and %d"
+                         % (2 * args.count, len(calibration), len(probe)))
+    domains = ["wiki"] * args.count + ["chat"] * args.count
     hooks = Hooks(model, args.splits)
     per_split = {s: targets(model, s) for s in args.splits}
 
-    # Normal equations, accumulated per document in float64 on the CPU: [x | 1] for the
-    # residual stream at each split, against every target above it.
-    gram, cross, sums, tokens = {}, {}, {}, 0
+    # Centered ridge with an unpenalized intercept, from sums accumulated in float64 (the
+    # products too) and held on the CPU.
+    gram, cross, xsum, ysum, tokens = {}, {}, {}, {}, 0
     hooks.mode = "record"
     for ids in calibration:
         forward(model, ids)
         tokens += ids.shape[1]
         for s in args.splits:
-            x = torch.cat([hooks.stream[s], torch.ones_like(hooks.stream[s][:, :1])], 1)
-            gram[s] = gram.get(s, 0) + (x.T @ x).double().cpu()
+            x = hooks.stream[s].double()
+            gram[s] = gram.get(s, 0) + (x.T @ x).cpu()
+            xsum[s] = xsum.get(s, 0) + x.sum(0).cpu()
             for name in per_split[s]:
-                y = hooks.outputs[name]
-                cross[s, name] = cross.get((s, name), 0) + (x.T @ y).double().cpu()
+                y = hooks.outputs[name].double()
+                cross[s, name] = cross.get((s, name), 0) + (x.T @ y).cpu()
                 if s == min(args.splits):
-                    sums[name] = sums.get(name, 0) + y.sum(0).double().cpu()
+                    ysum[name] = ysum.get(name, 0) + y.sum(0).cpu()
     print("calibration: %d documents, %d tokens" % (len(calibration), tokens), flush=True)
-    maps = {}
+    maps, diagnostics = {}, {}
     for s in args.splits:
-        g = gram[s].clone()
-        g += torch.eye(g.shape[0], dtype=g.dtype) * g.diagonal().mean() * RIDGE
-        factor = torch.linalg.cholesky(g)
+        mx = xsum[s] / tokens
+        g = gram[s] - tokens * torch.outer(mx, mx)
+        lam = float(g.diagonal().mean()) * RIDGE
+        eig = torch.linalg.eigvalsh(g)
+        factor = torch.linalg.cholesky(g + lam * torch.eye(g.shape[0], dtype=g.dtype))
+        diagnostics[s] = dict(ridge_lambda=lam, eig_min=float(eig[0]), eig_max=float(eig[-1]),
+                              condition_ridged=float((eig[-1] + lam) / (eig[0].clamp_min(0) + lam)))
         for name in per_split[s]:
-            maps[s, name] = torch.cholesky_solve(cross[s, name], factor).T.float().to(args.device)
-    width = gram[args.splits[0]].shape[0]  # residual stream, both branches, plus the intercept
+            my = ysum[name] / tokens
+            w = torch.cholesky_solve(cross[s, name] - tokens * torch.outer(mx, my), factor)
+            if not torch.isfinite(w).all():
+                raise SystemExit("non-finite map for split %d %s" % (s, name))
+            bias = my - mx @ w
+            maps[s, name] = torch.cat([w.T, bias[:, None]], 1).float().to(args.device)
+    width = gram[args.splits[0]].shape[0] + 1  # residual stream, both branches, plus the intercept
     del gram, cross
-    means = {name: (total / tokens).float() for name, total in sums.items()}
-    hooks.means = means
+    hooks.means = {name: (total / tokens).float() for name, total in ysum.items()}
 
     report = dict(checkpoint=str(args.checkpoint), calibration_docs=len(calibration),
                   calibration_tokens=tokens, probe_docs=len(probe), prompt_share=args.prompt_share,
-                  ridge=RIDGE, splits={})
-    # R^2 on the probe documents, per target part.
-    errors, totals = {}, {}
+                  ridge=RIDGE, length=args.length, splits={})
+    # Reconstruction on the probe documents, per target part: R^2 about the probe's own
+    # per-channel means, and skill against the calibration mean (what the mean fill uses).
+    errors, spread, ssum, ssq, count = {}, {}, {}, {}, 0
     hooks.mode = "record"
     for ids in probe:
         forward(model, ids)
+        count += ids.shape[1]
         for s in args.splits:
             x = hooks.stream[s]
-            for name, (_, parts) in per_split[s].items():
+            for name in per_split[s]:
                 weight, y = maps[s, name], hooks.outputs[name]
-                miss = (x @ weight[:, :-1].T + weight[:, -1] - y).pow(2)
-                spread = (y - means[name].to(y.device)).pow(2)
-                for part, (a, b) in parts.items():
-                    errors[s, name, part] = errors.get((s, name, part), 0.0) + float(miss[:, a:b].sum())
-                    totals[s, name, part] = totals.get((s, name, part), 0.0) + float(spread[:, a:b].sum())
-    first = model.model.layers
+                miss = (x @ weight[:, :-1].T + weight[:, -1] - y).pow(2).sum(0).double().cpu()
+                off = (y - hooks.means[name].to(y.device)).pow(2).sum(0).double().cpu()
+                errors[s, name] = errors.get((s, name), 0) + miss
+                spread[s, name] = spread.get((s, name), 0) + off
+                if s == min(args.splits):
+                    ssum[name] = ssum.get(name, 0) + y.double().sum(0).cpu()
+                    ssq[name] = ssq.get(name, 0) + y.double().pow(2).sum(0).cpu()
+    layers = model.model.layers
     for s in args.splits:
         rows = {}
         for name, (_, parts) in per_split[s].items():
-            rows[name] = {part: 1 - errors[s, name, part] / totals[s, name, part] for part in parts}
+            centered = ssq[name] - ssum[name].pow(2) / count
+            rows[name] = {}
+            for part, (a, b) in parts.items():
+                err = float(errors[s, name][a:b].sum())
+                rows[name][part] = dict(r2=1 - err / max(float(centered[a:b].sum()), 1e-12),
+                                        skill=1 - err / max(float(spread[s, name][a:b].sum()), 1e-12))
             print("split %2d  layer %-7s %s" % (s, name, "  ".join(
-                "%s R2 %.3f" % (part, value) for part, value in rows[name].items())), flush=True)
+                "%s R2 %.3f" % (part, v["r2"]) for part, v in rows[name].items())), flush=True)
         outputs = sum(m.out_features for m, _ in per_split[s].values())
-        skipped = sum(p.numel() for layer in first[s + 1:] for p in layer.parameters())
-        report["splits"][s] = dict(r2=rows, map_parameters=width * outputs,
+        skipped = sum(p.numel() for layer in layers[s + 1:] for p in layer.parameters())
+        report["splits"][s] = dict(reconstruction=rows, solve=diagnostics[s], map_parameters=width * outputs,
                                    skipped_layer_parameters=skipped)
 
-    # Continuation NLL: exact prefill against each split's fill, paired per document.
-    hooks.split = None
-    deltas = {}
+    # Continuation NLL against an exact prefill, per token, by distance from the boundary.
+    docs = []
     for doc, ids in enumerate(probe):
         prompt = int(ids.shape[1] * args.prompt_share)
-        hooks.mode = "record"  # also fills hooks.stream for the fills below
-        exact = continuation_nll(model, forward(model, ids), ids, prompt)
+        if not 1 < prompt < ids.shape[1]:
+            raise SystemExit("probe document %d too short for the prompt share" % doc)
+        hooks.mode = "record"  # also records the streams the fills below read
+        exact = continuation_losses(model, forward(model, ids), ids, prompt)
+        row = dict(domain=domains[doc], tokens=int(ids.shape[1]), prompt=prompt,
+                   exact=float(exact.mean()), splits={})
         for s in args.splits:
             hooks.maps = {name: maps[s, name] for name in per_split[s]}
-            hooks.split, hooks.prompt = s, prompt
+            hooks.split, hooks.prompt = s, prompt - 1  # the last prompt token runs exactly
             for mode in ("fill", "mean") + (("identity",) if doc == 0 else ()):
-                hooks.mode = mode
-                deltas.setdefault((s, mode), []).append(
-                    continuation_nll(model, forward(model, ids), ids, prompt) - exact)
+                hooks.mode, hooks.filled = mode, set()
+                delta = continuation_losses(model, forward(model, ids), ids, prompt) - exact
+                if hooks.filled != set(hooks.maps):
+                    raise SystemExit("split %d %s: filled %s of %s"
+                                     % (s, mode, sorted(hooks.filled), sorted(hooks.maps)))
+                if mode == "identity":
+                    if float(delta.abs().max()) > 1e-3:
+                        raise SystemExit("identity fill moved the loss by %.5f" % float(delta.abs().max()))
+                    continue
+                cell = {name: float(delta[a:b].mean()) for name, a, b in BINS if len(delta) > a}
+                cell["all"] = float(delta.mean())
+                row["splits"].setdefault(str(s), {})[mode] = cell
         hooks.maps, hooks.split = {}, None
-    half = len(probe) // 2
+        docs.append(row)
+    report["documents"] = docs
     for s in args.splits:
         out = report["splits"][s]
-        out["identity_delta"] = deltas[s, "identity"][0]
         for mode in ("fill", "mean"):
-            for kind, part in (("wiki", slice(0, half)), ("chat", slice(half, None))):
-                d = deltas[s, mode][part]
-                mean = sum(d) / len(d)
-                se = (sum((v - mean) ** 2 for v in d) / max(len(d) - 1, 1) / len(d)) ** 0.5
-                out["%s_%s" % (mode, kind)] = [mean, se]
-        print("split %2d  continuation dNLL  ridge fill: wiki %+.4f (se %.4f) chat %+.4f (se %.4f)  "
-              "mean fill: wiki %+.4f chat %+.4f  identity %+.5f  map/skipped params %.2f"
-              % (s, *out["fill_wiki"], *out["fill_chat"], out["mean_wiki"][0], out["mean_chat"][0],
-                 out["identity_delta"], out["map_parameters"] / out["skipped_layer_parameters"]), flush=True)
+            for domain in ("wiki", "chat"):
+                out["%s_%s" % (mode, domain)] = {
+                    name: mean_se([d["splits"][str(s)][mode][name] for d in docs
+                                   if d["domain"] == domain and name in d["splits"][str(s)][mode]])
+                    for name in ("all",) + tuple(b[0] for b in BINS)}
+        f, c = out["fill_wiki"], out["fill_chat"]
+        print("split %2d  ridge fill dNLL  wiki: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | "
+              "chat: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | mean fill all: wiki %+.4f chat %+.4f | "
+              "map/skipped params %.2f"
+              % (s, f["all"][0], f["first"][0], f["2-8"][0], f["33+"][0], c["all"][0], c["first"][0],
+                 c["2-8"][0], c["33+"][0], out["mean_wiki"]["all"][0], out["mean_chat"]["all"][0],
+                 out["map_parameters"] / out["skipped_layer_parameters"]), flush=True)
     hooks.remove()
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 0
