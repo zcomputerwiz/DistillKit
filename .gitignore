@@ -286,3 +286,12 @@ scratch/code_corpus/v2-build.log
 # Learning-rate sweep and probe checkpoints: weights stay local, reports are tracked.
 scratch/dense_gr/sweep-lr-*/
 scratch/dense_gr/checkpoints-kahan-probe/
+
+# Blend screens' merged weights (merge_search.ps1): ~26 GB a directory, rebuilt from the
+# two checkpoints and the alpha schedule its conversion.json records.
+/scratch/dense_gr/merges-*/
+# Throwaway evaluation working directories.
+/scratch/eval-*-temp*/
+# Error streams and aborted logs from queued runs, like the *.log files above.
+*.err
+*.log.aborted*

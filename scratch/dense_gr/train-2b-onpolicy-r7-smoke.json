@@ -1,0 +1,914 @@
+{
+  "vocab": 248320,
+  "kept_ids": 248320,
+  "coverage": 1.0,
+  "store": "scratch\\code_training\\tokens-v2",
+  "seed": 14,
+  "architecture": {
+    "ratio": "1:1",
+    "blend": 1.0,
+    "init_from": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-r5b\\ramp0-70",
+    "converted": false,
+    "frozen_router": false,
+    "dense_routing": false,
+    "asymmetric": false,
+    "variant": "r1-1-gr-s14-csa2",
+    "hidden": 2048,
+    "norm_mode": "exact",
+    "layers": 24,
+    "full_attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "store_tokens": 3003421492,
+  "compact_tokens": 3003421492,
+  "round_trip": true,
+  "parameters": 1915249222,
+  "liger": {
+    "swiglu": 24,
+    "rmsnorm": 61
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 12,
+  "accumulate": 2,
+  "scored_tokens": 70129,
+  "requested_targets": 3000000,
+  "unused_target_budget": 2929871,
+  "corpus_scored_targets": 10238321,
+  "step_measurements": [
+    {
+      "seconds": 6.178573500015773,
+      "targets": 6137
+    },
+    {
+      "seconds": 5.362959399993997,
+      "targets": 5753
+    },
+    {
+      "seconds": 5.242051100009121,
+      "targets": 6133
+    },
+    {
+      "seconds": 5.23375539999688,
+      "targets": 6128
+    },
+    {
+      "seconds": 5.101491599984001,
+      "targets": 6126
+    },
+    {
+      "seconds": 5.314672300009988,
+      "targets": 5622
+    },
+    {
+      "seconds": 5.02441989997169,
+      "targets": 5620
+    },
+    {
+      "seconds": 4.880616499984171,
+      "targets": 5241
+    },
+    {
+      "seconds": 5.302958499989472,
+      "targets": 5755
+    },
+    {
+      "seconds": 5.132460400054697,
+      "targets": 5733
+    },
+    {
+      "seconds": 5.374507399974391,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.166509400005452,
+      "targets": 5751
+    }
+  ],
+  "warmup_backward_targets": 45088,
+  "measured_step_tokens_per_second": 1107.6210573717049,
+  "peak_allocated_gib_by_device": {
+    "cuda:0": 13.963329315185547,
+    "cuda:1": 15.41154956817627
+  },
+  "seconds": 85.1266296999529,
+  "tokens_per_second": 823.8197641229863,
+  "first_loss": 1.0105613276801901,
+  "final_loss": 1.6100940573756497,
+  "inflation": 1.0,
+  "final_loss_per_original_token": 1.6100940573756497,
+  "final_heldout": 1.2207627278802848,
+  "final_heldout_per_original_token": 1.2207627278802848,
+  "final_copy": null,
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.3647188787681631,
+      "selected": 0.24375989371325193,
+      "entropy": 0.9157111644744873
+    },
+    {
+      "layer": 7,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.3557051073519844,
+      "selected": 0.23296867933061963,
+      "entropy": 0.9358770251274109
+    },
+    {
+      "layer": 11,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.35614732433311647,
+      "selected": 0.2333704852361569,
+      "entropy": 0.9391377568244934
+    },
+    {
+      "layer": 15,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.35967319995662544,
+      "selected": 0.23767021225043614,
+      "entropy": 0.9410669207572937
+    },
+    {
+      "layer": 19,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.3690393895033615,
+      "selected": 0.248902605479098,
+      "entropy": 0.9319050312042236
+    },
+    {
+      "layer": 23,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 1536,
+      "density": 0.35882011087616567,
+      "selected": 0.23663238192156102,
+      "entropy": 0.9243704080581665
+    }
+  ],
+  "passes": 0.006849658259396243,
+  "peak_allocated_gib": 13.963329315185547,
+  "peak_reserved_gib": 14.8828125,
+  "shared_delta_gib": 0.087890625,
+  "spill_telemetry_valid": true,
+  "spilled": false,
+  "spill_telemetry": {
+    "scope": "process",
+    "pid": 5352,
+    "coverage": "complete",
+    "valid_samples": 7,
+    "attempts": 7,
+    "failed_reads": 0,
+    "baseline_delayed": false,
+    "baseline_gib": 0.076171875,
+    "latest_gib": 0.1640625,
+    "peak_gib": 0.1640625,
+    "last_error": null,
+    "interval_seconds": 30.0,
+    "tolerance_gib": 1.0
+  },
+  "setup_seconds": 76.36516850005137,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 6137,
+      "passes": 0.0005994146891858538,
+      "loss": 1.0105613276801901,
+      "loss_per_original_token": 1.0105613276801901,
+      "tokens_per_second": 989.6479630179917,
+      "teacher_kl": 0.7042855998097209,
+      "dpo": 0.6637280583381653,
+      "dpo_margin": 0.05973968654870987,
+      "chosen_logp": -0.34387484192848206,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.42110655737704916,
+          "selected": 0.28490624094989864,
+          "entropy": 0.9190210103988647
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.41511270491803276,
+          "selected": 0.2774730910319529,
+          "entropy": 0.9297909736633301
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.41406737900078067,
+          "selected": 0.27609295057437977,
+          "entropy": 0.9381460547447205
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.42137612217017956,
+          "selected": 0.28522601119799207,
+          "entropy": 0.9323916435241699
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.42387295081967213,
+          "selected": 0.2883030456607781,
+          "entropy": 0.9208521246910095
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4191976483216237,
+          "selected": 0.2824461217298967,
+          "entropy": 0.9253979325294495
+        }
+      ],
+      "heldout": 1.2176972200669682,
+      "heldout_per_original_token": 1.2176972200669682,
+      "heldout_by_source": {
+        "..\\teacher-cache-curriculum-v4": 0.5435331581511359,
+        "..\\teacher-cache-expand-code": 0.7992618658379013,
+        "..\\teacher-cache-general-pilot": 2.273149793473356,
+        "..\\teacher-cache-thinking": 0.5791406581737897
+      },
+      "indexer": 22.727567166755307,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 5352,
+        "coverage": "complete",
+        "valid_samples": 3,
+        "attempts": 3,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 4,
+      "tokens": 30277,
+      "passes": 0.002957223161883672,
+      "loss": 0.6649306828665102,
+      "loss_per_original_token": 0.6649306828665102,
+      "tokens_per_second": 791.2971313603834,
+      "teacher_kl": 0.4909452598370488,
+      "dpo": 0.707015335559845,
+      "dpo_margin": -0.027097513433545828,
+      "chosen_logp": -0.15481050685048103,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4159238387978142,
+          "selected": 0.27859681195096053,
+          "entropy": 0.9186904430389404
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.40136855971896956,
+          "selected": 0.2605147094314123,
+          "entropy": 0.9350710511207581
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.3912214578454333,
+          "selected": 0.2477616082633459,
+          "entropy": 0.939058244228363
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.3986631537861046,
+          "selected": 0.25712997152234773,
+          "entropy": 0.9405848383903503
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4028932474629196,
+          "selected": 0.262369980210445,
+          "entropy": 0.9320854544639587
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.40674643832943014,
+          "selected": 0.26716200888116615,
+          "entropy": 0.9263083934783936
+        }
+      ],
+      "indexer": 19.984159094112744,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 5352,
+        "coverage": "complete",
+        "valid_samples": 4,
+        "attempts": 4,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 8,
+      "tokens": 52515,
+      "passes": 0.00512925898689834,
+      "loss": 0.5868205335428154,
+      "loss_per_original_token": 0.5868205335428154,
+      "tokens_per_second": 891.655935709736,
+      "teacher_kl": 0.41961580103216334,
+      "dpo": 0.2704169452190399,
+      "dpo_margin": 1.2627029716968536,
+      "chosen_logp": -0.3365403115749359,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4335992388758782,
+          "selected": 0.300433198185153,
+          "entropy": 0.9259790182113647
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.42620389344262294,
+          "selected": 0.29123075345110533,
+          "entropy": 0.9378135204315186
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4297606850117096,
+          "selected": 0.2955370933487788,
+          "entropy": 0.9376339912414551
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4409579918032787,
+          "selected": 0.3095225166521865,
+          "entropy": 0.9412904381752014
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4420777224824356,
+          "selected": 0.31093885751520417,
+          "entropy": 0.9279189109802246
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.43841481264637,
+          "selected": 0.30630068056762233,
+          "entropy": 0.9285084009170532
+        }
+      ],
+      "indexer": 23.531161214661125,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 5352,
+        "coverage": "complete",
+        "valid_samples": 5,
+        "attempts": 5,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 11,
+      "tokens": 70129,
+      "passes": 0.006849658259396243,
+      "loss": 1.6100940573756497,
+      "loss_per_original_token": 1.6100940573756497,
+      "tokens_per_second": 939.1976204745467,
+      "teacher_kl": 0.6174752213367896,
+      "dpo": 0.19812864065170288,
+      "dpo_margin": 1.5189056396484375,
+      "chosen_logp": -0.35733531415462494,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.3647188787681631,
+          "selected": 0.24375989371325193,
+          "entropy": 0.9157111644744873
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.3557051073519844,
+          "selected": 0.23296867933061963,
+          "entropy": 0.9358770251274109
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.35614732433311647,
+          "selected": 0.2333704852361569,
+          "entropy": 0.9391377568244934
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.35967319995662544,
+          "selected": 0.23767021225043614,
+          "entropy": 0.9410669207572937
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.3690393895033615,
+          "selected": 0.248902605479098,
+          "entropy": 0.9319050312042236
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1536,
+          "density": 0.35882011087616567,
+          "selected": 0.23663238192156102,
+          "entropy": 0.9243704080581665
+        }
+      ],
+      "heldout": 1.2207627278802848,
+      "heldout_per_original_token": 1.2207627278802848,
+      "heldout_by_source": {
+        "..\\teacher-cache-curriculum-v4": 0.5468345211305912,
+        "..\\teacher-cache-expand-code": 0.8061666562159856,
+        "..\\teacher-cache-general-pilot": 2.273946549888535,
+        "..\\teacher-cache-thinking": 0.582409893269781
+      },
+      "indexer": 22.885408817384786,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 5352,
+        "coverage": "complete",
+        "valid_samples": 5,
+        "attempts": 5,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    }
+  ],
+  "run_args": {
+    "vocab": 248320,
+    "hidden": 2048,
+    "layers": 24,
+    "ratio": "1:1",
+    "blend": 1.0,
+    "norm_mode": "exact",
+    "batch": 64,
+    "length": 1024,
+    "accumulate": 2,
+    "tokens": 3000000,
+    "passes": null,
+    "evaluate_every": 100000,
+    "evaluate_windows": 64,
+    "lr": 1.83e-06,
+    "decay_fraction": 0.5,
+    "decay_floor": 0.05,
+    "router_lr": 0.000937,
+    "adapter_lr": null,
+    "sparse_stage": true,
+    "teacher_cache": [
+      "..\\teacher-cache-curriculum-v4",
+      "..\\teacher-cache-thinking",
+      "..\\teacher-cache-think-first",
+      "..\\teacher-cache-expand-code",
+      "..\\teacher-cache-general-pilot"
+    ],
+    "tensor_parallel": true,
+    "embedding_on": "away",
+    "micro_tokens": 3072,
+    "micro_batch": 1,
+    "teacher_weight": 0.5,
+    "teacher_max_length": 1536,
+    "exclude_documents": "..\\capture-data\\exclude-onpolicy-r7.json",
+    "min_answer_tokens": 2,
+    "kl_only_caches": null,
+    "unlikelihood_caches": null,
+    "unlikelihood_weight": 1.0,
+    "pairs": "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\pairs-r7-ref.jsonl",
+    "pairs_per_step": 2,
+    "pair_weight": 0.5,
+    "dpo_beta": 0.1,
+    "pair_sft_weight": 0.2,
+    "ce_only_caches": null,
+    "repeat": null,
+    "strip_effort_nonthinking": true,
+    "strip_effort_prompt": false,
+    "suppress_hedges": true,
+    "no_kahan": false,
+    "kl_chunk": 64,
+    "indexer_weight": 1.0,
+    "checkpoint_layers": false,
+    "warmup": 50,
+    "report_every": 4,
+    "store": "scratch\\code_training\\tokens-v2",
+    "spill_every": 30.0,
+    "seed": 14,
+    "probe_every": 0,
+    "probe_half": 256,
+    "probe_windows": 64,
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128,
+    "mla_latent_dim": 384,
+    "checkpoints": "scratch\\dense_gr\\checkpoints-2b-onpolicy-r7-smoke",
+    "no_checkpoint": false,
+    "resume": null,
+    "save_every": 100000,
+    "max_steps": 12,
+    "benchmark_warmup_steps": 0,
+    "init_from": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-r5b\\ramp0-70",
+    "dense_routing": false,
+    "inherit": true,
+    "train_only": "all",
+    "freeze_router": false,
+    "asymmetric": false,
+    "convert": false,
+    "output": "scratch\\dense_gr\\train-2b-onpolicy-r7-smoke.json"
+  },
+  "heldout_sample": [
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:add:1250"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:divide:2550"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:2850"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:3300"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:5150"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:300"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:4000"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:nothink:1050"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:percent:5800"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:word:1200"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "Magicoder-OSS:2100"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "Magicoder-OSS:220"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:170182"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:170612"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:186282"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:23064"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:236941"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:270506"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:285985"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:42563"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:434183"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:46719"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:566738"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:567129"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:613440"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:631785"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:639799"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:64948"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:77412"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:9019"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334389:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334408:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334435:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334796:4096"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:152:3072"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:238:1024"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:45:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:2853d08f-5639-42a5-8a44-704d5ccd4cce>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:55ea7355-9ec9-4317-b9c2-96be48c2b22f>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:9caa353b-8501-4acb-aa54-a443233f3c57>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:a52b8bca-e20a-4db8-a45e-bd9d6a7dadaa>:1024"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:bf39c2b1-ba73-4b48-8a84-7796ac1b235e>:4096"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:d01d905d-7974-4ce6-bc92-d2f855b51e00>:10240"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:d2464720-2e87-4061-9f5b-3ccfe0c3f6db>:2048"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:368af7bef0307ce390e87ff2450c0eb0"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:3b274a05e45a6bedd109190672967c63"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:3bcfb7756e0da53535868805f98756a3"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:4af91d26756bb1e1"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:5f889fe2a64d3612d8cc59aab245680f"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:62290cec9c29179a9100a91491713424"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:673e5e43bb40c2f06d88b67d2a921fd9"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:1e65013257ed1b65b8eb4343b3034ba2"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:29d3404a99510ffb6eb199683492ea8e"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:2ea103c1de305e77c4f35c5a41ada112"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:3db37d7f9d89c6aeb574a0d1da4d09c7"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:42ee528311662ddb7fb1cc1137fa9efd"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:4968f8f1fb013761713f92171f0f3df7"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:4e8bf3779f8fea9eb9b64d2fd617db02"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:526aaebc3b65876e3d582d0068cf4a2e"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:5b39459ac64fa78671fbb01ba6e148b0"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:5e901b77c3251ebb9c9f9feb98a8b82c"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:60f053f3c4f36fc056a9ef32a9f2ddd1"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:653f0834bac842374534f686e2a119ee"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_reasoning:1f8a14c969e459bbcbebf29710bfb877"
+    ]
+  ],
+  "suppressed_teacher_mass": 24.353058109529936
+}

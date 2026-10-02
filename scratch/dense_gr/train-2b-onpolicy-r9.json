@@ -1,0 +1,1890 @@
+{
+  "vocab": 248320,
+  "kept_ids": 248320,
+  "coverage": 1.0,
+  "store": "scratch\\code_training\\tokens-v2",
+  "seed": 17,
+  "architecture": {
+    "ratio": "1:1",
+    "blend": 1.0,
+    "init_from": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-r6r8b\\u50",
+    "converted": false,
+    "frozen_router": false,
+    "dense_routing": false,
+    "asymmetric": false,
+    "variant": "r1-1-gr-s17-csa2",
+    "hidden": 2048,
+    "norm_mode": "exact",
+    "layers": 24,
+    "full_attention_layers": [
+      3,
+      7,
+      11,
+      15,
+      19,
+      23
+    ],
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128
+  },
+  "store_tokens": 3003421492,
+  "compact_tokens": 3003421492,
+  "round_trip": true,
+  "parameters": 1915249222,
+  "liger": {
+    "swiglu": 24,
+    "rmsnorm": 61
+  },
+  "batch": 64,
+  "length": 1024,
+  "steps": 166,
+  "accumulate": 2,
+  "scored_tokens": 981809,
+  "requested_targets": 3000000,
+  "unused_target_budget": 2018191,
+  "corpus_scored_targets": 10487582,
+  "step_measurements": [
+    {
+      "seconds": 5.7881226999998034,
+      "targets": 6132
+    },
+    {
+      "seconds": 5.307853400001477,
+      "targets": 6137
+    },
+    {
+      "seconds": 4.924600000002101,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.343581900000572,
+      "targets": 6124
+    },
+    {
+      "seconds": 4.859133599999041,
+      "targets": 5749
+    },
+    {
+      "seconds": 5.000024900000426,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.111457300001348,
+      "targets": 6135
+    },
+    {
+      "seconds": 4.810645900000964,
+      "targets": 5749
+    },
+    {
+      "seconds": 5.272696199997881,
+      "targets": 6117
+    },
+    {
+      "seconds": 5.21168630000102,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.1968234999985725,
+      "targets": 6120
+    },
+    {
+      "seconds": 4.457240299998375,
+      "targets": 4987
+    },
+    {
+      "seconds": 4.920842300001823,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.95665210000152,
+      "targets": 6134
+    },
+    {
+      "seconds": 4.907015800003137,
+      "targets": 6128
+    },
+    {
+      "seconds": 5.1006030999997165,
+      "targets": 6136
+    },
+    {
+      "seconds": 5.273140900000726,
+      "targets": 6117
+    },
+    {
+      "seconds": 4.9661552000034135,
+      "targets": 5754
+    },
+    {
+      "seconds": 4.921247799997218,
+      "targets": 6132
+    },
+    {
+      "seconds": 4.81639830000131,
+      "targets": 5749
+    },
+    {
+      "seconds": 5.186681499999395,
+      "targets": 6108
+    },
+    {
+      "seconds": 4.5741965000015625,
+      "targets": 5241
+    },
+    {
+      "seconds": 5.024080600000161,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.429715800000849,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.9248785999989195,
+      "targets": 6137
+    },
+    {
+      "seconds": 4.951157499999681,
+      "targets": 6124
+    },
+    {
+      "seconds": 4.89727899999707,
+      "targets": 5754
+    },
+    {
+      "seconds": 4.692589300000691,
+      "targets": 5241
+    },
+    {
+      "seconds": 4.539211600000272,
+      "targets": 5112
+    },
+    {
+      "seconds": 5.188386500001798,
+      "targets": 6118
+    },
+    {
+      "seconds": 4.897187699996721,
+      "targets": 5622
+    },
+    {
+      "seconds": 5.105233300000691,
+      "targets": 6112
+    },
+    {
+      "seconds": 4.20865269999922,
+      "targets": 5622
+    },
+    {
+      "seconds": 5.187143200000719,
+      "targets": 6126
+    },
+    {
+      "seconds": 4.992146200002026,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.870440599999711,
+      "targets": 5604
+    },
+    {
+      "seconds": 3.6282252999990305,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.221586899999238,
+      "targets": 6132
+    },
+    {
+      "seconds": 4.9602355000024545,
+      "targets": 6124
+    },
+    {
+      "seconds": 4.948668199998792,
+      "targets": 6124
+    },
+    {
+      "seconds": 4.937962200001493,
+      "targets": 5625
+    },
+    {
+      "seconds": 4.740947300000698,
+      "targets": 5243
+    },
+    {
+      "seconds": 4.840963300001022,
+      "targets": 5624
+    },
+    {
+      "seconds": 4.971246699999028,
+      "targets": 6134
+    },
+    {
+      "seconds": 5.098150400001032,
+      "targets": 6124
+    },
+    {
+      "seconds": 4.950168499999563,
+      "targets": 5880
+    },
+    {
+      "seconds": 4.987764000001334,
+      "targets": 6133
+    },
+    {
+      "seconds": 5.117314599996462,
+      "targets": 6134
+    },
+    {
+      "seconds": 5.034832000001188,
+      "targets": 6133
+    },
+    {
+      "seconds": 5.253207900001144,
+      "targets": 6132
+    },
+    {
+      "seconds": 5.146446899998409,
+      "targets": 6116
+    },
+    {
+      "seconds": 4.760354900001403,
+      "targets": 5622
+    },
+    {
+      "seconds": 5.324659899997641,
+      "targets": 6139
+    },
+    {
+      "seconds": 4.913821099999041,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.930638999998337,
+      "targets": 5745
+    },
+    {
+      "seconds": 4.974766700001055,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.839073999999528,
+      "targets": 5749
+    },
+    {
+      "seconds": 5.071168799997395,
+      "targets": 6120
+    },
+    {
+      "seconds": 5.207174999999552,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.145820200003072,
+      "targets": 6135
+    },
+    {
+      "seconds": 5.00969890000124,
+      "targets": 5749
+    },
+    {
+      "seconds": 5.159288400001969,
+      "targets": 6135
+    },
+    {
+      "seconds": 5.126904400000058,
+      "targets": 6139
+    },
+    {
+      "seconds": 4.612405599997146,
+      "targets": 5241
+    },
+    {
+      "seconds": 4.444572899999912,
+      "targets": 6108
+    },
+    {
+      "seconds": 4.674630000001343,
+      "targets": 5371
+    },
+    {
+      "seconds": 4.537406700001156,
+      "targets": 6129
+    },
+    {
+      "seconds": 5.025928099999874,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.992900099998224,
+      "targets": 6126
+    },
+    {
+      "seconds": 5.257138599998143,
+      "targets": 6118
+    },
+    {
+      "seconds": 4.929483700001583,
+      "targets": 6124
+    },
+    {
+      "seconds": 5.145344500000647,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.976806899998337,
+      "targets": 6132
+    },
+    {
+      "seconds": 5.2103295999986585,
+      "targets": 6114
+    },
+    {
+      "seconds": 5.033565999998245,
+      "targets": 6117
+    },
+    {
+      "seconds": 4.752595300000394,
+      "targets": 5626
+    },
+    {
+      "seconds": 4.271423500002129,
+      "targets": 5366
+    },
+    {
+      "seconds": 4.982379199998832,
+      "targets": 6134
+    },
+    {
+      "seconds": 5.014499699998851,
+      "targets": 6126
+    },
+    {
+      "seconds": 5.178895900000498,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.144132900000841,
+      "targets": 5620
+    },
+    {
+      "seconds": 5.098487999999634,
+      "targets": 6135
+    },
+    {
+      "seconds": 5.222782400000142,
+      "targets": 5733
+    },
+    {
+      "seconds": 5.058596299997589,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.022336900001392,
+      "targets": 6134
+    },
+    {
+      "seconds": 4.694755900000018,
+      "targets": 5616
+    },
+    {
+      "seconds": 4.964638100002048,
+      "targets": 5733
+    },
+    {
+      "seconds": 4.91552049999882,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.679292900000291,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.108795799998916,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.940471899997647,
+      "targets": 5749
+    },
+    {
+      "seconds": 4.862306900002295,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.0444630999991205,
+      "targets": 6137
+    },
+    {
+      "seconds": 4.898850300000049,
+      "targets": 5616
+    },
+    {
+      "seconds": 5.153286000000662,
+      "targets": 6132
+    },
+    {
+      "seconds": 4.890442899999471,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.8725978000002215,
+      "targets": 6124
+    },
+    {
+      "seconds": 5.072006300000794,
+      "targets": 6134
+    },
+    {
+      "seconds": 5.091938800000207,
+      "targets": 6135
+    },
+    {
+      "seconds": 4.376191999999719,
+      "targets": 4343
+    },
+    {
+      "seconds": 5.281865100001596,
+      "targets": 6114
+    },
+    {
+      "seconds": 5.109040699997422,
+      "targets": 6138
+    },
+    {
+      "seconds": 4.49795069999891,
+      "targets": 6108
+    },
+    {
+      "seconds": 5.536679400000139,
+      "targets": 6118
+    },
+    {
+      "seconds": 5.207021800000803,
+      "targets": 6129
+    },
+    {
+      "seconds": 5.221435800001927,
+      "targets": 6136
+    },
+    {
+      "seconds": 5.025123800001893,
+      "targets": 6112
+    },
+    {
+      "seconds": 4.935935800000152,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.644939400001022,
+      "targets": 5620
+    },
+    {
+      "seconds": 4.508991599999717,
+      "targets": 5112
+    },
+    {
+      "seconds": 4.9854705999969156,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.05182319999949,
+      "targets": 6138
+    },
+    {
+      "seconds": 5.030532599997969,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.636520599997311,
+      "targets": 6126
+    },
+    {
+      "seconds": 4.871292800002266,
+      "targets": 5620
+    },
+    {
+      "seconds": 4.633245900000475,
+      "targets": 6133
+    },
+    {
+      "seconds": 5.05975639999815,
+      "targets": 6129
+    },
+    {
+      "seconds": 4.902291399997921,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.628007400002389,
+      "targets": 5620
+    },
+    {
+      "seconds": 5.138867600002413,
+      "targets": 6130
+    },
+    {
+      "seconds": 5.006116000000475,
+      "targets": 6112
+    },
+    {
+      "seconds": 5.0124494999981835,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.993805100002646,
+      "targets": 5751
+    },
+    {
+      "seconds": 5.152307899999869,
+      "targets": 6118
+    },
+    {
+      "seconds": 5.158362199999829,
+      "targets": 6132
+    },
+    {
+      "seconds": 4.869576599998254,
+      "targets": 5751
+    },
+    {
+      "seconds": 5.01291769999807,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.048453299998073,
+      "targets": 6129
+    },
+    {
+      "seconds": 4.404775499999232,
+      "targets": 5112
+    },
+    {
+      "seconds": 4.854483400002209,
+      "targets": 5751
+    },
+    {
+      "seconds": 4.786460500003159,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.108201800001552,
+      "targets": 6108
+    },
+    {
+      "seconds": 5.145949699999619,
+      "targets": 6138
+    },
+    {
+      "seconds": 5.010025499999756,
+      "targets": 5883
+    },
+    {
+      "seconds": 5.303183899999567,
+      "targets": 6126
+    },
+    {
+      "seconds": 5.204041499997402,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.397589300002437,
+      "targets": 5620
+    },
+    {
+      "seconds": 4.968188900002133,
+      "targets": 6128
+    },
+    {
+      "seconds": 4.973171800000273,
+      "targets": 6138
+    },
+    {
+      "seconds": 4.261741599999368,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.075207400001091,
+      "targets": 6138
+    },
+    {
+      "seconds": 4.740106200002629,
+      "targets": 5620
+    },
+    {
+      "seconds": 4.812834799999109,
+      "targets": 5620
+    },
+    {
+      "seconds": 5.195940599998721,
+      "targets": 6130
+    },
+    {
+      "seconds": 4.964732299999014,
+      "targets": 5625
+    },
+    {
+      "seconds": 5.075484299999516,
+      "targets": 5874
+    },
+    {
+      "seconds": 5.129281300000002,
+      "targets": 5622
+    },
+    {
+      "seconds": 4.710300899998401,
+      "targets": 4858
+    },
+    {
+      "seconds": 4.763992100000905,
+      "targets": 5368
+    },
+    {
+      "seconds": 5.041525600001478,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.673551399999269,
+      "targets": 5618
+    },
+    {
+      "seconds": 4.967695499999536,
+      "targets": 6138
+    },
+    {
+      "seconds": 5.09207890000107,
+      "targets": 6136
+    },
+    {
+      "seconds": 4.799701600000844,
+      "targets": 5622
+    },
+    {
+      "seconds": 4.883959999999206,
+      "targets": 5626
+    },
+    {
+      "seconds": 4.923046299998532,
+      "targets": 5624
+    },
+    {
+      "seconds": 5.391524300001038,
+      "targets": 6132
+    },
+    {
+      "seconds": 4.819866300000285,
+      "targets": 5370
+    },
+    {
+      "seconds": 5.007855600000767,
+      "targets": 6135
+    },
+    {
+      "seconds": 5.01589149999927,
+      "targets": 6133
+    },
+    {
+      "seconds": 4.690713899999537,
+      "targets": 5622
+    },
+    {
+      "seconds": 5.036610999999539,
+      "targets": 6128
+    },
+    {
+      "seconds": 5.0757973999971,
+      "targets": 6126
+    },
+    {
+      "seconds": 4.891374499999074,
+      "targets": 5754
+    },
+    {
+      "seconds": 4.7811881000016,
+      "targets": 5620
+    },
+    {
+      "seconds": 5.131462399996963,
+      "targets": 6128
+    }
+  ],
+  "warmup_backward_targets": 56567,
+  "measured_step_tokens_per_second": 1198.0022704328944,
+  "peak_allocated_gib_by_device": {
+    "cuda:0": 13.996667861938477,
+    "cuda:1": 15.414555549621582
+  },
+  "seconds": 846.0506362999986,
+  "tokens_per_second": 1160.4612748637699,
+  "first_loss": 0.5647254637542769,
+  "final_loss": 1.4292383996220235,
+  "inflation": 1.0,
+  "final_loss_per_original_token": 1.4292383996220235,
+  "final_heldout": 1.33677721103196,
+  "final_heldout_per_original_token": 1.33677721103196,
+  "final_copy": null,
+  "final_routing": [
+    {
+      "layer": 3,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.7899838572124757,
+      "selected": 0.6261694952132288,
+      "entropy": 0.9302035570144653
+    },
+    {
+      "layer": 7,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.8006518031189084,
+      "selected": 0.6455749564838991,
+      "entropy": 0.9278130531311035
+    },
+    {
+      "layer": 11,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.7806941398635477,
+      "selected": 0.6100413402959095,
+      "entropy": 0.9297282695770264
+    },
+    {
+      "layer": 15,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.7851257919103314,
+      "selected": 0.6180646214099217,
+      "entropy": 0.9296138286590576
+    },
+    {
+      "layer": 19,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.7870141934697856,
+      "selected": 0.6211243472584856,
+      "entropy": 0.9265846610069275
+    },
+    {
+      "layer": 23,
+      "mode": "full",
+      "unit": "positions",
+      "blocks": 512,
+      "density": 0.7798793859649122,
+      "selected": 0.6081647084421236,
+      "entropy": 0.9260013699531555
+    }
+  ],
+  "passes": 0.09361633596762342,
+  "peak_allocated_gib": 13.996667861938477,
+  "peak_reserved_gib": 15.314453125,
+  "shared_delta_gib": 0.087890625,
+  "spill_telemetry_valid": true,
+  "spilled": false,
+  "spill_telemetry": {
+    "scope": "process",
+    "pid": 14844,
+    "coverage": "complete",
+    "valid_samples": 31,
+    "attempts": 31,
+    "failed_reads": 0,
+    "baseline_delayed": false,
+    "baseline_gib": 0.076171875,
+    "latest_gib": 0.1640625,
+    "peak_gib": 0.1640625,
+    "last_error": null,
+    "interval_seconds": 30.0,
+    "tolerance_gib": 1.0
+  },
+  "setup_seconds": 79.11256030000004,
+  "history": [
+    {
+      "step": 0,
+      "tokens": 6132,
+      "passes": 0.0005846914951415875,
+      "loss": 0.5647254637542769,
+      "loss_per_original_token": 0.5647254637542769,
+      "tokens_per_second": 1054.0751918661842,
+      "teacher_kl": 0.375192170429292,
+      "ftpo": 2.0790201872587204,
+      "ftpo_margin": -1.828125,
+      "chosen_win": 0.0,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6036993389683571,
+          "selected": 0.42880477308294207,
+          "entropy": 0.9042466282844543
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6122805591677504,
+          "selected": 0.44119229264475746,
+          "entropy": 0.9177271723747253
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.5986975780234071,
+          "selected": 0.421620696400626,
+          "entropy": 0.9244193434715271
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6070214293454703,
+          "selected": 0.4336365414710485,
+          "entropy": 0.9205529689788818
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6139432975726051,
+          "selected": 0.44354460093896714,
+          "entropy": 0.9138014912605286
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6086943270481144,
+          "selected": 0.43583724569640064,
+          "entropy": 0.9202169179916382
+        }
+      ],
+      "heldout": 1.2885083652180185,
+      "heldout_per_original_token": 1.2885083652180185,
+      "heldout_by_source": {
+        "..\\teacher-cache-curriculum-v4": 0.4285321859102966,
+        "..\\teacher-cache-expand-code": 0.7962639833197874,
+        "..\\teacher-cache-general-pilot": 2.3595472126855164,
+        "..\\teacher-cache-thinking": 0.536205526411708
+      },
+      "indexer": 20.884205049886784,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 3,
+        "attempts": 3,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 25,
+      "tokens": 155784,
+      "passes": 0.014854138923538334,
+      "loss": 0.5850341771647168,
+      "loss_per_original_token": 0.5850341771647168,
+      "tokens_per_second": 1104.1580276889013,
+      "teacher_kl": 0.3476255340252259,
+      "ftpo": 1.949636548757553,
+      "ftpo_margin": -1.75,
+      "chosen_win": 0.0,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4903944359756098,
+          "selected": 0.33399341580207503,
+          "entropy": 0.9171125292778015
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4906669207317073,
+          "selected": 0.3343301077414206,
+          "entropy": 0.9364431500434875
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4800590701219512,
+          "selected": 0.320448423782921,
+          "entropy": 0.933826208114624
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.4897313262195122,
+          "selected": 0.33320780127693533,
+          "entropy": 0.9315062165260315
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.49425876524390244,
+          "selected": 0.33925079808459696,
+          "entropy": 0.9206600189208984
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1024,
+          "density": 0.49558879573170733,
+          "selected": 0.3408669193934557,
+          "entropy": 0.9123762845993042
+        }
+      ],
+      "indexer": 19.028525824020456,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 7,
+        "attempts": 7,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 50,
+      "tokens": 302508,
+      "passes": 0.02884439902353088,
+      "loss": 0.682335970602915,
+      "loss_per_original_token": 0.682335970602915,
+      "tokens_per_second": 1144.6850504248275,
+      "teacher_kl": 0.5594603558862186,
+      "ftpo": 1.097491666674614,
+      "ftpo_margin": -0.21875,
+      "chosen_win": 0.5,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.41801936963309916,
+          "selected": 0.28129826720725937,
+          "entropy": 0.9129095077514648
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4171631049960968,
+          "selected": 0.2802001882421083,
+          "entropy": 0.9304105639457703
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4186158274785324,
+          "selected": 0.28193328265276574,
+          "entropy": 0.9371528625488281
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4195099043715847,
+          "selected": 0.28315504633651895,
+          "entropy": 0.9317507743835449
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.42915812841530054,
+          "selected": 0.2951283304373009,
+          "entropy": 0.9164779782295227
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 1280,
+          "density": 0.4221677400468384,
+          "selected": 0.2864492832319722,
+          "entropy": 0.9066024422645569
+        }
+      ],
+      "indexer": 19.199806671192476,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 11,
+        "attempts": 11,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 75,
+      "tokens": 451898,
+      "passes": 0.04308886452568381,
+      "loss": 0.50047827163202,
+      "loss_per_original_token": 0.50047827163202,
+      "tokens_per_second": 1161.369607147309,
+      "teacher_kl": 0.40149996390217274,
+      "ftpo": 1.841149240732193,
+      "ftpo_margin": -1.171875,
+      "chosen_win": 0.125,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.8795598249027238,
+          "selected": 0.516363188976378,
+          "entropy": 0.9457635879516602
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.9274075875486382,
+          "selected": 0.7080462598425197,
+          "entropy": 0.9600484371185303
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.8134423638132295,
+          "selected": 0.25282972440944884,
+          "entropy": 0.884894073009491
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.8901386186770428,
+          "selected": 0.5596702755905512,
+          "entropy": 0.941408097743988
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.902602140077821,
+          "selected": 0.609375,
+          "entropy": 0.9468462467193604
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 256,
+          "density": 0.99130593385214,
+          "selected": 0.9650590551181102,
+          "entropy": 0.9610558152198792
+        }
+      ],
+      "indexer": 22.97598840230053,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 15,
+        "attempts": 15,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 100,
+      "tokens": 598878,
+      "passes": 0.05710353444673901,
+      "loss": 0.6820104078876843,
+      "loss_per_original_token": 0.6820104078876843,
+      "tokens_per_second": 1168.1824630855276,
+      "teacher_kl": 0.5313363771911224,
+      "ftpo": 1.6981957405805588,
+      "ftpo_margin": -0.375,
+      "chosen_win": 0.25,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7454389010721247,
+          "selected": 0.5463446475195822,
+          "entropy": 0.9402316808700562
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7638508162768031,
+          "selected": 0.5790361183637946,
+          "entropy": 0.9537440538406372
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7077622441520468,
+          "selected": 0.4795474325500435,
+          "entropy": 0.9546384215354919
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7446926778752436,
+          "selected": 0.5458414926022629,
+          "entropy": 0.9433428645133972
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7641553971734892,
+          "selected": 0.5802192123585727,
+          "entropy": 0.9341886639595032
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7668737816764133,
+          "selected": 0.5846932114882507,
+          "entropy": 0.9384467601776123
+        }
+      ],
+      "indexer": 18.90839307745727,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 19,
+        "attempts": 19,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 125,
+      "tokens": 748768,
+      "passes": 0.07139567538065494,
+      "loss": 0.5936376839083312,
+      "loss_per_original_token": 0.5936376839083312,
+      "tokens_per_second": 1174.9740343885276,
+      "teacher_kl": 0.5544551595089394,
+      "ftpo": 1.2218241393566132,
+      "ftpo_margin": -0.020833343267440796,
+      "chosen_win": 0.375,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6043326018638925,
+          "selected": 0.42971439749608764,
+          "entropy": 0.9123377799987793
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6131203944516689,
+          "selected": 0.4423708920187793,
+          "entropy": 0.926435649394989
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.5960358420026007,
+          "selected": 0.41767899061032865,
+          "entropy": 0.9350754618644714
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6140211855223233,
+          "selected": 0.4440238654147105,
+          "entropy": 0.9188781380653381
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6182948634590377,
+          "selected": 0.45009780907668234,
+          "entropy": 0.9144555330276489
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.622636270047681,
+          "selected": 0.4562597809076682,
+          "entropy": 0.9111701250076294
+        }
+      ],
+      "indexer": 22.1523532081409,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 23,
+        "attempts": 23,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 150,
+      "tokens": 893515,
+      "passes": 0.08519742682345655,
+      "loss": 0.6288638180496431,
+      "loss_per_original_token": 0.6288638180496431,
+      "tokens_per_second": 1174.688547068166,
+      "teacher_kl": 0.5217714969290241,
+      "ftpo": 1.6472657322883606,
+      "ftpo_margin": -0.90625,
+      "chosen_win": 0.0,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.5836787494581708,
+          "selected": 0.3996967918622848,
+          "entropy": 0.9108260869979858
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.5927476159514521,
+          "selected": 0.41281787949921755,
+          "entropy": 0.9259198904037476
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.5783180266579974,
+          "selected": 0.39220461658841943,
+          "entropy": 0.9312790036201477
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6036316103164283,
+          "selected": 0.42902973395931143,
+          "entropy": 0.9146887063980103
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6029780288253143,
+          "selected": 0.42789025821596244,
+          "entropy": 0.9100901484489441
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 768,
+          "density": 0.6114847475075856,
+          "selected": 0.44005281690140846,
+          "entropy": 0.9059627652168274
+        }
+      ],
+      "indexer": 21.121805029434853,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 27,
+        "attempts": 27,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    },
+    {
+      "step": 165,
+      "tokens": 981809,
+      "passes": 0.09361633596762342,
+      "loss": 1.4292383996220235,
+      "loss_per_original_token": 1.4292383996220235,
+      "tokens_per_second": 1175.0049280102276,
+      "teacher_kl": 0.4061085181626888,
+      "ftpo": 1.0161880850791931,
+      "ftpo_margin": 0.3125,
+      "chosen_win": 0.4166666716337204,
+      "routing": [
+        {
+          "layer": 3,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7899838572124757,
+          "selected": 0.6261694952132288,
+          "entropy": 0.9302035570144653
+        },
+        {
+          "layer": 7,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.8006518031189084,
+          "selected": 0.6455749564838991,
+          "entropy": 0.9278130531311035
+        },
+        {
+          "layer": 11,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7806941398635477,
+          "selected": 0.6100413402959095,
+          "entropy": 0.9297282695770264
+        },
+        {
+          "layer": 15,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7851257919103314,
+          "selected": 0.6180646214099217,
+          "entropy": 0.9296138286590576
+        },
+        {
+          "layer": 19,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7870141934697856,
+          "selected": 0.6211243472584856,
+          "entropy": 0.9265846610069275
+        },
+        {
+          "layer": 23,
+          "mode": "full",
+          "unit": "positions",
+          "blocks": 512,
+          "density": 0.7798793859649122,
+          "selected": 0.6081647084421236,
+          "entropy": 0.9260013699531555
+        }
+      ],
+      "heldout": 1.33677721103196,
+      "heldout_per_original_token": 1.33677721103196,
+      "heldout_by_source": {
+        "..\\teacher-cache-curriculum-v4": 0.4540992778442476,
+        "..\\teacher-cache-expand-code": 0.8557895927920061,
+        "..\\teacher-cache-general-pilot": 2.3988444210034525,
+        "..\\teacher-cache-thinking": 0.5938789180977767
+      },
+      "indexer": 21.253529837486326,
+      "shared_delta_gib": 0.087890625,
+      "spill_telemetry_valid": true,
+      "spilled": false,
+      "spill_telemetry": {
+        "scope": "process",
+        "pid": 14844,
+        "coverage": "complete",
+        "valid_samples": 30,
+        "attempts": 30,
+        "failed_reads": 0,
+        "baseline_delayed": false,
+        "baseline_gib": 0.076171875,
+        "latest_gib": 0.1640625,
+        "peak_gib": 0.1640625,
+        "last_error": null,
+        "interval_seconds": 30.0,
+        "tolerance_gib": 1.0
+      }
+    }
+  ],
+  "run_args": {
+    "vocab": 248320,
+    "hidden": 2048,
+    "layers": 24,
+    "ratio": "1:1",
+    "blend": 1.0,
+    "norm_mode": "exact",
+    "batch": 64,
+    "length": 1024,
+    "accumulate": 2,
+    "tokens": 3000000,
+    "passes": null,
+    "evaluate_every": 400,
+    "evaluate_windows": 64,
+    "lr": 1.83e-06,
+    "decay_fraction": 0.5,
+    "decay_floor": 0.05,
+    "router_lr": 0.000937,
+    "adapter_lr": null,
+    "sparse_stage": true,
+    "teacher_cache": [
+      "..\\teacher-cache-r8-code-short",
+      "..\\teacher-cache-curriculum-v4",
+      "..\\teacher-cache-thinking",
+      "..\\teacher-cache-think-first",
+      "..\\teacher-cache-expand-code",
+      "..\\teacher-cache-general-pilot"
+    ],
+    "tensor_parallel": true,
+    "embedding_on": "away",
+    "micro_tokens": 3072,
+    "micro_batch": 1,
+    "teacher_weight": 0.5,
+    "teacher_max_length": 1536,
+    "exclude_documents": "..\\capture-data\\exclude-onpolicy-r9.json",
+    "min_answer_tokens": 2,
+    "kl_only_caches": null,
+    "unlikelihood_caches": null,
+    "unlikelihood_weight": 1.0,
+    "pairs": "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\ftpo-r9.jsonl",
+    "lr_depth_ramp": [
+      0.1,
+      1.0
+    ],
+    "pairs_per_step": 4,
+    "pair_weight": 1.0,
+    "dpo_beta": 0.1,
+    "pair_sft_weight": 0.2,
+    "ftpo_clip": 2.0,
+    "ftpo_tether": 0.4,
+    "ftpo_target_tether": 0.05,
+    "ftpo_tau": 1.5,
+    "stop_chosen_win": 0.3,
+    "ce_only_caches": [
+      "..\\teacher-cache-r8-code-short"
+    ],
+    "repeat": null,
+    "strip_effort_nonthinking": true,
+    "strip_effort_prompt": false,
+    "suppress_hedges": true,
+    "no_kahan": false,
+    "kl_chunk": 64,
+    "indexer_weight": 1.0,
+    "checkpoint_layers": false,
+    "warmup": 50,
+    "report_every": 25,
+    "store": "scratch\\code_training\\tokens-v2",
+    "spill_every": 30.0,
+    "seed": 17,
+    "probe_every": 0,
+    "probe_half": 256,
+    "probe_windows": 64,
+    "mla": true,
+    "csa2": true,
+    "csa2_modes": [
+      "full",
+      "full",
+      "full",
+      "full",
+      "full",
+      "full"
+    ],
+    "csa2_top_k": 256,
+    "csa2_local_window": 128,
+    "csa2_block_size": 128,
+    "mla_latent_dim": 384,
+    "checkpoints": "scratch\\dense_gr\\checkpoints-2b-onpolicy-r9",
+    "no_checkpoint": false,
+    "resume": null,
+    "save_every": 400,
+    "max_steps": null,
+    "benchmark_warmup_steps": 0,
+    "init_from": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-r6r8b\\u50",
+    "dense_routing": false,
+    "inherit": true,
+    "train_only": "all",
+    "freeze_router": false,
+    "asymmetric": false,
+    "convert": false,
+    "output": "scratch\\dense_gr\\train-2b-onpolicy-r9.json"
+  },
+  "heldout_sample": [
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:add:1250"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:divide:2550"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:2850"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:3300"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:multiply:nothink:5150"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:300"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:4000"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:outsource:nothink:1050"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:percent:5800"
+    ],
+    [
+      "..\\teacher-cache-curriculum-v4",
+      "curriculum:word:1200"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "Magicoder-OSS:2100"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "Magicoder-OSS:220"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:170182"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:170612"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:186282"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:23064"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:236941"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:270506"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:285985"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:42563"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:434183"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:46719"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:566738"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:567129"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:613440"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:631785"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:639799"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:64948"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:77412"
+    ],
+    [
+      "..\\teacher-cache-expand-code",
+      "self-oss-instruct:9019"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334389:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334408:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334435:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "code:code-3334796:4096"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:152:3072"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:238:1024"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "finemath:45:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:0d9abb60-986e-4a83-8a4d-dc6e96fb3d41>:1024"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:2853d08f-5639-42a5-8a44-704d5ccd4cce>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:55ea7355-9ec9-4317-b9c2-96be48c2b22f>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:9caa353b-8501-4acb-aa54-a443233f3c57>:0"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:a52b8bca-e20a-4db8-a45e-bd9d6a7dadaa>:1024"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:bf39c2b1-ba73-4b48-8a84-7796ac1b235e>:4096"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:d01d905d-7974-4ce6-bc92-d2f855b51e00>:10240"
+    ],
+    [
+      "..\\teacher-cache-general-pilot",
+      "fineweb-edu:<urn:uuid:d2464720-2e87-4061-9f5b-3ccfe0c3f6db>:2048"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:2b4798fe7580db084e5976af503ecaba"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:346ae5765694ee3a61d879cebb573d42"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:368af7bef0307ce390e87ff2450c0eb0"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:42de0d81c948fba22d867964acbf75be"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:535f288008158b7c7bda45548c006c1f"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:62290cec9c29179a9100a91491713424"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_code:673e5e43bb40c2f06d88b67d2a921fd9"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:2ea103c1de305e77c4f35c5a41ada112"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:312f53c7c61c4648b809366fc8ed846d"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:39d25d79ea5145001056b1fe1da57dfe"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:3db37d7f9d89c6aeb574a0d1da4d09c7"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:3e37d4c1528df9fec3f4da46db055128"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:46563594f3d4fc7e46c4e96f43016308"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:4b85cf5b7eed562620cab8373f9ae95c"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:4d070110be2f95aa34a4f535e9a73db2"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:4f465619f2bdc2d4f316686d62c4de54"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:5147f6dc71f433f699ec06931736a35a"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:5a4533f109621e334f7f103f76cca1ef"
+    ],
+    [
+      "..\\teacher-cache-thinking",
+      "think:sft_math:6aac5ca8cb66ebdb05e7939ccd21cab6"
+    ]
+  ],
+  "suppressed_teacher_mass": 168.2245825262027
+}
