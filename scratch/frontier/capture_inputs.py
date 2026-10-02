@@ -46,7 +46,14 @@ def main():
     rows, dropped, tokens = [], 0, 0
     if args.kind == "qa":
         docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
+        seen = set()
         for row in map(json.loads, open(F / "frontier" / "qa-code.jsonl", encoding="utf-8")):
+            # A document answered in two requests appears twice; the cache needs unique ids,
+            # and the first occurrence is the one already captured.
+            if row["doc_id"] in seen:
+                dropped += len(row["items"])
+                continue
+            seen.add(row["doc_id"])
             messages, ids = [], None
             for n, item in enumerate(row["items"]):
                 question = item["question"] if n else "<document>\n%s</document>\n\n%s" % (docs[row["doc_id"]], item["question"])

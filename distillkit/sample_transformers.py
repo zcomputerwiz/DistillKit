@@ -598,11 +598,13 @@ def main(model, revision, input_jsonl, source_metadata, output, tokenizer, token
     manifest = None
     try:
         manifest = capture(overlap, batch_tokens)
-    except Exception:
+    except RuntimeError:  # CUDA out-of-memory and kernel errors; not ValueError
         if overlap == 1 and not batch_tokens:
             raise
         # Overlap and batching hold more activations; rather than lose a queued capture,
-        # start it again one document at a time.
+        # start it again one document at a time. Bad input (a duplicate document id, ids
+        # outside the vocabulary) raises ValueError and fails at once instead: a rerun
+        # would only reach the same document hours later.
         LOG.exception("Overlapped or batched capture failed; retrying one document at a time")
     if manifest is None:
         if Path(output).exists():

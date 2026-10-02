@@ -34,6 +34,7 @@ def main():
     parser.add_argument("--attn-implementation", default=None)
     parser.add_argument("--prefill-chunk", type=int, default=None)
     parser.add_argument("--weight-only-int8", action="store_true")
+    parser.add_argument("--logit-chunk-tokens", type=int, default=64, help="what the interrupted capture used")
     args = parser.parse_args()
     from transformers import AutoConfig, AutoTokenizer
 
@@ -85,7 +86,7 @@ def main():
                 "eval_policy": {"explicit_split_takes_precedence": True, "fallback_eval_every": args.eval_every},
                 "model": str(args.model), "revision": None, "int8": False,
                 "attn_implementation": args.attn_implementation, "prefill_chunk": args.prefill_chunk,
-                "weight_only_int8": args.weight_only_int8, "logit_chunk_tokens": 64,
+                "weight_only_int8": args.weight_only_int8, "logit_chunk_tokens": args.logit_chunk_tokens,
                 "input_jsonl_sha256": file_sha256(args.input_jsonl), "add_special_tokens": True,
                 "salvaged_from": str(args.partial)}
     with OfflineCacheWriter(args.output, tokenizer_hash=file_sha256(args.model / "tokenizer.json"),
