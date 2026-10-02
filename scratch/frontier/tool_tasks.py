@@ -162,7 +162,7 @@ def conversation_problem(conversation, scenario):
     raw_tools, messages = conversation.get("tools") or [], conversation.get("messages") or []
     if not isinstance(raw_tools, list) or not isinstance(messages, list) \
             or not all(isinstance(t, dict) and isinstance(t.get("function"), dict) for t in raw_tools) \
-            or not all(isinstance(m, dict) for m in messages):
+            or not all(isinstance(m, dict) and m.get("role") in ("user", "assistant", "tool") for m in messages):
         return "shape"
     tools = {t["function"].get("name"): t["function"] for t in raw_tools}
     if not tools or not messages or messages[0].get("role") != "user" or messages[-1].get("role") != "assistant":

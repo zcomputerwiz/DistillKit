@@ -970,3 +970,27 @@ fetched once a forward, layers split evenly (the memory split gave 26/38), alloc
 at 22.5 GiB (WDDM spills silently past the card). Short documents (~200 tokens) 290 -> 640
 tok/s, ~500-900-token documents ~800-960 tok/s; both cards ~94% busy. The agent capture was
 stopped at a third and its finished shards salvaged (salvage_capture.py).
+
+## Long round 1 (2026-10-02)
+
+From merges-r6r8b/u50: 6.0M tokens of the agent traces (assistant turns only) and the six
+int8-weight replay recaptures (r8-code-short CE only), one forward a document to 32K, DeltaNet
+decay gates at a tenth of the rate, 1,320 documents excluded (contamination plus answers both
+judges call wrong). 630 tok/s, peak 21.6 GiB. Held-out agent loss 0.84 -> 0.57 (salvaged half)
+and 0.93 -> 0.66 (recaptured half).
+
+Code NLL by position (24 documents at 32K; source = Qwen3.5-2B):
+
+| arm | 512 | 4K | 8K | 16K | 32K |
+|---|---|---|---|---|---|
+| source | 1.253 | 0.638 | 0.614 | 0.484 | 0.434 |
+| base (u50) | 1.320 | 0.720 | 0.722 | 0.597 | 0.561 |
+| long1 | 1.322 | 0.709 | 0.696 | 0.563 | 0.518 |
+| long1-u50 blend | 1.318 | 0.709 | 0.699 | 0.568 | 0.527 |
+| long1-ramp0-70 blend | 1.317 | 0.711 | 0.702 | 0.572 | 0.531 |
+
+The gap to the source at 32K falls from +0.126 to +0.083 (blends +0.093 / +0.097) while the
+512-token gap stays +0.07: the round fixed what it was for. Pass-key 100% at every length,
+logp -0.18 at 32K (base -0.35). Short screen: code NLL and math flat (u50 blend math 45.7%,
+gsm8k 71.9%; ramp0-70 best code NLL 0.7711); thinking NLL +0.012 for the raw round, about
+flat for the blends.
