@@ -4,7 +4,7 @@
 param([Parameter(Mandatory)][string]$Tuned, [Parameter(Mandatory)][string]$Tag, [string]$Base = "")
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"
-$env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+$env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
 $think = if ($Base) { $Base } else { "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2" }
 $out = "$root\scratch\dense_gr\merges-$Tag"
 New-Item -ItemType Directory -Force $out | Out-Null
@@ -38,7 +38,7 @@ $jobs = foreach ($gpu in 0, 1) {
     Start-Job -ArgumentList $gpu, $py, $root, $out, ($mine -join ";") -ScriptBlock {
         param($gpu, $py, $root, $out, $mine)
         $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
-        $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+        $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
         Set-Location $root
         $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\merge_proxy.py")
         foreach ($arm in $mine -split ";") { $argv.Add($arm) }

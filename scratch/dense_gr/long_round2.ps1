@@ -15,7 +15,7 @@
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"
 $C = "$D\capture-data"
-$env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
+$env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
 $base = "$root\scratch\dense_gr\merges-long1\u50"
 # The agent capture was stopped at a third and its finished shards salvaged (-a); the rest
 # was captured again with documents overlapped across the cards (-b).
