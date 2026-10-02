@@ -26,35 +26,59 @@ $caches = @($agentA, $agentB, $qaA, $qaB, $tools, $code, "..\teacher-cache-curri
 foreach ($cache in $caches) {
     if (-not (Test-Path "$D\$($cache.Substring(3))\manifest.json")) { "missing capture $cache; stopping"; exit 1 }
 }
-# Answers both judges call wrong (frontier judge + Codex; first-judge-only where Codex has
-# not looked yet), rebuilt now so it takes every Codex verdict written by the start.
+# Judged exclusions, rebuilt now so they take every Codex verdict written by the start:
+# Codex's verdict decides wherever it has one (it overrules the frontier judge either way,
+# and its own "wrong" excludes on its own); the frontier judge decides the rest.
+function Check([string]$what) { if ($LASTEXITCODE -ne 0) { "$what failed (exit $LASTEXITCODE); stopping"; exit 1 } }
+if (Test-Path "$root\scratch\dense_gr\checkpoints-2b-long-r2") { "checkpoints-2b-long-r2 exists; refusing to mix runs"; exit 1 }
 $F = "$C\frontier"
 & $py scratch\frontier\judge_docs.py collect --responses "$F\judge-responses.jsonl" "$F\judge-batched-responses.jsonl" `
     --second "$F\codex-crosscheck\judge-codex.jsonl" "$F\codex-missing\judge-missing.jsonl" `
     "$F\codex-crosscheck2\judge-codex.jsonl" --output "$C\exclude-judged.json"
-& $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" `
+Check "judged exclusions"
+# Plus the QA documents whose source code spells chat markup (capture_inputs.py): it
+# tokenizes to real turn and tool tokens inside the user's document.
+& $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa-markup.json" `
     --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r2.json"
+Check "exclusion list"
 "=== train $(Get-Date -Format HH:mm)"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $base,
     "--inherit", "--tensor-parallel", "--embedding-on", "away", "--checkpoint-layers", "--teacher-cache")
 foreach ($c2 in $caches) { $argv.Add($c2) }
+# Codex review (codex-review-r2/REVIEW.md): scored uniformly, QA would be 48% of the scored
+# tokens but under 1% of it answers. The answers (structural spans from capture_inputs.py,
+# with their closing <|im_end|>) weigh 16 to the document's 1, about an eighth of a QA
+# document's loss; the budget counts weight. Repeats then give roughly 26% agents / 31% QA /
+# 2% tools / 41% replay. Padding to the block multiple keeps the final turns that flooring
+# cut (28% of tool turns).
 foreach ($a in @("--assistant-only-caches", $agentA, $agentB, $tools, "--ce-only-caches", $code,
+                 "--repeat", "$agentA=3", "$agentB=3", "$tools=4", "$code=2", "..\teacher-cache-curriculum-v4-w8=2",
+                 "..\teacher-cache-thinking-w8=2", "..\teacher-cache-think-first-w8=2",
+                 "..\teacher-cache-expand-code-w8=2", "..\teacher-cache-general-pilot-w8=2", "--pad-to-block",
+                 "--answer-spans", "$C\frontier-qa.jsonl", "--answer-weight", "16",
                  "--lr-scale", "linear_attn\.(A_log|dt_bias|in_proj_a)=0.1", "--strip-effort-nonthinking",
                  "--exclude-documents", "..\capture-data\exclude-long-r2.json", "--suppress-hedges",
                  "--teacher-weight", "0.5", "--teacher-max-length", "32768", "--kl-chunk", "64",
                  "--min-answer-tokens", "2", "--micro-tokens", "32768", "--accumulate", "2",
-                 "--tokens", "6000000", "--warmup", "50", "--decay-fraction", "0.5", "--decay-floor", "0.05",
-                 "--evaluate-windows", "64", "--evaluate-every", "200", "--report-every", "25",
-                 "--save-every", "200", "--seed", "22",
+                 "--tokens", "8000000", "--warmup", "50", "--decay-fraction", "0.5", "--decay-floor", "0.05",
+                 "--evaluate-windows", "64", "--evaluate-every", "100", "--report-every", "25",
+                 "--save-every", "100", "--seed", "22",
                  "--checkpoints", "scratch\dense_gr\checkpoints-2b-long-r2",
                  "--output", "scratch\dense_gr\train-2b-long-r2.json")) { $argv.Add($a) }
-& $py $argv 2>&1 | Where-Object { $_ -match 'learning rates|plan:|stripped|held-out|loss .*->|Traceback|Error|spilled|SystemExit' }
+& $py $argv 2>&1 | Tee-Object -FilePath "$root\scratch\dense_gr\long-r2-train.log" |
+    Where-Object { $_ -match 'learning rates|plan:|stripped|held-out|loss .*->|Traceback|Error|spilled|SystemExit' }
+Check "training"
 $tuned = "$root\scratch\dense_gr\checkpoints-2b-long-r2\smoke-r1-1-gr-s22-csa2"
 if (-not (Test-Path "$tuned\config.json")) { "training produced no checkpoint; stopping"; exit 1 }
 
 "=== long-context probe $(Get-Date -Format HH:mm)"
-& $py scratch\dense_gr\long_context_probe.py --arm "long1=$tuned" --output scratch\csa2-eval\long-context-long1.json 2>&1 |
-    Where-Object { $_ -match '^==|^  ' -and $_ -notmatch 'warn|torch.nn' }
+& $py scratch\dense_gr\long_context_probe.py --arm "long1-u50=$base" --arm "long2=$tuned" `
+    --output scratch\csa2-eval\long-context-long2.json 2>&1 | Where-Object { $_ -match '^==|^  ' -and $_ -notmatch 'warn|torch.nn' }
+Check "long-context probe"
+"=== held-out QA answers $(Get-Date -Format HH:mm)"
+& $py scratch\frontier\qa_answer_eval.py --arm "long1-u50=$base" --arm "long2=$tuned" `
+    --output scratch\csa2-eval\qa-answers-long2.json
+Check "QA answer eval"
 "=== blend screen against the base $(Get-Date -Format HH:mm)"
 & .\scratch\dense_gr\merge_search.ps1 -Tuned $tuned -Tag long2 -Base $base
 "=== done $(Get-Date -Format HH:mm)"

@@ -22,12 +22,14 @@ def test_assistant_tokens_cover_turn_content_through_its_close():
     assert np.nonzero(assistant_tokens([7, 8, 3, 3], [7, 8], 9))[0].tolist() == [2, 3]
 
 
-def masked_ce(model, hidden, ids, supervised=None):
+def masked_ce(model, hidden, ids, weight=None):
+    """Plain-torch reference for `causal_ce`: the weighted mean of next-token NLL."""
     logits = F.linear(hidden[:, :-1], model.lm_head.weight)
-    targets = ids[:, 1:].clone()
-    if supervised is not None:
-        targets[~supervised[:, :-1]] = -100
-    return F.cross_entropy(logits.flatten(0, 1), targets.flatten(), ignore_index=-100)
+    nll = F.cross_entropy(logits.flatten(0, 1), ids[:, 1:].flatten(), reduction="none")
+    if weight is None:
+        return nll.mean()
+    w = weight[:, :-1].flatten().to(nll.dtype)
+    return (nll * w).sum() / w.sum()
 
 
 def test_step_scores_and_counts_only_supervised_positions():
@@ -44,7 +46,7 @@ def test_step_scores_and_counts_only_supervised_positions():
     result = backward_step(model, [record], ce=masked_ce, teacher_weight=0.5)
     assert result["targets"] == 6
     with torch.no_grad():
-        expected = masked_ce(model, model.model(ids).last_hidden_state, ids, supervised)
+        expected = masked_ce(model, model.model(ids).last_hidden_state, ids, supervised.float())
     assert abs(result["loss"] - float(expected)) < 1e-6
     # All-true supervision is the unmasked step.
     model.zero_grad()

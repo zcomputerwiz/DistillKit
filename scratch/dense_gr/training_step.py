@@ -115,23 +115,36 @@ def check_optimizer(model, optimizer):
         raise ValueError("trainable parameters missing from optimizer: " + ", ".join(missing[:6]))
 
 
-def causal_ce(model, hidden, ids, supervised=None):
-    """Mean next-token cross entropy; with `supervised` ([rows, length], position t scores
-    token t + 1), only over the supervised positions."""
+def position_weight(record):
+    """A record's per-position loss weights, or None when every position weighs 1. An
+    older record's boolean `supervised` mask is the 0/1 case."""
+    if "weight" in record:
+        return record["weight"]
+    if "supervised" in record:
+        return record["supervised"].float()
+    return None
+
+
+def causal_ce(model, hidden, ids, weight=None):
+    """Mean next-token cross entropy; with `weight` ([rows, length], position t's weight for
+    predicting token t + 1), the weighted mean, sum(w * nll) / sum(w)."""
     from cut_cross_entropy import linear_cross_entropy
 
     device = model.lm_head.weight.device
-    targets = ids
-    if supervised is not None:
-        targets = ids.clone()
-        targets[:, 1:][~supervised[:, :-1]] = -100  # CCE's ignore_index
     # CCE's Triton kernels launch on the *current* device, not the tensors' own. With
     # the head moved off home (--embedding-on away) that read another card's memory and
     # returned a loss of exactly 0 while the teacher KL, plain torch, carried on.
     with torch.cuda.device(device):
-        return linear_cross_entropy(hidden.to(device), model.lm_head.weight,
-                                    targets.to(device), shift=1,
-                                    reduction="mean").to(hidden.device)
+        if weight is None:
+            return linear_cross_entropy(hidden.to(device), model.lm_head.weight,
+                                        ids.to(device), shift=1, reduction="mean").to(hidden.device)
+        targets = ids.clone()
+        targets[:, 1:][weight[:, :-1] <= 0] = -100  # CCE's ignore_index: skips the zeros
+        # Per position: [rows, length - 1], position t's loss for token t + 1.
+        nll = linear_cross_entropy(hidden.to(device), model.lm_head.weight, targets.to(device),
+                                   shift=1, reduction="none")
+        w = weight[:, :-1].to(device=device, dtype=nll.dtype)
+        return ((nll * w).sum() / w.sum().clamp_min(1e-12)).to(hidden.device)
 
 
 def response_logprob(model, hidden, ids, start, end):
@@ -211,20 +224,21 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
     pairs = [r for r in records if r.get("pair")]
     records = [r for r in records if not r.get("pair")]
     counts, total = accumulation_shares([r["input_ids"] for r in records])
-    # Agent traces score only the assistant's turns; their share is what they score.
-    counts = [int(r["supervised"][:, :-1].sum()) if "supervised" in r else n
-              for r, n in zip(records, counts)]
+    # Position weights (assistant-only turns, answer spans, padding at 0); an older
+    # record's boolean `supervised` mask is the 0/1 case. A record's share of the step is
+    # its total weight, so an accumulated step equals one weighted mean over all of it.
+    weights = [position_weight(r) for r in records]
+    counts = [float(w[:, :-1].sum()) if w is not None else n for w, n in zip(weights, counts)]
     total = max(sum(counts), 1)
     if not (records or pairs) or any(n <= 0 for n in counts):
         raise ValueError("an optimizer step needs nonempty causal targets")
     result = dict(loss=0.0, teacher_kl=0.0, indexer=0.0, unlikelihood=0.0, objective=0.0,
                   targets=sum(counts))
-    for record, count in zip(records, counts):
+    for record, count, weight in zip(records, counts, weights):
         ids = record["input_ids"]
         mask = queries = scored_mask(ids.shape[1], ids.device, ids.shape[0])
-        supervised = record.get("supervised")
-        if supervised is not None:
-            mask = mask & supervised.to(mask.device)
+        if weight is not None:
+            mask = mask * weight.to(mask.device)  # float: the KL is summed weighted
         handles = []
         context = contextlib.nullcontext()
         if sparse_stage is not None:
@@ -246,8 +260,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 # thinks at length, and KL toward it at every position of a brief thought
                 # pulls against closing it.
                 ce_only = bool(record.get("ce_only", False))
-                language = (ce(model, hidden, ids) if supervised is None
-                            else ce(model, hidden, ids, supervised=supervised))
+                language = (ce(model, hidden, ids) if weight is None
+                            else ce(model, hidden, ids, weight=weight))
                 objective = language
                 carried = language.new_zeros(())
                 aligned = language.new_zeros(())
@@ -261,7 +275,7 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                     if negative is not None:
                         # A looping rollout: no KL on its repeated spans, where the
                         # teacher endorses the loop; unlikelihood pushes them down instead.
-                        kl_mask = mask & ~negative.to(mask.device)
+                        kl_mask = mask * ~negative.to(mask.device)
                         repelled = unlikelihood_loss(
                             hidden.to(where), model.lm_head, ids.to(where),
                             negative.to(where)).to(hidden.device) / count

@@ -188,7 +188,7 @@ class CachedTeacher:
                  max_length=None, answer_marker=None, min_answer_tokens=0, exclude=None,
                  suppress=None, kl_only=None, strip_prefix=None, unlikelihood=None,
                  think_close=None, repeat=None, strip_nonthinking=None, ce_only=None,
-                 assistant_only=None, turn_close=None):
+                 assistant_only=None, turn_close=None, answer_spans=None, answer_weight=1.0):
         paths = [path] if isinstance(path, (str, Path)) else list(path)
         if unlikelihood and (think_close is None or min_answer_tokens <= 0):
             raise ValueError("unlikelihood needs think_close (the `</think>` id) and "
@@ -212,6 +212,10 @@ class CachedTeacher:
         if suppress is not None and min_answer_tokens <= 0:
             raise ValueError("suppress needs min_answer_tokens > 0 so answer starts are known")
         self.suppress = None if suppress is None else np.asarray(suppress, dtype=np.int64)
+        # Pad each row up to the block multiple instead of cutting the document down to it
+        # (set by the trainer); the padded positions are masked out of every loss.
+        self.pad_blocks = False
+        self.real_width = {}
         self.suppressed_mass = 0.0
         self.cache = (OfflineTeacherCache(paths[0]) if len(paths) == 1
                       else MergedCache(paths))
@@ -303,6 +307,25 @@ class CachedTeacher:
         if self.assistant_only_ids and (not answer_marker or turn_close is None):
             raise ValueError("assistant_only needs answer_marker and turn_close (the <|im_end|> id)")
         self.turn_close = turn_close
+        # Structural answer spans (capture_inputs.py `answer_spans`: [start, stop) the body,
+        # `stop` its <|im_end|>) in the student's coordinates, i.e. after any stripped span.
+        # Their positions weigh `answer_weight` in every loss, the rest of the document 1
+        # (0 in assistant-only captures). They also say where a document's answer starts,
+        # which a marker scan gets wrong when source code spells chat markup.
+        if answer_weight <= 0:
+            raise ValueError("answer_weight must be positive")
+        self.answer_weight = float(answer_weight)
+        self.spans = {}
+        for doc_id in self.ids:
+            spans = (answer_spans or {}).get(doc_id)
+            if not spans:
+                continue
+            begin, end = self.offset.get(doc_id, (0, 0))
+            shift = lambda p: p if p < begin else p - (end - begin)
+            if any(begin <= p < end for span in spans for p in span):
+                raise ValueError("an answer span of %s overlaps its stripped prefix" % doc_id)
+            self.spans[doc_id] = [(shift(a), shift(b)) for a, b in spans]
+        self._weight_sums = {}
         # Both objectives score every position but the last, so a document's system
         # prompt and user turn are trained on exactly like its answer. That is fine
         # while the answer is in there, and the prefix cap makes it a question: a
@@ -333,7 +356,8 @@ class CachedTeacher:
                                  "vocabulary")
             before = len(self.ids)
             for doc_id in self.ids:
-                self.answer_start[doc_id] = self._answer_start(doc_id, answer_marker)
+                self.answer_start[doc_id] = (self.spans[doc_id][0][0] if doc_id in self.spans
+                                             else self._answer_start(doc_id, answer_marker))
             self.ids = [doc_id for doc_id in self.ids
                         if self._kept_answer(doc_id, self.cap(doc_id)) >= min_answer_tokens]
             self.dropped_all_prompt = before - len(self.ids)
@@ -512,13 +536,15 @@ class CachedTeacher:
         self.dropped_short = 0
         self.dropped_truncated_answer = 0
         for doc_id in sorted(self.ids):
-            width = self.cap(doc_id)
+            width = real = self.cap(doc_id)
             if block:
-                width = (width // block) * block
-            if width < 2:
+                width = -(-width // block) * block if self.pad_blocks else (width // block) * block
+            real = min(real, width)
+            if real < 2:
                 self.dropped_short += 1
                 continue
-            if self.min_answer_tokens > 0 and self._kept_answer(doc_id, width) < self.min_answer_tokens:
+            self.real_width[doc_id] = real
+            if self.min_answer_tokens > 0 and self._kept_answer(doc_id, real) < self.min_answer_tokens:
                 self.dropped_truncated_answer += 1
                 continue
             if budget is not None and width > budget:
@@ -531,9 +557,47 @@ class CachedTeacher:
                 groups.append((members[start:start + rows], width))
         return groups
 
+    def position_weight(self, doc_id, tokens, real):
+        """Loss weight of each position of a document's first `real` tokens.
+
+        Position t predicts token t + 1. A document's positions weigh 1 (assistant-only
+        captures: 1 in the assistant's turns, 0 elsewhere), its answer spans
+        `answer_weight` -- the answer body and its closing `<|im_end|>` -- and its last
+        position, which predicts nothing, 0. Padding past `real` weighs nothing.
+        """
+        weight = np.zeros(real, dtype=np.float32)
+        if doc_id in self.assistant_only_ids:
+            weight[:-1] = assistant_tokens(tokens[:real], self.answer_marker, self.turn_close)[1:]
+        else:
+            weight[:-1] = 1.0
+        for start, stop in self.spans.get(doc_id, ()):
+            first, last = max(start - 1, 0), min(stop, real - 1)
+            if first < last:
+                weight[first:last] = self.answer_weight
+        return weight
+
+    def weighted(self, doc_id):
+        """Whether a document needs a weight row (else every position weighs 1)."""
+        return doc_id in self.assistant_only_ids or doc_id in self.spans
+
+    def doc_weight(self, doc_id, real):
+        """Total loss weight of a document at `real` tokens: what it adds to the budget."""
+        if not self.weighted(doc_id):
+            return float(real - 1)
+        key = (doc_id, real)
+        if key not in self._weight_sums:
+            tokens = self._record(doc_id, real, tokens_only=True)["input_ids"]
+            self._weight_sums[key] = float(self.position_weight(doc_id, tokens, real).sum())
+        return self._weight_sums[key]
+
+    def group_weight(self, group, width):
+        return sum(self.doc_weight(doc_id, min(self.real_width.get(doc_id, width), width)) for doc_id in group)
+
     def planned_tokens(self, size, block=None, budget=None):
-        """Supervised targets per pass, excluding the final position of each row."""
-        return sum(len(group) * (width - 1)
+        """Weighted targets per pass: the sum of every position's loss weight, as trained
+        and as the budget counts them (assistant-only rows count their turns, padding
+        nothing, answers `answer_weight` each)."""
+        return sum(self.group_weight(group, width)
                    for group, width in self._groups(size, block, budget))
 
     def grouped(self, size, block=None, budget=None):
@@ -552,10 +616,13 @@ class CachedTeacher:
                 yield self.read_batch(group, width)
 
     def read_batch(self, doc_ids, width):
-        """One batch, every row exactly `width` long, nothing padded."""
-        ids, targets, values, repeats = [], [], [], []
+        """One batch, every row `width` long: a document's own prefix, then (with
+        `pad_blocks`) masked padding up to the block multiple."""
+        ids, targets, values, repeats, reals = [], [], [], [], []
         for doc_id in doc_ids:
-            record = self._record(doc_id, width, include_hidden_states=False)
+            real = min(self.real_width.get(doc_id, width), width)
+            reals.append(real)
+            record = self._record(doc_id, real, include_hidden_states=False)
             ids.append(np.asarray(record["input_ids"], dtype=np.int64))
             targets.append(np.asarray(record["topk_ids"], dtype=np.int64))
             values.append(np.asarray(record["topk_logprobs"], dtype=np.float32))
@@ -569,6 +636,18 @@ class CachedTeacher:
                 turn = last_response(ids[-1], self.answer_marker)
                 repeats.append(loop_tokens(ids[-1], len(ids[-1]) if turn is None else turn,
                                            self.think_close))
+        if any(real < width for real in reals):
+            # Causal: padding after a document changes none of its positions. The pads
+            # repeat the last token and carry a uniform, finite teacher row, all masked.
+            k = targets[0].shape[1]
+            for row, real in enumerate(reals):
+                pad = width - real
+                if pad:
+                    ids[row] = np.concatenate([ids[row], np.full(pad, ids[row][-1], dtype=np.int64)])
+                    targets[row] = np.concatenate([targets[row], np.zeros((pad, k), dtype=np.int64)])
+                    values[row] = np.concatenate([values[row], np.full((pad, k), -np.log(k), dtype=np.float32)])
+                    if repeats:  # unlikelihood documents share a bucket: one entry a row
+                        repeats[row] = np.concatenate([repeats[row], np.zeros(pad, dtype=bool)])
         batch = {"input_ids": torch.from_numpy(np.stack(ids)).to(self.device,
                                                                  non_blocking=True),
                  "topk_ids": torch.from_numpy(np.stack(targets)).to(self.device,
@@ -578,15 +657,12 @@ class CachedTeacher:
                  "doc_id": doc_ids[0], "doc_ids": list(doc_ids),
                  "kl_only": doc_ids[0] in self.kl_only_ids,
                  "ce_only": doc_ids[0] in self.ce_only_ids}
-        if any(doc_id in self.assistant_only_ids for doc_id in doc_ids):
-            # Position t is scored when the token it predicts, t + 1, is the assistant's.
-            supervised = np.zeros((len(ids), width), dtype=bool)
-            for row, (doc_id, tokens) in enumerate(zip(doc_ids, ids)):
-                if doc_id in self.assistant_only_ids:
-                    supervised[row, :-1] = assistant_tokens(tokens, self.answer_marker, self.turn_close)[1:]
-                else:
-                    supervised[row, :-1] = True
-            batch["supervised"] = torch.from_numpy(supervised).to(self.device, non_blocking=True)
+        if any(self.weighted(doc_id) for doc_id in doc_ids) or any(r < width for r in reals):
+            # Per-position loss weights (`position_weight`), zero over padding.
+            weight = np.zeros((len(ids), width), dtype=np.float32)
+            for row, (doc_id, tokens, real) in enumerate(zip(doc_ids, ids, reals)):
+                weight[row, :real] = self.position_weight(doc_id, tokens, real)
+            batch["weight"] = torch.from_numpy(weight).to(self.device, non_blocking=True)
         if repeats:
             # Position t predicts token t + 1, so a repeated token at t + 1 is a
             # negative at t; the last position predicts nothing.

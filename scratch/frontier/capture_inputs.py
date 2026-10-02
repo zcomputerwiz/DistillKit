@@ -5,6 +5,10 @@ and first question in the first user turn, then answer, question, answer -- in o
 through the document. Questions that would push it past --max-length are left off. All
 tokens are meant to be scored (the document is long-context language modelling too).
 
+Each QA row carries `answer_spans`: [start, stop) of every answer body, `stop` its closing
+`<|im_end|>`, found structurally (smoke_train.py's `--answer-spans` weights them).
+Documents whose source spells chat markup are listed in `<output stem>-markup.json`.
+
 tools: each verified tool conversation with its tool list; meant for --assistant-only-caches.
 
 Non-thinking turns (the answers are short and carry no reasoning). A tenth of each set,
@@ -29,6 +33,39 @@ def split_of(key, share=0.1):
     return "eval" if int(hashlib.sha256(key.encode()).hexdigest()[:8], 16) / 0xFFFFFFFF < share else "train"
 
 
+def chat_ids(tokenizer, messages, tools=None, generation=False):
+    text = tokenizer.apply_chat_template(messages, tools=tools, tokenize=False, enable_thinking=False,
+                                         add_generation_prompt=generation)
+    return tokenizer(text, add_special_tokens=False)["input_ids"]
+
+
+def qa_conversation(tokenizer, items, document, max_length):
+    """The document (None: the no-document control) and its questions as one conversation.
+
+    Returns the token ids and each answer's span, found structurally rather than by
+    scanning for turn markers (source code can contain them): the conversation rendered up
+    to the question with a generation prompt gives where the answer starts, and the turn's
+    own `<|im_end|>` where it stops -- [start, stop) is the answer body, `stop` its close.
+    Questions that would pass `max_length` are left off.
+    """
+    close = tokenizer.convert_tokens_to_ids("<|im_end|>")
+    messages, ids, spans = [], None, []
+    for n, item in enumerate(items):
+        question = item["question"]
+        if n == 0 and document is not None:
+            question = "<document>\n%s</document>\n\n%s" % (document, question)
+        asked = messages + [{"role": "user", "content": question}]
+        trial = chat_ids(tokenizer, asked + [{"role": "assistant", "content": item["answer"]}])
+        if len(trial) > max_length:
+            break
+        prompt = chat_ids(tokenizer, asked, generation=True)
+        if trial[:len(prompt)] != prompt:
+            raise ValueError("the generation prompt is not a prefix of the rendered answer turn")
+        spans.append([len(prompt), trial.index(close, len(prompt))])
+        messages, ids = asked + [{"role": "assistant", "content": item["answer"]}], trial
+    return ids, spans
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("kind", choices=["qa", "tools"])
@@ -40,10 +77,10 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER)
 
     def ids_of(messages, tools=None):
-        text = tokenizer.apply_chat_template(messages, tools=tools, tokenize=False, enable_thinking=False)
-        return tokenizer(text, add_special_tokens=False)["input_ids"]
+        return chat_ids(tokenizer, messages, tools)
 
-    rows, dropped, tokens = [], 0, 0
+    rows, dropped, tokens, flagged = [], 0, 0, []
+    markup = set(tokenizer.added_tokens_decoder)  # chat markup, think and tool tags
     if args.kind == "qa":
         docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
         seen = set()
@@ -54,19 +91,15 @@ def main():
                 dropped += len(row["items"])
                 continue
             seen.add(row["doc_id"])
-            messages, ids = [], None
-            for n, item in enumerate(row["items"]):
-                question = item["question"] if n else "<document>\n%s</document>\n\n%s" % (docs[row["doc_id"]], item["question"])
-                trial = ids_of(messages + [{"role": "user", "content": question},
-                                           {"role": "assistant", "content": item["answer"]}])
-                if len(trial) > args.max_length:
-                    dropped += len(row["items"]) - n
-                    break
-                messages += [{"role": "user", "content": question}, {"role": "assistant", "content": item["answer"]}]
-                ids = trial
+            ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]], args.max_length)
+            dropped += len(row["items"]) - len(spans)
+            # Source code that spells chat markup (`<|im_start|>assistant`, `<tool_call>`)
+            # tokenizes to the real markup tokens: fake turns inside the user's document.
+            if markup & set(tokenizer(docs[row["doc_id"]], add_special_tokens=False)["input_ids"]):
+                flagged.append("qa:" + row["doc_id"])
             if ids:
                 rows.append({"doc_id": "qa:" + row["doc_id"], "split": split_of(row["doc_id"]), "input_ids": ids,
-                             "questions": len(messages) // 2})
+                             "questions": len(spans), "answer_spans": spans})
     else:
         for name in ("tools.jsonl", "tools2.jsonl"):
             for row in map(json.loads, open(F / "frontier" / name, encoding="utf-8")):
@@ -90,6 +123,10 @@ def main():
                     continue
                 rows.append({"doc_id": "tools:" + row["doc_id"], "split": split_of(row["doc_id"]), "input_ids": ids,
                              "scenario": row["scenario"]})
+    if args.kind == "qa":
+        listing = args.output.with_name(args.output.stem + "-markup.json")
+        listing.write_text(json.dumps(sorted(flagged), indent=1), encoding="utf-8")
+        print("%d documents spell chat markup in their source -> %s" % (len(flagged), listing))
     with open(args.output, "w", encoding="utf-8") as out:
         for row in rows:
             tokens += len(row["input_ids"])

@@ -406,6 +406,15 @@ def main(argv=None) -> int:
     parser.add_argument("--stop-chosen-win", type=float, default=None,
                         help="finish once FTPO's chosen_win, averaged over the last 20 steps, "
                              "reaches this (antidoom stops at 0.15-0.3)")
+    parser.add_argument("--answer-spans", nargs="+", type=Path, default=None, metavar="JSONL",
+                        help="capture inputs whose rows carry `answer_spans` (capture_inputs.py): "
+                             "those documents' answer bodies and closing <|im_end|> weigh "
+                             "--answer-weight, the rest of the document 1")
+    parser.add_argument("--answer-weight", type=float, default=1.0,
+                        help="loss weight of an --answer-spans position (budget counts weight)")
+    parser.add_argument("--pad-to-block", action="store_true",
+                        help="pad each document up to the CSA2 block multiple with masked "
+                             "positions instead of cutting it down to one (keeps final turns)")
     parser.add_argument("--assistant-only-caches", type=Path, nargs="+", default=None,
                         help="captures (agent traces) scored only on the assistant's own turns: "
                              "no loss on harness system prompts, user turns or tool output")
@@ -861,6 +870,23 @@ def main(argv=None) -> int:
                 row = by_source.setdefault(source, [0.0, 0])
                 row[0] += part
                 row[1] += count
+                if doc_id in held_teacher.spans:
+                    # The answers alone (bodies and their closing <|im_end|>), unweighted: the
+                    # number the QA data is for, which the document's own NLL drowns out.
+                    keep = torch.zeros(ids.shape[1], dtype=torch.bool)
+                    for start, stop in held_teacher.spans[doc_id]:
+                        keep[start:min(stop + 1, ids.shape[1])] = True
+                    answers = ids.clone()
+                    answers[0, ~keep.to(ids.device)] = -100
+                    n = int(keep[1:].sum())
+                    if n:
+                        with torch.cuda.device(head.device):
+                            nll = float(linear_cross_entropy(state.to(head.device), head,
+                                                             answers.to(head.device), shift=1,
+                                                             reduction="mean")) * n
+                        row = by_source.setdefault("answers", [0.0, 0])
+                        row[0] += nll
+                        row[1] += n
             model.train()
             # Per source as well as in aggregate: a merged corpus's aggregate moves when
             # the mixture moves, so the column that says whether the model improved on
@@ -905,6 +931,16 @@ def main(argv=None) -> int:
         excluded = excluded_documents(args.exclude_documents)
         from teacher_kl import hedge_token_ids
 
+        spans = {}
+        for path in args.answer_spans or []:
+            for line in open(path, encoding="utf-8"):
+                row = json.loads(line)
+                if row.get("answer_spans"):
+                    spans[row["doc_id"]] = row["answer_spans"]
+        if args.answer_spans:
+            print("teacher: answer spans for %d documents, weight %.2f" % (len(spans), args.answer_weight),
+                  flush=True)
+
         suppress = hedge_token_ids(tokenizer) if args.suppress_hedges else None
         if suppress is not None:
             print("teacher: suppressing hedge openers %s in answers"
@@ -933,7 +969,8 @@ def main(argv=None) -> int:
                                 turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"),
                                 unlikelihood=args.unlikelihood_caches,
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
-                                repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []))
+                                repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []),
+                                answer_spans=spans, answer_weight=args.answer_weight)
         if args.kl_only_caches or args.unlikelihood_caches:
             print("teacher: %d documents trained on KL alone (on-policy), %d of them looping "
                   "with unlikelihood on repeats" % (len(teacher.kl_only_ids),
@@ -948,7 +985,8 @@ def main(argv=None) -> int:
                                      exclude=excluded, strip_prefix=strip,
                                      strip_nonthinking=nonthinking,
                                      assistant_only=args.assistant_only_caches,
-                                     turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"))
+                                     turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"),
+                                     answer_spans=spans)
         if excluded:
             print("excluded as benchmark contamination: %d train, %d held-out, of %d listed"
                   % (teacher.excluded, held_teacher.excluded, len(excluded)), flush=True)
@@ -1069,6 +1107,11 @@ def main(argv=None) -> int:
     if teacher is not None:
         # One-row and multi-row runs use the same independently fixed prefixes.
         block = getattr(model.config, "csa2_block_size", None)
+        if args.pad_to_block:
+            if sparse_stage is not None:
+                raise SystemExit("--pad-to-block masks padded targets, not the indexer's queries; "
+                                 "not with --sparse-stage")
+            teacher.pad_blocks = True
         groups = teacher._groups(args.micro_batch, block, args.micro_tokens or None)
         if not groups:
             raise SystemExit("no training documents survive the sample plan")

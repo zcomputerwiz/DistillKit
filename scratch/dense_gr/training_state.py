@@ -37,7 +37,10 @@ class PlannedBatches:
             self.order = self.generator.permutation(len(self.groups)).tolist()
             self.cursor = 0
         group, width = self.groups[self.order[self.cursor]]
-        return len(group) * (width - 1)
+        # What the step will actually charge: the group's total loss weight, the same sum
+        # the loss is normalized by (padding, assistant-only masks and answer weights).
+        weight = getattr(self.teacher, "group_weight", None)
+        return weight(group, width) if weight is not None else len(group) * (width - 1)
 
     def take(self, remaining):
         # Do not truncate a canonical prefix to spend a budget remainder. Stop
@@ -86,7 +89,8 @@ def take_step(batches, accumulate, remaining):
             break
         records.append(record)
         ids = record["input_ids"]
-        remaining -= ids.numel() - ids.shape[0]
+        weight = record.get("weight")
+        remaining -= float(weight[:, :-1].sum()) if weight is not None else ids.numel() - ids.shape[0]
     return records
 
 
