@@ -22,6 +22,11 @@ trained projector gets (not a bound on it):
   fourth once assembled). The boundary follows KV Prediction: fills cover the prompt up to
   its second-to-last token, and the last prompt token runs the full stack once reading
   them, so the first continuation token's loss is the one a real split prefill gets.
+  An exact recent tail (--tails; the Qwen3.8-27B split-prefill work kept the last ~2K of a
+  32K prompt exact and recovered most of the loss: 6.27 -> 5.49 PPL against 5.29 exact)
+  and exact anchors every ubatch (--anchor-every) are swept the same way.
+  Calibration and probe text mix WikiText with held-out chat, agent and code captures:
+  a projector fitted on prose alone does worst on code (the same work).
   A mean-only fill (calibration means) is a baseline; an identity fill checks the wiring,
   and every fill asserts that each target was intercepted.
 
@@ -84,7 +89,7 @@ class Hooks:
 
     def __init__(self, model, splits):
         self.model, self.splits = model, splits
-        self.mode, self.prompt, self.maps, self.means, self.split = "off", 0, {}, {}, None
+        self.mode, self.rows, self.maps, self.means, self.split = "off", None, {}, {}, None
         self.stream, self.outputs, self.filled = {}, {}, set()
         self.handles = []
         for s in splits:
@@ -120,16 +125,16 @@ class Hooks:
         if self.mode == "record":
             self.outputs[name] = output[0].float()
         elif self.mode in ("fill", "mean", "identity") and name in self.maps:
-            p = self.prompt
+            rows = self.rows.to(output.device)  # the approximated prompt positions
             if self.mode == "identity":
-                fill = output[0, :p].float()
+                fill = output[0, rows].float()
             else:
-                x = self.stream[self.split][:p]
+                x = self.stream[self.split][rows]
                 weight = self.maps[name]
                 fill = (x @ weight[:, :-1].T + weight[:, -1] if self.mode == "fill"
-                        else self.means[name].to(x.device).expand(p, -1))
+                        else self.means[name].to(x.device).expand(len(rows), -1))
             output = output.clone()
-            output[0, :p] = fill.to(output.dtype)
+            output[0, rows] = fill.to(output.dtype)
             self.filled.add(name)
         return output
 
@@ -164,7 +169,14 @@ def mean_se(values):
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
-    parser.add_argument("--chat", type=Path, default=Path("../teacher-cache-expand-chat"))
+    parser.add_argument("--chat", type=Path, nargs="+",
+                        default=[Path("../teacher-cache-expand-chat"), Path("../teacher-cache-agent-smol-b"),
+                                 Path("../teacher-cache-expand-code-w8")],
+                        help="held-out captures for the second half of the documents (chat, agent, code)")
+    parser.add_argument("--tails", type=int, nargs="+", default=[1, 128, 512],
+                        help="prompt tokens kept exact at the end (1: only the boundary token)")
+    parser.add_argument("--anchor-every", type=int, default=0,
+                        help="also keep every Nth prompt token exact (the last of each ubatch)")
     parser.add_argument("--splits", type=int, nargs="+", default=[11, 15, 19])
     parser.add_argument("--count", type=int, default=16, help="documents a kind, calibration and probe each")
     parser.add_argument("--length", type=int, default=2048)
@@ -182,13 +194,15 @@ def main() -> int:
         raise SystemExit("splits must be distinct layer indices below the last layer")
     if not 0 < args.prompt_share < 1:
         raise SystemExit("--prompt-share must be between 0 and 1")
-    calibration, probe = documents(tokenizer, [args.chat], args.count, args.length, args.device)
+    if min(args.tails) < 1:
+        raise SystemExit("tails must be at least 1 (the boundary token runs exactly)")
+    calibration, probe = documents(tokenizer, args.chat, args.count, args.length, args.device)
     # documents() gives `count` WikiText windows then `count` chat documents in each set;
     # with too few chat documents the halves would mislabel, so refuse.
     if len(calibration) != 2 * args.count or len(probe) != 2 * args.count:
         raise SystemExit("expected %d calibration and probe documents, got %d and %d"
                          % (2 * args.count, len(calibration), len(probe)))
-    domains = ["wiki"] * args.count + ["chat"] * args.count
+    domains = ["wiki"] * args.count + ["captures"] * args.count
     hooks = Hooks(model, args.splits)
     per_split = {s: targets(model, s) for s in args.splits}
 
@@ -229,7 +243,8 @@ def main() -> int:
     del gram, cross
     hooks.means = {name: (total / tokens).float() for name, total in ysum.items()}
 
-    report = dict(checkpoint=str(args.checkpoint), calibration_docs=len(calibration),
+    report = dict(checkpoint=str(args.checkpoint), captures=[str(c) for c in args.chat], tails=args.tails,
+                  anchor_every=args.anchor_every, calibration_docs=len(calibration),
                   calibration_tokens=tokens, probe_docs=len(probe), prompt_share=args.prompt_share,
                   ridge=RIDGE, length=args.length, splits={})
     # Reconstruction on the probe documents, per target part: R^2 about the probe's own
@@ -279,9 +294,15 @@ def main() -> int:
                    exact=float(exact.mean()), splits={})
         for s in args.splits:
             hooks.maps = {name: maps[s, name] for name in per_split[s]}
-            hooks.split, hooks.prompt = s, prompt - 1  # the last prompt token runs exactly
-            for mode in ("fill", "mean") + (("identity",) if doc == 0 else ()):
-                hooks.mode, hooks.filled = mode, set()
+            hooks.split = s
+            runs = [("fill", t) for t in args.tails] + [("mean", 1)] + ([("identity", 1)] if doc == 0 else [])
+            for mode, tail in runs:
+                rows = torch.arange(max(prompt - tail, 0))
+                if args.anchor_every:
+                    rows = rows[(rows + 1) % args.anchor_every != 0]
+                if not len(rows):
+                    continue
+                hooks.mode, hooks.rows, hooks.filled = mode, rows, set()
                 delta = continuation_losses(model, forward(model, ids), ids, prompt) - exact
                 if hooks.filled != set(hooks.maps):
                     raise SystemExit("split %d %s: filled %s of %s"
@@ -292,25 +313,25 @@ def main() -> int:
                     continue
                 cell = {name: float(delta[a:b].mean()) for name, a, b in BINS if len(delta) > a}
                 cell["all"] = float(delta.mean())
-                row["splits"].setdefault(str(s), {})[mode] = cell
+                row["splits"].setdefault(str(s), {})["%s-tail%d" % (mode, tail)] = cell
         hooks.maps, hooks.split = {}, None
         docs.append(row)
     report["documents"] = docs
     for s in args.splits:
         out = report["splits"][s]
-        for mode in ("fill", "mean"):
-            for domain in ("wiki", "chat"):
-                out["%s_%s" % (mode, domain)] = {
-                    name: mean_se([d["splits"][str(s)][mode][name] for d in docs
-                                   if d["domain"] == domain and name in d["splits"][str(s)][mode]])
+        for key in sorted({k for d in docs for k in d["splits"].get(str(s), {})}):
+            for domain in ("wiki", "captures"):
+                out["%s_%s" % (key, domain)] = {
+                    name: mean_se([d["splits"][str(s)][key][name] for d in docs
+                                   if d["domain"] == domain and name in d["splits"][str(s)].get(key, {})])
                     for name in ("all",) + tuple(b[0] for b in BINS)}
-        f, c = out["fill_wiki"], out["fill_chat"]
-        print("split %2d  ridge fill dNLL  wiki: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | "
-              "chat: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | mean fill all: wiki %+.4f chat %+.4f | "
-              "map/skipped params %.2f"
-              % (s, f["all"][0], f["first"][0], f["2-8"][0], f["33+"][0], c["all"][0], c["first"][0],
-                 c["2-8"][0], c["33+"][0], out["mean_wiki"]["all"][0], out["mean_chat"]["all"][0],
-                 out["map_parameters"] / out["skipped_layer_parameters"]), flush=True)
+            w, c = out["%s_wiki" % key], out["%s_captures" % key]
+            print("split %2d  %-12s dNLL  wiki: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f | "
+                  "captures: all %+.4f first %+.4f 2-8 %+.4f 33+ %+.4f"
+                  % (s, key, w["all"][0], w["first"][0], w["2-8"][0], w["33+"][0],
+                     c["all"][0], c["first"][0], c["2-8"][0], c["33+"][0]), flush=True)
+        print("split %2d  map/skipped params %.2f" % (s, out["map_parameters"] / out["skipped_layer_parameters"]),
+              flush=True)
     hooks.remove()
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
     return 0
