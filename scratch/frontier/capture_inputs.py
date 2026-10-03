@@ -45,6 +45,26 @@ def chat_ids(tokenizer, messages, tools=None, generation=False):
     return tokenizer(text, add_special_tokens=False)["input_ids"]
 
 
+def qa_items(names=("qa-code.jsonl", "qa-more.jsonl"), merge=True):
+    """{doc_id: verified items} in file order: the first eight questions (qa-code), then
+    the sixteen more asked without repeating them (qa-more). A document answered in two
+    requests appears in two rows; `merge` joins them (a question asked twice is kept once),
+    otherwise the first row stands -- what the first QA capture and its eval used.
+    """
+    items = {}
+    for name in names:
+        for row in map(json.loads, open(F / "frontier" / name, encoding="utf-8")):
+            if row["doc_id"] in items and not merge:
+                continue
+            kept = items.setdefault(row["doc_id"], [])
+            known = {item["question"] for item in kept}
+            for item in row["items"]:
+                if item["question"] not in known:
+                    known.add(item["question"])
+                    kept.append(item)
+    return items
+
+
 def qa_conversation(tokenizer, items, document, max_length):
     """The document (None: the no-document control) and its questions as one conversation.
 
@@ -97,15 +117,7 @@ def main():
                          "input_ids": ids[:args.max_length]})
     elif args.kind == "qa":
         docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
-        # Every verified question a document has, in one conversation: the first eight
-        # (qa-code), then the sixteen more asked without repeating them (qa-more). A
-        # document answered in two requests appears in two rows; its items are merged.
-        items = {}
-        for name in ("qa-code.jsonl", "qa-more.jsonl"):
-            for row in map(json.loads, open(F / "frontier" / name, encoding="utf-8")):
-                known = {item["question"] for item in items.get(row["doc_id"], [])}
-                items.setdefault(row["doc_id"], []).extend(i for i in row["items"] if i["question"] not in known)
-        for doc_id, questions in items.items():
+        for doc_id, questions in qa_items().items():
             row = {"doc_id": doc_id, "items": questions}
             ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]], args.max_length)
             dropped += len(row["items"]) - len(spans)

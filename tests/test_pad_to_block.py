@@ -80,3 +80,16 @@ def test_padded_step_matches_the_unpadded_documents(tmp_path):
     # TinyLM is causal, so the pads change no real position.
     assert abs(result["loss"] - reference["loss"]) < 1e-5
     assert abs(result["teacher_kl"] - reference["teacher_kl"]) < 1e-5
+
+
+def test_hedge_suppression_skips_documents_without_chat_turns(tmp_path):
+    # Raw text (no turn opener 3) keeps the teacher's view whole; a chat document loses
+    # the suppressed token (0, every cached top-k id here) from its answer onwards.
+    tokens = {"raw": [1, 2, 4, 5, 6, 8], "chat": [1, 3, 4, 5, 6, 8]}
+    path = write(tmp_path / "cache", list(tokens), tokens=tokens)
+    t = CachedTeacher(path, device="cpu", answer_marker=[3], turn_close=7, min_answer_tokens=1,
+                      suppress=np.array([0]))
+    raw = t.read_batch(["raw"], 6)["topk_logprobs"].numpy()
+    assert t.suppressed_mass == 0 and (raw == 0).all()
+    t.read_batch(["chat"], 6)
+    assert t.suppressed_mass > 0

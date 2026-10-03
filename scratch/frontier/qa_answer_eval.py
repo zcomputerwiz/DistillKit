@@ -29,24 +29,26 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scratch" / "dense_gr"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from capture_inputs import F, qa_conversation, split_of  # noqa: E402
+from capture_inputs import F, qa_conversation, qa_items, split_of  # noqa: E402
 from long_context_probe import TOKENIZER  # noqa: E402
 
 
-def conversations(tokenizer, max_length, exclude=()):
+def conversations(tokenizer, max_length, exclude=(), questions="first"):
     """Held-out QA conversations, rendered by capture_inputs.qa_conversation -- the same
     code that built the captured inputs -- in pairs: with the document, and the same
-    retained turns (questions and reference answers) without it.
+    retained turns (questions and reference answers) without it. `questions`: "first", the
+    original eight per document (the series every round so far reports), or "all", every
+    checked question as long round 3's capture merged them.
 
     Returns {"document": [...], "no_document": [...]}, each a list of
     (doc_id, ids, [(start, stop)] answer-body spans), in the same order.
     """
     docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
-    seen, full, control = set(), [], []
-    for row in map(json.loads, open(F / "frontier" / "qa-code.jsonl", encoding="utf-8")):
-        if row["doc_id"] in seen or split_of(row["doc_id"]) != "eval" or "qa:" + row["doc_id"] in exclude:
+    full, control = [], []
+    rows = (qa_items(("qa-code.jsonl",), merge=False) if questions == "first" else qa_items()).items()
+    for row in ({"doc_id": doc_id, "items": items} for doc_id, items in rows):
+        if split_of(row["doc_id"]) != "eval" or "qa:" + row["doc_id"] in exclude:
             continue
-        seen.add(row["doc_id"])
         ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]], max_length)
         if not spans:
             continue
@@ -91,6 +93,8 @@ def main():
     parser.add_argument("--limit", type=int, default=0, help="first N conversations only (smoke tests)")
     parser.add_argument("--exclude", nargs="*", type=Path, default=[],
                         help="JSON lists of document ids to leave out (the run's exclusions)")
+    parser.add_argument("--questions", choices=["first", "all"], default="first",
+                        help="first: the original eight per document; all: every checked question (round 3)")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -100,7 +104,7 @@ def main():
 
     tokenizer = AutoTokenizer.from_pretrained(TOKENIZER)
     exclude = {i for path in args.exclude for i in json.load(open(path, encoding="utf-8"))}
-    sets = conversations(tokenizer, args.max_length, exclude)
+    sets = conversations(tokenizer, args.max_length, exclude, args.questions)
     if args.limit:
         sets = {k: v[:args.limit] for k, v in sets.items()}
     print("held-out conversations: %d (%d ids on the exclusion lists), answer tokens %d" % (

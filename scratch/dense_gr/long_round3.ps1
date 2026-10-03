@@ -80,9 +80,13 @@ if (-not (Test-Path "$tuned\config.json")) { "training produced no checkpoint; s
     --output scratch\csa2-eval\long-context-long3.json 2>&1 | Where-Object { $_ -match '^==|^  ' -and $_ -notmatch 'warn|torch.nn' }
 Check "long-context probe"
 "=== held-out QA answers $(Get-Date -Format HH:mm)"
-& $py scratch\frontier\qa_answer_eval.py --arm "long1-u50=$base" --arm "long3=$tuned" `
-    --exclude "$C\exclude-long-r3.json" --output scratch\csa2-eval\qa-answers-long3.json
-Check "QA answer eval"
+# The original eight questions per document (comparable with round 2), then every checked
+# question as round 3 trained them.
+foreach ($q in "first", "all") {
+    & $py scratch\frontier\qa_answer_eval.py --arm "long1-u50=$base" --arm "long2-u50=$root\scratch\dense_gr\merges-long2\u50" `
+        --arm "long3=$tuned" --questions $q --exclude "$C\exclude-long-r3.json" --output "scratch\csa2-eval\qa-answers-long3-$q.json"
+    Check "QA answer eval ($q)"
+}
 "=== blend screen against the base $(Get-Date -Format HH:mm)"
 & .\scratch\dense_gr\merge_search.ps1 -Tuned $tuned -Tag long3 -Base $base
 Check "blend screen"

@@ -641,7 +641,10 @@ class CachedTeacher:
             values.append(np.asarray(record["topk_logprobs"], dtype=np.float32))
             if self.suppress is not None:
                 start = self.answer_start.get(doc_id, 0)
-                if start is not None:
+                # Hedges are an answer's habit: a document with no chat turns at all (raw
+                # code, prose) has no answer to keep them out of, and its "Wait" is text.
+                chat = self.answer_marker is None or bool((ids[-1] == self.answer_marker[0]).any())
+                if start is not None and chat:
                     values[-1], removed = suppress_teacher_tokens(
                         ids[-1], targets[-1], values[-1], self.suppress, start)
                     self.suppressed_mass += removed
