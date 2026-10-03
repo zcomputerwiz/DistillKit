@@ -44,11 +44,13 @@ $jobs = foreach ($gpu in 0, 1) {
         $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
         $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
         Set-Location $root
-        $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\merge_proxy.py")
-        foreach ($arm in $mine -split ";") { $argv.Add($arm) }
-        $argv.Add("--output"); $argv.Add("$out\proxy-gpu$gpu.json")
-        & $py $argv *> "$out\proxy-gpu$gpu.log"
-        if ($LASTEXITCODE -ne 0) { throw "merge_proxy on gpu $gpu failed (exit $LASTEXITCODE)" }
+        # One process per arm: the compiled generator's CUDA-graph pools outlive the model,
+        # and five arms in one process spilled ~10 GB a card into system memory (long3).
+        # merge_proxy adds each arm to the same results file.
+        foreach ($arm in $mine -split ";") {
+            & $py scratch\dense_gr\merge_proxy.py $arm --output "$out\proxy-gpu$gpu.json" *>> "$out\proxy-gpu$gpu.log"
+            if ($LASTEXITCODE -ne 0) { throw "merge_proxy on gpu $gpu failed for $arm (exit $LASTEXITCODE)" }
+        }
     }
 }
 $jobs | Wait-Job | Receive-Job
