@@ -1,6 +1,6 @@
 """The verified frontier data as capture input, rendered with the served chat template.
 
-qa: each long code document with its checked questions as a conversation -- the document
+qa: each long code document with all its checked questions as a conversation -- the document
 and first question in the first user turn, then answer, question, answer -- in order
 through the document. Questions that would push it past --max-length are left off. All
 tokens are meant to be scored (the document is long-context language modelling too).
@@ -11,11 +11,17 @@ Documents whose source spells chat markup are listed in `<output stem>-markup.js
 
 tools: each verified tool conversation with its tool list; meant for --assistant-only-caches.
 
+code: the same long code documents as raw text, no chat template, for KL alone
+(--kl-only-caches). There the teacher predicts code as code -- top-1 0.88 and calibrated
+(framing_check.py) -- where in a user turn it expects the person to stop typing at every
+line break (top-1 0.40, a false `<|im_end|>` at 47%). Same train/eval split as their QA.
+
 Non-thinking turns (the answers are short and carry no reasoning). A tenth of each set,
 chosen by a hash of its id, is held out.
 
     python scratch/frontier/capture_inputs.py qa --output ../capture-data/frontier-qa.jsonl
     python scratch/frontier/capture_inputs.py tools --output ../capture-data/frontier-tools.jsonl
+    python scratch/frontier/capture_inputs.py code --output ../capture-data/frontier-code-raw.jsonl
 """
 import argparse
 import hashlib
@@ -68,7 +74,7 @@ def qa_conversation(tokenizer, items, document, max_length):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("kind", choices=["qa", "tools"])
+    parser.add_argument("kind", choices=["qa", "tools", "code"])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--max-length", type=int, default=32768)
     args = parser.parse_args()
@@ -81,16 +87,26 @@ def main():
 
     rows, dropped, tokens, flagged = [], 0, 0, []
     markup = set(tokenizer.added_tokens_decoder)  # chat markup, think and tool tags
-    if args.kind == "qa":
-        docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
-        seen = set()
-        for row in map(json.loads, open(F / "frontier" / "qa-code.jsonl", encoding="utf-8")):
-            # A document answered in two requests appears twice; the cache needs unique ids,
-            # and the first occurrence is the one already captured.
-            if row["doc_id"] in seen:
-                dropped += len(row["items"])
+    if args.kind == "code":
+        for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8")):
+            ids = tokenizer(d["text"], add_special_tokens=False)["input_ids"]
+            if markup & set(ids):
+                dropped += 1
                 continue
-            seen.add(row["doc_id"])
+            rows.append({"doc_id": "code-raw:" + d["doc_id"], "split": split_of(d["doc_id"]),
+                         "input_ids": ids[:args.max_length]})
+    elif args.kind == "qa":
+        docs = {d["doc_id"]: d["text"] for d in map(json.loads, open(F / "long-docs-code.jsonl", encoding="utf-8"))}
+        # Every verified question a document has, in one conversation: the first eight
+        # (qa-code), then the sixteen more asked without repeating them (qa-more). A
+        # document answered in two requests appears in two rows; its items are merged.
+        items = {}
+        for name in ("qa-code.jsonl", "qa-more.jsonl"):
+            for row in map(json.loads, open(F / "frontier" / name, encoding="utf-8")):
+                known = {item["question"] for item in items.get(row["doc_id"], [])}
+                items.setdefault(row["doc_id"], []).extend(i for i in row["items"] if i["question"] not in known)
+        for doc_id, questions in items.items():
+            row = {"doc_id": doc_id, "items": questions}
             ids, spans = qa_conversation(tokenizer, row["items"], docs[row["doc_id"]], args.max_length)
             dropped += len(row["items"]) - len(spans)
             # Source code that spells chat markup (`<|im_start|>assistant`, `<tool_call>`)
@@ -133,7 +149,8 @@ def main():
             out.write(json.dumps(row) + "\n")
     print("%d documents, %d tokens (max %d), %d eval; %d %s left off -> %s"
           % (len(rows), tokens, max(len(r["input_ids"]) for r in rows), sum(r["split"] == "eval" for r in rows),
-             dropped, "questions" if args.kind == "qa" else "conversations", args.output))
+             dropped, {"qa": "questions", "tools": "conversations", "code": "documents (chat markup)"}[args.kind],
+             args.output))
 
 
 if __name__ == "__main__":
