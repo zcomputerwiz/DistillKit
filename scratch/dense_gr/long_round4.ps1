@@ -124,39 +124,7 @@ foreach ($q in "first", "all") {
         --arm "long4=$tuned" --questions $q --exclude "$C\exclude-long-r4.json" --output "scratch\csa2-eval\qa-answers-long4-$q.json"
     Check "QA answer eval ($q)"
 }
-"=== blend screen against the base $(Get-Date -Format HH:mm)"
-& .\scratch\dense_gr\merge_search.ps1 -Tuned $tuned -Tag long4 -Base $base
-Check "blend screen"
-# The loop gate (math_truncation.py): the screen's MATH problems at 4,096 new tokens, saved
-# texts; base 5 and round 3 31 answers unfinished and looping. Tuned and two blends, one
-# process each, two at a time.
-"=== loop test $(Get-Date -Format HH:mm)"
-$m = "$root\scratch\dense_gr\merges-long4"
-# On the fresh bank (MATH test outside MATH-500): round 4 trains on loops from the screen's
-# problems, so those cannot judge whether the fix generalizes. The base runs too unless
-# its fresh-bank result is already saved.
-$tests = @(@("long4", $tuned), @("long4-u50", "$m\u50"), @("long4-ramp0-70", "$m\ramp0-70"))
-if (-not (Test-Path "scratch\csa2-eval\math-truncation-fresh-long1-u50.json")) { $tests = @(, @("long1-u50", $base)) + $tests }
-for ($i = 0; $i -lt $tests.Count; $i += 2) {
-    $jobs = foreach ($j in $i..([Math]::Min($i + 1, $tests.Count - 1))) {
-        $name, $path = $tests[$j]
-        Start-Job -ArgumentList ($j % 2), $py, $root, $name, $path -ScriptBlock {
-            param($gpu, $py, $root, $name, $path)
-            # A compile cache per GPU, as merge_search keeps: two processes compiling into one
-            # cache raced (a kernel file read half-written) and the survivor recompiled into a spill.
-            $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
-            $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
-            Set-Location $root
-            & $py scratch\dense_gr\math_truncation.py --arm "$name=$path" --bank fresh `
-                --output "scratch\csa2-eval\math-truncation-fresh-$name.json" *> "scratch\dense_gr\mt-$name.log"
-            if ($LASTEXITCODE -ne 0) { throw "loop test $name failed (exit $LASTEXITCODE)" }
-        }
-    }
-    $jobs | Wait-Job | Receive-Job
-    if ($jobs | Where-Object { $_.State -ne "Completed" }) { "loop test failed; see scratch\dense_gr\mt-*.log"; exit 1 }
-}
-& $py scratch\dense_gr\loop_gate.py --base "scratch\csa2-eval\math-truncation-fresh-long1-u50.json" `
-    --candidates "scratch\csa2-eval\math-truncation-fresh-long4.json" "scratch\csa2-eval\math-truncation-fresh-long4-u50.json" `
-    "scratch\csa2-eval\math-truncation-fresh-long4-ramp0-70.json" --output "scratch\csa2-eval\loop-gate-long4.json"
-if ($LASTEXITCODE -ne 0) { "loop gate: no candidate passes"; exit 1 }
+# The blend screen and the loop gate (finish_round.ps1, also runnable on its own).
+& .\scratch\dense_gr\finish_round.ps1 -Tag long4 -Tuned $tuned -Base $base
+Check "blend screen and loop gate"
 "=== done $(Get-Date -Format HH:mm)"

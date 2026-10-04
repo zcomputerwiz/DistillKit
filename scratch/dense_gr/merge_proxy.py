@@ -125,11 +125,12 @@ def main() -> int:
         render = lambda q, thinking: tok.apply_chat_template(
             [{"role": "user", "content": PROMPT.format(problem=q)}], tokenize=False,
             add_generation_prompt=True, enable_thinking=thinking)
-        texts, _ = generate(model, tok, [render(q, False) for q, _ in gsm], 512, None)
+        # 32 rows: at 64 the prefill over the static cache spilled past 24 GB (long4 screen).
+        texts, _ = generate(model, tok, [render(q, False) for q, _ in gsm], 512, None, rows=32)
         answers = [boxed(t) for t in texts]
         row["gsm8k_nothink"] = sum(correct(a, r) for a, (_, r) in zip(answers, gsm)) / len(gsm)
         row["gsm8k_unboxed"] = sum(a is None for a in answers)
-        texts, cut = generate(model, tok, [render(q, True) for q, _ in math], 1024, (0.6, 0.95, 20))
+        texts, cut = generate(model, tok, [render(q, True) for q, _ in math], 1024, (0.6, 0.95, 20), rows=32)
         row["math_think"] = sum(correct(boxed(t.split("</think>")[-1]), r)
                                 for t, (_, r) in zip(texts, math)) / len(math)
         row["math_truncated"] = sum(cut)
