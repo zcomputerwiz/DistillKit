@@ -36,7 +36,9 @@ $agentA = "..\teacher-cache-agent-smol-a"; $agentB = "..\teacher-cache-agent-smo
 $code = "..\teacher-cache-r8-code-short-w8"
 $qa = "..\teacher-cache-frontier-qa2"; $raw = "..\teacher-cache-frontier-code-raw"; $tools = "..\teacher-cache-frontier-tools"
 $traces = "..\teacher-cache-teacher-math-gen"
-$loops = @("..\teacher-cache-onpolicy-r6-loop", "..\teacher-cache-onpolicy-r5-loop", "..\teacher-cache-loop-check")
+# r5-loop is left out: it shares 103 document ids with r6-loop, with different rollouts
+# (Codex review r4), and r6 is the larger and later set.
+$loops = @("..\teacher-cache-onpolicy-r6-loop", "..\teacher-cache-loop-check")
 $caches = @($agentA, $agentB, $qa, $raw, $tools, $code, "..\teacher-cache-curriculum-v4-w8", "..\teacher-cache-thinking-w8",
             "..\teacher-cache-think-first-w8", "..\teacher-cache-expand-code-w8", "..\teacher-cache-general-pilot-w8",
             $traces) + $loops
@@ -60,8 +62,12 @@ Check "judged exclusions"
 & $py scratch\frontier\trace_judge.py collect --responses "$F\trace-judge-responses.jsonl" `
     --traces "$C\teacher-gen-math.jsonl" --output "$C\teacher-gen-keep.json" --exclusions "$C\exclude-teacher-gen.json"
 Check "trace keep list"
+# And looping rollouts where the unlikelihood detector marks nothing (the thought closed
+# before the loop, or the repeats vary): they would train KL over the whole loop.
+& $py scratch\dense_gr\loop_negatives.py --caches ($loops | ForEach-Object { $_ }) --output "$C\exclude-zero-negative-loops.json"
+Check "zero-negative loops"
 & $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa2-markup.json" `
-    "$C\exclude-teacher-gen.json" `
+    "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" `
     --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r4.json"
 Check "exclusion list"
 "=== train $(Get-Date -Format HH:mm)"
@@ -78,7 +84,10 @@ foreach ($a in @("--assistant-only-caches", $agentA, $agentB, $tools, $qa, "--kl
                  "--ce-only-caches", $code,
                  "--repeat", "$agentA=3", "$agentB=3", "$tools=4", "$code=2", "..\teacher-cache-curriculum-v4-w8=2",
                  "..\teacher-cache-thinking-w8=2", "..\teacher-cache-think-first-w8=2",
-                 "..\teacher-cache-expand-code-w8=2", "..\teacher-cache-general-pilot-w8=2", "--pad-to-block",
+                 "..\teacher-cache-expand-code-w8=2", "..\teacher-cache-general-pilot-w8=2",
+                 # The repair data repeated so 8M tokens sees enough of it (Codex's seed-24
+                 # simulation saw 574 traces and 10 of round 3's loops once without).
+                 "$traces=2", "..\teacher-cache-onpolicy-r6-loop=2", "..\teacher-cache-loop-check=4", "--pad-to-block",
                  "--answer-spans", "$C\frontier-qa2.jsonl", "--answer-weight", "8",
                  "--lr-scale", "linear_attn\.(A_log|dt_bias|in_proj_a)=0.1", "--strip-effort-nonthinking",
                  "--exclude-documents", "..\capture-data\exclude-long-r4.json", "--suppress-hedges",
@@ -117,7 +126,11 @@ Check "blend screen"
 # process each, two at a time.
 "=== loop test $(Get-Date -Format HH:mm)"
 $m = "$root\scratch\dense_gr\merges-long4"
+# On the fresh bank (MATH test outside MATH-500): round 4 trains on loops from the screen's
+# problems, so those cannot judge whether the fix generalizes. The base runs too unless
+# its fresh-bank result is already saved.
 $tests = @(@("long4", $tuned), @("long4-u50", "$m\u50"), @("long4-ramp0-70", "$m\ramp0-70"))
+if (-not (Test-Path "scratch\csa2-eval\math-truncation-fresh-long1-u50.json")) { $tests = @(, @("long1-u50", $base)) + $tests }
 for ($i = 0; $i -lt $tests.Count; $i += 2) {
     $jobs = foreach ($j in $i..([Math]::Min($i + 1, $tests.Count - 1))) {
         $name, $path = $tests[$j]
@@ -125,17 +138,16 @@ for ($i = 0; $i -lt $tests.Count; $i += 2) {
             param($gpu, $py, $root, $name, $path)
             $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
             Set-Location $root
-            & $py scratch\dense_gr\math_truncation.py --arm "$name=$path" `
-                --output "scratch\csa2-eval\math-truncation-$name.json" *> "scratch\dense_gr\mt-$name.log"
+            & $py scratch\dense_gr\math_truncation.py --arm "$name=$path" --bank fresh `
+                --output "scratch\csa2-eval\math-truncation-fresh-$name.json" *> "scratch\dense_gr\mt-$name.log"
             if ($LASTEXITCODE -ne 0) { throw "loop test $name failed (exit $LASTEXITCODE)" }
         }
     }
     $jobs | Wait-Job | Receive-Job
     if ($jobs | Where-Object { $_.State -ne "Completed" }) { "loop test failed; see scratch\dense_gr\mt-*.log"; exit 1 }
 }
-foreach ($t in $tests) {
-    $s = (Get-Content "scratch\csa2-eval\math-truncation-$($t[0]).json" -Raw | ConvertFrom-Json).summary
-    "{0,-16} in-budget {1:P1}  any length {2:P1}  over budget {3}  unfinished at 4096 {4}  looping {5}" -f $t[0], `
-        $s.within_budget_correct, $s.correct_any_length, $s.over_budget, $s.over_budget_unfinished_at_new, $s.over_budget_looping
-}
+& $py scratch\dense_gr\loop_gate.py --base "scratch\csa2-eval\math-truncation-fresh-long1-u50.json" `
+    --candidates "scratch\csa2-eval\math-truncation-fresh-long4.json" "scratch\csa2-eval\math-truncation-fresh-long4-u50.json" `
+    "scratch\csa2-eval\math-truncation-fresh-long4-ramp0-70.json" --output "scratch\csa2-eval\loop-gate-long4.json"
+if ($LASTEXITCODE -ne 0) { "loop gate: no candidate passes"; exit 1 }
 "=== done $(Get-Date -Format HH:mm)"

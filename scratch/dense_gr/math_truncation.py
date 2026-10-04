@@ -31,10 +31,29 @@ def repetition(ids, tail=512):
     return 1 - len(set(grams)) / max(len(grams), 1)
 
 
+def fresh_bank(count, seed=11):
+    """MATH test problems outside MATH-500 (the benchmark), with boxed answers. The teacher
+    traces came from MATH train and round 4's loop rollouts from the screen's train bank,
+    so these are untouched by every repair input."""
+    from datasets import load_dataset
+    import random
+
+    from rollout_prompts import SUBJECTS
+
+    benchmark = {r["problem"] for r in load_dataset("HuggingFaceH4/MATH-500", split="test")}
+    bank = [(r["problem"], boxed(r["solution"])) for subject in SUBJECTS
+            for r in load_dataset("EleutherAI/hendrycks_math", subject, split="test")
+            if r["problem"] not in benchmark and boxed(r["solution"]) is not None]
+    return random.Random(seed).sample(bank, count)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--arm", required=True, metavar="NAME=CHECKPOINT")
     parser.add_argument("--count", type=int, default=256)
+    parser.add_argument("--bank", choices=["screen", "fresh"], default="screen",
+                        help="screen: merge_proxy's MATH train problems (round 4 trains on loops from "
+                             "them); fresh: MATH test outside MATH-500, which no capture or generation used")
     parser.add_argument("--budget", type=int, default=1024, help="the proxy's budget")
     parser.add_argument("--new", type=int, default=4096)
     parser.add_argument("--output", type=Path, required=True)
@@ -48,7 +67,7 @@ def main():
     tok.padding_side = "left"
     model = Qwen35WidenedForCausalLM.from_pretrained(path, dtype=torch.bfloat16).cuda().eval()
     model.config.use_cache = True
-    _, math = problems(args.count)
+    _, math = problems(args.count) if args.bank == "screen" else (None, fresh_bank(args.count))
     prompts = [tok.apply_chat_template([{"role": "user", "content": PROMPT.format(problem=q)}], tokenize=False,
                                        add_generation_prompt=True, enable_thinking=True) for q, _ in math]
     texts, cut = generate(model, tok, prompts, args.new, (0.6, 0.95, 20))
@@ -70,6 +89,7 @@ def main():
         "over_budget_finished": sum(r["finished"] for r in over),
         "over_budget_finished_correct": sum(r["correct"] for r in over if r["finished"]),
         "over_budget_looping": len(loops),
+        "over_budget_unfinished_looping": sum(not r["finished"] for r in loops),
         "over_budget_unfinished_at_new": sum(not r["finished"] for r in over),
         "median_tokens": sorted(r["tokens"] for r in rows)[len(rows) // 2],
     }

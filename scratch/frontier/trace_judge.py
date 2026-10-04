@@ -78,8 +78,7 @@ def build(args):
     for path in args.done or []:
         for row in map(json.loads, open(path, encoding="utf-8")):
             done |= {i for i, _ in verdicts_of(row)}
-    traces = [r for r in read_traces(args.traces)
-              if r["correct"] and r["finished"] and r["max_line_repeats"] < 5 and trace_id(r) not in done]
+    traces = [r for r in read_traces(args.traces) if eligible(r) and trace_id(r) not in done]
     groups, group, size = [], [], 0
     for r in traces:  # several traces a request, up to a character budget
         if group and (len(group) == args.per_request or size + len(r["text"]) > args.max_chars):
@@ -100,11 +99,20 @@ def build(args):
     print("%d traces (%d already judged) in %d requests -> %s" % (len(traces), len(done), len(groups), args.output))
 
 
+def eligible(r):
+    """Graded correct, finished with its thought closed, and loop-free: what is judged."""
+    return r["correct"] and r["finished"] and r["thought_closed"] and r["max_line_repeats"] < 5
+
+
 def collect(args):
     seen, keep, counts, issues, verdict = set(), [], Counter(), Counter(), {}
+    known = {trace_id(r) for r in read_traces(args.traces) if eligible(r)}
     for path in args.responses:
         for row in map(json.loads, open(path, encoding="utf-8")):
             for i, v in verdicts_of(row):
+                if i not in known:  # a judge's id for no trace it was sent
+                    counts["unknown id"] += 1
+                    continue
                 if i in seen:
                     continue
                 seen.add(i)
