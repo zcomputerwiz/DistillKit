@@ -56,6 +56,29 @@ def test_unlikelihood_matches_brute_force():
     torch.testing.assert_close(unlikelihood_loss(hidden, head, ids, negative, chunk=2), want)
 
 
+def test_unlikelihood_gradient_survives_chunk_checkpointing():
+    # Each chunk is checkpointed (its logits recomputed in backward); the gradients to the
+    # hidden state and the head must equal the unchunked computation's, weights included.
+    torch.manual_seed(1)
+    head = torch.nn.Linear(8, 32, bias=False)
+    hidden = torch.randn(2, 6, 8, requires_grad=True)
+    ids = torch.randint(0, 32, (2, 6))
+    negative = torch.zeros(2, 6, dtype=torch.bool)
+    negative[0, 1] = negative[0, 2] = negative[1, 3] = negative[1, 4] = True
+    weight = torch.rand(2, 6)
+    unlikelihood_loss(hidden, head, ids, negative, chunk=1, weight=weight).backward()
+    got = hidden.grad.clone(), head.weight.grad.clone()
+    hidden.grad = None
+    head.weight.grad = None
+    want = 0.0
+    for r, t in negative.nonzero().tolist():
+        p = F.softmax(head(hidden[r, t]), -1)[ids[r, t + 1]]
+        want = want - torch.log1p(-p) * weight[r, t]
+    want.backward()
+    torch.testing.assert_close(got[0], hidden.grad)
+    torch.testing.assert_close(got[1], head.weight.grad)
+
+
 def test_ce_only_batches_take_no_teacher_gradient():
     from training_step import backward_step
 

@@ -811,21 +811,33 @@ def unlikelihood_loss(hidden, head, ids, negative, chunk=128, weight=None):
     weight when `weight` is given (zero-weight negatives drop out), like every other term.
 
     Rows are projected in chunks: a 248320-wide fp32 row is 1 MB, and a looping micro
-    batch has hundreds of negatives."""
+    batch has hundreds of negatives -- thousands at 32K tokens of packed rollouts, which
+    is why each chunk is checkpointed like the KL's (chunked_head_loss): without it every
+    chunk's logits stayed alive for backward and long round 4 ran out of memory."""
+    from torch.utils.checkpoint import checkpoint
+
     if weight is not None:
         negative = negative & (weight > 0)
     positions = negative.nonzero()
     total = hidden.new_zeros((), dtype=torch.float32)
+
+    def penalty(state, wanted, scale):
+        logits = head(state).float()
+        p = (logits.gather(-1, wanted[:, None]).squeeze(-1) - logits.logsumexp(-1)).exp()
+        return (-torch.log1p(-p.clamp(max=1 - 1e-6)) * scale).sum()
+
     for begin in range(0, len(positions), chunk):
         at = positions[begin:begin + chunk]
         state = hidden[at[:, 0], at[:, 1]]
-        logits = head(state).float()
         wanted = ids[at[:, 0], at[:, 1] + 1]
-        p = (logits.gather(-1, wanted[:, None]).squeeze(-1) - logits.logsumexp(-1)).exp()
-        penalty = -torch.log1p(-p.clamp(max=1 - 1e-6))
-        if weight is not None:
-            penalty = penalty * weight[at[:, 0], at[:, 1]].float()
-        total = total + penalty.sum()
+        scale = (weight[at[:, 0], at[:, 1]].float() if weight is not None
+                 else torch.ones(len(at), device=state.device))
+        if state.requires_grad:
+            # Deterministic recompute; no RNG to restore (as chunked_head_loss).
+            total = total + checkpoint(penalty, state, wanted, scale, use_reentrant=False,
+                                       preserve_rng_state=False)
+        else:
+            total = total + penalty(state, wanted, scale)
     return total
 
 
