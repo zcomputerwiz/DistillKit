@@ -136,7 +136,10 @@ for ($i = 0; $i -lt $tests.Count; $i += 2) {
         $name, $path = $tests[$j]
         Start-Job -ArgumentList ($j % 2), $py, $root, $name, $path -ScriptBlock {
             param($gpu, $py, $root, $name, $path)
-            $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
+            # A compile cache per GPU, as merge_search keeps: two processes compiling into one
+            # cache raced (a kernel file read half-written) and the survivor recompiled into a spill.
+            $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu$gpu"
+            $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
             Set-Location $root
             & $py scratch\dense_gr\math_truncation.py --arm "$name=$path" --bank fresh `
                 --output "scratch\csa2-eval\math-truncation-fresh-$name.json" *> "scratch\dense_gr\mt-$name.log"
