@@ -132,6 +132,11 @@ def collect(args):
         e["rank"] = rank
     path = args.output.with_name("teacher-gen-index.jsonl")
     path.write_text("".join(json.dumps(e) + "\n" for e in index), encoding="utf-8")
+    if args.exclusions:
+        # The capture's ids (capture_math_gen: "tgen:" + trace id) of every trace not kept --
+        # rejected or not yet judged -- for --exclude-documents, like the other lists.
+        args.exclusions.write_text(json.dumps(sorted("tgen:" + e["id"] for e in index if not e["kept"]),
+                                              indent=0), encoding="utf-8")
     print("%d judged, %d kept -> %s\n%s\ncommon issues: %s"
           % (len(seen), len(keep), args.output, dict(sorted(counts.items())), issues.most_common(12)))
 
@@ -150,6 +155,7 @@ def main():
     c.add_argument("--traces", type=Path, required=True)
     c.add_argument("--output", type=Path, required=True)
     c.add_argument("--min-efficiency", type=int, default=3)
+    c.add_argument("--exclusions", type=Path, default=None, help="also write the not-kept capture ids here")
     args = parser.parse_args()
     (build if args.command == "build" else collect)(args)
 
