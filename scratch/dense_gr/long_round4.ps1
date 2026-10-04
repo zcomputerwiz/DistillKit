@@ -66,8 +66,14 @@ Check "trace keep list"
 # before the loop, or the repeats vary): they would train KL over the whole loop.
 & $py scratch\dense_gr\loop_negatives.py --caches ($loops | ForEach-Object { $_ }) --output "$C\exclude-zero-negative-loops.json"
 Check "zero-negative loops"
+# And documents carrying a problem of the loop gate's fresh bank (MATH repeats some problems
+# across its splits): 43 at review time, in r6-loop, the traces and the thinking replay.
+& $py scratch\dense_gr\fresh_bank_overlap.py --caches ($loops + @($traces, "..\teacher-cache-thinking-w8",
+    "..\teacher-cache-think-first-w8", "..\teacher-cache-curriculum-v4-w8") | ForEach-Object { $_ }) `
+    --output "$C\exclude-fresh-bank-overlap.json"
+Check "fresh-bank overlap"
 & $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa2-markup.json" `
-    "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" `
+    "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" "$C\exclude-fresh-bank-overlap.json" `
     --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r4.json"
 Check "exclusion list"
 "=== train $(Get-Date -Format HH:mm)"

@@ -24,7 +24,10 @@ def looping(row):
 def score(path, budget):
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     rows = data["rows"]
+    if data["summary"]["budget"] != budget:
+        raise SystemExit("%s was summarized at budget %s, the gate scores %d" % (path, data["summary"]["budget"], budget))
     return {"arm": data["summary"]["arm"], "problems": len(rows), "problem_set": [r["problem"] for r in rows],
+            "new": data["summary"]["new"],
             "within_budget_correct": sum(r["correct"] for r in rows if r["tokens"] <= budget) / len(rows),
             "correct_any_length": sum(r["correct"] for r in rows) / len(rows),
             "unfinished": sum(r["tokens"] > budget and not r["finished"] for r in rows),
@@ -50,6 +53,8 @@ def main():
         s = score(path, args.budget)
         if s.pop("problem_set") != base["problem_set"]:
             raise SystemExit("%s ran different problems from the base" % path)
+        if s["new"] != base["new"]:  # a shorter generation budget hides unfinished loops
+            raise SystemExit("%s generated %s new tokens, the base %s" % (path, s["new"], base["new"]))
         s["pass"] = (path != args.base and s["unfinished_looping"] <= limit_loops
                      and s["within_budget_correct"] >= limit_accuracy)
         results.append(s)
