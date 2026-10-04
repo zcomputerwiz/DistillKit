@@ -80,13 +80,15 @@ def held_nll(model, tokenizer, cache, count=64):
     return total / scored
 
 
-def generate(model, tokenizer, prompts, new, sampling):
+def generate(model, tokenizer, prompts, new, sampling, rows=64):
+    # Prefill attends over the static cache's whole length: its peak grows with rows x
+    # prompt x (prompt + new), 24.9 GiB at 64 x 576 x 4,672, so long budgets want fewer rows.
     width = -(-max(len(tokenizer(p, add_special_tokens=False)["input_ids"]) for p in prompts) // 64) * 64
-    runner = CompiledGreedy(model, 64, width, new, tokenizer.eos_token_id, sampling=sampling, seed=0)
+    runner = CompiledGreedy(model, rows, width, new, tokenizer.eos_token_id, sampling=sampling, seed=0)
     texts, cut = [], []
-    for start in range(0, len(prompts), 64):
-        chunk = prompts[start:start + 64]
-        batch = tokenizer(chunk + [chunk[0]] * (64 - len(chunk)), return_tensors="pt",
+    for start in range(0, len(prompts), rows):
+        chunk = prompts[start:start + rows]
+        batch = tokenizer(chunk + [chunk[0]] * (rows - len(chunk)), return_tensors="pt",
                           padding="max_length", max_length=width, add_special_tokens=False).to("cuda")
         out = runner(batch["input_ids"], batch["attention_mask"])
         for row in range(len(chunk)):

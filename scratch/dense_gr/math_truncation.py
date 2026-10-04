@@ -54,6 +54,8 @@ def main():
     parser.add_argument("--bank", choices=["screen", "fresh"], default="screen",
                         help="screen: merge_proxy's MATH train problems (round 4 trains on loops from "
                              "them); fresh: MATH test outside MATH-500, which no capture or generation used")
+    parser.add_argument("--rows", type=int, default=32,
+                        help="rows generated at once: 64 at 4,096 new tokens peaks at 24.9 GiB in prefill")
     parser.add_argument("--budget", type=int, default=1024, help="the proxy's budget")
     parser.add_argument("--new", type=int, default=4096)
     parser.add_argument("--output", type=Path, required=True)
@@ -70,7 +72,7 @@ def main():
     _, math = problems(args.count) if args.bank == "screen" else (None, fresh_bank(args.count))
     prompts = [tok.apply_chat_template([{"role": "user", "content": PROMPT.format(problem=q)}], tokenize=False,
                                        add_generation_prompt=True, enable_thinking=True) for q, _ in math]
-    texts, cut = generate(model, tok, prompts, args.new, (0.6, 0.95, 20))
+    texts, cut = generate(model, tok, prompts, args.new, (0.6, 0.95, 20), rows=args.rows)
     rows = []
     for text, unfinished, (problem, reference) in zip(texts, cut, math):
         ids = tok(text, add_special_tokens=False)["input_ids"]
