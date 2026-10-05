@@ -46,10 +46,28 @@ NOTHINK_INSTRUCTIONS = (INSTRUCTIONS
                                  "its final answer")
                         .replace("think exactly like this trace", "answer exactly like this response"))
 assert NOTHINK_INSTRUCTIONS.count("directly") == 1 and "imitating these responses" in NOTHINK_INSTRUCTIONS
+# The teacher's code (teacher_code.py), passing its problem's tests: those stand in for the reference.
+CODE_INSTRUCTIONS = (INSTRUCTIONS
+                     .replace("learn to think by imitating these traces", "learn to code by imitating these responses")
+                     .replace("a math problem: its reasoning inside <think>...</think>, then its final answer. The final "
+                              "answer has already been checked against the reference and is correct; the reference is given.",
+                              "a Python programming problem: on some, its reasoning inside <think>...</think> first, then "
+                              "its answer with the code. The code has already passed the problem's unit tests.")
+                     .replace("think exactly like this trace", "work exactly like this response"))
+assert "unit tests" in CODE_INSTRUCTIONS and "imitating these responses" in CODE_INSTRUCTIONS
+USER = re.compile(r"<\|im_start\|>user\n(.*?)<\|im_end\|>", re.S)
 
 
 def trace_id(row):
-    return "%s#%d" % (row["id"], row["seed"])
+    return row["id"] if "seed" not in row else "%s#%d" % (row["id"], row["seed"])
+
+
+def code_row(r):
+    """A verified code rollout (teacher_code.py) in a trace's fields; its tests are its grading."""
+    prompt, completion = r["text"][:r["prompt_chars"]], r["text"][r["prompt_chars"]:]
+    return {"id": r["doc_id"], "problem": USER.search(prompt).group(1), "reference": None, "text": completion,
+            "tokens": r["tokens"], "correct": r["verified"] == "passed", "finished": r["finished"],
+            "thought_closed": r["thought_closed"], "max_line_repeats": r["max_line_repeats"]}
 
 
 def verdicts_of(row):
@@ -70,7 +88,7 @@ def read_traces(path):
             rows.append(json.loads(line))
         except ValueError:  # the generator may be mid-write on the last line
             pass
-    return rows
+    return [code_row(r) if "prompt_chars" in r else r for r in rows]
 
 
 def score(v):
@@ -98,10 +116,13 @@ def build(args):
         groups.append(group)
     with open(args.output, "w", encoding="utf-8") as out:
         for g in groups:
-            body = "\n\n".join('<trace id="%s">\nProblem: %s\nReference answer: %s\n\n%s\n</trace>'
-                               % (trace_id(r), r["problem"], r["reference"], r["text"]) for r in g)
+            body = "\n\n".join('<trace id="%s">\nProblem: %s\n%s\n%s\n</trace>'
+                               % (trace_id(r), r["problem"], "" if r["reference"] is None
+                                  else "Reference answer: %s\n" % r["reference"], r["text"]) for r in g)
+            code = g[0]["reference"] is None
             out.write(json.dumps({"id": "trace-judge:" + trace_id(g[0]), "messages": [
-                {"role": "system", "content": NOTHINK_INSTRUCTIONS if args.nothink else INSTRUCTIONS},
+                {"role": "system", "content": CODE_INSTRUCTIONS if code else NOTHINK_INSTRUCTIONS if args.nothink
+                 else INSTRUCTIONS},
                 {"role": "user", "content": body}],
                 "max_tokens": 2000 + 600 * len(g), "reasoning": {"effort": "medium"},
                 "response_format": {"type": "json_object"}}) + "\n")
