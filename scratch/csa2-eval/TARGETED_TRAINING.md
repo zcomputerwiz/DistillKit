@@ -8,6 +8,37 @@ components each kind of data may change.
 - **Atlas**: what each layer and component represents and computes, per domain.
 - **Change map**: what a round changed where, and which changes produced its gains and its regressions.
 
+## Revisions after the Codex review (capture-data/frontier/codex-review-targeted/REVIEW.md)
+
+**First establish what regressed.**
+- The long-context probe scores every token, and its agent documents are not what training scores:
+  - **claude-code:** system prompt up to 8K, 85% tool output at 16-32K.
+  - **codex:** system prompt to 4K, then a third tool output.
+- Only 2 claude-code documents and 1 codex document reach 32K.
+- Round 5's "+0.18 on agent traces" is therefore mostly tool-output prediction. Held-out loss on assistant turns, which is what training scores, improved (0.640 to 0.562).
+- `atlas.py nll` is now the regression ledger:
+  - held-out conversations from the agent captures' eval splits, by harness;
+  - every token labelled by chat role;
+  - a 95% bootstrap interval over documents.
+- The screen's GSM8K non-thinking proxy allows 512 new tokens, against 2,048 in the benchmark. Round 5 learned the teacher's longer native answers, so its 5 → 55 "unboxed" answers there are probably truncation.
+
+**Cheap causal controls before any map-guided intervention** (`control_arms.ps1`):
+- Round 5's recipe stopped at step 100 of the same 10M schedule, compared with round 5's own step-100 state.
+- Three arms: no new data, the depth ramp, and a flat 0.55× rate (the ramp's mean).
+
+**Change map: a screening statistic only.**
+- CSA2's discrete top-k makes the path non-smooth, and the HVP correction is unavailable: the hyper-connection kernels are `once_differentiable`.
+- Exact reverts decide, starting with coherent families (`atlas.py revert`: embedding/head, norms, decay, write strength, DeltaNet, MLA, indexer, MLP, hyper-connections, depth thirds).
+- The greedy result is a repair *candidate*, not a minimal set.
+
+**Shields wait until the evidence shows separable damage.**
+- Batches mix sources: the groups are keyed by width and objective, not capture.
+- AdamW moves zero-gradient weights through momentum, weight decay and Kahan compensation.
+- Hooks would have to sit on the parameters after tensor-parallel sharding.
+- Better early levers: the depth ramp, a lower loss weight on the new sources, and cached KL-to-base on protected replay.
+
+**Ledger statistics:** paired document bootstrap intervals, the signed contrast G_arm − 0.8·G_A, both 1→0 and 0→1 transitions, and a full-budget confirmation with more seeds.
+
 ## What we already know (DISTILLATION.md)
 
 - **Loops (rounds 8b/8c):** the loop fix lives in the deep layers. Splicing round 8b's deep layers under round 6's shallow ones keeps it (98 and 11 truncations); a uniform blend dilutes it.
