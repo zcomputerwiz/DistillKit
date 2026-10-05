@@ -73,12 +73,12 @@ function Arm([string]$tag, [bool]$nonew, [string[]]$extra) {
     Check "training ($tag)"
     if (-not (Test-Path "$out\smoke-r1-1-gr-s25-csa2\config.json")) { "training $tag produced no checkpoint; stopping"; exit 1 }
 }
-Arm "nonew" $true @()
+# Arm "nonew" $true @()  -- answered by the ledger: round 4 u50 drifts the same way without the new data
 Arm "ramp" $false @("--lr-depth-ramp", "0.1", "1.0")
 Arm "flat" $false @("--lr-depth-ramp", "0.55", "0.55")
 
 "=== evaluate $(Get-Date -Format HH:mm)"
-$named = @(@("long5-step100", "$arms\long5-step100"), @("nonew", "$root\scratch\dense_gr\checkpoints-ctl-nonew\smoke-r1-1-gr-s25-csa2"),
+$named = @(@("long5-step100", "$arms\long5-step100"),
            @("ramp", "$root\scratch\dense_gr\checkpoints-ctl-ramp\smoke-r1-1-gr-s25-csa2"),
            @("flat", "$root\scratch\dense_gr\checkpoints-ctl-flat\smoke-r1-1-gr-s25-csa2"))
 $ledger = @("--arm", "base=$base") + ($named | ForEach-Object { @("--arm", "$($_[0])=$($_[1])") })
