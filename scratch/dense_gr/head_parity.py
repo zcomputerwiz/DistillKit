@@ -4,10 +4,12 @@ For each kind of micro-batch the trainer builds -- a 32K agent trace scored on i
 assistant turns, QA scored on its answers, raw code under KL alone, the teacher's own
 traces, packed looping rollouts under unlikelihood -- the student's final hidden states
 are computed once, then both paths compute the step's objective from them (teacher weight
-0.5, or KL plus unlikelihood for KL-only records, as backward_step does). Reports each loss
-term's relative difference, the cosine and relative error of the gradients for the hidden
-states and the head (shared path with CCE's gradient filter on and off), and the head
-losses' time and peak memory per path.
+0.5, or KL plus unlikelihood for KL-only records, as backward_step does), and an fp32
+reference -- the shared arithmetic on fp32 operands -- scores both. Reports each loss term,
+the cosine and relative error of each path's gradients for the hidden states and the head
+against the reference (and shared against old), and the head losses' time and peak memory
+per path: head-phase numbers, not full-step ones. The old path's KL chunk is the rounds'
+--kl-chunk (`--old-chunk`, 64), the shared path's the trainer's --head-chunk (`--head-chunk`, 512).
 
     python scratch/dense_gr/head_parity.py --checkpoint <ckpt> --output scratch/csa2-eval/head-parity.json
 """
@@ -39,6 +41,7 @@ CASES = [("agent trace, assistant turns", "teacher-cache-agent-smol-b", "assista
 
 
 VARIANTS = [("old", "old"), ("shared", "shared")]
+CHUNKS = {"old": 64, "shared": 512}  # set from --old-chunk / --head-chunk
 
 
 def batch_for(tokenizer, kind, cache, budget):
@@ -82,12 +85,13 @@ def objective(model, hidden, batch, mode, head_weight=None):
         sums = head_losses(hidden, model.lm_head.weight if head_weight is None else head_weight, ids,
                            weight=weight, topk_ids=batch["topk_ids"], topk_logprobs=batch["topk_logprobs"],
                            kl_weight=torch.broadcast_to(kl_mask, ids.shape), negative=negative,
+                           chunk=CHUNKS["shared"],
 )
         language, carried, repelled = sums["nll"] / sums["weight"], sums["kl"] / count, sums["unlikelihood"] / count
     else:
         language = causal_ce(model, hidden, ids) if weight is None else causal_ce(model, hidden, ids, weight=weight)
         carried = grouped_tail_kl(hidden, model.lm_head, batch["topk_ids"], batch["topk_logprobs"], kl_mask,
-                                  chunk_length=64) / count
+                                  chunk_length=CHUNKS["old"]) / count
         repelled = hidden.new_zeros((), dtype=torch.float32)
         if negative is not None:
             repelled = unlikelihood_loss(hidden, model.lm_head, ids, negative, weight=weight) / count
@@ -123,8 +127,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
     parser.add_argument("--budget", type=int, default=32768)
+    parser.add_argument("--old-chunk", type=int, default=64, help="the old KL's chunk: the rounds' --kl-chunk")
+    parser.add_argument("--head-chunk", type=int, default=512, help="the shared path's rows a projection")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    CHUNKS.update(old=args.old_chunk, shared=args.head_chunk)
     from transformers import AutoTokenizer
 
     from distillkit.models import Qwen35WidenedForCausalLM

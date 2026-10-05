@@ -387,6 +387,9 @@ def main(argv=None) -> int:
     parser.add_argument("--shared-head-loss", action="store_true",
                         help="cross entropy, teacher KL and unlikelihood from one projection of the "
                              "scored rows (shared_head.py) instead of a projection each")
+    parser.add_argument("--head-chunk", type=int, default=512,
+                        help="rows projected at once by --shared-head-loss: each chunk's fp32 logits "
+                             "are ~485 MiB at 512 (the old path's budget is --kl-chunk)")
     parser.add_argument("--pairs", type=Path, default=None,
                         help="preference pairs with reference log-probs (ref_logprobs.py): "
                              "DPO plus cross entropy on the chosen side, mixed into every step")
@@ -577,7 +580,7 @@ def main(argv=None) -> int:
             raise SystemExit("resume needs fresh --output and --checkpoints paths")
     if (args.tokens < 1 or args.length < 2 or args.micro_batch < 1 or args.micro_tokens < 0
             or args.save_every < 0 or args.report_every < 1 or args.evaluate_windows < 1
-            or args.benchmark_warmup_steps < 0
+            or args.benchmark_warmup_steps < 0 or args.head_chunk < 1
             or (args.max_steps is not None and args.max_steps < 1)
             or (args.passes is not None and args.passes <= 0)):
         raise SystemExit("budgets, lengths and reporting counts must be positive")
@@ -1141,7 +1144,7 @@ def main(argv=None) -> int:
                         pair_sft_weight=args.pair_sft_weight,
                         ftpo_options=dict(clip=args.ftpo_clip, tether=args.ftpo_tether,
                                           target_tether=args.ftpo_target_tether, tau=args.ftpo_tau),
-                        shared_head=args.shared_head_loss)
+                        shared_head=args.shared_head_loss, head_chunk=args.head_chunk)
     pairs = None
     if args.pairs is not None:
         pairs = PairSource(args.pairs, tokenizer.pad_token_id or tokenizer.eos_token_id, seed=args.seed)

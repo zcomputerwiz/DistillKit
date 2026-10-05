@@ -51,7 +51,8 @@ def _chunk_losses(h, head_weight, targets, weight, topk_ids, topk_logprobs, kl_w
     if topk_ids is not None:
         keep = kl_weight > 0
         if bool(keep.any()):
-            student = logits[keep].gather(-1, topk_ids[keep]) - lse[keep, None]
+            # Gather first: indexing the rows of `logits` would copy them, 485 MiB a chunk.
+            student = logits.gather(-1, topk_ids)[keep] - lse[keep, None]
             kl = (grouped_tail_kl_rows(student, topk_logprobs[keep].float()) * kl_weight[keep]).sum()
     ul = zero
     if negative is not None and bool(negative.any()):

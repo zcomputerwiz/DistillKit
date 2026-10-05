@@ -249,7 +249,8 @@ def test_resume_after_export_ignores_only_export_metadata(tmp_path):
 
 
 @pytest.mark.parametrize("devices", [["cpu", "cpu"], ["cuda:0", "cuda:1"]])
-def test_three_steps_tensor_parallel_matches_unsharded(devices):
+@pytest.mark.parametrize("shared_head", [False, True])
+def test_three_steps_tensor_parallel_matches_unsharded(devices, shared_head):
     if devices[0].startswith("cuda") and torch.cuda.device_count() < 2:
         pytest.skip("needs two CUDA devices")
     from test_csa2_routing import tiny_config
@@ -272,7 +273,7 @@ def test_three_steps_tensor_parallel_matches_unsharded(devices):
     a = torch.optim.AdamW(plain.parameters(), lr=1e-4, betas=(.9, .95))
     b = torch.optim.AdamW(sharded.parameters(), lr=1e-4, betas=(.9, .95))
     batch = [{k: v.to(devices[0]) for k, v in r.items()} for r in records(64)]
-    options = dict(ce=ce, teacher_weight=.5)
+    options = dict(ce=ce, teacher_weight=.5, shared_head=shared_head, head_chunk=5)
     with torch.autograd.set_multithreading_enabled(False):
         for model in (plain, sharded):
             backward_step(model, batch, sparse_stage=routing_layers(model), **options)

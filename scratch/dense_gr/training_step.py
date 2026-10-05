@@ -200,13 +200,14 @@ def ftpo_loss(logits, row, *, clip=2.0, tether=0.4, target_tether=0.05, tau=1.5)
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                   sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0,
                   pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob,
-                  ftpo_options=None, shared_head=False):
+                  ftpo_options=None, shared_head=False, head_chunk=512):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
     The injected CE callable is only for CPU correctness tests; production uses CCE.
     `shared_head` computes CE, KL and unlikelihood from one projection of the scored rows
-    (shared_head.py) instead of a projection each.
+    (shared_head.py) instead of a projection each, `head_chunk` rows at a time (each chunk's
+    fp32 logits are rows x 248,320 x 4 bytes, ~485 MiB at 512).
     Preference-pair records (`pair`) are left out of the token accounting and add
     `pair_weight` times their mean preference objective; FTPO rows (`ftpo`, also `pair`)
     likewise, with `ftpo_options` passed to `ftpo_loss`.
@@ -271,7 +272,7 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                         topk_ids=record["topk_ids"].to(where) if distil else None,
                         topk_logprobs=record["topk_logprobs"].to(where) if distil else None,
                         kl_weight=None if kl_mask is None else torch.broadcast_to(kl_mask, ids.shape).to(where),
-                        negative=None if negative is None else negative.to(where))
+                        negative=None if negative is None else negative.to(where), chunk=head_chunk)
                     language = (sums["nll"] / sums["weight"].clamp_min(1e-12)).to(hidden.device)
                     carried = (sums["kl"] / count).to(hidden.device)
                     repelled = (sums["unlikelihood"] / count).to(hidden.device)
