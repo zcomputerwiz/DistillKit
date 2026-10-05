@@ -604,6 +604,8 @@ class CachedTeacher:
                        offsets=sorted((d, [int(p) for p in span]) for d, span in self.offset.items()),
                        marker=[int(t) for t in self.answer_marker or []],
                        close=None if self.turn_close is None else int(self.turn_close))
+        if getattr(self, "context_kl", None):  # absent when off: earlier plans keep their digest
+            payload["context_kl"] = [float(v) for v in self.context_kl]
         return hashlib.sha256(json.dumps(payload).encode()).hexdigest()
 
     def weighted(self, doc_id):
@@ -696,6 +698,22 @@ class CachedTeacher:
             for row, (doc_id, tokens, real) in enumerate(zip(doc_ids, ids, reals)):
                 weight[row, :real] = self.position_weight(doc_id, tokens, real)
             batch["weight"] = torch.from_numpy(weight).to(self.device, non_blocking=True)
+            context = getattr(self, "context_kl", None)
+            if context and any(d in self.assistant_only_ids for d in doc_ids):
+                # KL alone on an assistant-only document's context (system, user, tool
+                # output): nothing else holds the student's predictions there, and the long
+                # rounds drifted on them in the early layers (atlas.py, long5). Every k-th
+                # position at k times the weight -- the same total, a k-th of the head rows.
+                scale, every = context
+                extra = np.zeros((len(ids), width), dtype=np.float32)
+                for row, (doc_id, real) in enumerate(zip(doc_ids, reals)):
+                    if doc_id not in self.assistant_only_ids:
+                        continue
+                    offset = sum(map(ord, doc_id)) % every
+                    picked = np.zeros(width, dtype=bool)
+                    picked[offset:real - 1:every] = True
+                    extra[row] = np.where(picked & (weight[row] == 0), scale * every, 0.0)
+                batch["context_kl"] = torch.from_numpy(extra).to(self.device, non_blocking=True)
         if repeats:
             # Position t predicts token t + 1, so a repeated token at t + 1 is a
             # negative at t; the last position predicts nothing.

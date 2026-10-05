@@ -263,6 +263,10 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 # endorses the loop; unlikelihood pushes them down instead.
                 kl_mask = None if not distil else (mask if negative is None
                                                    else mask * ~negative.to(mask.device))
+                context = record.get("context_kl") if distil else None
+                if context is not None:
+                    # KL alone on an assistant-only document's sampled context positions.
+                    kl_mask = torch.broadcast_to(kl_mask, ids.shape) + context.to(kl_mask.device)
                 if shared_head:
                     # One projection of the scored rows for every head loss (shared_head.py).
                     where = model.lm_head.weight.device
@@ -272,7 +276,8 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                         topk_ids=record["topk_ids"].to(where) if distil else None,
                         topk_logprobs=record["topk_logprobs"].to(where) if distil else None,
                         kl_weight=None if kl_mask is None else torch.broadcast_to(kl_mask, ids.shape).to(where),
-                        negative=None if negative is None else negative.to(where), chunk=head_chunk)
+                        negative=None if negative is None else negative.to(where), chunk=head_chunk,
+                        kl_beyond=context is not None)
                     language = (sums["nll"] / sums["weight"].clamp_min(1e-12)).to(hidden.device)
                     carried = (sums["kl"] / count).to(hidden.device)
                     repelled = (sums["unlikelihood"] / count).to(hidden.device)

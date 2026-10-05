@@ -418,6 +418,12 @@ def main(argv=None) -> int:
                              "--answer-weight, the rest of the document 1")
     parser.add_argument("--answer-weight", type=float, default=1.0,
                         help="loss weight of an --answer-spans position (budget counts weight)")
+    parser.add_argument("--context-kl", type=float, default=0.0,
+                        help="teacher KL weight on the context tokens of --assistant-only-caches "
+                             "documents (system, user, tool output), KL alone and outside the "
+                             "budget; the long rounds drifted there with nothing holding them")
+    parser.add_argument("--context-every", type=int, default=8,
+                        help="--context-kl on every k-th context position at k times the weight")
     parser.add_argument("--pad-to-block", action="store_true",
                         help="pad each document up to the CSA2 block multiple with masked "
                              "positions instead of cutting it down to one (keeps final turns)")
@@ -977,6 +983,12 @@ def main(argv=None) -> int:
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
                                 repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []),
                                 answer_spans=spans, answer_weight=args.answer_weight)
+        if args.context_kl:
+            if not args.assistant_only_caches or args.context_every < 1:
+                raise SystemExit("--context-kl needs --assistant-only-caches and --context-every >= 1")
+            teacher.context_kl = (args.context_kl, args.context_every)
+            print("teacher: KL at %.3g on every %d-th context position of assistant-only documents"
+                  % (args.context_kl, args.context_every), flush=True)
         if args.kl_only_caches or args.unlikelihood_caches:
             print("teacher: %d documents trained on KL alone (on-policy), %d of them looping "
                   "with unlikelihood on repeats" % (len(teacher.kl_only_ids),

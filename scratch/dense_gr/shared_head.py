@@ -62,13 +62,15 @@ def _chunk_losses(h, head_weight, targets, weight, topk_ids, topk_logprobs, kl_w
 
 
 def head_losses(hidden, head_weight, ids, weight=None, topk_ids=None, topk_logprobs=None,
-                kl_weight=None, negative=None, chunk=512):
+                kl_weight=None, negative=None, chunk=512, kl_beyond=False):
     """The head's losses for one record, projecting only the rows that carry weight.
 
     hidden [rows, length, d] and everything else on the head's device. Position t predicts
     token t + 1; `weight` [rows, length] is each position's loss weight (None: 1 for every
     position but the last), `kl_weight` the teacher KL's (None: no KL; it must be zero
-    wherever `weight` is), `negative` the looping positions that take unlikelihood.
+    wherever `weight` is, unless `kl_beyond`: then rows with KL weight alone are projected
+    too, for KL only -- the context tokens of an assistant-only document), `negative` the
+    looping positions that take unlikelihood.
 
     Returns sums, for the caller to normalize as before: `nll` (sum of weight x cross
     entropy), `weight` (sum of weights), `kl` (sum of kl_weight x KL), `unlikelihood`
@@ -77,9 +79,14 @@ def head_losses(hidden, head_weight, ids, weight=None, topk_ids=None, topk_logpr
     rows, length = ids.shape
     w = torch.zeros(rows, length, device=hidden.device, dtype=torch.float32)
     w[:, :-1] = 1.0 if weight is None else weight[:, :-1].float()
-    if kl_weight is not None and bool((kl_weight[:, :-1] > 0)[w[:, :-1] <= 0].any()):
-        raise ValueError("kl_weight must be zero wherever weight is")
-    at = (w > 0).nonzero()
+    if kl_beyond and kl_weight is not None:
+        kl_weight = kl_weight.clone()
+        kl_weight[:, -1] = 0  # the last position predicts nothing
+        at = ((w > 0) | (kl_weight > 0)).nonzero()
+    else:
+        if kl_weight is not None and bool((kl_weight[:, :-1] > 0)[w[:, :-1] <= 0].any()):
+            raise ValueError("kl_weight must be zero wherever weight is")
+        at = (w > 0).nonzero()
     r, t = at[:, 0], at[:, 1]
     h, targets, wr = hidden[r, t], ids[r, t + 1], w[r, t]
     kid = None if topk_ids is None else topk_ids[r, t]
