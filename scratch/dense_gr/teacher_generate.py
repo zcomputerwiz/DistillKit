@@ -47,6 +47,8 @@ def main():
     parser.add_argument("--max-tokens", type=int, default=6144)
     parser.add_argument("--server", default="http://127.0.0.1:8090")
     parser.add_argument("--workers", type=int, default=16)
+    parser.add_argument("--nothink", action="store_true",
+                        help="the teacher's non-thinking mode: its template's empty think block, no thought")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     from transformers import AutoTokenizer
@@ -67,7 +69,7 @@ def main():
     def run(job):
         p, seed = job
         prompt = tok.apply_chat_template([{"role": "user", "content": PROMPT.format(problem=p["problem"])}],
-                                         tokenize=False, add_generation_prompt=True, enable_thinking=True,
+                                         tokenize=False, add_generation_prompt=True, enable_thinking=not args.nothink,
                                          reasoning_effort="medium")
         try:
             reply = complete(args.server, prompt, args.max_tokens, seed)
@@ -78,7 +80,7 @@ def main():
         finished = reply.get("stop_type") in ("eos", "word") or bool(reply.get("stopped_eos"))
         return {"id": p["id"], "seed": seed, "problem": p["problem"], "reference": p["answer"], "prompt": prompt,
                 "text": text, "tokens": reply.get("tokens_predicted"), "finished": finished,
-                "thought_closed": "</think>" in text,
+                "thought_closed": args.nothink or "</think>" in text,
                 "correct": bool(correct(boxed(text.split("</think>")[-1]), p["answer"])),
                 "max_line_repeats": repetition(text)}
 
