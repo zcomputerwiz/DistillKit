@@ -131,8 +131,11 @@ foreach ($a in @("--assistant-only-caches", $agentA, $agentB, $tools, $qa, "--kl
                  # The repair data repeated so 8M tokens sees enough of it (Codex's seed-24
                  # simulation saw 574 traces and 10 of round 3's loops once without).
                  "$traces=2", "..\teacher-cache-onpolicy-r6-loop=2", "..\teacher-cache-loop-check=4",
-                 # The new teacher-written sets, thrice, so 10M tokens sees several hundred of each.
-                 "$nothink=3", "$tcode=3", "--pad-to-block", "--shared-head-loss", "--head-chunk", "512",
+                 # The new teacher-written sets at about 5% of the pass each, the reviewed mix: the
+                 # judge and the tests left ~475 code and ~1,450 answer documents to train (the
+                 # review assumed ~1,000 and ~2,300), and at x3 the seed-25 prefix saw 108 distinct
+                 # code documents (1% of targets) and 483 answers (3%). At x8 and x4, ~320 and ~600.
+                 "$nothink=4", "$tcode=8", "--pad-to-block", "--shared-head-loss", "--head-chunk", "512",
                  "--answer-spans", "$C\frontier-qa2.jsonl", "--answer-weight", "8",
                  "--lr-scale", "linear_attn\.(A_log|dt_bias|in_proj_a)=0.1", "--strip-effort-nonthinking",
                  "--exclude-documents", "..\capture-data\exclude-long-r5.json", "--suppress-hedges",
