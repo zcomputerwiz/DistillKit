@@ -1145,7 +1145,10 @@ So round 5 uses 2,500 kept MATH/GSM8K train problems, answered natively, graded,
   - The master list names source problems (`math:algebra:1319`). The copies are `tgen:...#0` and `tnothink:...#0`.
   - The 13-word screen run on the teacher traces themselves flags 150 of them (102 were kept in round 4), and round 4 trained on them.
   - Its clean rescoring also left the teacher corpora out.
-  - Both screens now decode capture inputs. Round 5 excludes the hits, and clean rescoring includes the teacher corpora, so round 4's "clean" numbers need a rerun.
+  - Both screens now decode capture inputs. Round 5 excludes the hits, and clean rescoring includes the teacher corpora.
+  - Rerunning round 4's clean numbers with the teacher traces in the screen marks 129 MATH-500 problems as seen (102 before) and 253 GSM8K (251). The rerun shows no inflation:
+    - round 4 u50, MATH-500 thinking: 50.7% clean against the source's 53.9%, and 49.6% against 55.0% on the problems now marked;
+    - GSM8K thinking: 75.6% clean against 75.3%.
 - **A failed request could leave a partial dataset that passed as complete.**
   - The generators now retry, then exit nonzero.
   - Verification is written atomically.
