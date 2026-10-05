@@ -89,3 +89,29 @@ def test_taps_replace_one_head_only():
     width = 32 // units[2][3]
     x = seen["x"]
     assert torch.all(x[..., width:2 * width] == 0) and not torch.all(x[..., :width] == 0)
+
+
+def test_roles_follow_the_chat_structure():
+    from atlas import ROLES, roles_of
+
+    S, E, NL = 248045, 248046, 198
+    ids = [S, 8678, NL, 11, 12, E, S, 846, NL, 13, E,
+           S, 74455, NL, 248068, 14, 248069, 15, 248058, 16, 248059, E,
+           S, 846, NL, 248066, 17, 248067, E, S, 13766, NL, 18, E, 19]
+    names = [ROLES[k] for k in roles_of(ids)]
+    content = [n for t, n in zip(ids, names) if 11 <= t <= 19]
+    assert content == ["system", "system", "user", "thinking", "assistant", "tool-call",
+                       "tool-result", "tool-result", "plain"]
+    assert all(n == "structure" for t, n in zip(ids, names) if t in (S, E, NL, 248068, 248069))
+
+
+def test_paired_delta_is_zero_for_identical_arms_and_signed():
+    from atlas import paired_delta
+
+    rng = np.random.default_rng(0)
+    ref = np.stack([rng.uniform(50, 60, 20), np.zeros(20), np.full(20, 100.0)], 1)
+    assert paired_delta(ref, ref.copy()) == (0.0, 0.0, 0.0)
+    worse = ref.copy()
+    worse[:, 0] += 5.0  # +0.05 a target on every document
+    d, lo, hi = paired_delta(ref, worse)
+    assert abs(d - 0.05) < 1e-9 and lo <= d <= hi

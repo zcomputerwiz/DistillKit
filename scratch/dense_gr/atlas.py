@@ -4,13 +4,19 @@ Domains are fixed held-out documents, the same tokens for every arm. Units are t
 own components: each layer's mixer output (Gated DeltaNet or MLA/CSA2) and MLP output, and
 the mixers' heads -- the input of `linear_attn.out_proj` / `self_attn.o_proj`, a head a slice.
 
-  domains     the fixed sets: agent traces and llama.cpp source as the long-context probe
-              draws them, and the eval splits of the teacher captures
-  nll         per-domain loss of each arm, with per-token losses and top-1 hits for 1->0 counts
-  change      the change map: every parameter row's and column's share of a round's
-              per-domain loss change, 0.5 (g_base + g_tuned) . (theta_tuned - theta_base) --
-              the trapezoid rule along the straight path, exact for a quadratic loss --
-              checked against the measured change (completeness)
+  domains     the fixed sets, token ids frozen: held-out (eval-split) agent conversations by
+              harness, tool use, the teacher's code and math, QA, general text, and llama.cpp
+              source; every token labelled with its chat role (roles_of)
+  nll         the regression ledger: each arm's loss per domain and role (assistant, thinking,
+              tool call, tool result, system, user, plain), against the first arm with a 95%
+              bootstrap interval over documents. The long-context probe scores every token, and
+              its agent documents are the system prompt to 8K and mostly tool output beyond:
+              training scores the model's own turns, so the ledger separates them
+  change      the change map, a screening statistic: every parameter row's and column's
+              0.5 (g_base + g_tuned) . (theta_tuned - theta_base), the trapezoid rule along the
+              straight path (Simpson's with --midpoint). Its sum is compared with the measured
+              change, but CSA2's discrete top-k makes the path non-smooth and cancellation can
+              hide misranked columns: exact reverts decide (Codex review, codex-review-targeted)
   importance  the atlas: each unit's mean-ablation effect per domain, estimated for every unit
               from one forward and backward a document (attribution patching), the largest
               confirmed by ablating them for real
@@ -40,37 +46,85 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 D = HERE.parents[2]  # HybridModel
 DOMAINS = HERE.parent / "csa2-eval" / "atlas" / "domains.pt"
-# domain: (capture, documents, token cap); eval splits only, sampled with a fixed seed.
-CAPTURES = {"teacher-code": ("teacher-cache-teacher-code", 48, 4096),
-            "thinking-math": ("teacher-cache-teacher-math-gen", 48, 4096),
-            "nothink-math": ("teacher-cache-teacher-nothink-math", 64, 4096),
-            "qa": ("teacher-cache-frontier-qa2", 16, 4096),
-            "general": ("teacher-cache-general-pilot-w8", 48, 2048),
-            "agent-train": ("teacher-cache-agent-smol-b", 16, 4096)}
+# domain: (captures, document-id prefix, documents, token cap); eval splits only (never
+# trained), sampled with a fixed seed. The agent conversations keep their system prompt
+# (claude-code's is ~12K tokens of tool definitions) and are scored by role.
+CAPTURES = {
+    "agent-claude-code": (("teacher-cache-agent-smol-a", "teacher-cache-agent-smol-b"), "claude-code:", 12, 16384),
+    "agent-codex": (("teacher-cache-agent-smol-b",), "codex:", 12, 16384),
+    "agent-opencode": (("teacher-cache-agent-smol-b",), "opencode:", 12, 16384),
+    "agent-mini-swe": (("teacher-cache-agent-smol-b",), "mini-swe-agent:", 24, 16384),
+    "tools": (("teacher-cache-frontier-tools",), "", 48, 4096),
+    "teacher-code": (("teacher-cache-teacher-code",), "", 48, 4096),
+    "thinking-math": (("teacher-cache-teacher-math-gen",), "", 48, 4096),
+    "nothink-math": (("teacher-cache-teacher-nothink-math",), "", 64, 4096),
+    "qa": (("teacher-cache-frontier-qa2",), "", 16, 16384),
+    "general": (("teacher-cache-general-pilot-w8",), "", 48, 2048)}
+# Chat structure, all single tokens in this vocabulary.
+IM_START, IM_END, NEWLINE = 248045, 248046, 198
+OPENS = {248068: "think", 248058: "call", 248066: "response"}
+CLOSES = {248069, 248059, 248067}
+ROLE_TOKENS = {846: "user", 74455: "assistant", 8678: "system", 13766: "tool"}
+ROLES = ["structure", "system", "user", "tool-result", "assistant", "thinking", "tool-call", "plain"]
+
+
+def roles_of(ids):
+    """Each token's role: chat structure (turn markers, role names, think/tool tags), system,
+    user, tool result (a tool turn, or <tool_response> inside a user turn), assistant text,
+    thinking, tool call; 'plain' outside any turn (code, prose)."""
+    out = np.full(len(ids), ROLES.index("plain"), np.int8)
+    role = inner = None
+    state = 0  # 1: next token names the role, 2: then its newline
+    for i, t in enumerate(int(x) for x in ids):
+        if t == IM_START:
+            out[i], state, inner = 0, 1, None
+            continue
+        if state == 1:
+            out[i], role, state = 0, ROLE_TOKENS.get(t, "user"), 2
+            continue
+        if state == 2 and t == NEWLINE:
+            out[i], state = 0, 0
+            continue
+        state = 0
+        if t == IM_END:
+            out[i], role = 0, None
+        elif t in OPENS:
+            out[i], inner = 0, OPENS[t]
+        elif t in CLOSES:
+            out[i], inner = 0, None
+        elif role is not None:
+            name = {"system": "system", "tool": "tool-result",
+                    "user": "tool-result" if inner == "response" else "user",
+                    "assistant": {"think": "thinking", "call": "tool-call"}.get(inner, "assistant")}[role]
+            out[i] = ROLES.index(name)
+    return out
 
 
 def build_domains(args):
     from transformers import AutoTokenizer
 
     from distillkit.offline_cache import OfflineTeacherCache
-    from long_context_probe import TOKENIZER, agent_documents, code_documents
+    from long_context_probe import TOKENIZER, code_documents
 
     tok = AutoTokenizer.from_pretrained(TOKENIZER)
-    domains = {}
-    for kind, ids in (agent_documents(tok, args.length, args.long_documents)
-                      + code_documents(tok, args.length, args.long_documents // 2)):
-        name = "code-llamacpp" if kind == "code" else kind.replace("agent:", "agent-")
-        domains.setdefault(name, []).append(torch.tensor(ids, dtype=torch.int32))
-    for name, (capture, count, cap) in CAPTURES.items():
-        cache = OfflineTeacherCache(D / capture)
-        ids = sorted(cache.document_ids("eval"))
-        picked = random.Random(0).sample(ids, min(count, len(ids)))
-        docs = [cache.read_document(i, tokens_only=True)["input_ids"][:cap] for i in picked]
+    # llama.cpp's source as the probe reads it, frozen here: the tree is live.
+    domains = {"code-llamacpp": [torch.tensor(ids, dtype=torch.int32)
+                                 for _, ids in code_documents(tok, args.length, args.code_documents)]}
+    for name, (captures, prefix, count, cap) in CAPTURES.items():
+        caches = [OfflineTeacherCache(D / c) for c in captures]
+        pool = sorted((i, k) for k, cache in enumerate(caches) for i in cache.document_ids("eval")
+                      if i.startswith(prefix))
+        picked = random.Random(0).sample(pool, min(count, len(pool)))
+        docs = [caches[k].read_document(i, tokens_only=True)["input_ids"][:cap] for i, k in picked]
         domains[name] = [torch.tensor(d.astype(np.int64), dtype=torch.int32) for d in docs if len(d) >= 64]
+    roles = {name: [torch.from_numpy(roles_of(d.numpy())) for d in docs] for name, docs in domains.items()}
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"domains": domains, "length": args.length}, args.output)
+    torch.save({"domains": domains, "roles": roles, "length": args.length}, args.output)
     for name, docs in domains.items():
-        print("%-20s %4d documents %8d tokens" % (name, len(docs), sum(len(d) for d in docs)))
+        mix = torch.cat(roles[name]).bincount(minlength=len(ROLES)).float()
+        print("%-18s %4d documents %8d tokens  %s" % (
+            name, len(docs), sum(len(d) for d in docs),
+            " ".join("%s %.0f%%" % (r, 100 * m / mix.sum()) for r, m in zip(ROLES, mix) if m > 0)))
 
 
 def read_domains(path, only=None):
@@ -127,37 +181,67 @@ def token_losses(model, ids, chunk=1024):
     return torch.cat(nll).cpu().numpy().astype(np.float32), torch.cat(hit).cpu().numpy()
 
 
+GROUPS = {"all": list(range(len(ROLES))), "own-turns": [ROLES.index(r) for r in ("assistant", "thinking", "tool-call")]}
+
+
+def ledger_rows(per_doc, labels):
+    """Per role (and the 'all' / 'own-turns' groups): per-document sums of loss, top-1 hits
+    and targets, so arms can be compared document by document."""
+    rows = {}
+    for key, members in [(r, [k]) for k, r in enumerate(ROLES)] + list(GROUPS.items()):
+        sums = np.array([[nll[np.isin(lab, members)].sum(), hit[np.isin(lab, members)].sum(),
+                          np.isin(lab, members).sum()] for (nll, hit), lab in zip(per_doc, labels)], dtype=np.float64)
+        if sums[:, 2].sum() > 0:
+            rows[key] = sums
+    return rows
+
+
+def paired_delta(ref, cur, draws=2000, seed=0):
+    """Loss change, pooled over targets, with a 95% bootstrap interval over documents."""
+    delta = lambda idx: (cur[idx, 0].sum() - ref[idx, 0].sum()) / max(ref[idx, 2].sum(), 1)
+    rng = np.random.default_rng(seed)
+    boots = [delta(rng.integers(0, len(ref), len(ref))) for _ in range(draws)]
+    return float(delta(np.arange(len(ref)))), float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
+
+
 def run_nll(args):
-    domains = read_domains(args.domains, args.only)
-    summary = {}
+    data = torch.load(args.domains)
+    domains = {k: v for k, v in data["domains"].items() if not args.only or k in args.only}
+    roles = data.get("roles", {})
+    rows = {}
     for name, path in arms(args.arm):
         model = load(path)
-        arrays = {}
-        summary[name] = {}
+        rows[name] = {}
         for domain, docs in domains.items():
-            per = [token_losses(model, ids) for ids in docs]
-            arrays[domain + "/nll"] = np.concatenate([p[0] for p in per])
-            arrays[domain + "/hit"] = np.concatenate([p[1] for p in per])
-            summary[name][domain] = {"nll": float(arrays[domain + "/nll"].mean()),
-                                     "top1": float(arrays[domain + "/hit"].mean())}
-            print("%-10s %-20s nll %.4f top1 %.3f" % (name, domain, summary[name][domain]["nll"],
-                                                     summary[name][domain]["top1"]), flush=True)
-        np.savez_compressed(args.output_dir / ("nll-%s.npz" % name), **arrays)
+            per_doc = [token_losses(model, ids) for ids in docs]
+            labels = ([r.numpy()[1:] for r in roles[domain]] if domain in roles
+                      else [np.full(len(d) - 1, ROLES.index("plain")) for d in docs])
+            rows[name][domain] = ledger_rows(per_doc, labels)
+            whole = rows[name][domain]["all"]
+            print("%-10s %-18s nll %.4f top1 %.3f" % (name, domain, whole[:, 0].sum() / whole[:, 2].sum(),
+                                                     whole[:, 1].sum() / whole[:, 2].sum()), flush=True)
         del model
         torch.cuda.empty_cache()
-    names = [n for n, _ in arms(args.arm)]
-    if len(names) >= 2:
-        # Sample-wise forgetting against the first arm (arXiv 2510.17776): targets it got
-        # right (top-1) that the other gets wrong, and the reverse.
-        ref = np.load(args.output_dir / ("nll-%s.npz" % names[0]))
-        for other in names[1:]:
-            cur = np.load(args.output_dir / ("nll-%s.npz" % other))
-            for domain in domains:
-                a, b = ref[domain + "/hit"], cur[domain + "/hit"]
-                summary[other][domain].update(
-                    delta_nll=float(cur[domain + "/nll"].mean() - ref[domain + "/nll"].mean()),
-                    forgot=int((a & ~b).sum()), learned=int((~a & b).sum()), targets=int(len(a)))
+    names = list(rows)
+    summary = {}
+    for name in names:
+        summary[name] = {}
+        for domain in domains:
+            summary[name][domain] = {}
+            for key, sums in rows[name][domain].items():
+                entry = {"nll": sums[:, 0].sum() / sums[:, 2].sum(), "top1": sums[:, 1].sum() / sums[:, 2].sum(),
+                         "targets": int(sums[:, 2].sum())}
+                if name != names[0]:
+                    ref = rows[names[0]][domain][key]
+                    entry["delta"], entry["low"], entry["high"] = paired_delta(ref, sums)
+                summary[name][domain][key] = entry
     (args.output_dir / "nll.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+    for name in names[1:]:
+        print("\n== %s against %s: loss change [95%% interval over documents]" % (name, names[0]))
+        for domain in domains:
+            cells = ["%s %+.3f [%+.3f,%+.3f]" % (k, e["delta"], e["low"], e["high"])
+                     for k, e in summary[name][domain].items() if e["targets"] >= 200 and k != "structure"]
+            print("%-18s %s" % (domain, "  ".join(cells)))
 
 
 # ------------------------------------------------------------------------------- change
@@ -438,8 +522,8 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     d = sub.add_parser("domains")
     d.add_argument("--output", type=Path, default=DOMAINS)
-    d.add_argument("--length", type=int, default=4096, help="agent traces and llama.cpp source")
-    d.add_argument("--long-documents", type=int, default=24, help="agent traces (half each harness)")
+    d.add_argument("--length", type=int, default=4096, help="llama.cpp source documents")
+    d.add_argument("--code-documents", type=int, default=12)
     for command in ("nll", "change", "importance", "lens"):
         p = sub.add_parser(command)
         p.add_argument("--domains", type=Path, default=DOMAINS)
