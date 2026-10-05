@@ -1017,3 +1017,97 @@ captures), which the exact tail removes; four times the prompt length moves the 
 cost by ~+0.003 at split 15, so the approximation does not compound badly over longer
 recurrences. Dense maps cost a third of the parameters they replace, so a trained
 projector should be low-rank. Results: scratch/csa2-eval/split-profile-u50*.json (local).
+
+## Long round 2: the QA documents in a user turn (2026-10-02)
+
+Round 1 plus the verified frontier data: the long code documents with their checked questions
+(the document in the first user turn, every token scored, answers weighted 16) and the
+tool-call conversations (assistant turns only). The answers improved by 0.45 nats (held-out
+answer NLL with the document 1.51 -> 1.07; the document's benefit 0.75 -> 0.92), but code NLL
+got worse with distance: 32K 0.527 -> 0.728, 16K 0.568 -> 0.700. Its half blend kept two
+thirds of the answer gain and the long-code gain (32K 0.519).
+
+**The teacher in a user turn is not a code model** (`framing_check.py`, twelve documents
+captured three ways, scored on the document's own tokens):
+
+| framing | teacher top-1 | mean top-1 p | false end-of-turn |
+|---|---|---|---|
+| raw text | 0.878 | 0.893 | 0.000 |
+| `read_file` tool result | 0.608 | 0.831 | 0.007 |
+| user turn | 0.403 | 0.848 | 0.475 |
+
+In a user turn the chat teacher expects the person to stop typing at every line break, 56% of
+positions past 8K. That is its real expectation, not a capture fault (the LLM.int8 and int8-
+weight captures agree: 21.1% vs 21.0% on r8-code-short), and KL toward the teacher on prompts
+stays the recipe -- the student should share the teacher's expectations. The fix is the
+framing, not the masking.
+
+## Long round 3: raw-text code under KL, QA answers only (2026-10-03)
+
+The same 839 code documents captured as raw text and trained on the teacher's KL alone (no
+cross entropy on the repositories' code), and the QA conversations with every checked
+question (qa-code + qa-more, 17,652, answers at weight 8) scored on the answers only. Code NLL
+improved at every length (32K 0.542 -> 0.502 in the same probe run), QA answers by 0.51 nats.
+But long MATH thinking began to loop: at 4,096 new tokens (`math_truncation.py`), 31 of 256
+answers unfinished and looping against the base's 5; within the 1,024-token budget accuracy was
+unchanged. The best guess for the cause: raw code rewards continuing a pattern seen earlier in
+the context.
+
+**The teacher cannot fix a loop it is shown** (`loop_teacher.py`, the teacher over the
+student's looping rollouts): at the first token of a repeated line its top-1 repeats the line
+70% of the time on the first occurrence, 85% at the first repeat, 97% from the sixth. KL on
+looping text trains the loop in; the signal has to come from elsewhere.
+
+## Long round 4: the teacher's own thinking, and unlikelihood on loops (2026-10-04)
+
+- **Teacher-written thinking**: 9,212 MATH/GSM8K train problems through a llama-server
+  running the teacher GGUF (tensor split, 32 slots, ~220 tok/s aggregate; draft-MTP doubles
+  single-stream speed but not batched throughput). 8,586 correct, 15 looping. The 8,534
+  correct, finished, loop-free traces were ranked by the frontier judge (`trace_judge.py`:
+  valid / efficient / worth imitating) into an index; 6,560 kept. A Codex spot check of 80
+  stratified traces found no invalid reasoning among the keeps (agreement 85%); the judge is
+  stricter than Codex on rigour, so some good traces are excluded.
+- **Unlikelihood**: the on-policy r6 loop rollouts and round 3's own (loop-check), with the
+  three where the detector marks nothing excluded (`loop_negatives.py`).
+- **The loop gate** (`loop_gate.py`): MATH test outside MATH-500, a bank no repair input
+  carries (`--bank fresh`; 43 training documents that repeat one of its problems excluded),
+  base re-run on it. The screen's bank minus the trained-on problems was tried and dropped:
+  chosen by the arms' own loops, it hid them.
+
+Fresh bank, 256 problems, 4,096 new tokens:
+
+| arm | within 1,024 | any length | unfinished | unfinished and looping |
+|---|---|---|---|---|
+| base (long1-u50) | 46.9% | 50.0% | 45 | 5 |
+| round 3 | 41.8% | 47.7% | 70 | 31 |
+| round 4 | 43.0% | 46.9% | 65 | 5 |
+| round 4 u50 | 47.3% | 52.3% | 44 | 1 |
+| round 4 ramp0-70 | 45.3% | 50.0% | 52 | 2 |
+
+Round 4's u50 blend against the base: code NLL at 32K 0.542 -> 0.516, agent traces at 32K
+1.313 -> 1.316 (claude-code) and 1.248 -> 1.183 (codex), QA answers -0.334, loops 5 -> 1,
+short screen within noise (code NLL 0.778 -> 0.788, GSM8K 71.1% -> 70.3%, MATH 42.6% both).
+Pass-key 100% throughout. The current candidate; the finalist suite decides.
+
+Two infrastructure faults found on the way: `unlikelihood_loss` kept every chunk's logits for
+backward (OOM with 32K-token packed loops; now checkpointed per chunk), and `CompiledGreedy`'s
+prefill attends over the static cache's whole length, so 64 rows at a 4,096-token budget peak
+at 24.9 GiB (the loop test and the blend screen now generate 32 rows at a time).
+
+## Head losses from one projection (2026-10-04)
+
+`--shared-head-loss` (`shared_head.py`): cross entropy, the grouped-tail KL and unlikelihood
+from one projection of only the rows that carry weight, chunked and checkpointed, instead of
+CCE for the cross entropy plus a KL projection of every position (prompt and padding rows
+included). On real batches against an fp32 reference (`head_parity.py`) the KL and
+unlikelihood values equal the old path's and the gradients are as close to the reference or
+closer (cosine >= 0.9989); the head phase is 8x faster on agent traces, 56x on QA answers,
+1.5-1.9x on fully scored text. End to end on round 4's recipe (`head_bench.ps1`): 558 -> 762
+tok/s, peak reserved 21.2 -> 19.1 GiB, the same loss curve. Codex reviewed it twice
+(codex-review-shared-head): yes for the measured tensor-parallel setup.
+
+Tried first and rejected: CCE's log-sum-exp plus 64 gathered logits, which would not project
+the logits at all. The KL's tail, 1 - the student's top-k mass, cancels to ~1e-6 on
+predictable text; CCE's log-sum-exp is that of bf16-rounded logits (up to 0.12 from exact) and
+never agreed with separately gathered logits closely enough -- a fifth of a raw-code batch got
+a negative tail. The loss terms must come from the same logits.
