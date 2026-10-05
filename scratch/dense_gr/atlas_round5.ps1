@@ -16,22 +16,23 @@ foreach ($p in $base, $tuned, $prev, "$m\u50", "$m\ramp0-70") {
     if (-not (Test-Path "$p\config.json")) { "missing checkpoint $p; stopping"; exit 1 }
 }
 "=== atlas $(Get-Date -Format HH:mm)"
-$jobs = @(
-    Start-Job -ArgumentList 0, $py, $root, $out, $base, $tuned, $prev, $m -ScriptBlock {
+$jobs = @()
+$jobs += Start-Job -ArgumentList 0, $py, $root, $out, $base, $tuned, $prev, $m -ScriptBlock {
         param($gpu, $py, $root, $out, $base, $tuned, $prev, $m)
         $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
         Set-Location $root
         & $py scratch\dense_gr\atlas.py nll --arm "base=$base" --arm "long4-u50=$prev" --arm "long5=$tuned" `
             --arm "long5-u50=$m\u50" --arm "long5-ramp0-70=$m\ramp0-70" --output-dir $out *> "$out\nll.log"
         if ($LASTEXITCODE -ne 0) { throw "ledger failed (exit $LASTEXITCODE)" }
-    },
-    Start-Job -ArgumentList 1, $py, $root, $out, $base, $tuned -ScriptBlock {
+}
+$jobs += Start-Job -ArgumentList 1, $py, $root, $out, $base, $tuned -ScriptBlock {
         param($gpu, $py, $root, $out, $base, $tuned)
         $env:CUDA_VISIBLE_DEVICES = "$gpu"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
         Set-Location $root
         & $py scratch\dense_gr\atlas.py revert --base $base --tuned $tuned --output-dir $out *> "$out\revert.log"
         if ($LASTEXITCODE -ne 0) { throw "reverts failed (exit $LASTEXITCODE)" }
-    })
+}
+if ($jobs.Count -ne 2) { "started $($jobs.Count) of 2 jobs; stopping"; $jobs | Stop-Job; exit 1 }
 $jobs | Wait-Job -Timeout 14400 | Out-Null
 $jobs | Receive-Job
 if ($jobs | Where-Object { $_.State -ne "Completed" }) {

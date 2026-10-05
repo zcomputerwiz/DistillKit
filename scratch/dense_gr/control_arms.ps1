@@ -83,15 +83,15 @@ $named = @(@("long5-step100", "$arms\long5-step100"), @("nonew", "$root\scratch\
            @("flat", "$root\scratch\dense_gr\checkpoints-ctl-flat\smoke-r1-1-gr-s25-csa2"))
 $ledger = @("--arm", "base=$base") + ($named | ForEach-Object { @("--arm", "$($_[0])=$($_[1])") })
 $proxy = @("base=$base") + ($named | ForEach-Object { "$($_[0])=$($_[1])" })
-$jobs = @(
-    Start-Job -ArgumentList $py, $root, $arms, (($ledger) -join ";") -ScriptBlock {
+$jobs = @()
+$jobs += Start-Job -ArgumentList $py, $root, $arms, (($ledger) -join ";") -ScriptBlock {
         param($py, $root, $arms, $ledger)
         $env:CUDA_VISIBLE_DEVICES = "0"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
         Set-Location $root
         & $py scratch\dense_gr\atlas.py nll ($ledger -split ";") --output-dir "$arms\ledger" *> "$arms\ledger.log"
         if ($LASTEXITCODE -ne 0) { throw "ledger failed (exit $LASTEXITCODE)" }
-    },
-    Start-Job -ArgumentList $py, $root, $arms, (($proxy) -join ";") -ScriptBlock {
+}
+$jobs += Start-Job -ArgumentList $py, $root, $arms, (($proxy) -join ";") -ScriptBlock {
         param($py, $root, $arms, $proxy)
         $env:CUDA_VISIBLE_DEVICES = "1"; $env:TORCHINDUCTOR_CACHE_DIR += "-gpu1"
         $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
@@ -100,7 +100,8 @@ $jobs = @(
             & $py scratch\dense_gr\merge_proxy.py $arm --output "$arms\proxy.json" *>> "$arms\proxy.log"
             if ($LASTEXITCODE -ne 0) { throw "merge_proxy failed for $arm (exit $LASTEXITCODE)" }
         }
-    })
+}
+if ($jobs.Count -ne 2) { "started $($jobs.Count) of 2 jobs; stopping"; $jobs | Stop-Job; exit 1 }
 $jobs | Wait-Job -Timeout 10800 | Out-Null
 $jobs | Receive-Job
 if ($jobs | Where-Object { $_.State -ne "Completed" }) { $jobs | Stop-Job; "evaluation failed or timed out; see $arms\*.log"; exit 1 }
