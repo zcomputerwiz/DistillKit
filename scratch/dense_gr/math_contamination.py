@@ -14,6 +14,21 @@ import re
 from pathlib import Path
 
 USER = re.compile(r"<\|im_start\|>user\n(.*?)<\|im_end\|>", re.S)
+TOKENIZER = Path(__file__).resolve().parents[3] / "teacher-hf" / "tokenizer.json"
+_decoder = []
+
+
+def user_text(row):
+    """A row's user turns: from its `text`, or its `input_ids` decoded (capture input),
+    else its rendered `prompt`."""
+    text = row.get("text", "")
+    if not text and "input_ids" in row:
+        if not _decoder:
+            from tokenizers import Tokenizer
+
+            _decoder.append(Tokenizer.from_file(str(TOKENIZER)))
+        text = _decoder[0].decode(row["input_ids"], skip_special_tokens=False)
+    return " ".join(USER.findall(text)) or row.get("prompt", "")
 
 
 def words(text):
@@ -43,7 +58,7 @@ def main():
     for path in args.corpora:
         for line in open(path, encoding="utf-8"):
             row = json.loads(line)
-            text = " ".join(USER.findall(row.get("text", ""))) or row.get("prompt", "")
+            text = user_text(row)
             key = " ".join(words(text))
             found = exact.get(key)
             if found is None:

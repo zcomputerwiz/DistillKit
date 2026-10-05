@@ -1,0 +1,29 @@
+"""Repeated documents: each copy is its own visit, never a second row of the same microbatch."""
+import sys
+from pathlib import Path
+from types import SimpleNamespace
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scratch" / "dense_gr"))
+
+from teacher_kl import CachedTeacher  # noqa: E402
+
+
+def plan(ids, size, cap=lambda doc_id: 100):
+    stub = SimpleNamespace(ids=ids, cap=cap, pad_blocks=False, real_width={}, min_answer_tokens=0,
+                           kl_only_ids=set(), unlikelihood_ids=set(), ce_only_ids=set())
+    return CachedTeacher._groups(stub, size)
+
+
+def test_copies_of_a_document_never_share_a_group():
+    ids = ["d%d" % i for i in range(10) for _ in range(3)] + ["once%d" % i for i in range(5)]
+    groups = plan(ids, 4)
+    assert sorted(d for group, _ in groups for d in group) == sorted(ids)
+    assert all(len(set(group)) == len(group) for group, _ in groups)
+
+
+def test_group_shapes_do_not_depend_on_repeats_order():
+    # The same members per bucket chunk into the same row counts: warmed shapes hold.
+    ids = ["d%d" % i for i in range(7) for _ in range(2)]
+    widths = lambda doc_id: 100 if int(doc_id[1:]) % 2 else 200
+    assert sorted((len(g), w) for g, w in plan(ids, 3, widths)) == [(2, 200), (3, 100), (3, 100),
+                                                                    (3, 200), (3, 200)]

@@ -89,7 +89,7 @@ def generate(args):
     def run(row):
         try:
             reply = complete(args.server, row["prompt"], args.max_tokens, args.seed)
-        except Exception as error:  # a full shared KV pool or a dropped connection: retried on resume
+        except Exception as error:  # still failing after complete()'s retries: rerun to resume
             print("skipped %s: %s" % (row["doc_id"], error), flush=True)
             return None
         text = reply["content"]
@@ -98,16 +98,20 @@ def generate(args):
                 "finished": reply.get("stop_type") in ("eos", "word") or bool(reply.get("stopped_eos")),
                 "thought_closed": (not row["thinking"]) or "</think>" in text, "max_line_repeats": repetition(text)}
 
-    start, produced = time.time(), 0
+    start, produced, skipped = time.time(), 0, 0
     with open(args.output, "a", encoding="utf-8") as out, ThreadPoolExecutor(args.workers) as pool:
         for n, row in enumerate(pool.map(run, jobs), 1):
             if row is None:
+                skipped += 1
                 continue
             out.write(json.dumps(row, ensure_ascii=False) + "\n")
             out.flush()
             produced += row["tokens"] or 0
             if n % 32 == 0 or n == len(jobs):
                 print("%d/%d  %.0f tok/s" % (n, len(jobs), produced / (time.time() - start)), flush=True)
+    # A partial set must not pass for a finished one: the caller stops, and a rerun resumes.
+    if skipped:
+        raise SystemExit("%d of %d requests failed; rerun to resume past the rest" % (skipped, len(jobs)))
 
 
 def inputs(args):
@@ -118,11 +122,17 @@ def inputs(args):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "frontier"))
     from capture_inputs import split_of
 
+    wanted = {json.loads(line)["doc_id"] for line in open(args.prompts, encoding="utf-8")}
+    verified = [json.loads(line) for line in open(args.verified, encoding="utf-8")]
+    missing = wanted - {row["doc_id"] for row in verified}
+    if missing:
+        raise SystemExit("%d of %d prompts have no verified rollout, e.g. %s; generate again (it resumes)"
+                         % (len(missing), len(wanted), sorted(missing)[:3]))
     tok = AutoTokenizer.from_pretrained(TEACHER)
     end = tok.convert_tokens_to_ids("<|im_end|>")
     counts, n, tokens = {}, 0, 0
     with open(args.output, "w", encoding="utf-8") as out:
-        for row in map(json.loads, open(args.verified, encoding="utf-8")):
+        for row in verified:
             counts[row["verified"]] = counts.get(row["verified"], 0) + 1
             if not (row["verified"] == "passed" and row["finished"] and row["thought_closed"]
                     and row["max_line_repeats"] < 5):
@@ -142,6 +152,7 @@ def main():
     sub = parser.add_subparsers(dest="command", required=True)
     i = sub.add_parser("inputs")
     i.add_argument("--verified", type=Path, default=C / "teacher-code-verified.jsonl")
+    i.add_argument("--prompts", type=Path, default=C / "code-prompts-teacher.jsonl")
     i.add_argument("--output", type=Path, default=C / "teacher-code.jsonl")
     p = sub.add_parser("prompts")
     p.add_argument("--count", type=int, default=1500)

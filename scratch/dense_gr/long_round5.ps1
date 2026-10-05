@@ -88,9 +88,16 @@ Check "zero-negative loops"
     "..\teacher-cache-think-first-w8", "..\teacher-cache-curriculum-v4-w8") | ForEach-Object { $_ }) `
     --output "$C\exclude-fresh-bank-overlap.json"
 Check "fresh-bank overlap"
+# And the teacher-written documents whose problem contains a GSM8K-test or MATH-500 question,
+# by the rule exclude-math-benchmarks.json was built with (math_contamination.py), screened
+# under their own ids: the master list names the source problems (math:algebra:1319), which
+# the copies (tgen:math:algebra:1319#0, tnothink:...) do not match. 150 traces at review.
+& $py scratch\dense_gr\math_contamination.py --corpora "$C\teacher-math-gen.jsonl" "$C\teacher-nothink-math.jsonl" `
+    "$C\teacher-code.jsonl" --output "$C\exclude-teacher-benchmarks.json"
+Check "teacher benchmark screen"
 & $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa2-markup.json" `
     "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" "$C\exclude-fresh-bank-overlap.json" `
-    --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r5.json"
+    "$C\exclude-teacher-benchmarks.json" --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r5.json"
 Check "exclusion list"
 "=== train $(Get-Date -Format HH:mm)"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $base,

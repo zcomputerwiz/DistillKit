@@ -53,8 +53,13 @@ $jobs = foreach ($gpu in 0, 1) {
         }
     }
 }
-$jobs | Wait-Job | Receive-Job
-if ($jobs | Where-Object { $_.State -ne "Completed" }) { "blend screen failed; see $out\proxy-gpu*.log"; exit 1 }
+# Bounded (five arms a card take about an hour): a worker hung in a CUDA wait or a compile
+# would otherwise hold the round forever.
+$jobs | Wait-Job -Timeout 10800 | Out-Null
+$jobs | Receive-Job
+if ($jobs | Where-Object { $_.State -ne "Completed" }) {
+    $jobs | Stop-Job; "blend screen failed or timed out; see $out\proxy-gpu*.log"; exit 1
+}
 Get-Content "$out\proxy-gpu0.log", "$out\proxy-gpu1.log" | Select-String "code nll|Traceback|Error"
 "=== done $(Get-Date -Format HH:mm)"
 exit 0

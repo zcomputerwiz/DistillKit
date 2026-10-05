@@ -101,5 +101,9 @@ for bench in ('gsm8k', 'math500'):
                 print('%-8s %-15s %-9s accuracy %.1f%%  no answer %d  truncated %d  mean %d tok' % (bench, mode, name, 100 * s['accuracy'], s['no_answer'], s['truncated'], s['mean_tokens']))
 "@
 "== math on problems no training document contains (clean_rescore.py)"
-& $py "$math\clean_rescore.py" --corpora "$D\capture-data\thinking-code-math.jsonl" "$D\capture-data\think-first-5m.jsonl" "$D\capture-data\prompts-r5.jsonl" --tags source think $Tag 2>&1 | Where-Object { $_ -match 'gsm8k|math500' }
+# With the teacher-written corpora (capture inputs, decoded) where they exist: a problem any
+# round trained on is not clean for any arm.
+$corpora = @("thinking-code-math", "think-first-5m", "prompts-r5", "teacher-math-gen", "teacher-nothink-math", "teacher-code") |
+    ForEach-Object { "$D\capture-data\$_.jsonl" } | Where-Object { Test-Path $_ }
+& $py "$math\clean_rescore.py" --corpora $corpora --tags source think $Tag 2>&1 | Where-Object { $_ -match 'gsm8k|math500' }
 "=== done $(Get-Date -Format HH:mm)"

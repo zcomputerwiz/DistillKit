@@ -78,12 +78,16 @@ def main():
             samples.append({"id": row["doc_id"], "solution": code, "test": tests[key]})
     status = sandbox(samples) if samples else {}
     counts = {}
-    with open(args.output, "w", encoding="utf-8") as out:
+    # Written aside, then renamed: the file's existence is how a resumed pipeline knows
+    # verification finished.
+    partial = args.output.with_name(args.output.name + ".partial")
+    with open(partial, "w", encoding="utf-8") as out:
         for row in rows:
             if row["doc_id"] in status:
                 row["verified"] = status[row["doc_id"]]
             counts[row["verified"]] = counts.get(row["verified"], 0) + 1
             out.write(json.dumps(row, ensure_ascii=False) + "\n")
+    partial.replace(args.output)
     print("verified %d rollouts: %s -> %s" % (len(rows), json.dumps(counts), args.output))
 
 

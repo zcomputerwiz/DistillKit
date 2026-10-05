@@ -50,11 +50,17 @@ def problems(args):
 def inputs(args):
     from transformers import AutoTokenizer
 
+    wanted = {json.loads(line)["id"] for line in open(args.problems, encoding="utf-8")}
+    answers = [json.loads(line) for line in open(args.answers, encoding="utf-8")]
+    missing = wanted - {row["id"] for row in answers}
+    if missing:
+        raise SystemExit("%d of %d problems have no answer, e.g. %s; run teacher_generate.py --nothink "
+                         "again (it resumes)" % (len(missing), len(wanted), sorted(missing)[:3]))
     tok = AutoTokenizer.from_pretrained(TEACHER)
     end = tok.convert_tokens_to_ids("<|im_end|>")
     n = tokens = total = 0
     with open(args.output, "w", encoding="utf-8") as out:
-        for row in map(json.loads, open(args.answers, encoding="utf-8")):
+        for row in answers:
             total += 1
             if not (row["correct"] and row["finished"] and row["max_line_repeats"] < 5):
                 continue
@@ -75,6 +81,7 @@ def main():
     p.add_argument("--seed", type=int, default=6)
     i = sub.add_parser("inputs")
     i.add_argument("--answers", type=Path, default=C / "teacher-gen-nothink.jsonl")
+    i.add_argument("--problems", type=Path, default=C / "teacher-nothink-problems.jsonl")
     i.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     (problems if args.command == "problems" else inputs)(args)

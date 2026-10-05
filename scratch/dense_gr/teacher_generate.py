@@ -26,12 +26,19 @@ from merge_proxy import PROMPT, boxed, correct  # noqa: E402
 TEACHER = "D:/DeepThought/Projects/HybridModel/teacher-hf"
 
 
-def complete(server, prompt, max_tokens, seed):
+def complete(server, prompt, max_tokens, seed, attempts=3):
+    """One completion, retried after a pause: a full shared KV pool frees as other slots finish."""
     body = json.dumps({"prompt": prompt, "n_predict": max_tokens, "temperature": 0.6, "top_p": 0.95,
                        "top_k": 20, "seed": seed, "cache_prompt": False}).encode()
     request = urllib.request.Request(server + "/completion", body, {"Content-Type": "application/json"})
-    with urllib.request.urlopen(request, timeout=3600) as response:
-        return json.loads(response.read())
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(request, timeout=3600) as response:
+                return json.loads(response.read())
+        except Exception:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(30)
 
 
 def repetition(text):
@@ -73,7 +80,7 @@ def main():
                                          reasoning_effort="medium")
         try:
             reply = complete(args.server, prompt, args.max_tokens, seed)
-        except Exception as error:  # a full shared KV pool or a dropped connection: retried on resume
+        except Exception as error:  # still failing after retries: rerun to resume past the rest
             print("skipped %s: %s" % (p["id"], error), flush=True)
             return None
         text = reply["content"]
@@ -84,10 +91,11 @@ def main():
                 "correct": bool(correct(boxed(text.split("</think>")[-1]), p["answer"])),
                 "max_line_repeats": repetition(text)}
 
-    start, produced = time.time(), 0
+    start, produced, skipped = time.time(), 0, 0
     with open(args.output, "a", encoding="utf-8") as out, ThreadPoolExecutor(args.workers) as pool:
         for n, row in enumerate(pool.map(run, jobs), 1):
             if row is None:
+                skipped += 1
                 continue
             out.write(json.dumps(row) + "\n")
             out.flush()
@@ -98,7 +106,10 @@ def main():
     print(json.dumps({"traces": len(rows), "finished": sum(r["finished"] for r in rows),
                       "correct": sum(r["correct"] for r in rows),
                       "looping (a line 5+ times)": sum(r["max_line_repeats"] >= 5 for r in rows),
-                      "median tokens": sorted(r["tokens"] or 0 for r in rows)[len(rows) // 2]}, indent=1))
+                      "median tokens": sorted(r["tokens"] or 0 for r in rows)[len(rows) // 2] if rows else 0}, indent=1))
+    # A partial set must not pass for a finished one: the caller stops, and a rerun resumes.
+    if skipped:
+        raise SystemExit("%d of %d requests failed; rerun to resume past the rest" % (skipped, len(jobs)))
 
 
 if __name__ == "__main__":

@@ -533,6 +533,7 @@ class CachedTeacher:
             raise ValueError("batch size, block and budget must be positive")
         buckets = {}
         groups = []
+        copies = {}
         self.dropped_short = 0
         self.dropped_truncated_answer = 0
         for doc_id in sorted(self.ids):
@@ -549,9 +550,13 @@ class CachedTeacher:
                 continue
             if budget is not None and width > budget:
                 raise ValueError("micro-token budget is smaller than a retained document")
+            copies[doc_id] = copy = copies.get(doc_id, -1) + 1
             buckets.setdefault((width, doc_id in self.kl_only_ids, doc_id in self.unlikelihood_ids,
-                                doc_id in self.ce_only_ids), []).append(doc_id)
+                                doc_id in self.ce_only_ids), []).append((copy, doc_id))
         for (width, _, _, _), members in sorted(buckets.items()):
+            # A repeated document's copies fill successive rounds of its bucket: side by side
+            # they would share a microbatch, one visit weighted n times, not n visits.
+            members = [doc_id for _, doc_id in sorted(members)]
             rows = size if budget is None else max(1, budget // width)
             for start in range(0, len(members), rows):
                 groups.append((members[start:start + rows], width))

@@ -33,8 +33,13 @@ for ($i = 0; $i -lt $tests.Count; $i += 2) {
             if ($LASTEXITCODE -ne 0) { throw "loop test $name failed (exit $LASTEXITCODE)" }
         }
     }
-    $jobs | Wait-Job | Receive-Job
-    if ($jobs | Where-Object { $_.State -ne "Completed" }) { "loop test failed; see scratch\dense_gr\mt-*.log"; exit 1 }
+    # Bounded (an arm takes well under an hour): a worker hung in a CUDA wait or a compile
+    # would otherwise hold the round forever.
+    $jobs | Wait-Job -Timeout 7200 | Out-Null
+    $jobs | Receive-Job
+    if ($jobs | Where-Object { $_.State -ne "Completed" }) {
+        $jobs | Stop-Job; "loop test failed or timed out; see scratch\dense_gr\mt-*.log"; exit 1
+    }
 }
 & $py scratch\dense_gr\loop_gate.py --base $baseResult `
     --candidates ($tests | Where-Object { $_[0] -ne $BaseName } | ForEach-Object { "scratch\csa2-eval\math-truncation-fresh-$($_[0]).json" }) `
