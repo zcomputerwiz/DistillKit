@@ -2,13 +2,15 @@
 # replay control and round 2: sampled thinking code (3 seeds), math in both modes, the
 # arithmetic probe, hedge rate, WikiText, MMLU, sandbox scoring, loop audit.
 #   powershell -File eval_checkpoint.ps1 -Checkpoint <dir> -Tag <name>
-param([Parameter(Mandatory)][string]$Checkpoint, [Parameter(Mandatory)][string]$Tag)
+# -SkipCode: the code generations already exist (the generator refuses to overwrite them).
+param([Parameter(Mandatory)][string]$Checkpoint, [Parameter(Mandatory)][string]$Tag, [switch]$SkipCode)
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"
 $code = "$root\scratch\downstream\code_bench"; $math = "$root\scratch\downstream\math_bench"
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
 $think = "$root\scratch\dense_gr\checkpoints-2b-thinking-pass\smoke-r1-1-gr-s4-csa2"
 $r2 = $Checkpoint
+if (-not $SkipCode) {
 "=== code, sampled thinking, 3 seeds $(Get-Date -Format HH:mm)"
 $jobs = foreach ($gpu in "0", "1") {
     Start-Job -ArgumentList $gpu, $py, $code, $root, $r2, $Tag -ScriptBlock {
@@ -32,6 +34,7 @@ $jobs = foreach ($gpu in "0", "1") {
     }
 }
 $jobs | Wait-Job | Receive-Job
+}
 "=== math $(Get-Date -Format HH:mm)"
 $jobs = foreach ($spec in @("0|gsm8k", "1|math500")) {
     Start-Job -ArgumentList $spec, $py, $math, $root, $r2, $Tag -ScriptBlock {
@@ -41,8 +44,10 @@ $jobs = foreach ($spec in @("0|gsm8k", "1|math500")) {
         $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"
         Set-Location $root
         foreach ($mode in "think-sampled", "nothink-greedy") {
+            # 32 rows: MATH-500's longest problems at 64 rows spilled 11.6 GB past the card in
+            # the prefill over the static cache (long4-u50 suite, 2026-10-04).
             $argv = [System.Collections.Generic.List[string]]@("$math\run_math.py", "--checkpoint", $r2,
-                "--bench", $bench, "--compiled", "--output", "$math\$Tag-$bench-$mode")
+                "--bench", $bench, "--compiled", "--batch-size", "32", "--output", "$math\$Tag-$bench-$mode")
             if ($mode -eq "think-sampled") { $argv.Add("--sample") } else { $argv.Add("--no-thinking") }
             & $py $argv *> "$math\$Tag-$bench-$mode.log"
         }
