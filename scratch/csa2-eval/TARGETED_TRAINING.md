@@ -39,6 +39,44 @@ components each kind of data may change.
 
 **Ledger statistics:** paired document bootstrap intervals, the signed contrast G_arm − 0.8·G_A, both 1→0 and 0→1 transitions, and a full-budget confirmation with more seeds.
 
+## Phase 1 results: round 5 against its base (scratch/csa2-eval/atlas/long5)
+
+**Ledger.** Round 5 unblended, loss change against long1-u50, by the role of the predicted token:
+
+| domain | own turns | tool output | system | user / document |
+|---|---|---|---|---|
+| agent claude-code | -0.100 | +0.324 | +0.135 | +0.033 |
+| agent codex | -0.111 | +0.307 | +0.162 | -0.021 |
+| agent mini-swe | -0.085 | +0.211 | +0.035 | +0.175 |
+| tools | -0.087 | -0.019 | -0.013 | -0.253 |
+| teacher code | -0.026 | | | -0.031 |
+| thinking math | -0.060 | | | +0.017 |
+| non-thinking math | -0.051 | | | +0.038 |
+| QA | -0.452 (answers) | | | +0.156 (the documents) |
+| llama.cpp source (plain) | -0.019 | | | |
+
+- Everything the model writes improved.
+- What regressed is predicting other people's text inside chats. The assistant-only caches (agent, tools, QA) put no loss there.
+- Round 4 u50 drifts the same way (tool output +0.06), so the new data did not cause it.
+- The blends trade it off:
+  - u50: tool output +0.06, own turns -0.06;
+  - ramp0-70: no context regression, own turns -0.04.
+
+**Family reverts** (round 5 with one family back at the base; change against round 5):
+- **Layers 0-7** hold the whole context regression: tool output -0.33/-0.30, QA documents -0.19. Reverting them costs claude-code about a quarter of its own-turn gain (+0.024 of -0.100), and QA about half (+0.24 of -0.45).
+- **Layers 8-15:** tool output -0.09/-0.11. **Layers 16-23:** none (+0.02).
+- **By kind:**
+  - MLPs: tool output -0.25, own turns +0.04;
+  - DeltaNet: -0.15, +0.005;
+  - MLA: -0.11, +0.015 (QA answers +0.085: long-range retrieval);
+  - norms, decay, write strength, indexer, hyper-connections and the embedding/head: within ±0.006.
+
+**Reading.** Shallow layers, mostly their MLPs, drift on positions nothing scores. The gains are spread across depth.
+
+**Two levers follow, both being tested as step-100 arms against round 5's own step 100:**
+- **The depth ramp** (`control_arms.ps1`: ramp, and flat 0.55× as its control).
+- **Teacher KL alone on the context tokens** (`--context-kl 0.01 --context-every 8`, Codex-reviewed `CONTEXT_KL.md`; `context_arm.ps1`). It keeps the student's expectations there on the teacher's, with no cross entropy on text the teacher did not write.
+
 ## What we already know (DISTILLATION.md)
 
 - **Loops (rounds 8b/8c):** the loop fix lives in the deep layers. Splicing round 8b's deep layers under round 6's shallow ones keeps it (98 and 11 truncations); a uniform blend dilutes it.
