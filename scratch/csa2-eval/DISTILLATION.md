@@ -1158,6 +1158,37 @@ Over all 2,500 problems:
 - Plan: 95,583 documents, 76.8M targets a pass.
 - Training throughput is 877 tok/s at step 25, peaking at 21.2 GB on a 24 GB card with no spill.
 
+**Results.**
+- **Training:** 10M targets at 936 tok/s, held-out loss 0.801 → 0.739.
+- **Long-context probe, round 5 unblended:**
+  - Code NLL is the best of any round at every length (32K: 0.506; round 4 u50 0.516; base 0.542).
+  - Pass-key retrieval stays at 100% at every length.
+  - The agent-trace buckets rose 0.1-0.18 nats, but those documents are not what training scores. They are system prompt to 8K, and for claude-code 85% tool output at 16-32K. Only 2 claude-code documents and 1 codex document reach 32K.
+  - On held-out assistant turns, agent loss improved (0.640 → 0.562).
+  - The probe needs a role-split rework; `atlas.py nll` now gives that ledger.
+- **Held-out Q&A answers:** -0.518 nats against the base on the first questions (round 4 u50: -0.334), and -0.458 on all questions (-0.304). The document's benefit grows from 0.612 to 0.822.
+
+Blend screen proxies (base = long1-u50):
+
+| arm | code NLL | thinking NLL | GSM8K non-thinking (unboxed) | MATH thinking (truncated) |
+|---|---|---|---|---|
+| base | 0.778 | 0.5523 | 70.7% (5) | 42.6% (108) |
+| round 5 | 0.805 | 0.5606 | 63.3% (55) | 41.8% (122) |
+| u30 | 0.782 | 0.5515 | 72.3% (12) | 44.1% (112) |
+| u50 | 0.789 | 0.5524 | 69.5% (18) | 41.8% (123) |
+| ramp0-70 | 0.794 | 0.5536 | 71.1% (7) | 43.8% (121) |
+
+The GSM8K non-thinking proxy allows 512 new tokens, against 2,048 in the benchmark. Round 5 learned the teacher's longer native answers, so its 55 unboxed answers there are probably truncation. The suite will tell.
+
+Fresh-bank loop gate (256 problems, 4,096 tokens):
+
+| arm | within 1,024 | any length | unfinished | looping | gate |
+|---|---|---|---|---|---|
+| base | 46.9% | 50.0% | 45 | 5 | |
+| round 5 | 43.8% | 49.2% | 59 | 3 | fail (accuracy) |
+| round 5 u50 | 47.3% | 52.3% | 47 | 5 | pass |
+| round 5 ramp0-70 | 46.5% | 55.1% | 54 | 4 | pass |
+
 **Pre-launch Codex review** (codex-review-r5) found three High problems, fixed before launch:
 - **Benchmark exclusions did not follow the teacher's copies.**
   - The master list names source problems (`math:algebra:1319`). The copies are `tgen:...#0` and `tnothink:...#0`.
