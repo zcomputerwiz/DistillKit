@@ -115,3 +115,22 @@ def test_paired_delta_is_zero_for_identical_arms_and_signed():
     worse[:, 0] += 5.0  # +0.05 a target on every document
     d, lo, hi = paired_delta(ref, worse)
     assert abs(d - 0.05) < 1e-9 and lo <= d <= hi
+
+
+def test_families_cover_the_real_parameter_names():
+    from atlas import FAMILIES, family_members
+    from safetensors import safe_open
+
+    path = Path(__file__).resolve().parents[1] / "scratch" / "dense_gr" / "merges-long1" / "u50" / "model.safetensors"
+    if not path.exists():
+        import pytest
+        pytest.skip("no checkpoint")
+    names = list(safe_open(str(path), "pt").keys())
+    sizes = {f: len(family_members(f, names)) for f in FAMILIES}
+    assert sizes["embed-head"] == 1 and sizes["decay"] == 18 * 3 and sizes["write-strength"] == 18
+    assert sizes["deltanet"] == 18 * 4 and sizes["mla"] == 6 * 4 and sizes["indexer"] == 6 * 4
+    assert sizes["mlp"] == 24 * 3 and sizes["hyper"] == 48 * 5
+    assert sizes["layers-0-7"] + sizes["layers-8-15"] + sizes["layers-16-23"] == len(names) - 2
+    # Every parameter is in some non-depth family.
+    covered = set().union(*(family_members(f, names) for f in FAMILIES if not f.startswith("layers")))
+    assert covered == set(names), sorted(set(names) - covered)[:5]

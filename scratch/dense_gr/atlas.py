@@ -335,6 +335,88 @@ def run_change(args):
     (args.output_dir / "change.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
 
 
+# ------------------------------------------------------------------------------- revert
+
+# Parameter families, coarse first (Codex review: coherent group reverts before heads).
+FAMILIES = {
+    "embed-head": r"^model\.embed_tokens\.",  # tied: the input embedding and the readout
+    "norms": r"(layernorm|^model\.norm\.|q_norm|kv_a_norm|linear_attn\.norm)",
+    "decay": r"linear_attn\.(A_log|dt_bias|in_proj_a)\b",  # g = -exp(A_log) softplus(a + dt_bias)
+    "write-strength": r"linear_attn\.in_proj_b\b",
+    "deltanet": r"linear_attn\.(in_proj_qkv|in_proj_z|conv1d|out_proj)\b",
+    "mla": r"self_attn\.(q_proj|kv_a_proj|kv_b_proj|o_proj)\b",
+    "indexer": r"self_attn\.(index_|indexer_)",
+    "mlp": r"\.mlp\.",
+    "hyper": r"_residual\.",
+    "layers-0-7": range(0, 8), "layers-8-15": range(8, 16), "layers-16-23": range(16, 24)}
+
+
+def family_members(family, names):
+    import re
+
+    rule = FAMILIES[family]
+    if isinstance(rule, range):
+        return [n for n in names if n.startswith("model.layers.") and int(n.split(".")[2]) in rule]
+    return [n for n in names if re.search(rule, n)]
+
+
+def run_revert(args):
+    """Each family of the tuned checkpoint put back to the base, scored on the ledger."""
+    data = torch.load(args.domains)
+    domains = {k: v for k, v in data["domains"].items() if not args.only or k in args.only}
+    labels = {d: ([r.numpy()[1:] for r in data["roles"][d]] if d in data.get("roles", {})
+                  else [np.full(len(x) - 1, ROLES.index("plain")) for x in docs]) for d, docs in domains.items()}
+    model = load(args.base)
+    base = {n: p.detach().to("cpu", copy=True) for n, p in model.named_parameters()}
+    del model
+    torch.cuda.empty_cache()
+    model = load(args.tuned)
+    params = dict(model.named_parameters())
+    tuned = {n: p.detach().to("cpu", copy=True) for n, p in params.items()}
+
+    def evaluate(name):
+        started = time.time()
+        out = {d: ledger_rows([token_losses(model, ids) for ids in docs], labels[d]) for d, docs in domains.items()}
+        print("%-22s %.0f s" % (name, time.time() - started), flush=True)
+        return out
+
+    def put(source, names):
+        with torch.no_grad():
+            for n in names:
+                params[n].copy_(source[n])
+
+    rows = {"tuned": evaluate("tuned")}
+    for family in args.families:
+        members = family_members(family, list(params))
+        if not members:
+            raise SystemExit("family %s matches no parameter" % family)
+        put(base, members)
+        rows["revert " + family] = evaluate("revert " + family)
+        put(tuned, members)
+    put(base, list(params))
+    rows["base"] = evaluate("base")
+    summary = {}
+    for arm, by_domain in rows.items():
+        summary[arm] = {}
+        for domain, by_role in by_domain.items():
+            summary[arm][domain] = {}
+            for key, sums in by_role.items():
+                entry = {"nll": sums[:, 0].sum() / sums[:, 2].sum(), "targets": int(sums[:, 2].sum())}
+                for ref in ("tuned", "base"):
+                    if arm != ref:
+                        d, lo, hi = paired_delta(rows[ref][domain][key], sums)
+                        entry["vs_" + ref] = [d, lo, hi]
+                summary[arm][domain][key] = entry
+    (args.output_dir / "revert.json").write_text(json.dumps(summary, indent=1), encoding="utf-8")
+    print("\n== loss change against the tuned checkpoint (negative: reverting the family helps)")
+    for arm in rows:
+        if arm == "tuned":
+            continue
+        cells = ["%s/%s %+.3f" % (d, k, e["vs_tuned"][0]) for d, by_role in summary[arm].items()
+                 for k, e in by_role.items() if k in ("all", "own-turns", "tool-result") and e["targets"] >= 200]
+        print("%-22s %s" % (arm, "  ".join(cells)))
+
+
 # --------------------------------------------------------------------------- importance
 
 def units_of(model):
@@ -524,17 +606,20 @@ def main():
     d.add_argument("--output", type=Path, default=DOMAINS)
     d.add_argument("--length", type=int, default=4096, help="llama.cpp source documents")
     d.add_argument("--code-documents", type=int, default=12)
-    for command in ("nll", "change", "importance", "lens"):
+    for command in ("nll", "change", "revert", "importance", "lens"):
         p = sub.add_parser(command)
         p.add_argument("--domains", type=Path, default=DOMAINS)
         p.add_argument("--only", nargs="*", default=None, help="these domains only")
         p.add_argument("--output-dir", type=Path, required=True)
-        if command == "change":
+        if command in ("change", "revert"):
             p.add_argument("--base", required=True)
             p.add_argument("--tuned", required=True)
+        if command == "change":
             p.add_argument("--midpoint", action="store_true",
                            help="a third gradient at the midpoint: Simpson's rule, for when the "
                                 "trapezoid misses the measured change by more than ~10%%")
+        elif command == "revert":
+            p.add_argument("--families", nargs="+", default=list(FAMILIES), choices=list(FAMILIES))
         else:
             p.add_argument("--arm", action="append", required=True, help="name=checkpoint")
         if command == "importance":
@@ -545,7 +630,7 @@ def main():
     if args.command != "domains":
         args.output_dir.mkdir(parents=True, exist_ok=True)
     {"domains": build_domains, "nll": run_nll, "change": run_change,
-     "importance": run_importance, "lens": run_lens}[args.command](args)
+     "revert": run_revert, "importance": run_importance, "lens": run_lens}[args.command](args)
 
 
 if __name__ == "__main__":
