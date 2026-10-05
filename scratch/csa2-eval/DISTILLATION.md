@@ -1111,3 +1111,50 @@ the logits at all. The KL's tail, 1 - the student's top-k mass, cancels to ~1e-6
 predictable text; CCE's log-sum-exp is that of bf16-rounded logits (up to 0.12 from exact) and
 never agreed with separately gathered logits closely enough -- a fifth of a raw-code batch got
 a negative tail. The loss terms must come from the same logits.
+
+## Long round 5: the teacher's own non-thinking answers and code (2026-10-05)
+
+Round 4's u50 trails the source most in non-thinking math and in code:
+- MATH-500 non-thinking: 48.0% against 54.8%, with 119 answers lacking a boxed result against 65.
+- HumanEval+ (sampled): 38.4% against 43.1%.
+- MBPP+: 51 of its sampled code answers loop, against 20.
+
+Round 5 adds the teacher's own text for both.
+
+**Non-thinking answers: native, not thinking with the thought dropped** (`nothink_pilot.py`, 200
+problems). Both candidates were scored under the teacher's non-thinking view:
+- The thinking-mode answers, with the thought dropped, carry leaps:
+  - a median of 2 tokens per answer that the non-thinking teacher gives under 1%;
+  - a median worst-token NLL of 17.8.
+  - These are steps it only resolved while thinking. They would teach the student to state what it cannot derive.
+- Its native non-thinking answers show the work instead:
+  - 553 tokens median against 226;
+  - median NLL 0.058 a token;
+  - none outside its top 64;
+  - 200 of 200 correct.
+
+So round 5 uses 2,500 kept MATH/GSM8K train problems, answered natively, graded, then judged by the frontier model. Its wording for the judge is "learn to answer by imitating these responses".
+- On the first 1,171 answers, reasoning was valid in 99.5%, but 33% were not worth imitating.
+- Most of those had excessive re-checking (146), repetition (124) or a redundant second method (~140).
+- Only judged-and-rejected answers are excluded.
+
+**Code**: 1,500 fresh KodCode problems (none of round 8's), prompts at medium effort, thinking 60% of the time. Each passes its pytest suite in the sandbox and goes through the same judge.
+
+**Pre-launch Codex review** (codex-review-r5) found three High problems, fixed before launch:
+- **Benchmark exclusions did not follow the teacher's copies.**
+  - The master list names source problems (`math:algebra:1319`). The copies are `tgen:...#0` and `tnothink:...#0`.
+  - The 13-word screen run on the teacher traces themselves flags 150 of them (102 were kept in round 4), and round 4 trained on them.
+  - Its clean rescoring also left the teacher corpora out.
+  - Both screens now decode capture inputs. Round 5 excludes the hits, and clean rescoring includes the teacher corpora, so round 4's "clean" numbers need a rerun.
+- **A failed request could leave a partial dataset that passed as complete.**
+  - The generators now retry, then exit nonzero.
+  - Verification is written atomically.
+  - The input builders refuse a set that is missing any problem.
+- **The effort regime differs between the new data and the evaluation.**
+  - Thinking evaluations use the template default, xhigh. The new teacher data is rendered at medium, with no system turn.
+  - This one is kept as is for round 5, so it stays comparable with the base and rounds 1-4. It also matches what an unconfigured server does.
+  - Measuring the student at medium, and the served default, are open questions.
+
+Two Medium fixes:
+- Repeated documents now fill successive rounds of their length bucket. Before, the copies sat side by side in one microbatch, which made one visit weighted n times rather than n visits.
+- Waits are bounded: Wait-Job deadlines, and the watcher flags 30 idle minutes on both GPUs in any phase.
