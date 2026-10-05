@@ -58,7 +58,7 @@ from vocab_remap import (bytes_to_unicode, build_vocabulary,  # noqa: E402,F401
                          byte_token_ids, cached_remap)
 from training_step import (KahanAdamW8bit, backward_step, check_optimizer,  # noqa: E402
                            optimizer_step, synchronize)
-from training_state import (PlannedBatches, WindowBatches, read_training_state,  # noqa: E402
+from training_state import (PlannedBatches, WindowBatches, prefix_exposure, read_training_state,  # noqa: E402
                             restore_training_state, save_training_state, take_step)
 
 BASE = "D:/DeepThought/Projects/HybridModel/student-2b-hf"
@@ -1136,6 +1136,13 @@ def main(argv=None) -> int:
         args.tokens = int(args.passes * corpus_targets)
     if args.tokens < 1:
         raise SystemExit("budget contains no supervised targets")
+    if teacher is not None:
+        # The mix this budget actually trains on, capture by capture (a pass's shares only
+        # promise it in expectation).
+        exposure = prefix_exposure(teacher, groups, args.seed, args.tokens)
+        for name, (visits, distinct, targets) in sorted(exposure.items(), key=lambda kv: -kv[1][2]):
+            print("prefix: %-34s %6d visits %6d distinct %10.0f targets" % (name, visits, distinct, targets),
+                  flush=True)
 
     step_options = dict(teacher_weight=args.teacher_weight if teacher is not None else 0.0,
                         indexer_weight=args.indexer_weight, sparse_stage=sparse_stage,

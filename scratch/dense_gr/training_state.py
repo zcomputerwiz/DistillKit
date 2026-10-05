@@ -68,6 +68,27 @@ class PlannedBatches:
         return self.teacher.read_batch(group, width)
 
 
+def prefix_exposure(teacher, groups, seed, budget):
+    """What `budget` targets will see of each capture: the seed's whole-batch prefix, replayed
+    as PlannedBatches.take() spends it. {capture name: [visits, distinct documents, targets]}."""
+    replay = PlannedBatches(teacher, groups, seed)
+    owner = getattr(getattr(teacher, "cache", None), "_owner", None)
+    seen, stats, spent = set(), {}, 0.0
+    while True:
+        targets = replay.next_targets()
+        if targets > budget - spent:
+            return stats
+        group, width = groups[replay.order[replay.cursor]]
+        replay.cursor += 1
+        spent += targets
+        for doc_id in group:
+            row = stats.setdefault(Path(owner[doc_id][0]).name if owner else "all", [0, 0, 0.0])
+            row[0] += 1
+            row[1] += doc_id not in seen
+            seen.add(doc_id)
+            row[2] += teacher.group_weight([doc_id], width)
+
+
 class WindowBatches:
     def __init__(self, stream, rows, width, seed, device="cuda"):
         if len(stream) < width or rows < 1 or width < 2:
