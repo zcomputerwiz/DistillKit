@@ -1,18 +1,30 @@
 #!/bin/bash
 # Watch a long_round*.ps1 run; return as soon as it ends or anything goes wrong:
-# the round's PowerShell exits, the round log says it stopped or failed, the trainer log
-# shows a traceback, the GPUs spill into system memory, or (while training) a GPU idles.
-# In any phase, both GPUs idle for [quiet checks] (default 60, 30 minutes) is a hung worker.
+# the round log says it stopped or failed, the round's PowerShell exits (0 only when its log
+# ends on "=== done"), the trainer log shows a traceback, the GPUs spill into system memory,
+# a GPU idles while training, or both GPUs idle for [quiet checks] (default 60, 30 minutes)
+# in a GPU phase -- not before the log's first "===" line (exclusion lists), nor in
+# "=== sandbox" (Docker tests) or "=== blend screen" (merges): those run on the CPU.
 #   bash watch_round.sh <round pid> <round log> <train log> [max seconds] [quiet checks]
 pid=$1; round=$2; train=$3; limit=${4:-7000}; quiet_limit=${5:-60}
-read16() { iconv -f UTF-16 -t UTF-8 "$1" 2>/dev/null || cat "$1"; }
+# PowerShell's logs are UTF-16 with a byte-order mark; anything else is read as is (iconv
+# from UTF-16 "succeeds" on an even-length UTF-8 file, as nonsense).
+read16() {
+    local bom; bom=$(head -c2 "$1" 2>/dev/null | od -An -tx1 | tr -d ' \n')
+    if [ "$bom" = "fffe" ] || [ "$bom" = "feff" ]; then iconv -f UTF-16 -t UTF-8 "$1" 2>/dev/null; else cat "$1" 2>/dev/null; fi
+}
+# The wrappers' own failure lines, not a summary's JSON key ("failed": 12).
+failure='stopping|(^|[^"])failed($|[^"])|refusing|no candidate passes|did not come up|move it aside'
+failed() { if read16 "$round" | grep -qE "$failure"; then echo "ROUND REPORTS A FAILURE"; read16 "$round" | tail -12; exit 1; fi; }
 start=$(date +%s); idle=0; quiet=0
 while true; do
+    failed
     if ! tasklist //FI "PID eq $pid" | grep -q powershell; then
-        echo "ROUND EXITED $(date +%H:%M)"; read16 "$round" | grep -vE "held-out  teacher|^\s*$" | tail -25; exit 0
-    fi
-    if read16 "$round" | grep -qE "stopping|failed|refusing|no candidate passes"; then
-        echo "ROUND REPORTS A FAILURE"; read16 "$round" | tail -12; exit 1
+        failed  # a failure line written just before the exit
+        if read16 "$round" | grep -a "^===" | tail -1 | grep -q "^=== done"; then
+            echo "ROUND EXITED $(date +%H:%M)"; read16 "$round" | grep -vE "held-out  teacher|^\s*$" | tail -25; exit 0
+        fi
+        echo "ROUND EXITED WITHOUT === done $(date +%H:%M)"; read16 "$round" | tail -12; exit 1
     fi
     if read16 "$train" | grep -qE "^Traceback"; then
         echo "TRAINER TRACEBACK"; read16 "$train" | grep -A8 "^Traceback" | tail -12; exit 1
@@ -26,10 +38,14 @@ while true; do
         if [ "${u:-0}" -lt 5 ]; then idle=$((idle + 1)); else idle=0; fi
         if [ $idle -ge 10 ]; then echo "A GPU IDLE 5 MIN DURING TRAINING"; read16 "$train" | tail -3; exit 1; fi
     fi
-    # Any phase: the CPU stretches (merges, exclusion lists) end well inside the limit.
+    phase=$(read16 "$round" | grep -a "^===" | tail -1)
     top=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | sort -n | tail -1)
-    if [ "${top:-0}" -lt 5 ]; then quiet=$((quiet + 1)); else quiet=0; fi
-    if [ $quiet -ge "$quiet_limit" ]; then echo "BOTH GPUS IDLE $((quiet / 2)) MIN $(date +%H:%M)"; read16 "$round" | tail -5; exit 1; fi
+    if [ -z "$phase" ] || echo "$phase" | grep -qE "^=== (sandbox|blend screen)" || [ "${top:-0}" -ge 5 ]; then
+        quiet=0
+    else
+        quiet=$((quiet + 1))
+    fi
+    if [ $quiet -ge "$quiet_limit" ]; then echo "BOTH GPUS IDLE $((quiet / 2)) MIN IN $phase"; read16 "$round" | tail -5; exit 1; fi
     if [ $(( $(date +%s) - start )) -gt "$limit" ]; then
         echo "STILL RUNNING $(date +%H:%M)"; read16 "$train" | grep -E "^step" | tail -1; exit 2
     fi

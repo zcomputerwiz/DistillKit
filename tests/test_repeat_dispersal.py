@@ -21,6 +21,16 @@ def test_copies_of_a_document_never_share_a_group():
     assert all(len(set(group)) == len(group) for group, _ in groups)
 
 
+def test_sparse_buckets_and_unequal_repeats_close_batches_short():
+    # Codex recheck r5: a bucket with fewer documents than rows put copies side by side.
+    assert plan(["a"] * 3, 4) == [(["a"], 100), (["a"], 100), (["a"], 100)]
+    groups = plan(["a"] * 3 + ["b"] + ["c"] * 2, 2)
+    assert sorted(d for g, _ in groups for d in g) == ["a", "a", "a", "b", "c", "c"]
+    assert all(len(set(g)) == len(g) for g, _ in groups)
+    many = ["d%d" % (i % 7) for i in range(7 * 5)] + ["e%d" % i for i in range(3) for _ in range(2)]
+    assert all(len(set(g)) == len(g) for g, _ in plan(many, 6))
+
+
 def test_prefix_exposure_replays_the_plan_budget():
     from training_state import PlannedBatches, prefix_exposure
 

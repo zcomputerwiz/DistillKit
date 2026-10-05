@@ -555,11 +555,23 @@ class CachedTeacher:
                                 doc_id in self.ce_only_ids), []).append((copy, doc_id))
         for (width, _, _, _), members in sorted(buckets.items()):
             # A repeated document's copies fill successive rounds of its bucket: side by side
-            # they would share a microbatch, one visit weighted n times, not n visits.
+            # they would share a microbatch, one visit weighted n times, not n visits. Where a
+            # round's start meets a copy already in the batch (a bucket of few documents), a
+            # later member takes its place, or the batch closes short.
             members = [doc_id for _, doc_id in sorted(members)]
             rows = size if budget is None else max(1, budget // width)
-            for start in range(0, len(members), rows):
-                groups.append((members[start:start + rows], width))
+            i = 0
+            while i < len(members):
+                group = []
+                while i < len(members) and len(group) < rows:
+                    if members[i] in group:
+                        swap = next((j for j in range(i + 1, len(members)) if members[j] not in group), None)
+                        if swap is None:
+                            break
+                        members[i], members[swap] = members[swap], members[i]
+                    group.append(members[i])
+                    i += 1
+                groups.append((group, width))
         return groups
 
     def position_weight(self, doc_id, tokens, real):
