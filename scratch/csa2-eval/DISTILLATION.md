@@ -1138,7 +1138,25 @@ So round 5 uses 2,500 kept MATH/GSM8K train problems, answered natively, graded,
 - Most of those had excessive re-checking (146), repetition (124) or a redundant second method (~140).
 - Only judged-and-rejected answers are excluded.
 
-**Code**: 1,500 fresh KodCode problems (none of round 8's), prompts at medium effort, thinking 60% of the time. Each passes its pytest suite in the sandbox and goes through the same judge.
+Over all 2,500 problems:
+- 2,469 answers were graded correct.
+- The judge kept 1,610 of the 2,463 it judged. It rejected 853: 339 for re-checking, 257 for repetition, and about 240 for a redundant second method.
+- Rejected answers have a median length of 1,114 tokens, against 510 for kept ones.
+- 28 more answers are excluded for overlapping a benchmark (the 13-word screen).
+
+**Code**: 1,500 fresh KodCode problems (none of round 8's), prompts at medium effort, thinking 60% of the time.
+- **Sandbox (pytest suites):** 871 passed, 577 failed, 52 cut.
+  - Thinking answers pass less often than non-thinking ones: 52% against 68%.
+  - 201 of the thinking failures end with two or three code blocks, typically example usage after the solution. The prompt asks for a single block, and verification tests the last one.
+  - The Filter (38%) and Docs (23%) subsets pass least: plotting, and libraries the sandbox lacks.
+- **Judge:** kept 531 of the 862 that passed and finished. 102 of the rejects were judged invalid reasoning behind passing code; 109 were rejected for repetition.
+- **Teacher throughput:** about 205 tok/s aggregate, so 2.1 hours for the code.
+
+**Mix.** At x3, the seed-25 prefix of 10M targets (the trainer's new `prefix:` lines) saw only 108 distinct code documents (1% of targets) and 483 answers (3%). The review's mix assumed about 1,000 and 2,300 documents, against about 475 and 1,450 actually kept.
+- Round 5 was restarted four minutes in at code x8 and answers x4, the reviewed ~5% each.
+- The prefix then sees 329 distinct code documents (4.8%) and 562 answers (4.9%).
+- Plan: 95,583 documents, 76.8M targets a pass.
+- Training throughput is 877 tok/s at step 25, peaking at 21.2 GB on a 24 GB card with no spill.
 
 **Pre-launch Codex review** (codex-review-r5) found three High problems, fixed before launch:
 - **Benchmark exclusions did not follow the teacher's copies.**
