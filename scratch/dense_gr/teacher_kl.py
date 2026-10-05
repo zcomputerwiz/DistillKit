@@ -709,10 +709,10 @@ class CachedTeacher:
                 for row, (doc_id, real) in enumerate(zip(doc_ids, reals)):
                     if doc_id not in self.assistant_only_ids:
                         continue
-                    offset = sum(map(ord, doc_id)) % every
-                    picked = np.zeros(width, dtype=bool)
-                    picked[offset:real - 1:every] = True
-                    extra[row] = np.where(picked & (weight[row] == 0), scale * every, 0.0)
+                    # Every k-th *eligible* position (Codex review: a grid over absolute
+                    # positions aliased with short alternating turns).
+                    eligible = np.flatnonzero(weight[row, :real - 1] == 0)
+                    extra[row, eligible[sum(map(ord, doc_id)) % every::every]] = scale * every
                 batch["context_kl"] = torch.from_numpy(extra).to(self.device, non_blocking=True)
         if repeats:
             # Position t predicts token t + 1, so a repeated token at t + 1 is a

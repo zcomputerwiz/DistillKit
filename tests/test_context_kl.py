@@ -40,7 +40,27 @@ def test_context_positions_are_sampled_outside_the_turns(tmp_path):
             assert not (picked & (weight[row] > 0)).any()  # never on a scored position
             assert not picked[real - 1:].any()  # nor the last real position or padding
             context = (weight[row][:real - 1] == 0).sum()
-            assert abs(int(picked.sum()) - context / 2) <= 1  # half of the context
+            assert abs(int(picked.sum()) - context / 2) <= 0.5  # half of the context
+
+
+def test_sampling_counts_eligible_positions_not_absolute_ones(tmp_path):
+    # Codex review: alternating short turns put every eligible position on one parity, and a
+    # grid over absolute positions then took all of them or none.
+    from test_merged_cache import write
+    from teacher_kl import CachedTeacher
+
+    tokens = {"x": [3, 7] * 7, "y": [3, 7] * 7}
+    path = write(tmp_path / "alt", list(tokens), tokens=tokens)
+    teacher = CachedTeacher(path, device="cpu", assistant_only=[path], answer_marker=[3], turn_close=7)
+    teacher.pad_blocks = True
+    teacher.context_kl = (0.1, 2)
+    teacher._groups(4, block=8)
+    batch = teacher.read_batch(["x", "y"], 16)
+    weight, extra = batch["weight"].numpy(), batch["context_kl"].numpy()
+    for row in range(2):
+        eligible = int((weight[row][:13] == 0).sum())
+        assert extra[row].sum() == pytest.approx(0.1 * 2 * ((eligible + 1) // 2), abs=0.2 + 1e-6)
+        assert abs(extra[row].sum() - 0.1 * eligible) <= 0.2 + 1e-6
 
 
 def test_off_by_default_and_outside_the_digest(tmp_path):

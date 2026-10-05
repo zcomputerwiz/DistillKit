@@ -21,6 +21,7 @@ import argparse
 import contextlib
 import importlib.metadata as metadata
 import json
+import math
 import re
 import shutil
 import sys
@@ -983,6 +984,8 @@ def main(argv=None) -> int:
                                 think_close=tokenizer.convert_tokens_to_ids("</think>"),
                                 repeat=dict(spec.rsplit("=", 1) for spec in args.repeat or []),
                                 answer_spans=spans, answer_weight=args.answer_weight)
+        if not (math.isfinite(args.context_kl) and args.context_kl >= 0):
+            raise SystemExit("--context-kl must be a finite weight >= 0")
         if args.context_kl:
             if not args.assistant_only_caches or args.context_every < 1:
                 raise SystemExit("--context-kl needs --assistant-only-caches and --context-every >= 1")

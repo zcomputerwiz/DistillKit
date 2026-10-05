@@ -1,8 +1,8 @@
 # The context-KL arm (--context-kl, Codex-reviewed): round 5's recipe to step 100 of its
 # 10M schedule like control_arms.ps1, plus teacher KL alone on assistant-only documents'
 # context, then the role-split ledger and the screen's proxies against the same base.
-#   powershell -File context_arm.ps1 -Weight 0.05 -Every 8 [-Tag context] [-Extra "--lr-depth-ramp","0.1","1.0"]
-param([double]$Weight = 0.05, [int]$Every = 8, [string]$Tag = "context", [string[]]$Extra = @())
+#   powershell -File context_arm.ps1 -Weight 0.01 -Every 8 [-Tag context] [-Extra "--lr-depth-ramp","0.1","1.0"]
+param([double]$Weight = 0.01, [int]$Every = 8, [string]$Tag = "context", [string[]]$Extra = @())
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"; $C = "$D\capture-data"
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
