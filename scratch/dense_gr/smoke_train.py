@@ -384,6 +384,9 @@ def main(argv=None) -> int:
                              "loop it is shown (~0.9 on the repeated token), so KL there "
                              "trains the loop in.")
     parser.add_argument("--unlikelihood-weight", type=float, default=1.0)
+    parser.add_argument("--shared-head-loss", action="store_true",
+                        help="cross entropy, teacher KL and unlikelihood from one projection of the "
+                             "scored rows (shared_head.py) instead of a projection each")
     parser.add_argument("--pairs", type=Path, default=None,
                         help="preference pairs with reference log-probs (ref_logprobs.py): "
                              "DPO plus cross entropy on the chosen side, mixed into every step")
@@ -1137,7 +1140,8 @@ def main(argv=None) -> int:
                         pair_weight=args.pair_weight, dpo_beta=args.dpo_beta,
                         pair_sft_weight=args.pair_sft_weight,
                         ftpo_options=dict(clip=args.ftpo_clip, tether=args.ftpo_tether,
-                                          target_tether=args.ftpo_target_tether, tau=args.ftpo_tau))
+                                          target_tether=args.ftpo_target_tether, tau=args.ftpo_tau),
+                        shared_head=args.shared_head_loss)
     pairs = None
     if args.pairs is not None:
         pairs = PairSource(args.pairs, tokenizer.pad_token_id or tokenizer.eos_token_id, seed=args.seed)

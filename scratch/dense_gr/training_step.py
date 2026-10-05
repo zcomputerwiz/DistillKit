@@ -6,6 +6,7 @@ import contextlib
 import bitsandbytes as bnb
 import torch
 
+from shared_head import head_losses
 from teacher_kl import accumulation_shares, grouped_tail_kl, scored_mask, unlikelihood_loss
 from training_state import position_weight
 
@@ -199,11 +200,13 @@ def ftpo_loss(logits, row, *, clip=2.0, tether=0.4, target_tether=0.05, tau=1.5)
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                   sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0,
                   pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob,
-                  ftpo_options=None):
+                  ftpo_options=None, shared_head=False):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
     The injected CE callable is only for CPU correctness tests; production uses CCE.
+    `shared_head` computes CE, KL and unlikelihood from one projection of the scored rows
+    (shared_head.py) instead of a projection each.
     Preference-pair records (`pair`) are left out of the token accounting and add
     `pair_weight` times their mean preference objective; FTPO rows (`ftpo`, also `pair`)
     likewise, with `ftpo_options` passed to `ftpo_loss`.
@@ -251,29 +254,45 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 # thinks at length, and KL toward it at every position of a brief thought
                 # pulls against closing it.
                 ce_only = bool(record.get("ce_only", False))
-                language = (ce(model, hidden, ids) if weight is None
-                            else ce(model, hidden, ids, weight=weight))
-                objective = language
-                carried = language.new_zeros(())
-                aligned = language.new_zeros(())
-                repelled = language.new_zeros(())
-                if (teacher_weight or kl_only) and not ce_only:
-                    if "topk_ids" not in record:
-                        raise ValueError("teacher weight requires cached targets")
+                distil = bool(teacher_weight or kl_only) and not ce_only
+                if distil and "topk_ids" not in record:
+                    raise ValueError("teacher weight requires cached targets")
+                negative = record.get("negative") if distil else None
+                # A looping rollout: no KL on its repeated spans, where the teacher
+                # endorses the loop; unlikelihood pushes them down instead.
+                kl_mask = None if not distil else (mask if negative is None
+                                                   else mask * ~negative.to(mask.device))
+                if shared_head:
+                    # One projection of the scored rows for every head loss (shared_head.py).
                     where = model.lm_head.weight.device
-                    kl_mask = mask
-                    negative = record.get("negative")
-                    if negative is not None:
-                        # A looping rollout: no KL on its repeated spans, where the
-                        # teacher endorses the loop; unlikelihood pushes them down instead.
-                        kl_mask = mask * ~negative.to(mask.device)
-                        repelled = unlikelihood_loss(
-                            hidden.to(where), model.lm_head, ids.to(where), negative.to(where),
-                            weight=None if weight is None else weight.to(where)).to(hidden.device) / count
-                    carried = grouped_tail_kl(
-                        hidden.to(where), model.lm_head, record["topk_ids"].to(where),
-                        record["topk_logprobs"].to(where), kl_mask.to(where),
-                        chunk_length=kl_chunk).to(hidden.device) / count
+                    sums = head_losses(
+                        hidden.to(where), model.lm_head.weight, ids.to(where),
+                        weight=None if weight is None else weight.to(where),
+                        topk_ids=record["topk_ids"].to(where) if distil else None,
+                        topk_logprobs=record["topk_logprobs"].to(where) if distil else None,
+                        kl_weight=None if kl_mask is None else torch.broadcast_to(kl_mask, ids.shape).to(where),
+                        negative=None if negative is None else negative.to(where))
+                    language = (sums["nll"] / sums["weight"].clamp_min(1e-12)).to(hidden.device)
+                    carried = (sums["kl"] / count).to(hidden.device)
+                    repelled = (sums["unlikelihood"] / count).to(hidden.device)
+                else:
+                    language = (ce(model, hidden, ids) if weight is None
+                                else ce(model, hidden, ids, weight=weight))
+                    carried = language.new_zeros(())
+                    repelled = language.new_zeros(())
+                    if distil:
+                        where = model.lm_head.weight.device
+                        if negative is not None:
+                            repelled = unlikelihood_loss(
+                                hidden.to(where), model.lm_head, ids.to(where), negative.to(where),
+                                weight=None if weight is None else weight.to(where)).to(hidden.device) / count
+                        carried = grouped_tail_kl(
+                            hidden.to(where), model.lm_head, record["topk_ids"].to(where),
+                            record["topk_logprobs"].to(where), kl_mask.to(where),
+                            chunk_length=kl_chunk).to(hidden.device) / count
+                objective = language
+                aligned = language.new_zeros(())
+                if distil:
                     objective = (1 - teacher_weight) * language + teacher_weight * carried
                     if kl_only:
                         # The student's own text: the teacher's view only. The CE is

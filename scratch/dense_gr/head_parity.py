@@ -1,0 +1,177 @@
+"""The separate head losses against shared_head.head_losses on real batches, on one GPU.
+
+For each kind of micro-batch the trainer builds -- a 32K agent trace scored on its
+assistant turns, QA scored on its answers, raw code under KL alone, the teacher's own
+traces, packed looping rollouts under unlikelihood -- the student's final hidden states
+are computed once, then both paths compute the step's objective from them (teacher weight
+0.5, or KL plus unlikelihood for KL-only records, as backward_step does). Reports each loss
+term's relative difference, the cosine and relative error of the gradients for the hidden
+states and the head (shared path with CCE's gradient filter on and off), and the head
+losses' time and peak memory per path.
+
+    python scratch/dense_gr/head_parity.py --checkpoint <ckpt> --output scratch/csa2-eval/head-parity.json
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import statistics
+import sys
+import time
+from pathlib import Path
+
+import torch
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parents[1]))
+
+from shared_head import head_losses  # noqa: E402
+from teacher_kl import CachedTeacher, grouped_tail_kl, scored_mask, unlikelihood_loss  # noqa: E402
+from training_step import causal_ce  # noqa: E402
+
+D = Path("D:/DeepThought/Projects/HybridModel")
+CASES = [("agent trace, assistant turns", "teacher-cache-agent-smol-b", "assistant"),
+         ("QA, answers only", "teacher-cache-frontier-qa2", "qa"),
+         ("raw code, KL only", "teacher-cache-frontier-code-raw", "kl_only"),
+         ("teacher math traces", "teacher-cache-teacher-math-gen", "plain"),
+         ("looping rollouts, packed", "teacher-cache-onpolicy-r6-loop", "loops")]
+
+
+VARIANTS = [("old", "old"), ("shared", "shared")]
+
+
+def batch_for(tokenizer, kind, cache, budget):
+    from smoke_train import ANSWER_MARKER
+
+    path = D / cache
+    marker = tokenizer(ANSWER_MARKER, add_special_tokens=False)["input_ids"]
+    options = dict(answer_marker=marker, min_answer_tokens=2, max_length=32768,
+                   turn_close=tokenizer.convert_tokens_to_ids("<|im_end|>"),
+                   think_close=tokenizer.convert_tokens_to_ids("</think>"))
+    if kind in ("assistant", "qa"):
+        options["assistant_only"] = [path]
+    if kind == "qa":
+        spans = {r["doc_id"]: r["answer_spans"] for r in map(json.loads, open(D / "capture-data" / "frontier-qa2.jsonl",
+                                                                               encoding="utf-8"))}
+        options.update(answer_spans=spans, answer_weight=8.0)
+    if kind == "kl_only":
+        options["kl_only"] = [path]
+    if kind == "loops":
+        options["unlikelihood"] = [path]
+    teacher = CachedTeacher(path, "train", device="cuda", **options)
+    teacher.pad_blocks = True
+    groups = teacher._groups(1, 128, budget)
+    # The fullest micro-batch: the most tokens, and for loops the most rollouts.
+    group, width = max(groups, key=lambda g: (len(g[0]) if kind == "loops" else 0, len(g[0]) * g[1]))
+    batch = teacher.read_batch(group, width)
+    batch["kl_only"] = kind in ("kl_only", "loops")
+    return batch
+
+
+def objective(model, hidden, batch, mode, head_weight=None):
+    ids, weight, negative = batch["input_ids"], batch.get("weight"), batch.get("negative")
+    rows, length = ids.shape
+    count = float(weight[:, :-1].sum()) if weight is not None else rows * (length - 1)
+    mask = scored_mask(length, ids.device, rows)
+    if weight is not None:
+        mask = mask * weight
+    kl_mask = mask if negative is None else mask * ~negative
+    if mode != "old":
+        # "reference": the same arithmetic on fp32 operands with the logits formed exactly.
+        sums = head_losses(hidden, model.lm_head.weight if head_weight is None else head_weight, ids,
+                           weight=weight, topk_ids=batch["topk_ids"], topk_logprobs=batch["topk_logprobs"],
+                           kl_weight=torch.broadcast_to(kl_mask, ids.shape), negative=negative,
+)
+        language, carried, repelled = sums["nll"] / sums["weight"], sums["kl"] / count, sums["unlikelihood"] / count
+    else:
+        language = causal_ce(model, hidden, ids) if weight is None else causal_ce(model, hidden, ids, weight=weight)
+        carried = grouped_tail_kl(hidden, model.lm_head, batch["topk_ids"], batch["topk_logprobs"], kl_mask,
+                                  chunk_length=64) / count
+        repelled = hidden.new_zeros((), dtype=torch.float32)
+        if negative is not None:
+            repelled = unlikelihood_loss(hidden, model.lm_head, ids, negative, weight=weight) / count
+    total = carried + repelled if batch["kl_only"] else 0.5 * language + 0.5 * carried
+    return total, {"ce": float(language), "kl": float(carried), "unlikelihood": float(repelled)}
+
+
+def run(model, hidden, batch, mode, repeats=3):
+    times, peak = [], 0
+    for _ in range(repeats if mode != "reference" else 1):
+        h = (hidden.detach().float() if mode == "reference" else hidden.detach()).requires_grad_(True)
+        head = model.lm_head.weight.detach().float().requires_grad_(True) if mode == "reference" else None
+        model.lm_head.weight.grad = None
+        torch.cuda.synchronize()
+        torch.cuda.reset_peak_memory_stats()
+        base = torch.cuda.memory_allocated()
+        start = time.perf_counter()
+        total, terms = objective(model, h, batch, mode, head)
+        total.backward()
+        torch.cuda.synchronize()
+        times.append(time.perf_counter() - start)
+        peak = max(peak, torch.cuda.max_memory_allocated() - base)
+    w_grad = head.grad if mode == "reference" else model.lm_head.weight.grad
+    return terms, h.grad.float(), w_grad.float(), statistics.median(times), peak / 2**30
+
+
+def compare(a, b):
+    cos = torch.nn.functional.cosine_similarity(a.flatten(), b.flatten(), dim=0)
+    return {"cosine": float(cos), "relative_error": float((a - b).norm() / b.norm().clamp_min(1e-30))}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--checkpoint", type=Path, required=True)
+    parser.add_argument("--budget", type=int, default=32768)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    from transformers import AutoTokenizer
+
+    from distillkit.models import Qwen35WidenedForCausalLM
+
+    tokenizer = AutoTokenizer.from_pretrained(args.checkpoint)
+    model = Qwen35WidenedForCausalLM.from_pretrained(args.checkpoint, dtype=torch.bfloat16).cuda().eval()
+    for p in model.model.parameters():
+        p.requires_grad_(False)
+    model.lm_head.weight.requires_grad_(True)  # tied to the embedding: the body still runs without grad
+    results = []
+    for name, cache, kind in CASES:
+        batch = batch_for(tokenizer, kind, cache, args.budget)
+        with torch.no_grad():
+            hidden = model.model(input_ids=batch["input_ids"], attention_mask=torch.ones_like(batch["input_ids"]),
+                                 use_cache=False).last_hidden_state
+        ref_terms, ref_h, ref_w, _, _ = run(model, hidden, batch, "reference")
+        row = {"case": name, "shape": list(batch["input_ids"].shape),
+               "scored": float((batch["weight"][:, :-1] > 0).float().mean()) if "weight" in batch else 1.0,
+               "reference": ref_terms}
+        for label, mode in VARIANTS:
+            terms, h_grad, w_grad, seconds, peak = run(model, hidden, batch, mode)
+            row[label] = {**terms, "seconds": seconds, "peak_gib": peak,
+                          "hidden_grad": compare(h_grad, ref_h), "head_grad": compare(w_grad, ref_w)}
+            if label == "old":
+                old_h, old_w = h_grad, w_grad
+            else:
+                row[label]["vs old"] = {"hidden_grad": compare(h_grad, old_h), "head_grad": compare(w_grad, old_w)}
+            del h_grad, w_grad
+            torch.cuda.empty_cache()
+        del ref_h, ref_w, old_h, old_w
+        results.append(row)
+        print("== %s %s, %.0f%% of positions scored" % (name, row["shape"], 100 * row["scored"]))
+        print("   %-18s ce %.5f kl %.5f ul %.5f" % ("fp32 reference", ref_terms["ce"], ref_terms["kl"],
+                                                  ref_terms["unlikelihood"]))
+        for label, *_ in VARIANTS:
+            s = row[label]
+            print("   %-22s ce %.5f kl %.5f ul %.5f  %.3fs  peak %.2f GiB  vs reference: grad cos hidden %.6f head %.6f"
+                  "  rel err %.2e / %.2e" % (label, s["ce"], s["kl"], s["unlikelihood"], s["seconds"], s["peak_gib"],
+                                             s["hidden_grad"]["cosine"], s["head_grad"]["cosine"],
+                                             s["hidden_grad"]["relative_error"], s["head_grad"]["relative_error"]),
+                  flush=True)
+        del hidden, batch
+        torch.cuda.empty_cache()
+        print("   shared vs old: grad cos hidden %.7f head %.7f" % (
+            row["shared"]["vs old"]["hidden_grad"]["cosine"], row["shared"]["vs old"]["head_grad"]["cosine"]), flush=True)
+    args.output.write_text(json.dumps(results, indent=1))
+
+
+if __name__ == "__main__":
+    main()

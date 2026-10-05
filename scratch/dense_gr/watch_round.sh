@@ -18,8 +18,9 @@ while true; do
     fi
     spill=$(powershell -NoProfile -Command "(Get-Counter '\GPU Adapter Memory(*)\Shared Usage').CounterSamples | ? { \$_.InstanceName -like '*1262e*' } | % { [int](\$_.CookedValue/1MB) } | Measure-Object -Maximum | % Maximum")
     if [ "${spill:-0}" -gt 2048 ]; then echo "SPILL ${spill} MB $(date +%H:%M)"; exit 1; fi
-    # Idle GPUs only count while training: the merges after it run on the CPU.
-    if ! read16 "$round" | grep -q "=== long-context probe"; then
+    # Idle GPUs only count while training: the merges after it run on the CPU, and the
+    # loop test's odd arm leaves one GPU free (finish_round logs never train at all).
+    if read16 "$round" | grep -q "=== train" && ! read16 "$round" | grep -q "=== long-context probe"; then
         u=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits | sort -n | head -1)
         if [ "${u:-0}" -lt 5 ]; then idle=$((idle + 1)); else idle=0; fi
         if [ $idle -ge 10 ]; then echo "A GPU IDLE 5 MIN DURING TRAINING"; read16 "$train" | tail -3; exit 1; fi
