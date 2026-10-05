@@ -5,8 +5,10 @@
 # a GPU idles while training, or both GPUs idle for [quiet checks] (default 60, 30 minutes)
 # in a GPU phase -- not before the log's first "===" line (exclusion lists), nor in
 # "=== sandbox" (Docker tests) or "=== blend screen" (merges): those run on the CPU.
-#   bash watch_round.sh <round pid> <round log> <train log> [max seconds] [quiet checks]
-pid=$1; round=$2; train=$3; limit=${4:-7000}; quiet_limit=${5:-60}
+# Nested scripts end on their own lines (merge_search: "=== blend screen done", finish_round:
+# "=== round checks done"), so "=== done" is the watched script's own; [done line] for another.
+#   bash watch_round.sh <round pid> <round log> <train log> [max seconds] [quiet checks] [done line]
+pid=$1; round=$2; train=$3; limit=${4:-7000}; quiet_limit=${5:-60}; done_line=${6:-=== done}
 # PowerShell's logs are UTF-16 with a byte-order mark; anything else is read as is (iconv
 # from UTF-16 "succeeds" on an even-length UTF-8 file, as nonsense).
 read16() {
@@ -21,10 +23,10 @@ while true; do
     failed
     if ! tasklist //FI "PID eq $pid" | grep -q powershell; then
         failed  # a failure line written just before the exit
-        if read16 "$round" | grep -a "^===" | tail -1 | grep -q "^=== done"; then
+        if read16 "$round" | grep -a "^===" | tail -1 | grep -qF "$done_line"; then
             echo "ROUND EXITED $(date +%H:%M)"; read16 "$round" | grep -vE "held-out  teacher|^\s*$" | tail -25; exit 0
         fi
-        echo "ROUND EXITED WITHOUT === done $(date +%H:%M)"; read16 "$round" | tail -12; exit 1
+        echo "ROUND EXITED WITHOUT $done_line $(date +%H:%M)"; read16 "$round" | tail -12; exit 1
     fi
     if read16 "$train" | grep -qE "^Traceback"; then
         echo "TRAINER TRACEBACK"; read16 "$train" | grep -A8 "^Traceback" | tail -12; exit 1

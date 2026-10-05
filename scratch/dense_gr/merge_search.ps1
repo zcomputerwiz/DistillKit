@@ -61,5 +61,5 @@ if ($jobs | Where-Object { $_.State -ne "Completed" }) {
     $jobs | Stop-Job; "blend screen failed or timed out; see $out\proxy-gpu*.log"; exit 1
 }
 Get-Content "$out\proxy-gpu0.log", "$out\proxy-gpu1.log" | Select-String "code nll|Traceback|Error"
-"=== done $(Get-Date -Format HH:mm)"
+"=== blend screen done $(Get-Date -Format HH:mm)"
 exit 0

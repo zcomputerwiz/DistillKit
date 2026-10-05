@@ -80,13 +80,14 @@ Check "judged exclusions"
 Check "trace keep list"
 # And the non-thinking answers and code the same judge rejected (trace_judge_queue.ps1 -Nothink,
 # -Code): only judged ones, since every answer was already graded correct (or passed its
-# tests), finished and loop-free.
+# tests), finished and loop-free. Written under the round's own names: the queue publishes the
+# plain ones whenever it finishes, and a half-written list must not reach exclusion_for.
 foreach ($set in @("nothink", "teacher-gen-nothink.jsonl", "tnothink:"), @("code", "teacher-code-verified.jsonl", "tcode:")) {
     $judged = "$F\$($set[0])-judge-responses.jsonl"
     if (-not (Test-Path $judged)) { New-Item -ItemType File $judged | Out-Null }
     & $py scratch\frontier\trace_judge.py collect --responses $judged --traces "$C\$($set[1])" `
-        --output "$C\teacher-$($set[0])-keep.json" --index "$C\teacher-$($set[0])-index.jsonl" `
-        --exclusions "$C\exclude-teacher-$($set[0]).json" --prefix $set[2] --only-rejected
+        --output "$C\teacher-$($set[0])-keep-r5.json" --index "$C\teacher-$($set[0])-index-r5.jsonl" `
+        --exclusions "$C\exclude-teacher-$($set[0])-r5.json" --prefix $set[2] --only-rejected
     Check "$($set[0]) keep list"
 }
 # And looping rollouts where the unlikelihood detector marks nothing (the thought closed
@@ -108,7 +109,7 @@ Check "fresh-bank overlap"
 Check "teacher benchmark screen"
 & $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa2-markup.json" `
     "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" "$C\exclude-fresh-bank-overlap.json" `
-    "$C\exclude-teacher-benchmarks.json" "$C\exclude-teacher-nothink.json" "$C\exclude-teacher-code.json" `
+    "$C\exclude-teacher-benchmarks.json" "$C\exclude-teacher-nothink-r5.json" "$C\exclude-teacher-code-r5.json" `
     --caches ($caches | ForEach-Object { $_ }) `
     --output "$C\exclude-long-r5.json"
 Check "exclusion list"

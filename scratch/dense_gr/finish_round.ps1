@@ -45,4 +45,4 @@ for ($i = 0; $i -lt $tests.Count; $i += 2) {
     --candidates ($tests | Where-Object { $_[0] -ne $BaseName } | ForEach-Object { "scratch\csa2-eval\math-truncation-fresh-$($_[0]).json" }) `
     --output "scratch\csa2-eval\loop-gate-$Tag.json"
 if ($LASTEXITCODE -ne 0) { "loop gate: no candidate passes"; exit 1 }
-"=== done $(Get-Date -Format HH:mm)"
+"=== round checks done $(Get-Date -Format HH:mm)"
