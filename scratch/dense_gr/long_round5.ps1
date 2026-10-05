@@ -78,6 +78,12 @@ Check "judged exclusions"
 & $py scratch\frontier\trace_judge.py collect --responses "$F\trace-judge-responses.jsonl" `
     --traces "$C\teacher-gen-math.jsonl" --output "$C\teacher-gen-keep.json" --exclusions "$C\exclude-teacher-gen.json"
 Check "trace keep list"
+# And the non-thinking answers the same judge rejected (trace_judge_queue.ps1 -Nothink): only
+# judged ones, since every answer here was already graded correct, finished and loop-free.
+& $py scratch\frontier\trace_judge.py collect --responses "$F\nothink-judge-responses.jsonl" `
+    --traces "$C\teacher-gen-nothink.jsonl" --output "$C\teacher-nothink-keep.json" --index "$C\teacher-nothink-index.jsonl" `
+    --exclusions "$C\exclude-teacher-nothink.json" --prefix "tnothink:" --only-rejected
+Check "non-thinking keep list"
 # And looping rollouts where the unlikelihood detector marks nothing (the thought closed
 # before the loop, or the repeats vary): they would train KL over the whole loop.
 & $py scratch\dense_gr\loop_negatives.py --caches ($loops | ForEach-Object { $_ }) --output "$C\exclude-zero-negative-loops.json"
@@ -97,7 +103,8 @@ Check "fresh-bank overlap"
 Check "teacher benchmark screen"
 & $py scratch\dense_gr\exclusion_for.py --master "$C\exclude-master-v2.json" "$C\exclude-judged.json" "$C\frontier-qa2-markup.json" `
     "$C\exclude-teacher-gen.json" "$C\exclude-zero-negative-loops.json" "$C\exclude-fresh-bank-overlap.json" `
-    "$C\exclude-teacher-benchmarks.json" --caches ($caches | ForEach-Object { $_ }) --output "$C\exclude-long-r5.json"
+    "$C\exclude-teacher-benchmarks.json" "$C\exclude-teacher-nothink.json" --caches ($caches | ForEach-Object { $_ }) `
+    --output "$C\exclude-long-r5.json"
 Check "exclusion list"
 "=== train $(Get-Date -Format HH:mm)"
 $argv = [System.Collections.Generic.List[string]]@("scratch\dense_gr\smoke_train.py", "--init-from", $base,

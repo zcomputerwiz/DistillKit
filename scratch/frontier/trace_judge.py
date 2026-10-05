@@ -38,6 +38,14 @@ earn their keep; 1 = wanders, tries many approaches aimlessly, re-derives the sa
 
 Return only JSON: {"verdicts": [one per trace: {"id": the trace id, "valid": "yes" | "no" | "unsure", \
 "efficiency": 1-5, "clarity": 1-5, "imitate": "yes" | "no", "issues": [...]}]}"""
+# The teacher's non-thinking answers (teacher_generate.py --nothink): the reasoning is the answer.
+NOTHINK_INSTRUCTIONS = (INSTRUCTIONS
+                        .replace("learn to think by imitating these traces", "learn to answer by imitating these responses")
+                        .replace("its reasoning inside <think>...</think>, then its final answer",
+                                 "answered directly, with no separate thinking section: its worked solution, then "
+                                 "its final answer")
+                        .replace("think exactly like this trace", "answer exactly like this response"))
+assert NOTHINK_INSTRUCTIONS.count("directly") == 1 and "imitating these responses" in NOTHINK_INSTRUCTIONS
 
 
 def trace_id(row):
@@ -93,7 +101,8 @@ def build(args):
             body = "\n\n".join('<trace id="%s">\nProblem: %s\nReference answer: %s\n\n%s\n</trace>'
                                % (trace_id(r), r["problem"], r["reference"], r["text"]) for r in g)
             out.write(json.dumps({"id": "trace-judge:" + trace_id(g[0]), "messages": [
-                {"role": "system", "content": INSTRUCTIONS}, {"role": "user", "content": body}],
+                {"role": "system", "content": NOTHINK_INSTRUCTIONS if args.nothink else INSTRUCTIONS},
+                {"role": "user", "content": body}],
                 "max_tokens": 2000 + 600 * len(g), "reasoning": {"effort": "medium"},
                 "response_format": {"type": "json_object"}}) + "\n")
     print("%d traces (%d already judged) in %d requests -> %s" % (len(traces), len(done), len(groups), args.output))
@@ -138,12 +147,14 @@ def collect(args):
     index.sort(key=lambda e: (e["score"] is None, -(e["score"] or 0), e["tokens"] or 0))
     for rank, e in enumerate(index, 1):
         e["rank"] = rank
-    path = args.output.with_name("teacher-gen-index.jsonl")
+    path = args.index or args.output.with_name("teacher-gen-index.jsonl")
     path.write_text("".join(json.dumps(e) + "\n" for e in index), encoding="utf-8")
     if args.exclusions:
         # The capture's ids (capture_math_gen: "tgen:" + trace id) of every trace not kept --
-        # rejected or not yet judged -- for --exclude-documents, like the other lists.
-        args.exclusions.write_text(json.dumps(sorted("tgen:" + e["id"] for e in index if not e["kept"]),
+        # rejected or not yet judged (`--only-rejected`: judged and rejected) -- for
+        # --exclude-documents, like the other lists.
+        args.exclusions.write_text(json.dumps(sorted(args.prefix + e["id"] for e in index if not e["kept"]
+                                                     and (e["judged"] or not args.only_rejected)),
                                               indent=0), encoding="utf-8")
     print("%d judged, %d kept -> %s\n%s\ncommon issues: %s"
           % (len(seen), len(keep), args.output, dict(sorted(counts.items())), issues.most_common(12)))
@@ -158,12 +169,16 @@ def main():
     b.add_argument("--done", type=Path, nargs="*", default=None)
     b.add_argument("--per-request", type=int, default=8)
     b.add_argument("--max-chars", type=int, default=60000)
+    b.add_argument("--nothink", action="store_true", help="non-thinking answers: the judge's wording for them")
     c = sub.add_parser("collect")
     c.add_argument("--responses", type=Path, nargs="+", required=True)
     c.add_argument("--traces", type=Path, required=True)
     c.add_argument("--output", type=Path, required=True)
     c.add_argument("--min-efficiency", type=int, default=3)
     c.add_argument("--exclusions", type=Path, default=None, help="also write the not-kept capture ids here")
+    c.add_argument("--prefix", default="tgen:", help="the capture's id prefix (tnothink: for non-thinking answers)")
+    c.add_argument("--only-rejected", action="store_true", help="exclusions: judged and rejected only")
+    c.add_argument("--index", type=Path, default=None, help="ranked index path (default teacher-gen-index.jsonl)")
     args = parser.parse_args()
     (build if args.command == "build" else collect)(args)
 
