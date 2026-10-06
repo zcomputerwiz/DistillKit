@@ -1,0 +1,978 @@
+{
+  "sets": {
+    "frozen.json": {
+      "base": {
+        "dependent": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 24,
+          "units": 24,
+          "success": 8,
+          "emitted_calls": 18,
+          "schema_valid": 16,
+          "truncated": 1,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "initial": {
+          "n": 8,
+          "units": 8,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "long_extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "missing_info": {
+          "n": 4,
+          "units": 1,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "no_call": {
+          "n": 4,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 16,
+          "success": 12
+        }
+      },
+      "context": {
+        "dependent": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 4,
+          "schema_valid": 4,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 24,
+          "units": 24,
+          "success": 2,
+          "emitted_calls": 5,
+          "schema_valid": 4,
+          "truncated": 0,
+          "delta_vs_base": -0.25,
+          "paired_95_ci": [
+            -0.4166666666666667,
+            -0.08333333333333333
+          ],
+          "learned": 0,
+          "forgot": 6
+        },
+        "initial": {
+          "n": 8,
+          "units": 8,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "long_extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "missing_info": {
+          "n": 4,
+          "units": 1,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "no_call": {
+          "n": 4,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 16,
+          "success": 12
+        }
+      },
+      "flat": {
+        "dependent": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 24,
+          "units": 24,
+          "success": 4,
+          "emitted_calls": 13,
+          "schema_valid": 11,
+          "truncated": 0,
+          "delta_vs_base": -0.16666666666666666,
+          "paired_95_ci": [
+            -0.3333333333333333,
+            -0.041666666666666664
+          ],
+          "learned": 0,
+          "forgot": 4
+        },
+        "initial": {
+          "n": 8,
+          "units": 8,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "long_extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "missing_info": {
+          "n": 4,
+          "units": 1,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "no_call": {
+          "n": 4,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 16,
+          "success": 16
+        }
+      },
+      "long5": {
+        "dependent": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 5,
+          "emitted_calls": 5,
+          "schema_valid": 5,
+          "truncated": 0,
+          "delta_vs_base": 0.125,
+          "paired_95_ci": [
+            0.0,
+            0.375
+          ],
+          "learned": 1,
+          "forgot": 0
+        },
+        "extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 24,
+          "units": 24,
+          "success": 1,
+          "emitted_calls": 4,
+          "schema_valid": 3,
+          "truncated": 0,
+          "delta_vs_base": -0.2916666666666667,
+          "paired_95_ci": [
+            -0.4583333333333333,
+            -0.125
+          ],
+          "learned": 0,
+          "forgot": 7
+        },
+        "initial": {
+          "n": 8,
+          "units": 8,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "long_extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "missing_info": {
+          "n": 4,
+          "units": 1,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "no_call": {
+          "n": 4,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 16,
+          "success": 13
+        }
+      },
+      "ramp": {
+        "dependent": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 24,
+          "units": 24,
+          "success": 4,
+          "emitted_calls": 13,
+          "schema_valid": 11,
+          "truncated": 0,
+          "delta_vs_base": -0.16666666666666666,
+          "paired_95_ci": [
+            -0.3333333333333333,
+            -0.041666666666666664
+          ],
+          "learned": 0,
+          "forgot": 4
+        },
+        "initial": {
+          "n": 8,
+          "units": 8,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "long_extract": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "missing_info": {
+          "n": 4,
+          "units": 1,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "no_call": {
+          "n": 4,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 0,
+          "schema_valid": 0,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 16,
+          "success": 16
+        }
+      }
+    },
+    "post-tool-frozen.json": {
+      "base": {
+        "heldout_call": {
+          "n": 12,
+          "units": 12,
+          "success": 6,
+          "emitted_calls": 9,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 0,
+          "success": 0
+        }
+      },
+      "context": {
+        "heldout_call": {
+          "n": 12,
+          "units": 12,
+          "success": 3,
+          "emitted_calls": 4,
+          "schema_valid": 4,
+          "truncated": 0,
+          "delta_vs_base": -0.25,
+          "paired_95_ci": [
+            -0.5,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 3
+        },
+        "both_pair_variants": {
+          "n": 0,
+          "success": 0
+        }
+      },
+      "flat": {
+        "heldout_call": {
+          "n": 12,
+          "units": 12,
+          "success": 8,
+          "emitted_calls": 9,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.16666666666666666,
+          "paired_95_ci": [
+            0.0,
+            0.4166666666666667
+          ],
+          "learned": 2,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 0,
+          "success": 0
+        }
+      },
+      "long5": {
+        "heldout_call": {
+          "n": 12,
+          "units": 12,
+          "success": 3,
+          "emitted_calls": 5,
+          "schema_valid": 5,
+          "truncated": 0,
+          "delta_vs_base": -0.25,
+          "paired_95_ci": [
+            -0.5,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 3
+        },
+        "both_pair_variants": {
+          "n": 0,
+          "success": 0
+        }
+      },
+      "ramp": {
+        "heldout_call": {
+          "n": 12,
+          "units": 12,
+          "success": 7,
+          "emitted_calls": 9,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.08333333333333333,
+          "paired_95_ci": [
+            0.0,
+            0.25
+          ],
+          "learned": 1,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 0,
+          "success": 0
+        }
+      }
+    },
+    "framed-frozen.json": {
+      "base": {
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 4,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 33,
+          "units": 27,
+          "success": 13,
+          "emitted_calls": 31,
+          "schema_valid": 28,
+          "truncated": 1,
+          "delta_vs_base": 0.0,
+          "paired_95_ci": [
+            0.0,
+            0.0
+          ],
+          "learned": 0,
+          "forgot": 0
+        },
+        "both_pair_variants": {
+          "n": 4,
+          "success": 0
+        }
+      },
+      "context": {
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 33,
+          "units": 27,
+          "success": 9,
+          "emitted_calls": 16,
+          "schema_valid": 14,
+          "truncated": 0,
+          "delta_vs_base": -0.12121212121212122,
+          "paired_95_ci": [
+            -0.29041745730550284,
+            0.03125
+          ],
+          "learned": 1,
+          "forgot": 5
+        },
+        "both_pair_variants": {
+          "n": 4,
+          "success": 4
+        }
+      },
+      "flat": {
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 33,
+          "units": 27,
+          "success": 14,
+          "emitted_calls": 28,
+          "schema_valid": 25,
+          "truncated": 0,
+          "delta_vs_base": 0.030303030303030304,
+          "paired_95_ci": [
+            -0.06451612903225806,
+            0.1388888888888889
+          ],
+          "learned": 2,
+          "forgot": 1
+        },
+        "both_pair_variants": {
+          "n": 4,
+          "success": 4
+        }
+      },
+      "long5": {
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 33,
+          "units": 27,
+          "success": 9,
+          "emitted_calls": 19,
+          "schema_valid": 16,
+          "truncated": 0,
+          "delta_vs_base": -0.12121212121212122,
+          "paired_95_ci": [
+            -0.29041745730550284,
+            0.03125
+          ],
+          "learned": 1,
+          "forgot": 5
+        },
+        "both_pair_variants": {
+          "n": 4,
+          "success": 4
+        }
+      },
+      "ramp": {
+        "error": {
+          "n": 8,
+          "units": 4,
+          "success": 8,
+          "emitted_calls": 8,
+          "schema_valid": 8,
+          "truncated": 0,
+          "delta_vs_base": 0.5,
+          "paired_95_ci": [
+            0.5,
+            0.5
+          ],
+          "learned": 4,
+          "forgot": 0
+        },
+        "heldout_call": {
+          "n": 33,
+          "units": 27,
+          "success": 14,
+          "emitted_calls": 26,
+          "schema_valid": 24,
+          "truncated": 0,
+          "delta_vs_base": 0.030303030303030304,
+          "paired_95_ci": [
+            -0.06451612903225806,
+            0.1388888888888889
+          ],
+          "learned": 2,
+          "forgot": 1
+        },
+        "both_pair_variants": {
+          "n": 4,
+          "success": 4
+        }
+      }
+    }
+  },
+  "checkpoint_fingerprints": {
+    "base": {
+      "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-long1\\u50",
+      "weights": {
+        "model.safetensors": {
+          "bytes": 3830958812,
+          "sha256": "c0b2e21610bc7adba0c0f64fa5fbf7b366394e4762e10880b4575c3dd637387c"
+        }
+      }
+    },
+    "context": {
+      "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\checkpoints-ctl-context\\smoke-r1-1-gr-s25-csa2",
+      "weights": {
+        "model.safetensors": {
+          "bytes": 3830958812,
+          "sha256": "93b69349633eeb96be83c88c043dacd3839cd9b8c9c4964290d62d06a1d94501"
+        }
+      }
+    },
+    "flat": {
+      "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\checkpoints-ctl-flat\\smoke-r1-1-gr-s25-csa2",
+      "weights": {
+        "model.safetensors": {
+          "bytes": 3830958812,
+          "sha256": "94969b06df2c65c177e4280f69ddf0d72e53b22635213bcffba70da2a7d40306"
+        }
+      }
+    },
+    "long5": {
+      "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\control-arms\\long5-step100",
+      "weights": {
+        "model.safetensors": {
+          "bytes": 3830958812,
+          "sha256": "8c3fdbdf264d2bd2d2d35192fa5d04a75952f7802d345548d7d1a739b7854103"
+        }
+      }
+    },
+    "ramp": {
+      "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\checkpoints-ctl-ramp\\smoke-r1-1-gr-s25-csa2",
+      "weights": {
+        "model.safetensors": {
+          "bytes": 3830958812,
+          "sha256": "7b5d6c4cf99783ab9e8f8a135e478679853c58e6b3772d638bfcdf39134b8bd3"
+        }
+      }
+    }
+  },
+  "fixture_hashes": {
+    "framed-frozen.json": "d0454f5adb12053759c43de44f0dab9656c0d8e3b17c191643e38a1016e38833",
+    "frozen.json": "c75d3a045ed4cbe86a3503b712152e3affe72bcdcc3e5f9c43d68e438215756a",
+    "post-tool-frozen.json": "76a6d74df0e92bd297ea96d9dcab09b89a8337403bb8a3b53a15c69b26c0aa52"
+  },
+  "grading_note": "All raw outputs rescored with the same grader. Exact replay call match is not execution/semantic equivalence. Missing-info grade is a request heuristic. Synthetic pair/duplicate-prompt groups bootstrap jointly; heldout units are documents. Small screen, no full-task success or sampling reliability."
+}

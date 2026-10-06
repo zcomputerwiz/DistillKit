@@ -4,11 +4,14 @@
 
 The completed [role-loss research review](ROLE_LOSS_REVIEW.md) recommends keeping
 assistant-only supervision, with user/tool context visible. Tool-output NLL is
-a diagnostic rather than an agent-success gate. Evaluate base, round-5 step 100,
-ramp, flat and context checkpoints on calls and result-conditioned responses
-before adopting another preservation objective. No longer training recipe has
-been selected. The validated streaming/cache optimization is available for the
-next run; further CCE work is optional.
+a diagnostic rather than an agent-success gate. The completed
+[tool behavior screen](tool-behavior/RESULTS.md) compares base, round-5 step 100,
+ramp, flat and context. All retain simple returned-value extraction; round-5
+and context frequently omit calls. Explicit tool instructions recover part of
+the gap. Flat is the preferred confirmation candidate, given tool behavior
+comparable to ramp and better QA retention. No longer recipe or new preservation
+objective has been adopted. The validated streaming/cache optimization is
+available for the next run; further CCE work is optional.
 
 October 5 execution diagnostics are recorded in [TRAINING_PROFILE_RESULTS.md](TRAINING_PROFILE_RESULTS.md).
 The subsequent [streaming head experiment](STREAMING_HEAD_RESULTS.md) combines

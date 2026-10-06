@@ -3,6 +3,11 @@
 Reviewed 2026-10-05. This is a research and experiment-design review. No model,
 training objective, cache, or checkpoint was changed; no training was launched.
 
+Follow-up: the [completed behavior evaluation](tool-behavior/RESULTS.md) found
+retained simple result reading but tool-call omissions, partly recoverable by
+explicit system instructions. It favors flat as the next confirmation candidate
+and provides no reason to advance teacher context-KL for preservation.
+
 ## Recommendation
 
 Keep the existing assistant-only CE/KL objective for agent conversations,
