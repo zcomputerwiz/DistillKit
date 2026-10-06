@@ -200,7 +200,7 @@ def ftpo_loss(logits, row, *, clip=2.0, tether=0.4, target_tether=0.05, tau=1.5)
 def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                   sparse_stage=None, kl_chunk=256, ce=causal_ce, unlikelihood_weight=1.0,
                   pair_weight=0.0, dpo_beta=0.1, pair_sft_weight=0.2, logprob=response_logprob,
-                  ftpo_options=None, shared_head=False, head_chunk=512):
+                  ftpo_options=None, shared_head=False, head_chunk=512, streaming_head=False):
     """Accumulate means over the identical B*(L-1) positions for all three terms.
 
     Does not clear gradients or update weights, so warm-up exercises this exact path.
@@ -213,6 +213,9 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
     likewise, with `ftpo_options` passed to `ftpo_loss`.
     """
     from distillkit.models.qwen35.csa2 import isolated_indexer, recorded_attention
+
+    if streaming_head and (not shared_head or sparse_stage is not None):
+        raise ValueError("streaming head needs shared head and no sparse-stage objective")
 
     if not 0 <= teacher_weight <= 1 or indexer_weight < 0 or pair_weight < 0:
         raise ValueError("invalid objective weights")
@@ -270,14 +273,26 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                 if shared_head:
                     # One projection of the scored rows for every head loss (shared_head.py).
                     where = model.lm_head.weight.device
-                    sums = head_losses(
-                        hidden.to(where), model.lm_head.weight, ids.to(where),
+                    head_hidden = hidden.to(where)
+                    head_function = head_losses
+                    extra = {}
+                    if streaming_head:
+                        from streaming_head import backward_head
+                        head_function = backward_head
+                        ce_scale = 0. if kl_only and distil else ((1 - teacher_weight) if distil else 1.)
+                        kl_scale = (1. if kl_only else teacher_weight) if distil else 0.
+                        ul_scale = unlikelihood_weight if kl_only and distil else 0.
+                        extra = dict(coefficients=tuple(c / total for c in (ce_scale, kl_scale, ul_scale)))
+                    sums = head_function(
+                        head_hidden, model.lm_head.weight, ids.to(where),
                         weight=None if weight is None else weight.to(where),
                         topk_ids=record["topk_ids"].to(where) if distil else None,
                         topk_logprobs=record["topk_logprobs"].to(where) if distil else None,
                         kl_weight=None if kl_mask is None else torch.broadcast_to(kl_mask, ids.shape).to(where),
                         negative=None if negative is None else negative.to(where), chunk=head_chunk,
-                        kl_beyond=context is not None)
+                        kl_beyond=context is not None, **extra)
+                    if streaming_head:
+                        sums, head_gradient = sums
                     language = (sums["nll"] / sums["weight"].clamp_min(1e-12)).to(hidden.device)
                     carried = (sums["kl"] / count).to(hidden.device)
                     repelled = (sums["unlikelihood"] / count).to(hidden.device)
@@ -314,7 +329,11 @@ def backward_step(model, records, *, teacher_weight=0.0, indexer_weight=1.0,
                                            selected=chosen, query_mask=queries)  # every query routes
                     objective = objective + indexer_weight * aligned
             share = count / total
-            (objective * share).backward()
+            if streaming_head:
+                if head_hidden.requires_grad:
+                    head_hidden.backward(head_gradient)
+            else:
+                (objective * share).backward()
             for name, value in (("loss", language), ("teacher_kl", carried),
                                 ("indexer", aligned), ("unlikelihood", repelled),
                                 ("objective", objective)):

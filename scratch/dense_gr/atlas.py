@@ -1,3 +1,4 @@
+# Assisted-by: Codex
 """What the student represents where, and what a round changed (TARGETED_TRAINING.md, Phase 1).
 
 Domains are fixed held-out documents, the same tokens for every arm. Units are the hybrid's
@@ -32,15 +33,38 @@ the mixers' heads -- the input of `linear_attn.out_proj` / `self_attn.o_proj`, a
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
 import random
 import sys
 import time
 from pathlib import Path
 
+# Building frozen token fixtures must never initialize CUDA, including from imports.
+_CPU_DOMAINS = sys.argv[1:2] == ["domains"]
+if _CPU_DOMAINS:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+
 import numpy as np
 import torch
 from torch.nn import functional as F
+
+
+def _domains_cpu_guard():
+    if torch.cuda.is_initialized():
+        raise RuntimeError("domain fixture building requires CUDA to remain uninitialized")
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+    torch.cuda.is_available = lambda: False
+
+    def reject_cuda(*args, **kwargs):
+        raise RuntimeError("CUDA initialization is forbidden while building domain fixtures")
+
+    torch.cuda._lazy_init = reject_cuda
+
+
+if _CPU_DOMAINS:
+    _domains_cpu_guard()
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -100,26 +124,106 @@ def roles_of(ids):
     return out
 
 
+def capture_cap(spec):
+    """Parse an explicit capture-domain prefix cap without changing defaults."""
+    try:
+        name, value = spec.split("=", 1)
+        cap = int(value)
+    except (ValueError, TypeError) as exc:
+        raise argparse.ArgumentTypeError("capture caps must be domain=tokens") from exc
+    if name not in CAPTURES or cap < 64:
+        raise argparse.ArgumentTypeError("capture cap needs a known capture domain and at least 64 tokens")
+    return name, cap
+
+
 def build_domains(args):
-    from transformers import AutoTokenizer
+    _domains_cpu_guard()
 
     from distillkit.offline_cache import OfflineTeacherCache
-    from long_context_probe import TOKENIZER, code_documents
 
-    tok = AutoTokenizer.from_pretrained(TOKENIZER)
-    # llama.cpp's source as the probe reads it, frozen here: the tree is live.
-    domains = {"code-llamacpp": [torch.tensor(ids, dtype=torch.int32)
-                                 for _, ids in code_documents(tok, args.length, args.code_documents)]}
-    for name, (captures, prefix, count, cap) in CAPTURES.items():
+    overrides = dict(args.capture_cap)
+    if len(overrides) != len(args.capture_cap):
+        raise ValueError("specify each capture-domain cap only once")
+    extension = bool(overrides or args.reuse_code_domains is not None)
+    if extension and (args.output.exists() or args.output.resolve() == DOMAINS.resolve()):
+        raise ValueError("domain extensions require a fresh output; original domains.pt must be preserved")
+    reused = None
+    if args.reuse_code_domains is not None:
+        reused = torch.load(args.reuse_code_domains, map_location="cpu")
+        domains = {"code-llamacpp": reused["domains"]["code-llamacpp"]}
+        code_source = {"reused_domains": str(args.reuse_code_domains.resolve()),
+                       "sha256": hashlib.sha256(args.reuse_code_domains.read_bytes()).hexdigest()}
+    else:
+        from transformers import AutoTokenizer
+        from long_context_probe import TOKENIZER, code_documents
+
+        tok = AutoTokenizer.from_pretrained(TOKENIZER)
+        # The source tree is live; extensions can instead reuse the frozen source.
+        domains = {"code-llamacpp": [torch.tensor(ids, dtype=torch.int32)
+                                     for _, ids in code_documents(tok, args.length, args.code_documents)]}
+        code_source = {"live_tree": "llama.cpp", "token_cap": args.length,
+                       "requested_documents": args.code_documents}
+    source_metadata = {}
+    capture_metadata = {}
+    own_roles = [ROLES.index(r) for r in ("assistant", "thinking", "tool-call")]
+    for name, (captures, prefix, count, default_cap) in CAPTURES.items():
+        cap = overrides.get(name, default_cap)
         caches = [OfflineTeacherCache(D / c) for c in captures]
+        for cache_name, cache in zip(captures, caches):
+            manifest_path = D / cache_name / "manifest.json"
+            source_metadata[cache_name] = {
+                "manifest_sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                "sequence_length": cache.manifest["sequence_length"],
+                "truncation": cache.manifest["truncation"]}
         pool = sorted((i, k) for k, cache in enumerate(caches) for i in cache.document_ids("eval")
                       if i.startswith(prefix))
         picked = random.Random(0).sample(pool, min(count, len(pool)))
-        docs = [caches[k].read_document(i, tokens_only=True)["input_ids"][:cap] for i, k in picked]
-        domains[name] = [torch.tensor(d.astype(np.int64), dtype=torch.int32) for d in docs if len(d) >= 64]
+        docs, metadata = [], []
+        for document_id, index in picked:
+            source = caches[index].read_document(document_id, tokens_only=True)["input_ids"]
+            prefix_ids = source[:cap]
+            if len(prefix_ids) < 64:
+                continue
+            ids = torch.tensor(prefix_ids.astype(np.int64), dtype=torch.int32)
+            docs.append(ids)
+            row = {"capture": captures[index], "document_id": document_id,
+                   "source_tokens": len(source), "retained_tokens": len(ids), "cap": cap,
+                   "token_sha256": hashlib.sha256(ids.numpy().tobytes()).hexdigest()}
+            if name == "qa":
+                source_roles = roles_of(source)
+                source_own = np.flatnonzero(np.isin(source_roles[1:], own_roles)) + 1
+                row.update(source_own_turn_targets=len(source_own),
+                           retained_own_turn_targets=int((source_own < len(ids)).sum()),
+                           first_own_turn_token=None if not len(source_own) else int(source_own[0]),
+                           complete_source_retained=len(ids) == len(source))
+            metadata.append(row)
+        domains[name] = docs
+        capture_metadata[name] = {"cap": cap, "default_cap": default_cap, "documents": metadata}
     roles = {name: [torch.from_numpy(roles_of(d.numpy())) for d in docs] for name, docs in domains.items()}
+    verification = {}
+    if reused is not None:
+        if domains.keys() != reused["domains"].keys():
+            raise ValueError("extension changed the frozen domain set")
+        for name, docs in domains.items():
+            original_docs = reused["domains"][name]
+            original_roles = reused["roles"][name]
+            if len(docs) != len(original_docs) or len(original_roles) != len(docs):
+                raise ValueError(f"extension changed document count for {name}")
+            for index, (original, current) in enumerate(zip(original_docs, docs)):
+                if len(current) < len(original) or not torch.equal(original, current[:len(original)]):
+                    raise ValueError(f"extension changed original token prefix: {name}/{index}")
+                if not torch.equal(original_roles[index], roles[name][index][:len(original)]):
+                    raise ValueError(f"extension changed original role prefix: {name}/{index}")
+            verification[name] = {"documents": len(docs), "tokens": sum(len(d) for d in original_docs),
+                                  "token_prefixes_equal": True, "role_prefixes_equal": True,
+                                  "unchanged": all(torch.equal(a, b) for a, b in zip(original_docs, docs))}
+    metadata = {"format_version": 1, "seed": 0, "split": "eval", "code_source": code_source,
+                "captures": capture_metadata, "source_caches": source_metadata,
+                "original_prefix_verification": verification, "cuda_initialized": torch.cuda.is_initialized()}
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"domains": domains, "roles": roles, "length": args.length}, args.output)
+    length = reused.get("length", args.length) if reused is not None else args.length
+    torch.save({"domains": domains, "roles": roles, "length": length, "metadata": metadata}, args.output)
+    args.output.with_suffix(".json").write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     for name, docs in domains.items():
         mix = torch.cat(roles[name]).bincount(minlength=len(ROLES)).float()
         print("%-18s %4d documents %8d tokens  %s" % (
@@ -204,24 +308,69 @@ def paired_delta(ref, cur, draws=2000, seed=0):
     return float(delta(np.arange(len(ref)))), float(np.percentile(boots, 2.5)), float(np.percentile(boots, 97.5))
 
 
+def save_token_evidence(args, domains, labels, tokens):
+    """Save aligned token observations so later paired statistics need no model rerun."""
+    arrays = {}
+    for domain, docs in domains.items():
+        for index, (ids, role) in enumerate(zip(docs, labels[domain])):
+            arrays[f"documents/{domain}/{index}/ids"] = ids.numpy()
+            arrays[f"documents/{domain}/{index}/roles"] = role
+    for arm, by_domain in tokens.items():
+        for domain, observations in by_domain.items():
+            for index, (nll, hit) in enumerate(observations):
+                arrays[f"observations/{arm}/{domain}/{index}/nll"] = nll
+                arrays[f"observations/{arm}/{domain}/{index}/hit"] = hit
+    np.savez_compressed(args.output_dir / "token_evidence.npz", **arrays)
+    metadata = {"format_version": 1, "roles": ROLES, "arms": list(tokens),
+                "documents": {d: len(docs) for d, docs in domains.items()},
+                "domains_path": str(args.domains.resolve()),
+                "domains_sha256": hashlib.sha256(args.domains.read_bytes()).hexdigest(),
+                "command": sys.argv, "checkpoint_paths": {}}
+    metadata["model_source_sha256"] = {
+        str(p.relative_to(HERE.parents[1])): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in sorted((HERE.parents[1] / "distillkit" / "models" / "qwen35").glob("*.py"))}
+    metadata["family_parameters"] = getattr(args, "evidence_family_members", {})
+    paths = ({"base": args.base, "tuned": args.tuned} if args.command == "revert"
+             else dict(arms(args.arm)))
+    for name, path in paths.items():
+        checkpoint = Path(path).resolve()
+        metadata["checkpoint_paths"][name] = {
+            "path": str(checkpoint),
+            "config_sha256": hashlib.sha256((checkpoint / "config.json").read_bytes()).hexdigest(),
+            "weights": [{"name": p.name, "bytes": p.stat().st_size,
+                         "mtime_ns": p.stat().st_mtime_ns}
+                        for p in sorted(checkpoint.glob("*.safetensors"))]}
+    (args.output_dir / "token_evidence.json").write_text(
+        json.dumps(metadata, indent=2), encoding="utf-8")
+
+
 def run_nll(args):
     data = torch.load(args.domains)
     domains = {k: v for k, v in data["domains"].items() if not args.only or k in args.only}
     roles = data.get("roles", {})
     rows = {}
+    tokens = {}
+    labels_by_domain = {}
     for name, path in arms(args.arm):
         model = load(path)
         rows[name] = {}
+        if args.save_token_evidence:
+            tokens[name] = {}
         for domain, docs in domains.items():
             per_doc = [token_losses(model, ids) for ids in docs]
             labels = ([r.numpy()[1:] for r in roles[domain]] if domain in roles
                       else [np.full(len(d) - 1, ROLES.index("plain")) for d in docs])
             rows[name][domain] = ledger_rows(per_doc, labels)
+            if args.save_token_evidence:
+                tokens[name][domain] = per_doc
+                labels_by_domain[domain] = labels
             whole = rows[name][domain]["all"]
             print("%-10s %-18s nll %.4f top1 %.3f" % (name, domain, whole[:, 0].sum() / whole[:, 2].sum(),
                                                      whole[:, 1].sum() / whole[:, 2].sum()), flush=True)
         del model
         torch.cuda.empty_cache()
+        if args.save_token_evidence:
+            save_token_evidence(args, domains, labels_by_domain, tokens)
     names = list(rows)
     summary = {}
     for name in names:
@@ -349,6 +498,10 @@ FAMILIES = {
     "mlp": r"\.mlp\.",
     "hyper": r"_residual\.",
     "layers-0-7": range(0, 8), "layers-8-15": range(8, 16), "layers-16-23": range(16, 24)}
+DEFAULT_FAMILIES = tuple(FAMILIES)
+FAMILIES.update({
+    "mlp-layers-0-7": r"^model\.layers\.[0-7]\.mlp\.",
+    "mlp-layers-8-23": r"^model\.layers\.(?:[89]|1[0-9]|2[0-3])\.mlp\."})
 
 
 def family_members(family, names):
@@ -373,10 +526,16 @@ def run_revert(args):
     model = load(args.tuned)
     params = dict(model.named_parameters())
     tuned = {n: p.detach().to("cpu", copy=True) for n, p in params.items()}
+    args.evidence_family_members = {f: family_members(f, list(params)) for f in args.families}
+    tokens = {}
 
     def evaluate(name):
         started = time.time()
-        out = {d: ledger_rows([token_losses(model, ids) for ids in docs], labels[d]) for d, docs in domains.items()}
+        per_doc = {d: [token_losses(model, ids) for ids in docs] for d, docs in domains.items()}
+        out = {d: ledger_rows(observations, labels[d]) for d, observations in per_doc.items()}
+        if args.save_token_evidence:
+            tokens[name] = per_doc
+            save_token_evidence(args, domains, labels, tokens)
         print("%-22s %.0f s" % (name, time.time() - started), flush=True)
         return out
 
@@ -606,11 +765,18 @@ def main():
     d.add_argument("--output", type=Path, default=DOMAINS)
     d.add_argument("--length", type=int, default=4096, help="llama.cpp source documents")
     d.add_argument("--code-documents", type=int, default=12)
+    d.add_argument("--capture-cap", type=capture_cap, action="append", default=[], metavar="DOMAIN=TOKENS",
+                   help="override one capture-domain token cap; original defaults are unchanged")
+    d.add_argument("--reuse-code-domains", type=Path,
+                   help="reuse frozen llama.cpp tokens and verify every original token/role prefix")
     for command in ("nll", "change", "revert", "importance", "lens"):
         p = sub.add_parser(command)
         p.add_argument("--domains", type=Path, default=DOMAINS)
         p.add_argument("--only", nargs="*", default=None, help="these domains only")
         p.add_argument("--output-dir", type=Path, required=True)
+        if command in ("nll", "revert"):
+            p.add_argument("--save-token-evidence", action="store_true",
+                           help="save aligned per-token NLL/hits and input provenance for paired comparisons")
         if command in ("change", "revert"):
             p.add_argument("--base", required=True)
             p.add_argument("--tuned", required=True)
@@ -619,7 +785,7 @@ def main():
                            help="a third gradient at the midpoint: Simpson's rule, for when the "
                                 "trapezoid misses the measured change by more than ~10%%")
         elif command == "revert":
-            p.add_argument("--families", nargs="+", default=list(FAMILIES), choices=list(FAMILIES))
+            p.add_argument("--families", nargs="+", default=list(DEFAULT_FAMILIES), choices=list(FAMILIES))
         else:
             p.add_argument("--arm", action="append", required=True, help="name=checkpoint")
         if command == "importance":

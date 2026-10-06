@@ -353,9 +353,9 @@ def main(argv=None) -> int:
                              "document runs 24 GiB out of memory. A prefix is free of "
                              "the context mismatch a mid-document window would carry, "
                              "because causal attention means the first n positions see "
-                             "exactly what the teacher saw. 2048 keeps 89.3% of this "
+                             "exactly what the teacher saw. 2048 keeps 89.3%% of this "
                              "corpus and peaks within a gigabyte of the ceiling; 1024 "
-                             "keeps 74.1% and leaves about three. Measured in "
+                             "keeps 74.1%% and leaves about three. Measured in "
                              "teacher_kl.py.")
     parser.add_argument("--exclude-documents", type=Path, default=None,
                         help="JSON list of cache document ids to leave out of training and "
@@ -391,6 +391,10 @@ def main(argv=None) -> int:
     parser.add_argument("--head-chunk", type=int, default=512,
                         help="rows projected at once by --shared-head-loss: each chunk's fp32 logits "
                              "are ~485 MiB at 512 (the old path's budget is --kl-chunk)")
+    parser.add_argument("--streaming-head-loss", action="store_true",
+                        help="opt-in: backpropagate shared head chunks immediately, then the body once")
+    parser.add_argument("--checkpoint-selection-cache", action="store_true",
+                        help="opt-in: reuse Full CSA2 selections in each outer checkpoint frame")
     parser.add_argument("--pairs", type=Path, default=None,
                         help="preference pairs with reference log-probs (ref_logprobs.py): "
                              "DPO plus cross entropy on the chosen side, mixed into every step")
@@ -517,6 +521,22 @@ def main(argv=None) -> int:
                         help="additional hard limit on total optimizer steps")
     parser.add_argument("--benchmark-warmup-steps", type=int, default=0,
                         help="exclude this many real optimizer steps from step timing")
+    parser.add_argument("--benchmark-fixed-records", action="store_true",
+                        help="bounded benchmark only: replay one frozen real accumulation cycle")
+    parser.add_argument("--benchmark-group-indices", type=int, nargs="+",
+                        help="canonical teacher-plan group indices for the frozen accumulation cycle")
+    parser.add_argument("--benchmark-shape", type=int, nargs=2, metavar=("ROWS", "WIDTH"),
+                        help="choose frozen teacher records with exactly this planned shape")
+    parser.add_argument("--benchmark-profile-dir", type=Path,
+                        help="new directory for measured-step CPU/CUDA traces and saved-storage accounting")
+    parser.add_argument("--benchmark-profile-backend", choices=("kineto", "nsys"), default="kineto",
+                        help="benchmark only: Kineto trace or external Nsight CUDA API/NVTX capture")
+    parser.add_argument("--benchmark-grad-streams", action="store_true",
+                        help="profiling only: record parameter post-accumulation stream/thread metadata")
+    parser.add_argument("--benchmark-replay-selection-cache", action="store_true",
+                        help="bounded benchmark only: cache CSA2 selections in their outer checkpoint frame")
+    parser.add_argument("--benchmark-streaming-head", action="store_true",
+                        help="bounded benchmark only: immediate chunk head backward before body backward")
     parser.add_argument("--init-from", type=Path, default=None,
                         help="start from this checkpoint instead of a fresh "
                              "initialization. Its architecture must match the one the "
@@ -593,6 +613,31 @@ def main(argv=None) -> int:
         raise SystemExit("budgets, lengths and reporting counts must be positive")
     if args.no_checkpoint and args.save_every:
         raise SystemExit("--no-checkpoint conflicts with --save-every")
+    if args.streaming_head_loss and (not args.shared_head_loss or args.sparse_stage):
+        raise SystemExit("streaming-head-loss needs shared-head-loss and no sparse-stage objective")
+    if args.checkpoint_selection_cache and (not args.checkpoint_layers or args.sparse_stage):
+        raise SystemExit("checkpoint-selection-cache needs outer checkpoints and no sparse-stage recording")
+    diagnostic = (args.benchmark_fixed_records or args.benchmark_streaming_head or args.benchmark_replay_selection_cache or args.benchmark_group_indices is not None
+                  or args.benchmark_shape is not None or args.benchmark_profile_dir is not None)
+    if args.benchmark_grad_streams and args.benchmark_profile_dir is None:
+        raise SystemExit("--benchmark-grad-streams needs --benchmark-profile-dir")
+    if args.benchmark_profile_backend != "kineto" and args.benchmark_profile_dir is None:
+        raise SystemExit("--benchmark-profile-backend nsys needs --benchmark-profile-dir")
+    if diagnostic:
+        if args.benchmark_streaming_head and (not args.shared_head_loss or args.sparse_stage):
+            raise SystemExit("streaming head benchmark needs shared-head-loss and no sparse-stage objective")
+        if args.benchmark_replay_selection_cache and (not args.checkpoint_layers or args.sparse_stage):
+            raise SystemExit("selection replay benchmark needs full outer checkpoints and no sparse-stage recording")
+        if (not args.no_checkpoint or args.save_every or args.resume or args.pairs is not None
+                or args.max_steps is None or args.max_steps <= args.benchmark_warmup_steps
+                or args.benchmark_warmup_steps < 2):
+            raise SystemExit("benchmark diagnostics need --no-checkpoint, at least two optimizer "
+                             "warmups and a bounded measured-step count; no resume or preference pairs")
+        if args.benchmark_group_indices is not None and args.benchmark_shape is not None:
+            raise SystemExit("choose benchmark group indices or a shape, not both")
+        if args.output.exists() or (args.benchmark_profile_dir is not None and args.benchmark_profile_dir.exists()):
+            raise SystemExit("benchmark diagnostics need fresh output and profile paths")
+        args.benchmark_fixed_records = True
     inherited = None
     if args.inherit:
         if args.init_from is None:
@@ -1151,6 +1196,36 @@ def main(argv=None) -> int:
         args.tokens = int(args.passes * corpus_targets)
     if args.tokens < 1:
         raise SystemExit("budget contains no supervised targets")
+    fixed_manifest = None
+    if args.benchmark_fixed_records:
+        from training_profile import FrozenBatches, record_manifest
+
+        indices = args.benchmark_group_indices
+        if indices is not None or args.benchmark_shape is not None:
+            if teacher is None:
+                raise SystemExit("benchmark group/shape selection needs a teacher cache")
+            if indices is None:
+                matches = [i for i, (g, w) in enumerate(groups)
+                           if [len(g), w] == args.benchmark_shape]
+                indices = np.random.default_rng(args.seed).permutation(matches).tolist()[:args.accumulate]
+            if len(indices) != args.accumulate or any(i < 0 or i >= len(groups) for i in indices):
+                raise SystemExit("benchmark needs one valid group index per accumulation microbatch")
+            records = [teacher.read_batch(*groups[i]) for i in indices]
+        else:
+            records = take_step(batches, args.accumulate, args.tokens)
+            if len(records) != args.accumulate:
+                raise SystemExit("benchmark target budget cannot cover a complete accumulation cycle")
+        batches = FrozenBatches(records)
+        if args.tokens < sum(batches.counts) * args.max_steps:
+            raise SystemExit("benchmark target budget cannot cover every requested optimizer step")
+        fixed_manifest = {"plan_fingerprint": getattr(PlannedBatches(teacher, groups, args.seed),
+                                                     "fingerprint", None) if teacher is not None else None,
+                          "group_indices": indices, "records": record_manifest(
+                              records, teacher_weight=args.teacher_weight if teacher is not None else 0.0,
+                              unlikelihood_weight=args.unlikelihood_weight)}
+        shapes = sorted({tuple(r["input_ids"].shape) for r in records})
+        print("benchmark: frozen shapes %s, targets/step %.0f"
+              % (shapes, sum(batches.counts)), flush=True)
     if teacher is not None:
         # The mix this budget actually trains on, capture by capture (a pass's shares only
         # promise it in expectation).
@@ -1166,7 +1241,8 @@ def main(argv=None) -> int:
                         pair_sft_weight=args.pair_sft_weight,
                         ftpo_options=dict(clip=args.ftpo_clip, tether=args.ftpo_tether,
                                           target_tether=args.ftpo_target_tether, tau=args.ftpo_tau),
-                        shared_head=args.shared_head_loss, head_chunk=args.head_chunk)
+                        shared_head=args.shared_head_loss, head_chunk=args.head_chunk,
+                        streaming_head=args.benchmark_streaming_head or args.streaming_head_loss)
     pairs = None
     if args.pairs is not None:
         pairs = PairSource(args.pairs, tokenizer.pad_token_id or tokenizer.eos_token_id, seed=args.seed)
@@ -1180,7 +1256,7 @@ def main(argv=None) -> int:
     # shape's first training step runs single-threaded instead (below). Warming all of
     # them first cost a discarded forward and backward per shape: with documents padded to
     # the block, 342 shapes and 8M input tokens before round 2's first update.
-    if args.tensor_parallel:
+    if args.tensor_parallel and not args.benchmark_fixed_records:
         examples = {}
         if teacher is not None:
             for group, width in groups:
@@ -1229,6 +1305,16 @@ def main(argv=None) -> int:
     train_started = session_started - previous_seconds
     stage = dense_routing(model) if args.dense_routing else contextlib.nullcontext()
     stage.__enter__()
+    selection_cache_stats = []
+    diagnostics = None
+    if args.benchmark_profile_dir is not None:
+        from training_profile import TrainingProfile
+
+        diagnostics = TrainingProfile(args.benchmark_profile_dir, model,
+                                      grad_streams=args.benchmark_grad_streams,
+                                      backend=args.benchmark_profile_backend)
+        (diagnostics.directory / "records.json").write_text(
+            json.dumps({"records": fixed_manifest, "run_args": run_args}, indent=2), encoding="utf-8")
     while scored_tokens < args.tokens and (args.max_steps is None or step < args.max_steps):
         microbatches = take_step(batches, args.accumulate, args.tokens - scored_tokens)
         if not microbatches:
@@ -1251,14 +1337,26 @@ def main(argv=None) -> int:
         fresh = {tuple(r["input_ids"].shape) for r in microbatches if "input_ids" in r} - warmed_shapes
         quiet = (torch.autograd.set_multithreading_enabled(False) if args.tensor_parallel and fresh
                  else contextlib.nullcontext())
-        with quiet:
+        profile_step = (diagnostics.step(step, optimizer, last=step + 1 >= args.max_steps)
+                        if diagnostics is not None and step >= args.benchmark_warmup_steps
+                        else contextlib.nullcontext())
+        replay_cache = None
+        if args.benchmark_replay_selection_cache or args.checkpoint_selection_cache:
+            from selection_replay import SelectionReplayCache
+            replay_cache = SelectionReplayCache(model)
+        with quiet, profile_step, (replay_cache if replay_cache is not None else contextlib.nullcontext()):
             metrics = optimizer_step(model, optimizer, microbatches,
                                      tensor_parallel=args.tensor_parallel, **step_options)
+        if replay_cache is not None:
+            selection_cache_stats.append({"step": step, **replay_cache.report()})
         warmed_shapes |= fresh
         synchronize(model)
         step_seconds = time.perf_counter() - step_started
         if step >= args.benchmark_warmup_steps:
             step_timings.append({"seconds": step_seconds, "targets": metrics["targets"]})
+            if diagnostics is not None:
+                step_timings[-1]["instrumented"] = True
+                diagnostics.finish()
         scored_tokens += metrics["targets"]
         loss, teacher_cost, indexer_cost = metrics["loss"], metrics["teacher_kl"], metrics["indexer"]
         finished = (args.tokens - scored_tokens < batches.next_targets()
@@ -1364,6 +1462,8 @@ def main(argv=None) -> int:
         if finished:
             break
 
+    if diagnostics is not None:
+        diagnostics.close()
     stage.__exit__(None, None, None)
     synchronize(model)
     steps = step
@@ -1433,6 +1533,14 @@ def main(argv=None) -> int:
         "setup_seconds": session_started - started,
         "history": history,
         "run_args": run_args,
+        **({"benchmark_records": fixed_manifest} if fixed_manifest is not None else {}),
+        **({"benchmark_selection_cache": selection_cache_stats} if args.benchmark_replay_selection_cache else {}),
+        **({"selection_replay_cache": selection_cache_stats} if args.checkpoint_selection_cache else {}),
+        **({"benchmark_profile": {"steps": diagnostics.steps,
+                                   "backend": diagnostics.backend,
+                                   "timing_includes_instrumentation": True,
+                                   "timing_excludes_trace_export": True}}
+           if diagnostics is not None else {}),
         "heldout_sample": held_sample if teacher is not None else None,
         "suppressed_teacher_mass": (teacher.suppressed_mass
                                     if teacher is not None and teacher.suppress is not None

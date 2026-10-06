@@ -1,8 +1,10 @@
 # The context-KL arm (--context-kl, Codex-reviewed): round 5's recipe to step 100 of its
 # 10M schedule like control_arms.ps1, plus teacher KL alone on assistant-only documents'
 # context, then the role-split ledger and the screen's proxies against the same base.
-#   powershell -File context_arm.ps1 -Weight 0.01 -Every 8 [-Tag context] [-Extra "--lr-depth-ramp","0.1","1.0"]
-param([double]$Weight = 0.01, [int]$Every = 8, [string]$Tag = "context", [string[]]$Extra = @())
+#   powershell -File context_arm.ps1 -Weight 0.01 -Every 8 [-Tag context] [-CompareControls] [-SaveTokenEvidence]
+# Assisted-by: Codex
+param([double]$Weight = 0.01, [int]$Every = 8, [string]$Tag = "context", [string[]]$Extra = @(),
+      [switch]$CompareControls, [switch]$SaveTokenEvidence)
 Set-Location "D:\DeepThought\Projects\HybridModel\DistillKit"
 $py = "$PWD\.venv\Scripts\python.exe"; $root = "$PWD"; $D = "D:\DeepThought\Projects\HybridModel"; $C = "$D\capture-data"
 $env:PYTHONPATH = $root; $env:HF_HUB_DISABLE_SYMLINKS_WARNING = "1"; $env:PYTHONIOENCODING = "utf-8"
@@ -11,6 +13,12 @@ $base = "$root\scratch\dense_gr\merges-long1\u50"
 $arms = "$root\scratch\dense_gr\control-arms"
 $out = "$root\scratch\dense_gr\checkpoints-ctl-$Tag"
 if (Test-Path $out) { "$out exists; move it aside first; stopping"; exit 1 }
+if ($CompareControls) {
+    foreach ($checkpoint in @("$arms\long5-step100", "$root\scratch\dense_gr\checkpoints-ctl-ramp\smoke-r1-1-gr-s25-csa2",
+                             "$root\scratch\dense_gr\checkpoints-ctl-flat\smoke-r1-1-gr-s25-csa2")) {
+        if (-not (Test-Path "$checkpoint\config.json")) { "comparison checkpoint $checkpoint missing; stopping"; exit 1 }
+    }
+}
 $agentA = "..\teacher-cache-agent-smol-a"; $agentB = "..\teacher-cache-agent-smol-b"
 $code = "..\teacher-cache-r8-code-short-w8"
 $qa = "..\teacher-cache-frontier-qa2"; $raw = "..\teacher-cache-frontier-code-raw"; $tools = "..\teacher-cache-frontier-tools"
@@ -49,11 +57,19 @@ $tuned = "$out\smoke-r1-1-gr-s25-csa2"
 if (-not (Test-Path "$tuned\config.json")) { "training $Tag produced no checkpoint; stopping"; exit 1 }
 "=== evaluate $Tag $(Get-Date -Format HH:mm)"
 $jobs = @()
-$jobs += Start-Job -ArgumentList $py, $root, $arms, $base, $Tag, $tuned -ScriptBlock {
-    param($py, $root, $arms, $base, $tag, $tuned)
+$jobs += Start-Job -ArgumentList $py, $root, $arms, $base, $Tag, $tuned, $CompareControls.IsPresent, $SaveTokenEvidence.IsPresent -ScriptBlock {
+    param($py, $root, $arms, $base, $tag, $tuned, $compareControls, $saveTokenEvidence)
     $env:CUDA_VISIBLE_DEVICES = "0"; $env:PYTHONPATH = $root; $env:PYTHONIOENCODING = "utf-8"
     Set-Location $root
-    & $py scratch\dense_gr\atlas.py nll --arm "base=$base" --arm "$tag=$tuned" --output-dir "$arms\ledger-$tag" *> "$arms\ledger-$tag.log"
+    $ledger = @("scratch\dense_gr\atlas.py", "nll", "--arm", "base=$base")
+    if ($compareControls) {
+        $ledger += @("--arm", "long5-step100=$arms\long5-step100",
+                     "--arm", "ramp=$root\scratch\dense_gr\checkpoints-ctl-ramp\smoke-r1-1-gr-s25-csa2",
+                     "--arm", "flat=$root\scratch\dense_gr\checkpoints-ctl-flat\smoke-r1-1-gr-s25-csa2")
+    }
+    $ledger += @("--arm", "$tag=$tuned", "--output-dir", "$arms\ledger-$tag")
+    if ($saveTokenEvidence) { $ledger += "--save-token-evidence" }
+    & $py $ledger *> "$arms\ledger-$tag.log"
     if ($LASTEXITCODE -ne 0) { throw "ledger failed (exit $LASTEXITCODE)" }
 }
 $jobs += Start-Job -ArgumentList $py, $root, $arms, $Tag, $tuned -ScriptBlock {

@@ -1,5 +1,28 @@
 # Targeted training: map what the student represents where, then train there
 
+## Current decision (2026-10-05)
+
+The completed [role-loss research review](ROLE_LOSS_REVIEW.md) recommends keeping
+assistant-only supervision, with user/tool context visible. Tool-output NLL is
+a diagnostic rather than an agent-success gate. Evaluate base, round-5 step 100,
+ramp, flat and context checkpoints on calls and result-conditioned responses
+before adopting another preservation objective. No longer training recipe has
+been selected. The validated streaming/cache optimization is available for the
+next run; further CCE work is optional.
+
+October 5 execution diagnostics are recorded in [TRAINING_PROFILE_RESULTS.md](TRAINING_PROFILE_RESULTS.md).
+The subsequent [streaming head experiment](STREAMING_HEAD_RESULTS.md) combines
+immediate chunk backward and per-frame selection reuse for a measured 10.00%
+whole-step gain on the frozen 32K pair. Under the user's practical numerical
+criterion, post-update prediction changes are no more frequent than an ordinary
+repeat on the tested prefix. Both are now optional trainer flags, with existing
+defaults preserved; the larger-chunk test is separate from those gains.
+The opt-in per-checkpoint selection cache improved matched 32K step throughput
+by 4.96%, with unchanged allocated peaks. GPU backward repeatability remains a
+validation limit even in unchanged single-GPU controls; bitwise equality is no
+longer the acceptance gate after the user's clarification. CCE stable forward accuracy is verified; complete KL/UL backward
+and any scheduling changes enabled by its memory savings remain unimplemented.
+
 Goal: efficient distillation rounds that improve a target skill without regressions elsewhere,
 and so without the post-hoc base blends (u50, ramp0-70) every round has needed so far.
 Method: first build two maps of the 2B hybrid student, then use them to decide which
@@ -24,7 +47,7 @@ components each kind of data may change.
 
 **Cheap causal controls before any map-guided intervention** (`control_arms.ps1`):
 - Round 5's recipe stopped at step 100 of the same 10M schedule, compared with round 5's own step-100 state.
-- Three arms: no new data, the depth ramp, and a flat 0.55× rate (the ramp's mean).
+- The depth ramp and a flat 0.55× rate (the ramp's mean). The proposed no-new-data arm was disabled in the runner and has not been tested.
 
 **Change map: a screening statistic only.**
 - CSA2's discrete top-k makes the path non-smooth, and the HVP correction is unavailable: the hyper-connection kernels are `once_differentiable`.
@@ -57,7 +80,7 @@ components each kind of data may change.
 
 - Everything the model writes improved.
 - What regressed is predicting other people's text inside chats. The assistant-only caches (agent, tools, QA) put no loss there.
-- Round 4 u50 drifts the same way (tool output +0.06), so the new data did not cause it.
+- Round 4 u50 drifts the same way (tool output +0.06), so the problem predates round 5. This does not rule out additional damage from round 5's new data; the matched no-new-data control has not been run.
 - The blends trade it off:
   - u50: tool output +0.06, own turns -0.06;
   - ramp0-70: no context regression, own turns -0.04.
@@ -71,11 +94,114 @@ components each kind of data may change.
   - MLA: -0.11, +0.015 (QA answers +0.085: long-range retrieval);
   - norms, decay, write strength, indexer, hyper-connections and the embedding/head: within ±0.006.
 
-**Reading.** Shallow layers, mostly their MLPs, drift on positions nothing scores. The gains are spread across depth.
+**Reading.** The separate depth and module reverts pointed to shallow MLPs. Their intersection was then tested directly, as documented below. The gains are spread across depth.
 
-**Two levers follow, both being tested as step-100 arms against round 5's own step 100:**
+**Two levers were tested as step-100 arms against round 5's own step 100:**
 - **The depth ramp** (`control_arms.ps1`: ramp, and flat 0.55× as its control).
 - **Teacher KL alone on the context tokens** (`--context-kl 0.01 --context-every 8`, Codex-reviewed `CONTEXT_KL.md`; `context_arm.ps1`). It keeps the student's expectations there on the teacher's, with no cross entropy on text the teacher did not write.
+
+## Follow-up diagnostics and step-100 controls (2026-10-05)
+
+The missing intersection test is complete in `atlas/long5-mlp-intersection`:
+round 5, its base, the shallow MLP revert, and the remaining MLP revert, all on
+the same frozen domains. The base and round-5 results exactly reproduce all
+84 comparable cells in the earlier family-revert ledger.
+
+| MLPs reverted | Claude tool NLL change vs round 5 | Codex tool NLL change vs round 5 | Claude own-turn cost | Codex own-turn cost |
+|---|---:|---:|---:|---:|
+| Layers 0-7 | -0.234 | -0.221 | +0.009 | +0.009 |
+| Layers 8-23 | -0.035 | -0.055 | +0.026 | +0.029 |
+
+The shallow MLP revert retains 90.85%/91.52% of Claude/Codex own-turn gains,
+94.55% of teacher-code own-turn gains, and 101.57% of plain llama.cpp code
+gains. The paired signed 80%-retention contrasts are positive, including their
+95% intervals, for those domains. QA answer retention is 88.10%, but only
+three of sixteen QA documents contain scored answers (1,502 targets), so that
+estimate has limited coverage. Claude/Codex tool-output regression remains
++0.090/+0.086 nats against the base. The shallow MLPs explain much of the
+damage, but reverting them alone does not repair it completely. This is a
+post-training causal revert, not evidence that freezing them during training
+will produce the same outcome.
+
+The existing whole-MLP and whole-shallow-third tests were already complete;
+they were not repeated. Per-token NLL and top-1 observations are now retained
+by the optional `atlas.py --save-token-evidence`, with document, model-source,
+and checkpoint provenance. `atlas_compare.py` computes jointly paired
+retention intervals and both 1-to-0 and 0-to-1 transitions from that evidence.
+
+The two step-100 training controls finished before these diagnostics:
+
+| Arm | Claude tool delta vs base | Codex tool delta vs base | Claude own-turn delta | Codex own-turn delta | QA answer delta |
+|---|---:|---:|---:|---:|---:|
+| Round 5 step 100 | +0.055 | +0.031 | -0.047 | -0.052 | -0.325 |
+| Depth ramp 0.1 to 1.0 | -0.011 | -0.012 | -0.043 | -0.047 | -0.236 |
+| Flat 0.55 rate | +0.045 | +0.029 | -0.045 | -0.048 | -0.294 |
+| Context teacher KL W=0.01, K=8 | +1.499 | +1.488 | -0.046 | -0.051 | -0.329 |
+
+The ramp reduces the measured tool regression more than the flat control,
+while retaining most agent own-turn gains and less of the QA gain. This is
+one seed and a short prefix of the 10M schedule, not a full-budget winner.
+The context-KL arm completed 100 steps with exactly 2,255,244 original targets,
+939.5 end-to-end tok/s, held-out loss 0.775074 and peak reserved memory 19.445 GiB.
+It retained 97.7%/98.5% of Claude/Codex own-turn gains but strongly worsened tool
+prediction. This fails the original context-prediction preservation criterion;
+the user's later distinction between predicting and using tool results means
+that this metric alone must not disqualify an arm on tool-use grounds. Do not
+launch a longer recipe until the intended behavioral criterion is settled.
+`control-arms/ledger-context/paired_comparison.json` uses jointly paired document
+bootstrap samples for all four step-100 arms and the base. The ramp's Claude/Codex
+own-turn signed 80% contrasts have positive intervals; its teacher-code contrast
+crosses zero and its original QA contrast is negative. The original QA set has
+only 3/16 answer-bearing documents; the completed 32K extension is reported below.
+
+`control-arms/ledger-context/teacher_role_audit.json` examines the raw unsuppressed
+cached teacher on those frozen token prefixes. The actual next tool token is
+absent from top-64 in 46.0%/49.0% of Claude/Codex positions; teacher top-1 is only
+26.5%/21.2%. Teacher KL alone can penalize the actual context tokens. This is a
+plausible objective conflict, not proof of its entire causal contribution. A
+frozen-u50 distribution anchor would measure preservation more directly, but is
+a different objective requiring an explicit choice before another arm. Existing
+tests establish shared/separate objective parity, not suitability of the targets.
+The completed QA extension keeps the same 16 documents and exact original token
+prefixes, with every answer-bearing document retained: 8,773 own-turn targets
+instead of 1,502 in only three documents. All ten other domains are unchanged.
+On this extension, own-turn deltas are ramp -0.23644, flat -0.28176, context
+-0.32019. Retention of A's gain is 75.25%, 89.68%, 101.91%, respectively. The
+ramp's signed 80% contrast is -0.01491 with paired 95% interval
+[-0.02264, -0.00660]. Thus the broader answer set confirms the QA tradeoff.
+Artifacts: `control-arms/ledger-context-qa32768/paired_comparison.json` and
+`scratch/csa2-eval/atlas/domains-qa32768-20261005-checks.json`.
+
+Teacher tool predictions are not predominantly turn endings: raw top-1
+`<|im_end|>` rates are 2.63%/2.20% for Claude/Codex, and `<|endoftext|>` is never
+top-1. Common predictions are commas, digits, spaces and newlines; some are
+confident incorrect content guesses (e.g. 98.9% on `0` where the returned digit
+is `1`). These numbers refer to tool-result content labels, excluding the
+structure labels of actual turn-ending tokens. The audit JSON retains examples,
+cached stop probability and top-token counts.
+
+Tool results remain masked in the ordinary assistant-only objective; the
+experimental context KL added a separate teacher loss on those positions.
+Tool-call generation remains supervised separately. Tool-result prediction NLL
+is a diagnostic, not a direct test of correctly reading returned results or
+choosing tools. The user raised this distinction; do not infer degraded tool
+use solely from the prediction regression, or silently change the preservation
+objective to a frozen-student anchor. Result-conditioned behavior needs its own
+evaluation before choosing a longer training recipe. All three arms improve
+teacher-forced tool-call token NLL. Context deltas are -0.02477 (Claude),
+-0.01940 (Codex), and -0.01321 (tools), with paired 95% intervals below zero.
+Context tool-call top-1 rises from 92.47% to 92.83% (Claude), 91.19% to 91.53%
+(Codex), and 95.28% to 95.35% (tools). This is evidence about predicted call
+tokens, not executed-call correctness or result-conditioned behavior.
+
+The short generation proxy reports context code NLL 0.8155, GSM8K 73.0% (24
+unboxed), and MATH 41.0% (107 truncated); retain the existing 512-token cap when
+comparing these proxies and do not mistake them for full benchmark scores.
+
+These frozen agent domains are capped at 16K. The comparison cannot establish
+the proposed 32K retention criterion without a separate long-context check.
+
+Assisted-by: Codex
 
 ## What we already know (DISTILLATION.md)
 
