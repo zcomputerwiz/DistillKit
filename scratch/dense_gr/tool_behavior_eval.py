@@ -85,7 +85,10 @@ def score(case, text, truncated=False):
     grounded = (not calls and not malformed and value in text and
                 all(v not in text for v in case.get("forbidden_values", []))) if value else None
     no_call = not calls and not malformed
-    if case["category"] == "missing_info":
+    if case.get("require_question"):
+        success = no_call and all(t.lower() in text.lower() for t in case["required_text"]) and bool(
+            re.search(r"\b(provide|tell|share|what|which|confirm)\b", text.lower()))
+    elif case["category"] == "missing_info":
         success = no_call and "ticket number" in text.lower() and bool(
             re.search(r"\b(provide|tell|share|what|which|confirm)\b", text.lower()))
     elif value:

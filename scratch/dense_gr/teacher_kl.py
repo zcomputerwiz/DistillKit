@@ -300,6 +300,17 @@ class CachedTeacher:
         self.unlikelihood_ids = from_captures(unlikelihood, "unlikelihood")
         self.kl_only_ids = from_captures(kl_only, "kl_only") | self.unlikelihood_ids
         self.ce_only_ids = from_captures(ce_only, "ce_only")
+        # Assisted-by: Codex
+        # Hard-label SFT can reuse the cache's token transport, but its reserved
+        # top-k arrays are not teacher predictions. Never allow them into KL.
+        caches = getattr(self.cache, "caches", [self.cache])
+        for cache in caches:
+            if cache.manifest.get("metadata", {}).get("target_kind") == "hard_labels_only":
+                required = set(cache.document_ids(split)) & set(self.ids)
+                if split == "train" and not required <= self.ce_only_ids:
+                    raise ValueError("hard_labels_only cache requires ce_only")
+                if split == "train" and not required <= from_captures(assistant_only, "assistant_only"):
+                    raise ValueError("hard_labels_only chat cache requires assistant_only")
         if self.ce_only_ids & self.kl_only_ids:
             raise ValueError("a capture cannot be both ce_only and kl_only")
         # Agent traces: only the assistant's own turns are scored (`assistant_tokens`).

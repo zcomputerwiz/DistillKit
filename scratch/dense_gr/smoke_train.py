@@ -1032,6 +1032,9 @@ def main(argv=None) -> int:
         if not (math.isfinite(args.context_kl) and args.context_kl >= 0):
             raise SystemExit("--context-kl must be a finite weight >= 0")
         if args.context_kl:
+            if any(c.manifest.get("metadata", {}).get("target_kind") == "hard_labels_only"
+                   for c in getattr(teacher.cache, "caches", [teacher.cache])):
+                raise SystemExit("context KL is incompatible with hard-label-only caches")
             if not args.assistant_only_caches or args.context_every < 1:
                 raise SystemExit("--context-kl needs --assistant-only-caches and --context-every >= 1")
             teacher.context_kl = (args.context_kl, args.context_every)

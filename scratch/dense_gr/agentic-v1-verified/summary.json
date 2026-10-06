@@ -1,0 +1,23 @@
+{
+  "train_documents": 720,
+  "train_tokens": 512261,
+  "train_supervised_tokens": 69321,
+  "eval_documents": 40,
+  "eval_tokens": 28317,
+  "eval_supervised_tokens": 3957,
+  "fixture_cases": 80,
+  "train_domains": [
+    "catalog",
+    "inventory",
+    "archive",
+    "workspace",
+    "library",
+    "registry"
+  ],
+  "eval_domains": [
+    "observatory",
+    "workshop"
+  ],
+  "generator_sha256": "692deb81604a8add2516fa594c8d24e165da0a8e8ef45714a2ef4a19b1108e3a",
+  "limitation": "Shared templates across splits; schema/domain transfer screen, not independent task-family generalization."
+}

@@ -1,6 +1,14 @@
 # Targeted training: map what the student represents where, then train there
 
-## Current decision (2026-10-05)
+## Current decision (2026-10-06)
+
+The user authorized research, a retention-protected agentic training plan, and
+starting a bounded experiment. See [the agentic pilot plan](AGENTIC_TRAINING_PLAN.md).
+It starts fresh from u50 with a conservative flat rate, verified assistant-only
+tool trajectories, broad existing replay, and a replay-only control. It does
+not adopt context KL or promote a checkpoint before behavior and retention
+checks. Prior flat remains evidence for the learning-rate choice rather than
+a matched control for the new data.
 
 The completed [role-loss research review](ROLE_LOSS_REVIEW.md) recommends keeping
 assistant-only supervision, with user/tool context visible. Tool-output NLL is
@@ -9,7 +17,7 @@ a diagnostic rather than an agent-success gate. The completed
 ramp, flat and context. All retain simple returned-value extraction; round-5
 and context frequently omit calls. Explicit tool instructions recover part of
 the gap. Flat is the preferred confirmation candidate, given tool behavior
-comparable to ramp and better QA retention. No longer recipe or new preservation
+comparable to ramp and better QA retention. No full-budget recipe or new preservation
 objective has been adopted. The validated streaming/cache optimization is
 available for the next run; further CCE work is optional.
 
