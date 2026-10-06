@@ -142,6 +142,10 @@ or preference/RL training. Never reward announcements or raw call count.
 
 ## Status
 
+Completed; the checkpoint was not selected. See [final pilot-1 results](AGENTIC_PILOT_RESULTS.md)
+and [the authorized version-2 follow-up](AGENTIC_V2_PLAN.md). The launch notes
+below are retained as the original execution record.
+
 Data, role-mask, CE-only guard, schema, and finite-environment tests passed
 (16 tests across the curriculum, tool evaluator, and repeat-dispersal suites;
 the existing six unlikelihood tests also passed in the earlier validation).

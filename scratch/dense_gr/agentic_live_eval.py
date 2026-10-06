@@ -14,7 +14,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-from agentic_curriculum import make_trajectory
+from agentic_curriculum import make_trajectory, make_contrast
 from tool_behavior_eval import parse_calls
 from tool_tasks import call_problem
 
@@ -48,8 +48,12 @@ class Environment:
             self.errors.append("invalid_schema")
             return {"error": "INVALID_CALL"}
         f = invocation["function"]
-        operation = f["name"][len(self.row["domain"]) + 1:]
-        a, e, kind = f["arguments"], self.env, self.row["kind"]
+        e, kind = self.env, self.row["kind"]
+        operation = e.get("operations", {}).get(f["name"], f["name"][len(self.row["domain"]) + 1:])
+        a = dict(f["arguments"])
+        identifier = e.get("id_argument", "record_id")
+        if identifier in a:
+            a["record_id"] = a.pop(identifier)
         if operation == "search":
             self.searched = True
             return {"matches": e["entries"] if a["name"] == e["name"] else [], "complete": True}
@@ -66,7 +70,7 @@ class Environment:
             self.read = True
             return {"record_id": a["record_id"], "state": self.state if a["record_id"] == e["id"] else "draft"}
         if operation == "set_state":
-            if kind in ("no_call", "read_after_search") or not self.choice or a["record_id"] != e["id"] or a["state"] != e["desired_state"]:
+            if kind in ("no_call", "read_after_search", "known_read") or not self.choice or a["record_id"] != e["id"] or a["state"] != e["desired_state"]:
                 self.errors.append("unrequested_mutation")
                 return {"error": "UNREQUESTED_MUTATION"}
             if kind == "recover" and not self.refreshed:
@@ -107,12 +111,16 @@ class Environment:
             self.success = self.searched and ask and self.mutations == 0
         elif kind == "read_after_search":
             self.success = self.searched and self.read and self.state in text and self.mutations == 0
+        elif kind == "known_read":
+            self.success = self.read and self.state in text and self.mutations == 0
         elif kind == "already_done":
             self.success = self.read and self.mutations == 0 and self.state in text
         else:
             self.success = self.state == e["desired_state"] and self.mutations == 1 and not ask
             if kind == "ask_choice":
                 self.success &= self.asked
+            if kind == "check_needed":
+                self.success &= self.read
         self.success &= not self.errors
 
 
@@ -130,7 +138,8 @@ def run(args):
             continue
         # Regenerate the deterministic environment while checking that every frozen
         # training/evaluation message is identical. Metadata was added after freeze.
-        fresh = make_trajectory(row["domain"], row["kind"], int(row["doc_id"].rsplit(":", 1)[1]))
+        factory = make_contrast if row.get("curriculum_version") == 2 else make_trajectory
+        fresh = factory(row["domain"], row["kind"], int(row["doc_id"].rsplit(":", 1)[1]))
         assert fresh["messages"] == row["messages"] and fresh["tools"] == row["tools"]
         environments.append(Environment(fresh))
     tok = AutoTokenizer.from_pretrained(args.checkpoint)

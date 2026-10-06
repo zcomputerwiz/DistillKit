@@ -2,6 +2,11 @@
 
 ## Current decision (2026-10-06)
 
+Pilot 1 finished and failed retention: see [results](AGENTIC_PILOT_RESULTS.md).
+Keep u50. The user authorized a [smaller follow-up](AGENTIC_V2_PLAN.md) with
+contrasting action examples and stronger code replay. The earlier synthetic
+task gains did not exceed replay alone on the broader tool screens.
+
 The user authorized research, a retention-protected agentic training plan, and
 starting a bounded experiment. See [the agentic pilot plan](AGENTIC_TRAINING_PLAN.md).
 It starts fresh from u50 with a conservative flat rate, verified assistant-only

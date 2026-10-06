@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scratch/dense_gr"))
-from agentic_curriculum import DOMAINS, KINDS, make_trajectory, validate
+from agentic_curriculum import DOMAINS, KINDS, CONTRAST_KINDS, make_trajectory, make_contrast, validate
 from teacher_kl import CachedTeacher
 from distillkit.offline_cache import OfflineCacheWriter
 from agentic_live_eval import Environment
@@ -99,3 +99,51 @@ def test_live_extra_read_allowed_but_unresolved_choice_cannot_mutate():
                                                    "state": row["environment"]["desired_state"]}))
     assert result["error"] == "UNREQUESTED_MUTATION"
     assert env.mutations == 0
+
+
+def test_v2_pairs_condition_write_on_observation_and_all_schema_variants_execute():
+    for n in range(4):
+        done = make_contrast("catalog", "already_done", n)
+        needed = make_contrast("catalog", "check_needed", n)
+        assert done["tools"] == needed["tools"]
+        first_result = next(i for i, m in enumerate(done["messages"]) if m["role"] == "tool")
+        assert done["messages"][:first_result] == needed["messages"][:first_result]
+        assert done["environment"]["initial_state"] != needed["environment"]["initial_state"]
+        for kind in CONTRAST_KINDS:
+            row = make_contrast("catalog", kind, n)
+            validate(row)
+            env = Environment(row)
+            for m in row["messages"]:
+                if m["role"] != "assistant":
+                    continue
+                text = m["content"] + "".join("<tool_call>" + json.dumps({
+                    "name": c["function"]["name"], "arguments": c["function"]["arguments"]}) + "</tool_call>"
+                    for c in m.get("tool_calls", []))
+                env.respond(text)
+            assert env.success, (n, kind, env.errors)
+            if kind in ("known_read", "already_done", "check_needed"):
+                assert not env.searched
+
+
+def test_v2_read_only_target_does_not_authorize_write():
+    row = make_contrast("catalog", "known_read", 2)
+    env = Environment(row)
+    from tool_behavior_eval import call
+    setter = next(name for name, op in row["environment"]["operations"].items() if op == "set_state")
+    result = env.execute(call(setter, {row["environment"]["id_argument"]: row["environment"]["id"],
+                                      "state": row["environment"]["desired_state"]}))
+    assert result["error"] == "UNREQUESTED_MUTATION" and env.mutations == 0
+
+
+def test_smaller_recipe_changes_only_requested_replay_weights_and_rate(tmp_path):
+    from agentic_arm import recipe
+    original, old = recipe(tmp_path / "data", tmp_path / "old")
+    argv, new = recipe(tmp_path / "data", tmp_path / "new", steps=20,
+                       code_multiplier=3, rate_scale=.275)
+    code = {"teacher-cache-frontier-code-raw", "teacher-cache-r8-code-short-w8",
+            "teacher-cache-expand-code-w8", "teacher-cache-teacher-code"}
+    for path, repeats in old["repeat"].items():
+        assert new["repeat"][path] == repeats * (3 if Path(path).name in code else 1)
+    assert argv[argv.index("--max-steps") + 1] == "20"
+    assert argv[argv.index("--lr-depth-ramp") + 1:argv.index("--lr-depth-ramp") + 3] == ["0.275", "0.275"]
+    assert new["ce"] == old["ce"] and new["assistant"] == old["assistant"]

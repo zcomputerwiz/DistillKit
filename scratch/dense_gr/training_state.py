@@ -21,16 +21,49 @@ def position_weight(record):
     return None
 
 
+def coverage_order(teacher, groups, generator, count):
+    """Assisted-by: Codex. One epoch permutation with source coverage up front.
+
+    Select an existing group per retained source, fill and shuffle the prefix.
+    No group is duplicated, truncated, or modified. Balances coverage, not tokens.
+    """
+    if not 1 <= count <= len(groups):
+        raise ValueError("coverage prefix must fit within one epoch")
+    owner = getattr(teacher.cache, "_owner", None)
+    fallback = str(getattr(teacher.cache, "path", "cache"))
+    candidates = {}
+    for index, (docs, width) in enumerate(groups):
+        sources = {str(owner[d][0]) if owner else fallback for d in docs}
+        for source in sources:
+            candidates.setdefault(source, []).append(index)
+    if count < len(candidates):
+        raise ValueError("coverage prefix needs at least one batch per source")
+    anchors = set()
+    for source in sorted(candidates):
+        if not anchors.intersection(candidates[source]):
+            anchors.add(int(generator.choice(candidates[source])))
+    order = generator.permutation(len(groups)).tolist()
+    prefix = sorted(anchors)
+    prefix += [i for i in order if i not in anchors][:count - len(prefix)]
+    generator.shuffle(prefix)
+    chosen = set(prefix)
+    return prefix + [i for i in order if i not in chosen]
+
+
 class PlannedBatches:
-    def __init__(self, teacher, groups, seed):
+    def __init__(self, teacher, groups, seed, balanced_prefix_batches=0):
         if not groups:
             raise ValueError("no training documents survive the sample plan")
         self.teacher, self.groups = teacher, groups
         self.generator = np.random.default_rng(seed)
         self.order, self.cursor = [], 0
+        if balanced_prefix_batches:
+            self.order = coverage_order(teacher, groups, self.generator, balanced_prefix_batches)
         cache = getattr(teacher, "cache", None)
         captures = getattr(cache, "caches", [cache])
         identity = dict(groups=groups, manifests=[getattr(c, "manifest", None) for c in captures])
+        if balanced_prefix_batches:
+            identity["balanced_prefix_batches"] = balanced_prefix_batches
         # The loss weights are part of the plan too: a resume against changed answer spans,
         # weight, padding or masks would charge and optimize a different objective.
         weights = getattr(teacher, "weight_identity", None)
@@ -68,10 +101,10 @@ class PlannedBatches:
         return self.teacher.read_batch(group, width)
 
 
-def prefix_exposure(teacher, groups, seed, budget):
+def prefix_exposure(teacher, groups, seed, budget, balanced_prefix_batches=0):
     """What `budget` targets will see of each capture: the seed's whole-batch prefix, replayed
     as PlannedBatches.take() spends it. {capture name: [visits, distinct documents, targets]}."""
-    replay = PlannedBatches(teacher, groups, seed)
+    replay = PlannedBatches(teacher, groups, seed, balanced_prefix_batches)
     owner = getattr(getattr(teacher, "cache", None), "_owner", None)
     seen, stats, spent = set(), {}, 0.0
     while True:

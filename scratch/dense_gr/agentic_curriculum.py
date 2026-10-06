@@ -31,6 +31,93 @@ DOMAINS = ["catalog", "inventory", "archive", "workspace", "library", "registry"
            "observatory", "workshop"]
 KINDS = ["discover", "known_id", "disambiguate", "ask_choice", "empty_search",
          "recover", "no_call", "read_after_search", "announce", "already_done"]
+CONTRAST_KINDS = KINDS + ["known_read", "check_needed"]
+
+
+def make_contrast(domain, kind, number):
+    """Version 2: paired conditional updates, known-ID reads, and varied schemas.
+
+    The v1 generator and its frozen evaluations remain unchanged. Extra reads
+    are valid, but a name search is not a prerequisite when the ID is known.
+    """
+    base_kind = {"known_read": "read_after_search", "check_needed": "already_done"}.get(kind, kind)
+    row = make_trajectory(domain, base_kind, 10000 + number)
+    e = row["environment"]
+    at = next(i for i, m in enumerate(row["messages"]) if m["role"] == "user")
+    prefix = row["messages"][:at]
+    user = lambda text: {"role": "user", "content": text}
+    assistant = lambda text: {"role": "assistant", "content": text}
+    def exchange(operation, arguments, result, ident):
+        c = call(domain + "_" + operation, arguments)
+        c["id"] = ident
+        return [{"role": "assistant", "content": "", "tool_calls": [c]},
+                {"role": "tool", "name": domain + "_" + operation, "tool_call_id": ident,
+                 "content": json.dumps(result, sort_keys=True)}]
+
+    if kind == "known_read":
+        text = [f"What is the current state of record ID {e['id']}?",
+                f"Read {e['id']} and report its state. The ID is already known.",
+                f"Look up record {e['id']} by ID and tell me its state.",
+                f"Please check the state for ID {e['id']}; do not modify it."][number % 4]
+        row["messages"] = prefix + [user(text)] + exchange("read", {"record_id": e["id"]},
+            {"record_id": e["id"], "state": e["initial_state"]}, "read-known") + [assistant(f"The state is {e['initial_state']}.")]
+    elif kind in ("check_needed", "already_done"):
+        # Identical task/schema/ID across the pair; the returned state alone
+        # decides whether an update is needed.
+        text = [f"Check record {e['id']} and set its state to {e['desired_state']} only if needed.",
+                f"Ensure ID {e['id']} is {e['desired_state']}. Read its state first and avoid a redundant write.",
+                f"Look up record {e['id']} by ID. If its state isn't {e['desired_state']}, update it.",
+                f"Inspect {e['id']}; change its state to {e['desired_state']} only if it differs."][number % 4]
+        if kind == "check_needed":
+            e["initial_state"] = "pending"
+        row["messages"] = prefix + [user(text)] + exchange("read", {"record_id": e["id"]},
+            {"record_id": e["id"], "state": e["initial_state"]}, "inspect")
+        if kind == "check_needed":
+            row["messages"] += exchange("set_state", {"record_id": e["id"], "state": e["desired_state"]},
+                {"status": "ok", "record_id": e["id"], "state": e["desired_state"]}, "update")
+            row["messages"].append(assistant(f"Updated {e['id']} to {e['desired_state']}."))
+        else:
+            row["messages"].append(assistant(f"The record is already {e['desired_state']}. No change was needed."))
+    else:
+        # Change surface wording without changing the task or reference action.
+        message = row["messages"][at]
+        if number % 4 == 1:
+            message["content"] = "Please " + message["content"][0].lower() + message["content"][1:]
+        elif number % 4 == 2:
+            message["content"] = message["content"].replace("Find the", "Locate the").replace("Set record", "Update record").replace(" and set its state to", "; its desired state is")
+        elif number % 4 == 3:
+            message["content"] = "Task: " + message["content"]
+    # Vary API names and identifier argument names so the learner must read the
+    # schema, not memorize *_search versus *_read or a particular tool order.
+    variants = [("search", "read", "set_state", "refresh", "record_id"),
+                ("find_by_name", "get_by_id", "update_state", "renew_session", "id"),
+                ("locate", "inspect", "change_state", "restore_session", "key"),
+                ("query_name", "fetch_record", "write_state", "refresh_session", "reference")]
+    variant = variants[number % len(variants)]
+    operations = ("search", "read", "set_state", "refresh")
+    names = {domain + "_" + old: domain + "_" + new for old, new in zip(operations, variant[:4])}
+    for t in row["tools"]:
+        f = t["function"]
+        f["name"] = names[f["name"]]
+        properties = f["parameters"]["properties"]
+        if "record_id" in properties:
+            properties[variant[4]] = properties.pop("record_id")
+            f["parameters"]["required"] = [variant[4] if p == "record_id" else p for p in f["parameters"]["required"]]
+    for i, m in enumerate(row["messages"]):
+        for c in m.get("tool_calls", []):
+            f = c["function"]
+            f["name"] = names[f["name"]]
+            if "record_id" in f["arguments"]:
+                f["arguments"][variant[4]] = f["arguments"].pop("record_id")
+            m["content"] = ("" if (number + i) % 2 else
+                            ["I'll do that now.", "I'll check using the available tool.", "I'll make that call."][(number + i) % 3])
+        if m["role"] == "tool":
+            m["name"] = names[m["name"]]
+    random.Random(f"tools-v2/{number}").shuffle(row["tools"])
+    e["operations"] = {names[domain + "_" + op]: op for op in operations}
+    e["id_argument"] = variant[4]
+    row.update(doc_id=f"agentic-v2:{domain}:{kind}:{number}", kind=kind, curriculum_version=2)
+    return row
 
 
 def make_trajectory(domain, kind, number):
@@ -183,13 +270,24 @@ def build(args):
             top_k=reference["top_k"], sequence_length=8192,
             metadata={"target_kind": "hard_labels_only", "required_objective": "assistant_only_ce",
                       "reserved_topk": "uniform placeholders; never use as teacher predictions",
-                      "generator": "agentic_curriculum.py", "version": 1}) as writer:
-        for domain in DOMAINS:
+                      "generator": "agentic_curriculum.py", "version": args.version}) as writer:
+        domains = DOMAINS if args.version == 1 else DOMAINS[:6] + ["dispatch", "records"]
+        for domain in domains:
             split = "train" if domain in DOMAINS[:6] else "eval"
-            for kind in KINDS:
+            for kind in (KINDS if args.version == 1 else CONTRAST_KINDS):
                 for n in range(args.per_kind if split == "train" else 2):
-                    row = make_trajectory(domain, kind, n)
+                    row = (make_trajectory if args.version == 1 else make_contrast)(domain, kind, n)
                     validate(row)
+                    if args.version == 2:
+                        from agentic_live_eval import Environment
+                        env = Environment(row)
+                        for m in row["messages"]:
+                            if m["role"] != "assistant":
+                                continue
+                            text = m["content"] + "".join("<tool_call>" + json.dumps({"name": c["function"]["name"],
+                                "arguments": c["function"]["arguments"]}) + "</tool_call>" for c in m.get("tool_calls", []))
+                            env.respond(text)
+                        assert env.success and env.done, row["doc_id"]
                     row["split"] = split
                     text = tok.apply_chat_template(row["messages"], tools=row["tools"], tokenize=False,
                                                    add_generation_prompt=False, enable_thinking=False)
@@ -213,7 +311,7 @@ def build(args):
                                 continue
                             is_question = kind in ("ask_choice", "empty_search") and (
                                 "Which section" in m["content"] or "Please provide" in m["content"])
-                            if not m.get("tool_calls") and not is_question and kind not in ("read_after_search", "already_done", "no_call"):
+                            if not m.get("tool_calls") and not is_question and kind not in ("read_after_search", "known_read", "already_done", "no_call"):
                                 continue
                             prefix = row["messages"][:index]
                             prompt = tok.apply_chat_template(prefix, tools=row["tools"], tokenize=False,
@@ -236,7 +334,7 @@ def build(args):
     (args.output / "heldout-frozen.json").write_text(json.dumps({"cases": fixtures}, indent=2), encoding="utf-8")
     hashes = {s: {r["token_sha256"] for r in rows if r["split"] == s} for s in ("train", "eval")}
     assert not hashes["train"] & hashes["eval"]
-    summary = dict(counts, fixture_cases=len(fixtures), train_domains=DOMAINS[:6], eval_domains=DOMAINS[6:],
+    summary = dict(counts, version=args.version, fixture_cases=len(fixtures), train_domains=domains[:6], eval_domains=domains[6:],
                    generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                    limitation="Shared templates across splits; schema/domain transfer screen, not independent task-family generalization.")
     (args.output / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -249,4 +347,5 @@ if __name__ == "__main__":
     parser.add_argument("--reference", type=Path, default=Path("../teacher-cache-frontier-tools"))
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--per-kind", type=int, default=12)
+    parser.add_argument("--version", type=int, choices=[1, 2], default=1)
     build(parser.parse_args())

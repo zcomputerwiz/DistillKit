@@ -21,13 +21,15 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
 
-def recipe(data, out, new_repeat=1, steps=50, control=False):
+def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, rate_scale=.55, balanced=False):
     names = ["agent-smol-a", "agent-smol-b", "frontier-qa2", "frontier-code-raw", "frontier-tools",
              "r8-code-short-w8", "curriculum-v4-w8", "thinking-w8", "think-first-w8", "expand-code-w8",
              "general-pilot-w8", "teacher-math-gen", "onpolicy-r6-loop", "loop-check",
              "teacher-nothink-math", "teacher-code"]
     paths = {n: str((ROOT.parent / ("teacher-cache-" + n)).resolve()) for n in names}
     factors = dict(zip(names, [3, 3, 1, 1, 4, 2, 2, 2, 2, 2, 2, 2, 2, 4, 4, 8]))
+    for name in ("frontier-code-raw", "r8-code-short-w8", "expand-code-w8", "teacher-code"):
+        factors[name] *= code_multiplier
     cache = str((data / "cache").resolve())
     all_caches = list(paths.values()) + ([] if control else [cache])
     assistant = [paths[n] for n in ("agent-smol-a", "agent-smol-b", "frontier-tools", "frontier-qa2")]
@@ -53,9 +55,11 @@ def recipe(data, out, new_repeat=1, steps=50, control=False):
             "--min-answer-tokens", "2", "--micro-tokens", "32768", "--accumulate", "2",
             "--tokens", "10000000", "--max-steps", str(steps), "--warmup", "10",
             "--decay-fraction", "0.5", "--decay-floor", "0.05",
-            "--lr-depth-ramp", "0.55", "0.55", "--evaluate-windows", "64",
+            "--lr-depth-ramp", str(rate_scale), str(rate_scale), "--evaluate-windows", "64",
             "--evaluate-every", str(steps), "--report-every", "5", "--save-every", str(steps),
             "--seed", "25", "--checkpoints", str(out / "checkpoints"), "--output", str(out / "train.json")]
+    if balanced:
+        argv += ["--balanced-prefix-batches", str(steps * 2)]
     return argv, dict(paths=all_caches, assistant=assistant, ce=ce, repeat=repeat,
                       kl=[paths["frontier-code-raw"]], ul=[paths["onpolicy-r6-loop"], paths["loop-check"]])
 
@@ -87,7 +91,7 @@ def teacher_for(options):
     return teacher
 
 
-def measure(teacher, steps):
+def measure(teacher, steps, balanced=False):
     import numpy as np
     groups = teacher._groups(1, 128, 32768)
     totals, prefix = Counter(), Counter()
@@ -97,7 +101,8 @@ def measure(teacher, steps):
             source = Path(teacher.cache._owner[doc][0]).name
             target[source] += teacher.doc_weight(doc, min(teacher.real_width[doc], width))
     rng = np.random.default_rng(25)
-    order = []
+    from training_state import coverage_order
+    order = coverage_order(teacher, groups, rng, steps * 2) if balanced else []
     while len(order) < steps * 2:
         order.extend(rng.permutation(len(groups)).tolist())
     visits = Counter()
@@ -106,7 +111,7 @@ def measure(teacher, steps):
         for doc in group:
             source = Path(teacher.cache._owner[doc][0]).name
             prefix[source] += teacher.doc_weight(doc, min(teacher.real_width[doc], width))
-            if doc.startswith("agentic-v1:"):
+            if doc.startswith(("agentic-v1:", "agentic-v2:")):
                 visits[doc] += 1
     return dict(epoch_weighted_targets=dict(totals), prefix_weighted_targets=dict(prefix),
                 prefix_total=sum(prefix.values()), prefix_new_fraction=prefix["cache"] / max(1, sum(prefix.values())),
@@ -118,21 +123,33 @@ def plan(args):
     if args.output.exists():
         raise ValueError("refuse to overwrite run directory")
     args.output.mkdir(parents=True)
-    _, options = recipe(args.data, args.output / "agentic", steps=args.steps)
+    tuning = dict(code_multiplier=args.code_multiplier, rate_scale=args.rate_scale, balanced=args.balanced)
+    _, options = recipe(args.data, args.output / "agentic", steps=args.steps, **tuning)
+    print("Measuring replay and new-target mass", flush=True)
     teacher = teacher_for(options)
-    initial = measure(teacher, args.steps)
+    initial = measure(teacher, args.steps, args.balanced)
     new = initial["epoch_weighted_targets"]["cache"]
     old = sum(initial["epoch_weighted_targets"].values()) - new
-    factor = max(1, round(old * .15 / .85 / new))
-    teacher.cache.close()
+    factor = max(1, round(old * args.new_share / (1 - args.new_share) / new))
+    # Masking and target counts do not depend on repetition. Reuse this CPU
+    # cache scan; change only the document multiset used to build groups.
+    original_ids = list(teacher.ids)
+    new_ids = set(teacher.cache.caches[-1].document_ids("train"))
     plans = {}
     for arm in ("agentic", "replay"):
-        argv, options = recipe(args.data, args.output / arm, factor, args.steps, arm == "replay")
-        teacher = teacher_for(options)
-        plans[arm] = dict(argv=argv, mixture=measure(teacher, args.steps))
-        teacher.cache.close()
+        print("Planning " + arm, flush=True)
+        argv, options = recipe(args.data, args.output / arm, factor, args.steps, arm == "replay", **tuning)
+        teacher.ids = [d for d in original_ids for _ in range(
+            (factor if arm == "agentic" else 0) if d in new_ids else 1)]
+        plans[arm] = dict(argv=argv, mixture=measure(teacher, args.steps, args.balanced))
+        if args.balanced:
+            observed = plans[arm]["mixture"]["prefix_weighted_targets"]
+            if any(observed.get(Path(p).name, 0) <= 0 for p in options["paths"]):
+                raise ValueError("balanced prefix failed to score every source")
+    teacher.cache.close()
     result = dict(start_checkpoint=str(HERE / "merges-long1/u50"), steps=args.steps,
-                  new_repeat=factor, data=str(args.data.resolve()), arms=plans,
+                  new_repeat=factor, data=str(args.data.resolve()), arms=plans, tuning=tuning,
+                  requested_new_share=args.new_share,
                   limitation="Equal optimizer steps and recipe, not identical token counts or replay documents after regrouping.")
     (args.output / "plan.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps({k: v["mixture"] for k, v in plans.items()}, indent=2))
@@ -162,6 +179,10 @@ def run(args):
     for arm, checkpoint in checkpoints.items():
         invoke(f"live-{arm}", [HERE / "agentic_live_eval.py", "--checkpoint", checkpoint,
                "--data", Path(spec["data"]) / "trajectories.jsonl", "--output", args.output / f"live-{arm}.json"])
+        if json.loads((Path(spec["data"]) / "summary.json").read_text()).get("version", 1) >= 2:
+            invoke(f"live-{arm}-v1", [HERE / "agentic_live_eval.py", "--checkpoint", checkpoint,
+                   "--data", HERE / "agentic-v1-verified/trajectories.jsonl",
+                   "--output", args.output / f"live-{arm}-v1.json"])
         for suite, fixture in (("transfer", Path(spec["data"]) / "heldout-frozen.json"),
                                ("original", ROOT / "scratch/csa2-eval/tool-behavior/frozen.json"),
                                ("post-tool", ROOT / "scratch/csa2-eval/tool-behavior/post-tool-frozen.json")):
@@ -186,6 +207,12 @@ if __name__ == "__main__":
     p.add_argument("--data", type=Path, default=HERE / "agentic-v1-verified")
     p.add_argument("--output", type=Path, default=HERE / "agentic-pilot-v1")
     p.add_argument("--steps", type=int, default=50)
+    p.add_argument("--new-share", type=float, default=.15)
+    p.add_argument("--code-multiplier", type=int, default=1)
+    p.add_argument("--rate-scale", type=float, default=.55)
+    p.add_argument("--balanced", action="store_true")
     a = p.parse_args()
+    if not 0 < a.new_share < 1 or a.code_multiplier < 1 or not 0 < a.rate_scale <= 1 or a.steps < 1:
+        p.error("invalid share, code multiplier, rate scale, or step count")
     a.output = a.output.resolve()
     {"plan": plan, "run": run}[a.command](a)

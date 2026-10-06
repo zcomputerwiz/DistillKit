@@ -517,6 +517,8 @@ def main(argv=None) -> int:
     parser.add_argument("--resume", type=Path, help="resume a complete training-state directory")
     parser.add_argument("--save-every", type=int, default=0,
                         help="save resumable state every N optimizer steps (0: final only)")
+    parser.add_argument("--balanced-prefix-batches", type=int, default=0,
+                        help="cover every retained cache in this many initial batches; 0 keeps random ordering")
     parser.add_argument("--max-steps", type=int, default=None,
                         help="additional hard limit on total optimizer steps")
     parser.add_argument("--benchmark-warmup-steps", type=int, default=0,
@@ -1185,7 +1187,7 @@ def main(argv=None) -> int:
         if not groups:
             raise SystemExit("no training documents survive the sample plan")
         corpus_targets = teacher.planned_tokens(args.micro_batch, block, args.micro_tokens or None)
-        batches = PlannedBatches(teacher, groups, args.seed)
+        batches = PlannedBatches(teacher, groups, args.seed, args.balanced_prefix_batches)
         shapes = sorted({(len(g), w) for g, w in groups})
         print("plan: %d documents, %d supervised targets, %d batches, %d shapes; "
               "dropped %d short and %d without enough answer targets"
@@ -1232,7 +1234,7 @@ def main(argv=None) -> int:
     if teacher is not None:
         # The mix this budget actually trains on, capture by capture (a pass's shares only
         # promise it in expectation).
-        exposure = prefix_exposure(teacher, groups, args.seed, args.tokens)
+        exposure = prefix_exposure(teacher, groups, args.seed, args.tokens, args.balanced_prefix_batches)
         for name, (visits, distinct, targets) in sorted(exposure.items(), key=lambda kv: -kv[1][2]):
             print("prefix: %-34s %6d visits %6d distinct %10.0f targets" % (name, visits, distinct, targets),
                   flush=True)
