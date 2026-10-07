@@ -30,6 +30,20 @@ def missing_fallback(text):
     return bool(absent and request and identifier)
 
 
+def unbacked_announcements(messages):
+    """Review flags, not a proof that arbitrary language never promises an action."""
+    flagged=[]
+    for i,m in enumerate(messages):
+        if m['role']!='assistant' or m.get('tool_calls'):
+            continue
+        text=m.get('content','')
+        if re.search(r'\b(if|once|after|would|could)\b',text,re.I):
+            continue
+        if re.search(r"\bI(?:'ll| will| am going to)\s+(?:now\s+)?(?:search|read|check|update|set|retrieve|open|run|call|inspect|resolve|refresh)\b",text,re.I):
+            flagged.append(i)
+    return flagged
+
+
 def grade(record):
     version, domain, kind, number = record['id'].split(':')
     row = (make_contrast if version == 'agentic-v2' else make_trajectory)(domain, kind, int(number))
@@ -57,7 +71,7 @@ def grade(record):
                 operation = row['environment'].get('operations', {}).get(f['name'], f['name'][len(domain)+1:])
                 if operation == 'read' and result.get('record_id') == env.env['id']:
                     target_read = True
-                if operation == 'search' and f['arguments'].get('name') == env.env['name']:
+                if operation == 'search' and isinstance(f['arguments'],dict) and f['arguments'].get('name') == env.env['name']:
                     correct_search = True
         if m['role'] == 'tool':
             if not pending:
@@ -101,6 +115,7 @@ def grade(record):
                 outcome=outcome, terminal=terminal, invalid_attempts=errors,
                 clean_success=outcome is True and not errors,
                 false_completion=bool(false_completion), review=review,
+                unbacked_announcements=unbacked_announcements(record['messages']),
                 verified_tool_results=verified_results, final_text=text)
 
 

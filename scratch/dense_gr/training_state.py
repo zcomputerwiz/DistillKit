@@ -50,6 +50,60 @@ def coverage_order(teacher, groups, generator, count):
     return prefix + [i for i in order if i not in chosen]
 
 
+class OrderedBatches:
+    """Assisted-by: Codex. A finite, frozen sequence; never reshuffle or repeat.
+
+    Validate each group against the current canonical plan. The ordinary plan's
+    fingerprint binds manifests, masks and objective weights for resume safety.
+    """
+    def __init__(self, teacher, groups, manifest):
+        canonical = {(tuple(docs), width) for docs, width in groups}
+        selected = [(list(row['documents']), int(row['width'])) for row in manifest['groups']]
+        if not selected or any((tuple(d), w) not in canonical for d, w in selected):
+            raise ValueError('frozen batches must be nonempty canonical groups')
+        self.teacher, self.groups, self.cursor = teacher, selected, 0
+        base = PlannedBatches(teacher, selected, 0)
+        self.fingerprint = base.fingerprint
+        expected = manifest.get('cache_sha256')
+        manifests = [c.manifest for c in getattr(teacher.cache, 'caches', [teacher.cache])]
+        actual = hashlib.sha256(json.dumps(manifests, sort_keys=True).encode()).hexdigest()
+        if expected != actual:
+            raise ValueError('frozen batch cache manifests changed')
+
+    def next_targets(self):
+        if self.cursor == len(self.groups):
+            return float('inf')
+        docs, width = self.groups[self.cursor]
+        return self.teacher.group_weight(docs, width)
+
+    def take(self, remaining):
+        if self.cursor == len(self.groups) or self.next_targets() > remaining:
+            return None
+        docs, width = self.groups[self.cursor]
+        self.cursor += 1
+        return self.teacher.read_batch(docs, width)
+
+    def state_dict(self):
+        return dict(fingerprint=self.fingerprint, cursor=self.cursor)
+
+    def exposure(self):
+        stats, seen = {}, set()
+        for docs, width in self.groups:
+            for doc in docs:
+                source = Path(self.teacher.cache._owner[doc][0]).name
+                row = stats.setdefault(source, [0, 0, 0.])
+                row[0] += 1
+                row[1] += doc not in seen
+                seen.add(doc)
+                row[2] += self.teacher.group_weight([doc], width)
+        return stats
+
+    def load_state_dict(self, state):
+        if state['fingerprint'] != self.fingerprint or not 0 <= state['cursor'] <= len(self.groups):
+            raise ValueError('resume frozen batch plan differs')
+        self.cursor = state['cursor']
+
+
 class PlannedBatches:
     def __init__(self, teacher, groups, seed, balanced_prefix_batches=0):
         if not groups:

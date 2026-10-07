@@ -7,7 +7,10 @@ context-target conflicts, grading defects, and math-proxy training overlap.
 Most aggregate code-loss regression is prompt loss; answer-only regression is
 small. Keep u50 pending representative outcome evaluation. The user approved
 masking context across all conversational replay, preserving raw code/text.
-The next recipe planner implements this; no new training has started.
+The [next phase plan](NEXT_TRAINING_PHASE.md) freezes a single 40-step masked
+replay continuation, compared with unchanged u50. The user selected masked
+replay only; there is no legacy-loss control. CPU preflight covers all 80
+microbatches with zero conversational context targets. No new training has started.
 
 Pilot 1 finished and failed retention: see [results](AGENTIC_PILOT_RESULTS.md).
 Keep u50. The user authorized a [smaller follow-up](AGENTIC_V2_PLAN.md) with

@@ -7,6 +7,7 @@ This is a narrow synthetic task-success screen, not a general agent benchmark.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -20,8 +21,10 @@ from tool_tasks import call_problem
 
 
 class Environment:
-    def __init__(self, row):
+    def __init__(self, row, grading_version=1):
         self.row = row
+        self.grading_version = grading_version
+        self.grade = None
         self.env = row["environment"]
         self.state = self.env["initial_state"]
         self.refreshed = False
@@ -81,6 +84,33 @@ class Environment:
         raise ValueError("unhandled validated operation")
 
     def respond(self, text, truncated=False):
+        if self.grading_version == 2:
+            # Keep legacy execution for reproducibility, then apply the audited
+            # outcome checks. Do not infer a successful continuation offline.
+            kind = self.row['kind']
+            if kind == 'ask_choice' and not self.choice:
+                self.searched = any(m['role'] == 'tool' and
+                    len(json.loads(m['content']).get('matches', [])) >= 2 for m in self.messages)
+            if kind == 'ask_choice' and not self.choice and self.searched and not truncated:
+                has_call = '<tool_call>' in text
+                question = re.search(r'\b(which|choose|select|prefer)\b', text, re.I)
+                subject = re.search(r'\b(record|one|section|north|south|match)\b', text, re.I)
+                if not has_call and question and subject:
+                    self.messages.append({'role':'assistant','content':text})
+                    self.messages.append({'role':'user','content':'The north section, please.'})
+                    self.choice = self.asked = True
+                    return
+            self.grading_version = 1
+            try:
+                self.respond(text, truncated)
+            finally:
+                self.grading_version = 2
+            if self.done:
+                from agentic_grade_audit import grade
+                self.grade = grade(dict(id=self.row['doc_id'], messages=self.messages,
+                                        errors=self.errors, success=self.success))
+                self.success = self.grade['outcome'] is True
+            return
         kind, e = self.row["kind"], self.env
         try:
             calls = parse_calls(text, self.definitions)
@@ -124,15 +154,16 @@ class Environment:
         self.success &= not self.errors
 
 
-def run(args):
+def run(args, environments=None):
     import smoke_train
     import torch
     from transformers import AutoTokenizer
     from distillkit.models import Qwen35WidenedForCausalLM
     if args.output.exists():
         raise ValueError("refuse to overwrite live evaluation")
-    rows = [json.loads(l) for l in args.data.read_text(encoding="utf-8").splitlines()]
-    environments = []
+    rows = ([] if environments is not None else
+            [json.loads(l) for l in args.data.read_text(encoding="utf-8").splitlines()])
+    environments = [] if environments is None else environments
     for row in rows:
         if row["split"] != "eval":
             continue
@@ -141,32 +172,43 @@ def run(args):
         factory = make_contrast if row.get("curriculum_version") == 2 else make_trajectory
         fresh = factory(row["domain"], row["kind"], int(row["doc_id"].rsplit(":", 1)[1]))
         assert fresh["messages"] == row["messages"] and fresh["tools"] == row["tools"]
-        environments.append(Environment(fresh))
+        environments.append(Environment(fresh, args.grading_version))
     tok = AutoTokenizer.from_pretrained(args.checkpoint)
     tok.padding_side, tok.pad_token_id = "left", 248044
     model = Qwen35WidenedForCausalLM.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to("cuda:0").eval()
     model.config.use_cache = True
-    torch.manual_seed(0)
+    torch.manual_seed(getattr(args,'seed',0))
     for turn in range(8):
         active = [e for e in environments if not e.done]
         if not active:
             break
-        for start in range(0, len(active), 8):
-            batch = active[start:start + 8]
+        batch_size = getattr(args,'batch_size',8)
+        sampling = getattr(args,'sample',False)
+        if batch_size<1 or (sampling and batch_size!=1):
+            raise ValueError('positive batch size required; sampled trajectories use batch size 1 for independent seeds')
+        for start in range(0, len(active), batch_size):
+            batch = active[start:start + batch_size]
             prompts = [tok.apply_chat_template(e.messages, tools=e.row["tools"], tokenize=False,
                         add_generation_prompt=True, enable_thinking=False) for e in batch]
             inputs = tok(prompts, return_tensors="pt", padding=True, add_special_tokens=False).to("cuda:0")
+            if sampling:
+                seed=int.from_bytes(hashlib.sha256(f"{batch[0].row['doc_id']}:{turn}:{args.seed}".encode()).digest()[:8],'little')%(2**63-1)
+                torch.manual_seed(seed)
             with torch.inference_mode():
-                outputs = model.generate(**inputs, max_new_tokens=512, do_sample=False,
-                    temperature=None, top_p=None, top_k=None, eos_token_id=[248044, 248046], pad_token_id=248044)
+                outputs = model.generate(**inputs, max_new_tokens=512, do_sample=sampling,
+                    temperature=.6 if sampling else None, top_p=.95 if sampling else None,
+                    top_k=20 if sampling else None, eos_token_id=[248044, 248046], pad_token_id=248044)
             for e, output in zip(batch, outputs):
                 tokens = output[inputs["input_ids"].shape[1]:].tolist()
                 stops = [i for i, t in enumerate(tokens) if t in (248044, 248046)]
                 e.respond(tok.decode(tokens[:stops[0]] if stops else tokens, skip_special_tokens=False), not stops)
         print(f"turn {turn + 1}: {sum(e.done for e in environments)}/{len(environments)} finished", flush=True)
     records = [dict(id=e.row["doc_id"], kind=e.row["kind"], success=e.success and e.done,
-                    calls=e.calls, mutations=e.mutations, errors=e.errors, messages=e.messages) for e in environments]
-    args.output.write_text(json.dumps(dict(checkpoint=str(args.checkpoint), records=records), indent=2), encoding="utf-8")
+                    calls=e.calls, mutations=e.mutations, errors=e.errors, messages=e.messages,
+                    grade=e.grade) for e in environments]
+    args.output.write_text(json.dumps(dict(checkpoint=str(args.checkpoint), grading_version=args.grading_version,
+                                           seed=getattr(args,'seed',0),sample=getattr(args,'sample',False),
+                                           records=records), indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
@@ -174,4 +216,9 @@ if __name__ == "__main__":
     p.add_argument("--checkpoint", type=Path, required=True)
     p.add_argument("--data", type=Path, required=True)
     p.add_argument("--output", type=Path, required=True)
+    p.add_argument('--grading-version', type=int, choices=[1,2], default=2,
+                   help='2 separates recovery from failure; 1 reproduces historical grading')
+    p.add_argument('--batch-size', type=int, default=8)
+    p.add_argument('--seed',type=int,default=0)
+    p.add_argument('--sample',action='store_true')
     run(p.parse_args())

@@ -258,6 +258,8 @@ def main(argv=None) -> int:
                         help="micro-batches per optimizer step; fixed-window sampling "
                              "keeps --batch rows per step, while cached documents use "
                              "--micro-batch or --micro-tokens per forward")
+    parser.add_argument("--ordered-batches", type=Path,
+                        help="finite JSON document/width sequence shared by controlled arms")
     parser.add_argument("--tokens", type=int, default=30_000_000,
                         help="scored tokens; one pass over the v1 store is 30.7M")
     parser.add_argument("--passes", type=float, default=None,
@@ -1188,17 +1190,35 @@ def main(argv=None) -> int:
             raise SystemExit("no training documents survive the sample plan")
         corpus_targets = teacher.planned_tokens(args.micro_batch, block, args.micro_tokens or None)
         batches = PlannedBatches(teacher, groups, args.seed, args.balanced_prefix_batches)
+        if args.ordered_batches:
+            from training_state import OrderedBatches
+            if args.balanced_prefix_batches or args.benchmark_fixed_records:
+                raise ValueError('ordered batches cannot be combined with other ordering modes')
+            frozen = json.loads(args.ordered_batches.read_text(encoding='utf-8'))
+            if len(frozen['groups']) % args.accumulate:
+                raise ValueError('ordered batches must contain complete optimizer steps')
+            batches = OrderedBatches(teacher, groups, frozen)
+            groups = batches.groups
         shapes = sorted({(len(g), w) for g, w in groups})
         print("plan: %d documents, %d supervised targets, %d batches, %d shapes; "
               "dropped %d short and %d without enough answer targets"
               % (sum(len(g) for g, _ in groups), corpus_targets, len(groups), len(shapes),
                  teacher.dropped_short, teacher.dropped_truncated_answer), flush=True)
     else:
+        if args.ordered_batches:
+            raise ValueError('ordered batches require teacher caches')
         corpus_targets = len(stream) - 1
         batches = WindowBatches(stream, args.batch // args.accumulate, args.length, args.seed)
         shapes = [(args.batch // args.accumulate, args.length)]
     if args.passes is not None:
+        if args.ordered_batches:
+            raise ValueError('ordered batches use their finite step count, not --passes')
         args.tokens = int(args.passes * corpus_targets)
+    if args.ordered_batches:
+        expected_steps=len(batches.groups)//args.accumulate
+        required_targets=sum(v[2] for v in batches.exposure().values())
+        if args.tokens<required_targets or (args.max_steps is not None and args.max_steps!=expected_steps):
+            raise ValueError('ordered run must cover the full frozen plan; budget or step limit would truncate it')
     if args.tokens < 1:
         raise SystemExit("budget contains no supervised targets")
     fixed_manifest = None
@@ -1234,7 +1254,8 @@ def main(argv=None) -> int:
     if teacher is not None:
         # The mix this budget actually trains on, capture by capture (a pass's shares only
         # promise it in expectation).
-        exposure = prefix_exposure(teacher, groups, args.seed, args.tokens, args.balanced_prefix_batches)
+        exposure = (batches.exposure() if args.ordered_batches else
+                    prefix_exposure(teacher, groups, args.seed, args.tokens, args.balanced_prefix_batches))
         for name, (visits, distinct, targets) in sorted(exposure.items(), key=lambda kv: -kv[1][2]):
             print("prefix: %-34s %6d visits %6d distinct %10.0f targets" % (name, visits, distinct, targets),
                   flush=True)

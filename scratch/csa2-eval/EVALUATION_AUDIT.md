@@ -6,6 +6,12 @@ Date: 2026-10-07. Both 20-step pilot-2 arms completed. Keep u50 while the
 evaluation gaps below are resolved. No additional training or checkpoint
 promotion was performed during this audit.
 
+Follow-up: [the next phase plan](NEXT_TRAINING_PHASE.md) corrects live grading,
+freezes broader retention and independently generated agent development tests,
+and replaces the overlapping math proxy. The user chose masked replay only
+against u50. Its finite 40-step schedule supersedes the earlier two-arm dry plan
+below; no follow-up training has started.
+
 ## Actual replay objectives
 
 Reconstructed the exact 40 microbatches from each arm (same seed, repetition,

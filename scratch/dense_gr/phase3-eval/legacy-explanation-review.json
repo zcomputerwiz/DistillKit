@@ -1,0 +1,102 @@
+{
+  "method": "Non-blind single-assistant semantic review against the frozen reference definition. Not an independent judge or an automatic grade for new generations.",
+  "reference": "Reviewed means the record has been checked; it does not by itself mean the record is active or ready.",
+  "records": [
+    {
+      "arm": "base",
+      "id": "agentic-v2:dispatch:no_call:0",
+      "text": "A dispatch record is reviewed when its current state is checked to ensure it is accurate and complete before it is used for any further actions.",
+      "text_sha256": "71890da1b22cdaf5da8c4c52b03269e69d7b0a24b8551c0316b9a0925c2b4030",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "base",
+      "id": "agentic-v2:dispatch:no_call:1",
+      "text": "A dispatch record is reviewed when its current state is checked to ensure it is accurate and complete before it is acted upon.",
+      "text_sha256": "312a3b4cfb50df70222e61c7de57ed93ca3f9fe4226224ccc1b618f68f26af0d",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "base",
+      "id": "agentic-v2:records:no_call:0",
+      "text": "A record is reviewed when its current state is checked and verified against the expected or expected-to-be state before any changes are made.",
+      "text_sha256": "d06c70c1a49be585791baf93f53fcbd23e26f47d460e6d36d45ea18158b6f4f6",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "base",
+      "id": "agentic-v2:records:no_call:1",
+      "text": "A records record is reviewed when its state is updated by the system.",
+      "text_sha256": "5d37dab62bd9f33343910451e0bab91a1c1505791d81d8fdf93306e3e73fe143",
+      "correct": false,
+      "rationale": "Conflates review with a state update or stale-session refresh."
+    },
+    {
+      "arm": "agentic",
+      "id": "agentic-v2:dispatch:no_call:0",
+      "text": "A dispatch record is reviewed when it is stale and needs to be updated with the latest information.",
+      "text_sha256": "142ad689a848eccd34e0dde6210617764fe03425806d96551a30ea170b297595",
+      "correct": false,
+      "rationale": "Conflates review with a state update or stale-session refresh."
+    },
+    {
+      "arm": "agentic",
+      "id": "agentic-v2:dispatch:no_call:1",
+      "text": "A dispatch record is reviewed when it is stale and needs to be refreshed to restore its current state.",
+      "text_sha256": "2e98af375eb9b0289381e9fd9808d1c8629a0062f53360f0afe5284db2ec095f",
+      "correct": false,
+      "rationale": "Conflates review with a state update or stale-session refresh."
+    },
+    {
+      "arm": "agentic",
+      "id": "agentic-v2:records:no_call:0",
+      "text": "A record is reviewed when its state is checked and verified against the expected state.",
+      "text_sha256": "1680827e5558192aff3d29a8fcc090cbfe5ebef1f30974fd4799a4062c7fa0bf",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "agentic",
+      "id": "agentic-v2:records:no_call:1",
+      "text": "A record is reviewed when its state is updated by records_update_state.",
+      "text_sha256": "a600f98586bd5e33873fbed47f4d48331d45c8cd2b78a0ae358495b83bbb58ed",
+      "correct": false,
+      "rationale": "Conflates review with a state update or stale-session refresh."
+    },
+    {
+      "arm": "replay",
+      "id": "agentic-v2:dispatch:no_call:0",
+      "text": "A dispatch record is reviewed when its state is checked to confirm it is current and valid before any further actions are taken.",
+      "text_sha256": "a2ca9951ef07b87817147b66ff1435d0d30f811ee0fea5906ee0529e55f20395",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "replay",
+      "id": "agentic-v2:dispatch:no_call:1",
+      "text": "A dispatch record is reviewed when its current state is checked to determine if any updates are needed.",
+      "text_sha256": "a9513062f1aae6ebb2d43df52912e3001bffc73aee6c9084bebdeaf0e41c196e",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "replay",
+      "id": "agentic-v2:records:no_call:0",
+      "text": "A record is reviewed when its current state is checked and verified against the expected state before any changes are made.",
+      "text_sha256": "e41d73af09ed20fd7cd78984bdb03f1950a50c750bc29aceffc088380afea2be",
+      "correct": true,
+      "rationale": "Explains review as checking or verification."
+    },
+    {
+      "arm": "replay",
+      "id": "agentic-v2:records:no_call:1",
+      "text": "A record is reviewed when its state is updated by records_update_state.",
+      "text_sha256": "a600f98586bd5e33873fbed47f4d48331d45c8cd2b78a0ae358495b83bbb58ed",
+      "correct": false,
+      "rationale": "Conflates review with a state update or stale-session refresh."
+    }
+  ]
+}

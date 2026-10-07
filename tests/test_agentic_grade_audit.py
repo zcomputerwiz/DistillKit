@@ -5,6 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scratch/dense_gr'))
 from agentic_curriculum import make_contrast
 from agentic_grade_audit import grade, asserted_state, missing_fallback
+from agentic_grade_audit import unbacked_announcements
 from agentic_live_eval import Environment
 from tool_behavior_eval import call
 
@@ -80,3 +81,34 @@ def test_review_keyword_is_not_automatic_semantic_success():
     env.respond('Review means I refuse to answer.')
     result = grade(record(env))
     assert result['outcome'] is None and result['review']
+
+
+def test_live_v2_accepts_clarification_without_both_direction_words():
+    env = Environment(make_contrast('dispatch', 'ask_choice', 0), grading_version=2)
+    invoke(env, 'search', name=env.env['name'])
+    env.respond('Which record should I choose?')
+    assert env.choice and env.asked and not env.done
+    invoke(env, 'set_state', record_id=env.env['id'], state=env.env['desired_state'])
+    env.respond('The record is now ' + env.state + '.')
+    assert env.success and env.grade['clean_success']
+
+
+def test_live_v2_does_not_invent_choices_after_wrong_search():
+    env = Environment(make_contrast('dispatch', 'ask_choice', 0), grading_version=2)
+    invoke(env, 'search', name='wrong')
+    env.respond('Which record should I choose, north or south?')
+    assert not env.choice and not env.success
+
+
+def test_live_v2_recovers_read_but_preserves_error_count():
+    env = Environment(make_contrast('dispatch', 'known_id', 0), grading_version=2)
+    invoke(env, 'read', record_id='missing')
+    invoke(env, 'set_state', record_id=env.env['id'], state=env.env['desired_state'])
+    env.respond('The record is now ' + env.state + '.')
+    assert env.success and not env.grade['clean_success']
+
+
+def test_announcement_without_call_is_flagged_but_conditional_offer_is_not():
+    assert unbacked_announcements([dict(role='assistant',content="I'll search now.")])==[0]
+    assert not unbacked_announcements([dict(role='assistant',content="I'll search now.",tool_calls=[{}])])
+    assert not unbacked_announcements([dict(role='assistant',content="I'll update it once you choose a record.")])
