@@ -2,7 +2,9 @@
 
 Assisted-by: Codex
 
-Date: 2026-10-07. **Planning and validation only; no training has started.**
+Date: 2026-10-07. **Execution authorized; u50 baseline evaluation is running.**
+No training has started yet. Runtime receipts and logs are in
+`scratch/dense_gr/phase3-masking/runs/`; the frozen plan files remain immutable.
 The user selected masked replay only, compared with u50. There is no runnable
 legacy context-loss arm. The older `agentic-v3-masked-plan` is superseded by
 `scratch/dense_gr/phase3-masking/plan.json`.
@@ -163,6 +165,15 @@ These are debugging cases, not a representative baseline. Their saved traces
 are `phase3-eval/smoke-agent-optional-cursor-output.json`.
 
 All paths below are relative to DistillKit; use `.venv/Scripts/python.exe`.
+
+`phase3_run.py baseline` executes the frozen baseline commands on independent
+GPU lanes (agent jobs on GPU 0, math jobs on GPU 1). Inspect the outputs before
+`phase3_run.py train`; training uses both GPUs and refuses an incomplete baseline.
+Then use `phase3_run.py candidate` and `phase3_run.py paired`. Stage receipts
+record the exact argv, device assignment, plan/protocol hashes, PID and exit code.
+Completed stages can be skipped on restart; failed or interrupted stages require
+inspection rather than automatic overwrite. `phase3_report.py` summarizes saved
+outcomes and review flags and lists paired gains/losses when both arms exist.
 
 ```text
 scratch/dense_gr/next_phase_plan.py --verify
