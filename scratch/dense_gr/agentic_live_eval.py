@@ -175,8 +175,18 @@ def run(args, environments=None):
         environments.append(Environment(fresh, args.grading_version))
     tok = AutoTokenizer.from_pretrained(args.checkpoint)
     tok.padding_side, tok.pad_token_id = "left", 248044
+    query_chunk = getattr(args, 'prefill_query_chunk', 0)
+    if query_chunk < 0:
+        raise ValueError('prefill query chunk must be nonnegative')
+    if query_chunk:
+        # Leave physical-memory headroom and cap PyTorch's allocator. This does
+        # not account for external CUDA allocations, so monitor Windows too.
+        torch.cuda.set_per_process_memory_fraction(.90)
     model = Qwen35WidenedForCausalLM.from_pretrained(args.checkpoint, dtype=torch.bfloat16).to("cuda:0").eval()
     model.config.use_cache = True
+    if query_chunk:
+        from bounded_cached_prefill import install
+        print('Bounded cached prefill layers:', install(model, query_chunk), flush=True)
     torch.manual_seed(getattr(args,'seed',0))
     for turn in range(8):
         active = [e for e in environments if not e.done]
@@ -195,6 +205,8 @@ def run(args, environments=None):
                 seed=int.from_bytes(hashlib.sha256(f"{batch[0].row['doc_id']}:{turn}:{args.seed}".encode()).digest()[:8],'little')%(2**63-1)
                 torch.manual_seed(seed)
             with torch.inference_mode():
+                if query_chunk:
+                    torch.cuda.reset_peak_memory_stats()
                 outputs = model.generate(**inputs, max_new_tokens=512, do_sample=sampling,
                     temperature=.6 if sampling else None, top_p=.95 if sampling else None,
                     top_k=20 if sampling else None, eos_token_id=[248044, 248046], pad_token_id=248044)
@@ -203,11 +215,16 @@ def run(args, environments=None):
                 stops = [i for i, t in enumerate(tokens) if t in (248044, 248046)]
                 e.respond(tok.decode(tokens[:stops[0]] if stops else tokens, skip_special_tokens=False), not stops)
             print(f"turn {turn + 1}: evaluated {min(start + batch_size, len(active))}/{len(active)} active tasks", flush=True)
+            if query_chunk:
+                print(f"prefill width {inputs['input_ids'].shape[1]}, batch {len(batch)}, "
+                      f"peak allocated {torch.cuda.max_memory_allocated()/2**30:.2f} GiB, "
+                      f"reserved {torch.cuda.max_memory_reserved()/2**30:.2f} GiB", flush=True)
         print(f"turn {turn + 1}: {sum(e.done for e in environments)}/{len(environments)} finished", flush=True)
     records = [dict(id=e.row["doc_id"], kind=e.row["kind"], success=e.success and e.done,
                     calls=e.calls, mutations=e.mutations, errors=e.errors, messages=e.messages,
                     grade=e.grade) for e in environments]
     args.output.write_text(json.dumps(dict(checkpoint=str(args.checkpoint), grading_version=args.grading_version,
+                                           prefill_query_chunk=query_chunk,
                                            seed=getattr(args,'seed',0),sample=getattr(args,'sample',False),
                                            records=records), indent=2), encoding="utf-8")
 
@@ -222,4 +239,5 @@ if __name__ == "__main__":
     p.add_argument('--batch-size', type=int, default=8)
     p.add_argument('--seed',type=int,default=0)
     p.add_argument('--sample',action='store_true')
+    p.add_argument('--prefill-query-chunk',type=int,default=0)
     run(p.parse_args())

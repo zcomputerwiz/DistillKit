@@ -205,6 +205,7 @@ if __name__=='__main__':
     p.add_argument('--seed',type=int,default=0)
     p.add_argument('--sample',action='store_true')
     p.add_argument('--short-only',action='store_true')
+    p.add_argument('--prefill-query-chunk',type=int,default=0)
     a=p.parse_args()
     if a.command=='freeze':
         freeze(a.data)

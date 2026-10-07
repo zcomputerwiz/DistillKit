@@ -74,6 +74,9 @@ def validate_available(require_complete=False):
                 if row['messages'][:len(original)]!=original:
                     raise ValueError('agent initial messages mismatch: '+row['id'])
         checkpoint=manifest['checkpoint'] if Path(argv[0]).name=='math_dev_eval.py' else output['checkpoint']
+        if '--prefill-query-chunk' in argv:
+            if output.get('prefill_query_chunk') != int(argv[argv.index('--prefill-query-chunk')+1]):
+                raise ValueError('bounded prefill runtime mismatch')
         if Path(checkpoint).resolve()!=Path(read(OUT/'plan.json')['start_checkpoint']).resolve():
             raise ValueError('baseline checkpoint mismatch')
         checked.append(dict(index=index,output=str(destination),cases=len(rows)))

@@ -44,6 +44,9 @@ def invoke(label, argv, devices):
     info=dict(label=label,status='running',argv=argv,argv_sha256=signature,
               cuda_visible_devices=devices,started=datetime.now(timezone.utc).isoformat(),
               protocol_sha256=digest(OUT/'evaluation.json'),plan_sha256=digest(OUT/'plan.json'))
+    if '--prefill-query-chunk' in argv:
+        info['runtime_source_sha256']={name:digest(HERE/name) for name in
+            ('bounded_cached_prefill.py','agentic_live_eval.py','agentic_scenarios.py')}
     with (runs/(label+'.log')).open('w',encoding='utf-8') as log:
         child=subprocess.Popen([sys.executable,*argv],cwd=ROOT,env=env,stdout=log,stderr=subprocess.STDOUT)
         info['pid']=child.pid

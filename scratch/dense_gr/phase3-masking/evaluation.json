@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "status": "frozen_not_executed",
   "assets": [
     {
@@ -43,7 +43,9 @@
         "--checkpoint",
         "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\merges-long1\\u50",
         "--output",
-        "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\eval\\base\\scenarios-greedy.json"
+        "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\eval\\base\\scenarios-greedy.json",
+        "--prefill-query-chunk",
+        "256"
       ],
       [
         "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\agentic_live_eval.py",
@@ -152,7 +154,9 @@
         "--checkpoint",
         "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\masked\\checkpoints\\smoke-r1-1-gr-s25-csa2",
         "--output",
-        "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\eval\\masked\\scenarios-greedy.json"
+        "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\eval\\masked\\scenarios-greedy.json",
+        "--prefill-query-chunk",
+        "256"
       ],
       [
         "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\agentic_live_eval.py",
@@ -283,5 +287,12 @@
       "--save-token-evidence"
     ]
   ],
-  "instruction": "Run with project Python from DistillKit. Create destination parents first. Baseline before training; candidate afterward. Final code/math benchmarks are separate confirmation, not recipe-selection metrics."
+  "instruction": "Run with project Python from DistillKit. Create destination parents first. Baseline before training; candidate afterward. Final code/math benchmarks are separate confirmation, not recipe-selection metrics.",
+  "runtime_amendment": {
+    "previous_protocol_sha256": "9c1aa9d9a3ddd6490f8a8328a2c9ea4a30321050d7e1151476122d16c8047947",
+    "reason": "VRAM spill in long cached prefill",
+    "scope": "Only command 0 in both arms: chunk independent indexer and SDPA query rows at 256; original projections, cache, selection, DeltaNet, sampling and data retained.",
+    "validation": "prefill-validation.json: exact selected sets and logits, identical 16-token greedy continuations through 3147 padded tokens; batch 2 x 16384 prefill peak allocated 10.893 GiB.",
+    "completed_baseline_receipts": "Commands 1-8 are unchanged and retained under their original protocol hash."
+  }
 }

@@ -1,0 +1,76 @@
+{
+  "query_chunk": 256,
+  "parity": [
+    {
+      "label": "512",
+      "length": 512,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "top1_equal": true,
+      "selected_sets_equal": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "greedy_tokens_equal": true
+    },
+    {
+      "label": "1024",
+      "length": 1024,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "top1_equal": true,
+      "selected_sets_equal": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "greedy_tokens_equal": true
+    },
+    {
+      "label": "2048",
+      "length": 2048,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "top1_equal": true,
+      "selected_sets_equal": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "greedy_tokens_equal": true
+    },
+    {
+      "label": "padded-agent-pair",
+      "length": 3147,
+      "max_abs": 0.0,
+      "mean_abs": 0.0,
+      "top1_equal": true,
+      "selected_sets_equal": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "greedy_tokens_equal": true
+    }
+  ],
+  "long_prefill": {
+    "length": 16384,
+    "batch": 2,
+    "seconds": 5.525719300028868,
+    "peak_allocated_gib": 10.89302396774292,
+    "peak_reserved_gib": 11.939453125
+  }
+}

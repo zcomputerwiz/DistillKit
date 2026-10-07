@@ -234,3 +234,19 @@ are recorded in [the evaluation audit](EVALUATION_AUDIT.md) and
 [the role-loss review](ROLE_LOSS_REVIEW.md). The specific 40-step schedule and
 triage thresholds are experimental choices for this project, not prescriptions
 claimed from those papers.
+
+### 2026-10-07: long baseline stopped for memory spill
+
+Windows GPU Process Memory counters measured PID 34792 (the u50 long agent baseline) at 23.468 GiB dedicated GPU memory and 44.529 GiB shared system memory on physical GPU 0; physical GPU 1 allocations from that process were zero. The process working set was 50,281,291,776 bytes. This confirms shared-memory spill; process commit is not a measurement of disk paging.
+
+The offending evaluation and its waiting continuation worker were stopped. The base-00 receipt records failure; the eight completed baseline stages are retained. Training has not started. The long suite only writes trajectories at completion, so its in-memory partial progress is not recoverable.
+
+Source inspection points to cached CSA2 prefill materializing full query-by-key routing and attention tensors. This is a likely source, not a measured tensor-level attribution. Installed Transformers generation already sets logits_to_keep=1 for this model, so adding that argument is not a remedy. Before resuming, bound prefill memory and validate the inference path consistently for both arms; preserve the frozen data and training objective. No model source has been changed.
+
+### Bounded cached prefill validated and restart authorized
+
+The evaluator now supports `--prefill-query-chunk 256`. Its per-instance adapter splits independent indexer query rows and the existing SDPA query rows, retaining the original projections, key history, cache updates, DeltaNet prefill, attention math, top-k rules, and decode. Model source is untouched. Full boolean selection masks remain quadratic; the large per-head float temporaries are bounded by query chunk times key length. This resolves the measured long-suite allocation without claiming linear memory at arbitrary context lengths. The bounded evaluator also caps the PyTorch allocator at 90% of physical GPU memory, leaving headroom; external CUDA allocations still require monitoring.
+
+Validation on u50: 512, 1024 and 2048 tokens, plus a left-padded two-row agent prompt batch of width 3147. All six layers' selected sets were identical, last-position logit max/mean absolute differences were zero, top-1 agreed, and 16-token greedy continuations were identical. A batch of two 16,384-token prompts completed in 5.526 seconds with peak allocated 10.893 GiB and peak reserved 11.939 GiB. These are bounded validation cases, not a general bitwise equivalence guarantee. Masked SDPA CPU tests and existing agent/protocol tests passed (18 tests).
+
+Evaluation protocol version 2 adds the flag only to command 0 in both arms and records the prior protocol hash. Commands 1-8, the frozen documents, training plan, objective and batch size are unchanged. Their completed baseline receipts remain valid. The failed long run's receipt/log and original protocol are archived in `phase3-masking/runs/spill-20261007T2243`. The long baseline will restart, followed by the previously authorized bounded training/evaluation sequence.
