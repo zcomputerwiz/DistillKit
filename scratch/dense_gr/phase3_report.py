@@ -25,6 +25,9 @@ def agent(path):
         counts['clean_success']+=bool(grade.get('clean_success',row['success'] and not row['errors']))
         counts['environment_outcome']+=bool(grade.get('outcome',False))
         counts['unauthorized_cases']+=bool('unauthorized_write' in row['errors'])
+        counts['false_completion_cases']+=bool(grade.get('false_completion') or (
+            row['kind'] in ('pagination','indirect_id','recover')
+            and grade.get('report_verified') and not grade.get('outcome')))
         counts['invalid_attempts']+=len(row['errors'])
         counts['unfinished']+=row.get('grade') is None
         counts['announcement_flags']+=len(grade.get('unbacked_announcements',[]))
@@ -46,6 +49,7 @@ def math_summary(path):
         raise ValueError('incomplete math run: '+str(path))
     rows=[json.loads(line) for line in (path/'cases.jsonl').read_text(encoding='utf-8').splitlines()]
     return dict(summary=read(path/'summary.json'),cases=len(rows),
+                budget_prefix=read(path/'budget-prefix.json')['summary'] if (path/'budget-prefix.json').exists() else None,
                 stop_tokens=dict(Counter(str(r['stop_token']) for r in rows)),
                 mean_generated_tokens=sum(len(r['token_ids']) for r in rows)/len(rows))
 

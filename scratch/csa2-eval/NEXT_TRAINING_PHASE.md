@@ -117,6 +117,9 @@ independent judge. It reinforces the decision not to promote v2.
    the first 16 cases per subject at 4,096 tokens with seed 0 to diagnose cap
    sensitivity. Grade strict boxed answers, but report unboxed/truncated cases
    separately and retain text for review. Do not silently change answer extraction.
+   The longer run uses a different batch shape: do not interpret cross-run
+   differences as purely the output-cap effect. Also grade each saved long-run
+   trajectory's first 2,048 tokens as a within-trajectory cap diagnostic.
 4. Train only the masked arm from the serialized argv after the baseline is
    valid. Save the final model and resume state. Do not automatically continue
    beyond 40 steps or promote the result.
@@ -167,13 +170,41 @@ are `phase3-eval/smoke-agent-optional-cursor-output.json`.
 All paths below are relative to DistillKit; use `.venv/Scripts/python.exe`.
 
 `phase3_run.py baseline` executes the frozen baseline commands on independent
-GPU lanes (agent jobs on GPU 0, math jobs on GPU 1). Inspect the outputs before
+GPU lanes (long agent suite on GPU 0; math, legacy and sampled agent jobs on GPU 1).
+This reuses the second GPU while long distractor prefills run. Inspect outputs before
 `phase3_run.py train`; training uses both GPUs and refuses an incomplete baseline.
 Then use `phase3_run.py candidate` and `phase3_run.py paired`. Stage receipts
 record the exact argv, device assignment, plan/protocol hashes, PID and exit code.
 Completed stages can be skipped on restart; failed or interrupted stages require
 inspection rather than automatic overwrite. `phase3_report.py` summarizes saved
 outcomes and review flags and lists paired gains/losses when both arms exist.
+
+The authorized continuation is running as `phase3_continue.py`. It waits for all
+baseline receipts, validates case inventories, initial messages, math question
+hashes/references and stop/truncation contracts, then runs the bounded training,
+candidate evaluations and paired retention. Any failed stage stops progression.
+Unknown semantic reports remain review items; the structural gate does not
+declare them passes. Runtime state is `phase3-masking/execution-status.json`.
+Final confirmation and model adoption still require assessment of the comparison.
+
+Observed baseline results so far: GSM8K 48/47/47 of 64, MATH 32/32/33 of 64
+across the three runs. One greedy GSM8K answer-grade flip occurred on identical
+prompts, so small candidate deltas need numerical-variation context. MATH has
+21/21/20 truncated cases at 2,048 tokens. On the long subset, grading its own
+2,048-token prefixes and full outputs gives the same 14/16 GSM8K and 10/16 MATH;
+this subset alone does not settle truncation sensitivity for the remaining cases.
+The three sampled agent trials score 15/15/14 automatic passes of 24, with
+11/13/13 clean passes. They all show three false-completion claims after renewing
+a session without retrying the failed write. Manual free-prose decisions are
+recorded separately in `phase3-masking/reviews/` and are not blind independent
+judgments. The 72-task long suite remains in progress.
+
+Performance follow-up: `CSA2Attention._token_path` requires no cache, so ordinary
+cache-enabled prefills take `_forward_gathered` even on long prompts. The no-cache
+path chunks query rows; the cache path materializes dense query/key scores.
+This is a candidate explanation for expensive long prefills, not a measured
+attribution. A chunked prefill that also fills the cache is a future optimization;
+the current comparison keeps the inference path consistent and model code intact.
 
 ```text
 scratch/dense_gr/next_phase_plan.py --verify

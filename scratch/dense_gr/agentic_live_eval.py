@@ -202,6 +202,7 @@ def run(args, environments=None):
                 tokens = output[inputs["input_ids"].shape[1]:].tolist()
                 stops = [i for i, t in enumerate(tokens) if t in (248044, 248046)]
                 e.respond(tok.decode(tokens[:stops[0]] if stops else tokens, skip_special_tokens=False), not stops)
+            print(f"turn {turn + 1}: evaluated {min(start + batch_size, len(active))}/{len(active)} active tasks", flush=True)
         print(f"turn {turn + 1}: {sum(e.done for e in environments)}/{len(environments)} finished", flush=True)
     records = [dict(id=e.row["doc_id"], kind=e.row["kind"], success=e.success and e.done,
                     calls=e.calls, mutations=e.mutations, errors=e.errors, messages=e.messages,

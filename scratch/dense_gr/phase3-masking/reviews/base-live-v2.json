@@ -1,0 +1,16 @@
+{
+  "evaluation": "base/live-v2.json",
+  "reviewer": "Codex; non-blind semantic review, not independent judge",
+  "correct_explanations": [
+    "agentic-v2:dispatch:no_call:0",
+    "agentic-v2:dispatch:no_call:1",
+    "agentic-v2:records:no_call:0"
+  ],
+  "incorrect_explanations": [
+    "agentic-v2:records:no_call:1"
+  ],
+  "reason": "Reviewed means checked/verified, not that the state was updated. The first three explanations match; the last conflates review with mutation.",
+  "automatic_success": 33,
+  "reviewed_success": 36,
+  "clean_success": 33
+}

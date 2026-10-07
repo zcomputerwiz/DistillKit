@@ -1,7 +1,7 @@
 # Assisted-by: Codex
 """Execute frozen phase-3 commands, retaining logs and resumable stage receipts.
 
-Baseline evaluation uses separate GPUs for independent agent and math jobs.
+Evaluation uses GPU 0 for the long agent suite; GPU 1 runs math and short agent suites.
 Training owns both GPUs; paired retention runs on GPU 0. No promotion is performed.
 """
 import argparse
@@ -67,10 +67,15 @@ def main(stage):
     if stage in ('baseline','candidate'):
         arm='base' if stage=='baseline' else 'masked'
         commands=spec['commands'][arm]
-        def lane(math):
-            for index,argv in enumerate(commands):
-                if ('math_dev_eval.py' in Path(argv[0]).name)==math:
-                    invoke(f'{arm}-{index:02d}',argv,'1' if math else '0')
+        def lane(secondary):
+            # Long distractor prefills dominate greedy agent evaluation. Fill the
+            # other GPU with math, then independent sampled trials while it runs.
+            indices=([i for i,a in enumerate(commands) if Path(a[0]).name=='math_dev_eval.py']+
+                     [i for i,a in enumerate(commands) if Path(a[0]).name=='agentic_live_eval.py']+
+                     [i for i,a in reversed(list(enumerate(commands))) if '--sample' in a]) if secondary else [
+                         i for i,a in enumerate(commands) if Path(a[0]).name=='agentic_scenarios.py' and '--sample' not in a]
+            for index in indices:
+                invoke(f'{arm}-{index:02d}',commands[index],'1' if secondary else '0')
         with ThreadPoolExecutor(max_workers=2) as pool:
             futures=[pool.submit(lane,math) for math in (False,True)]
             for future in futures:
