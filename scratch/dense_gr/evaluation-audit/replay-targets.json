@@ -1,0 +1,2786 @@
+{
+  "arms": {
+    "agentic": {
+      "teacher-cache-expand-code-w8/structure": {
+        "targets": 2304.0,
+        "ce_mass": 1152.0,
+        "kl_mass": 1152.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 976.5,
+        "teacher_target_absent_mass": 9.0,
+        "teacher_premature_stop_mass": 13.0
+      },
+      "teacher-cache-expand-code-w8/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/user": {
+        "targets": 36375.0,
+        "ce_mass": 18187.5,
+        "kl_mass": 18187.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7109.0,
+        "teacher_target_absent_mass": 2083.0,
+        "teacher_premature_stop_mass": 6821.5
+      },
+      "teacher-cache-expand-code-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/assistant": {
+        "targets": 46159.0,
+        "ce_mass": 23079.5,
+        "kl_mass": 23079.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 19579.5,
+        "teacher_target_absent_mass": 18.5,
+        "teacher_premature_stop_mass": 66.5
+      },
+      "teacher-cache-expand-code-w8/thinking": {
+        "targets": 256.0,
+        "ce_mass": 128.0,
+        "kl_mass": 128.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/plain": {
+        "targets": 512.0,
+        "ce_mass": 256.0,
+        "kl_mass": 256.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 256.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/structure": {
+        "targets": 648.0,
+        "ce_mass": 324.0,
+        "kl_mass": 324.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 230.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 10.5
+      },
+      "teacher-cache-teacher-code/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/user": {
+        "targets": 20153.0,
+        "ce_mass": 10076.5,
+        "kl_mass": 10076.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 3622.0,
+        "teacher_target_absent_mass": 1236.5,
+        "teacher_premature_stop_mass": 5104.5
+      },
+      "teacher-cache-teacher-code/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/assistant": {
+        "targets": 19699.0,
+        "ce_mass": 9849.5,
+        "kl_mass": 9849.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 9565.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-teacher-code/thinking": {
+        "targets": 16876.0,
+        "ce_mass": 8438.0,
+        "kl_mass": 8438.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 8129.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/plain": {
+        "targets": 72.0,
+        "ce_mass": 36.0,
+        "kl_mass": 36.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 36.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/structure": {
+        "targets": 944.0,
+        "ce_mass": 472.0,
+        "kl_mass": 472.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 448.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/assistant": {
+        "targets": 4273.0,
+        "ce_mass": 2136.5,
+        "kl_mass": 2136.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1815.5,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 0.5
+      },
+      "teacher-cache-agent-smol-b/thinking": {
+        "targets": 19050.0,
+        "ce_mass": 9525.0,
+        "kl_mass": 9525.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7710.5,
+        "teacher_target_absent_mass": 1.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/tool-call": {
+        "targets": 21766.0,
+        "ce_mass": 10883.0,
+        "kl_mass": 10883.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 10511.0,
+        "teacher_target_absent_mass": 1.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/structure": {
+        "targets": 2766.0,
+        "ce_mass": 2766.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/assistant": {
+        "targets": 5087.0,
+        "ce_mass": 5087.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/thinking": {
+        "targets": 538.0,
+        "ce_mass": 538.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/tool-call": {
+        "targets": 11434.0,
+        "ce_mass": 11434.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "cache/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/structure": {
+        "targets": 9.0,
+        "ce_mass": 0.0,
+        "kl_mass": 9.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/user": {
+        "targets": 27.0,
+        "ce_mass": 0.0,
+        "kl_mass": 27.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5.0,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 21.0
+      },
+      "teacher-cache-onpolicy-r6-loop/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/assistant": {
+        "targets": 161.0,
+        "ce_mass": 0.0,
+        "kl_mass": 132.0,
+        "ul_targets": 29.0,
+        "teacher_top1_correct_mass": 116.0,
+        "teacher_target_absent_mass": 1.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/thinking": {
+        "targets": 1.0,
+        "ce_mass": 0.0,
+        "kl_mass": 1.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/plain": {
+        "targets": 1.0,
+        "ce_mass": 0.0,
+        "kl_mass": 1.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/structure": {
+        "targets": 77.0,
+        "ce_mass": 0.0,
+        "kl_mass": 77.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 68.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/system": {
+        "targets": 259.0,
+        "ce_mass": 0.0,
+        "kl_mass": 259.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 98.0,
+        "teacher_target_absent_mass": 28.0,
+        "teacher_premature_stop_mass": 21.0
+      },
+      "teacher-cache-loop-check/user": {
+        "targets": 383.0,
+        "ce_mass": 0.0,
+        "kl_mass": 383.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 151.0,
+        "teacher_target_absent_mass": 4.0,
+        "teacher_premature_stop_mass": 103.0
+      },
+      "teacher-cache-loop-check/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/assistant": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/thinking": {
+        "targets": 28679.0,
+        "ce_mass": 0.0,
+        "kl_mass": 19135.0,
+        "ul_targets": 9544.0,
+        "teacher_top1_correct_mass": 16711.0,
+        "teacher_target_absent_mass": 1.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/plain": {
+        "targets": 14.0,
+        "ce_mass": 0.0,
+        "kl_mass": 14.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 14.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/structure": {
+        "targets": 517.0,
+        "ce_mass": 258.5,
+        "kl_mass": 258.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 254.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/assistant": {
+        "targets": 8087.0,
+        "ce_mass": 4043.5,
+        "kl_mass": 4043.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 3047.5,
+        "teacher_target_absent_mass": 8.0,
+        "teacher_premature_stop_mass": 12.0
+      },
+      "teacher-cache-frontier-qa2/thinking": {
+        "targets": 47.0,
+        "ce_mass": 23.5,
+        "kl_mass": 23.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 21.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/structure": {
+        "targets": 1741.0,
+        "ce_mass": 870.5,
+        "kl_mass": 870.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 715.5,
+        "teacher_target_absent_mass": 45.0,
+        "teacher_premature_stop_mass": 3.5
+      },
+      "teacher-cache-thinking-w8/system": {
+        "targets": 12158.0,
+        "ce_mass": 6079.0,
+        "kl_mass": 6079.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2668.5,
+        "teacher_target_absent_mass": 394.5,
+        "teacher_premature_stop_mass": 713.0
+      },
+      "teacher-cache-thinking-w8/user": {
+        "targets": 7531.0,
+        "ce_mass": 3765.5,
+        "kl_mass": 3765.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1009.5,
+        "teacher_target_absent_mass": 420.0,
+        "teacher_premature_stop_mass": 1789.5
+      },
+      "teacher-cache-thinking-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/assistant": {
+        "targets": 18527.0,
+        "ce_mass": 9263.5,
+        "kl_mass": 9263.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 8603.0,
+        "teacher_target_absent_mass": 4.5,
+        "teacher_premature_stop_mass": 2.5
+      },
+      "teacher-cache-thinking-w8/thinking": {
+        "targets": 16301.0,
+        "ce_mass": 8150.5,
+        "kl_mass": 8150.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 6933.0,
+        "teacher_target_absent_mass": 13.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/plain": {
+        "targets": 363.0,
+        "ce_mass": 181.5,
+        "kl_mass": 181.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 181.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/structure": {
+        "targets": 3.0,
+        "ce_mass": 1.5,
+        "kl_mass": 1.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/assistant": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/thinking": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/plain": {
+        "targets": 378.0,
+        "ce_mass": 189.0,
+        "kl_mass": 189.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 137.0,
+        "teacher_target_absent_mass": 9.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/structure": {
+        "targets": 2453.0,
+        "ce_mass": 1226.5,
+        "kl_mass": 1226.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 929.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 3.5
+      },
+      "teacher-cache-curriculum-v4-w8/system": {
+        "targets": 1628.0,
+        "ce_mass": 814.0,
+        "kl_mass": 814.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 339.0,
+        "teacher_target_absent_mass": 88.0,
+        "teacher_premature_stop_mass": 75.0
+      },
+      "teacher-cache-curriculum-v4-w8/user": {
+        "targets": 5009.0,
+        "ce_mass": 2504.5,
+        "kl_mass": 2504.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 277.0,
+        "teacher_target_absent_mass": 128.0,
+        "teacher_premature_stop_mass": 2027.0
+      },
+      "teacher-cache-curriculum-v4-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/assistant": {
+        "targets": 10312.0,
+        "ce_mass": 5156.0,
+        "kl_mass": 5156.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 4362.5,
+        "teacher_target_absent_mass": 66.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/thinking": {
+        "targets": 2087.0,
+        "ce_mass": 1043.5,
+        "kl_mass": 1043.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 832.0,
+        "teacher_target_absent_mass": 23.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/plain": {
+        "targets": 550.0,
+        "ce_mass": 275.0,
+        "kl_mass": 275.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 275.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/structure": {
+        "targets": 169.0,
+        "ce_mass": 84.5,
+        "kl_mass": 84.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 72.5,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-think-first-w8/system": {
+        "targets": 993.0,
+        "ce_mass": 496.5,
+        "kl_mass": 496.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 184.0,
+        "teacher_target_absent_mass": 42.5,
+        "teacher_premature_stop_mass": 112.0
+      },
+      "teacher-cache-think-first-w8/user": {
+        "targets": 2188.0,
+        "ce_mass": 1094.0,
+        "kl_mass": 1094.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 317.5,
+        "teacher_target_absent_mass": 177.0,
+        "teacher_premature_stop_mass": 496.5
+      },
+      "teacher-cache-think-first-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/assistant": {
+        "targets": 7920.0,
+        "ce_mass": 3960.0,
+        "kl_mass": 3960.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 3641.0,
+        "teacher_target_absent_mass": 2.5,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-think-first-w8/thinking": {
+        "targets": 2884.0,
+        "ce_mass": 1442.0,
+        "kl_mass": 1442.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1137.5,
+        "teacher_target_absent_mass": 5.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/plain": {
+        "targets": 39.0,
+        "ce_mass": 19.5,
+        "kl_mass": 19.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 19.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/structure": {
+        "targets": 186.0,
+        "ce_mass": 93.0,
+        "kl_mass": 93.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 88.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.5
+      },
+      "teacher-cache-frontier-tools/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/assistant": {
+        "targets": 844.0,
+        "ce_mass": 422.0,
+        "kl_mass": 422.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 330.5,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-frontier-tools/thinking": {
+        "targets": 36.0,
+        "ce_mass": 18.0,
+        "kl_mass": 18.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/tool-call": {
+        "targets": 1027.0,
+        "ce_mass": 513.5,
+        "kl_mass": 513.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 486.0,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/structure": {
+        "targets": 9.0,
+        "ce_mass": 4.5,
+        "kl_mass": 4.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 3.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.5
+      },
+      "teacher-cache-teacher-nothink-math/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/user": {
+        "targets": 86.0,
+        "ce_mass": 43.0,
+        "kl_mass": 43.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 14.5,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 23.5
+      },
+      "teacher-cache-teacher-nothink-math/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/assistant": {
+        "targets": 3945.0,
+        "ce_mass": 1972.5,
+        "kl_mass": 1972.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1949.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/thinking": {
+        "targets": 1.0,
+        "ce_mass": 0.5,
+        "kl_mass": 0.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/plain": {
+        "targets": 1.0,
+        "ce_mass": 0.5,
+        "kl_mass": 0.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/structure": {
+        "targets": 218.0,
+        "ce_mass": 109.0,
+        "kl_mass": 109.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 104.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/assistant": {
+        "targets": 1215.0,
+        "ce_mass": 607.5,
+        "kl_mass": 607.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 550.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/thinking": {
+        "targets": 5394.0,
+        "ce_mass": 2697.0,
+        "kl_mass": 2697.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2266.0,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/tool-call": {
+        "targets": 4521.0,
+        "ce_mass": 2260.5,
+        "kl_mass": 2260.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2185.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/structure": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/assistant": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/thinking": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/plain": {
+        "targets": 75095.0,
+        "ce_mass": 0.0,
+        "kl_mass": 75095.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 67391.0,
+        "teacher_target_absent_mass": 230.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/structure": {
+        "targets": 522.0,
+        "ce_mass": 522.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/system": {
+        "targets": 1332.0,
+        "ce_mass": 1332.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/user": {
+        "targets": 8707.0,
+        "ce_mass": 8707.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/assistant": {
+        "targets": 10636.0,
+        "ce_mass": 10636.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/thinking": {
+        "targets": 7882.0,
+        "ce_mass": 7882.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/plain": {
+        "targets": 78.0,
+        "ce_mass": 78.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/structure": {
+        "targets": 459.0,
+        "ce_mass": 229.5,
+        "kl_mass": 229.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 166.0,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 12.5
+      },
+      "teacher-cache-teacher-math-gen/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/user": {
+        "targets": 4784.0,
+        "ce_mass": 2392.0,
+        "kl_mass": 2392.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 544.0,
+        "teacher_target_absent_mass": 242.0,
+        "teacher_premature_stop_mass": 1538.5
+      },
+      "teacher-cache-teacher-math-gen/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/assistant": {
+        "targets": 11919.0,
+        "ce_mass": 5959.5,
+        "kl_mass": 5959.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5858.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/thinking": {
+        "targets": 11776.0,
+        "ce_mass": 5888.0,
+        "kl_mass": 5888.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5736.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/plain": {
+        "targets": 51.0,
+        "ce_mass": 25.5,
+        "kl_mass": 25.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 25.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      }
+    },
+    "replay": {
+      "teacher-cache-curriculum-v4-w8/structure": {
+        "targets": 3008.0,
+        "ce_mass": 1504.0,
+        "kl_mass": 1504.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1207.5,
+        "teacher_target_absent_mass": 3.5,
+        "teacher_premature_stop_mass": 30.5
+      },
+      "teacher-cache-curriculum-v4-w8/system": {
+        "targets": 16775.0,
+        "ce_mass": 8387.5,
+        "kl_mass": 8387.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5722.0,
+        "teacher_target_absent_mass": 245.5,
+        "teacher_premature_stop_mass": 267.5
+      },
+      "teacher-cache-curriculum-v4-w8/user": {
+        "targets": 8438.0,
+        "ce_mass": 4219.0,
+        "kl_mass": 4219.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 229.5,
+        "teacher_target_absent_mass": 284.0,
+        "teacher_premature_stop_mass": 3571.0
+      },
+      "teacher-cache-curriculum-v4-w8/tool-result": {
+        "targets": 572.0,
+        "ce_mass": 286.0,
+        "kl_mass": 286.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 130.0,
+        "teacher_target_absent_mass": 12.0,
+        "teacher_premature_stop_mass": 61.0
+      },
+      "teacher-cache-curriculum-v4-w8/assistant": {
+        "targets": 4149.0,
+        "ce_mass": 2074.5,
+        "kl_mass": 2074.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1729.5,
+        "teacher_target_absent_mass": 6.0,
+        "teacher_premature_stop_mass": 6.0
+      },
+      "teacher-cache-curriculum-v4-w8/thinking": {
+        "targets": 4411.0,
+        "ce_mass": 2205.5,
+        "kl_mass": 2205.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1569.0,
+        "teacher_target_absent_mass": 112.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/tool-call": {
+        "targets": 4624.0,
+        "ce_mass": 2312.0,
+        "kl_mass": 2312.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2289.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-curriculum-v4-w8/plain": {
+        "targets": 577.0,
+        "ce_mass": 288.5,
+        "kl_mass": 288.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 288.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/structure": {
+        "targets": 3.0,
+        "ce_mass": 1.5,
+        "kl_mass": 1.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/assistant": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/thinking": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-general-pilot-w8/plain": {
+        "targets": 632.0,
+        "ce_mass": 316.0,
+        "kl_mass": 316.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 193.5,
+        "teacher_target_absent_mass": 22.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/structure": {
+        "targets": 3132.0,
+        "ce_mass": 1566.0,
+        "kl_mass": 1566.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1307.0,
+        "teacher_target_absent_mass": 9.0,
+        "teacher_premature_stop_mass": 16.0
+      },
+      "teacher-cache-expand-code-w8/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/user": {
+        "targets": 40299.0,
+        "ce_mass": 20149.5,
+        "kl_mass": 20149.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7522.5,
+        "teacher_target_absent_mass": 2237.5,
+        "teacher_premature_stop_mass": 7928.0
+      },
+      "teacher-cache-expand-code-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/assistant": {
+        "targets": 47320.0,
+        "ce_mass": 23660.0,
+        "kl_mass": 23660.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 19933.5,
+        "teacher_target_absent_mass": 21.0,
+        "teacher_premature_stop_mass": 71.5
+      },
+      "teacher-cache-expand-code-w8/thinking": {
+        "targets": 348.0,
+        "ce_mass": 174.0,
+        "kl_mass": 174.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-expand-code-w8/plain": {
+        "targets": 696.0,
+        "ce_mass": 348.0,
+        "kl_mass": 348.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 348.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/structure": {
+        "targets": 117.0,
+        "ce_mass": 58.5,
+        "kl_mass": 58.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 42.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/user": {
+        "targets": 733.0,
+        "ce_mass": 366.5,
+        "kl_mass": 366.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 32.5,
+        "teacher_target_absent_mass": 44.5,
+        "teacher_premature_stop_mass": 314.5
+      },
+      "teacher-cache-teacher-code/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/assistant": {
+        "targets": 495.0,
+        "ce_mass": 247.5,
+        "kl_mass": 247.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 246.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/thinking": {
+        "targets": 13.0,
+        "ce_mass": 6.5,
+        "kl_mass": 6.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-code/plain": {
+        "targets": 13.0,
+        "ce_mass": 6.5,
+        "kl_mass": 6.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 6.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/structure": {
+        "targets": 720.0,
+        "ce_mass": 360.0,
+        "kl_mass": 360.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 342.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/assistant": {
+        "targets": 2920.0,
+        "ce_mass": 1460.0,
+        "kl_mass": 1460.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1327.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/thinking": {
+        "targets": 17420.0,
+        "ce_mass": 8710.0,
+        "kl_mass": 8710.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7071.0,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/tool-call": {
+        "targets": 15267.0,
+        "ce_mass": 7633.5,
+        "kl_mass": 7633.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7381.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-b/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/structure": {
+        "targets": 1341.0,
+        "ce_mass": 670.5,
+        "kl_mass": 670.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 491.5,
+        "teacher_target_absent_mass": 1.0,
+        "teacher_premature_stop_mass": 33.0
+      },
+      "teacher-cache-teacher-math-gen/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/user": {
+        "targets": 12548.0,
+        "ce_mass": 6274.0,
+        "kl_mass": 6274.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1815.5,
+        "teacher_target_absent_mass": 541.5,
+        "teacher_premature_stop_mass": 3472.0
+      },
+      "teacher-cache-teacher-math-gen/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/assistant": {
+        "targets": 46152.0,
+        "ce_mass": 23076.0,
+        "kl_mass": 23076.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 22648.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/thinking": {
+        "targets": 59303.0,
+        "ce_mass": 29651.5,
+        "kl_mass": 29651.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 28239.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-math-gen/plain": {
+        "targets": 149.0,
+        "ce_mass": 74.5,
+        "kl_mass": 74.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 74.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/structure": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/assistant": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/thinking": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-code-raw/plain": {
+        "targets": 135824.0,
+        "ce_mass": 0.0,
+        "kl_mass": 135824.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 119017.0,
+        "teacher_target_absent_mass": 705.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/structure": {
+        "targets": 792.0,
+        "ce_mass": 0.0,
+        "kl_mass": 792.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 678.0,
+        "teacher_target_absent_mass": 13.0,
+        "teacher_premature_stop_mass": 11.0
+      },
+      "teacher-cache-onpolicy-r6-loop/system": {
+        "targets": 3957.0,
+        "ce_mass": 0.0,
+        "kl_mass": 3957.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2078.0,
+        "teacher_target_absent_mass": 240.0,
+        "teacher_premature_stop_mass": 266.0
+      },
+      "teacher-cache-onpolicy-r6-loop/user": {
+        "targets": 5262.0,
+        "ce_mass": 0.0,
+        "kl_mass": 5262.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1753.0,
+        "teacher_target_absent_mass": 505.0,
+        "teacher_premature_stop_mass": 2123.0
+      },
+      "teacher-cache-onpolicy-r6-loop/tool-result": {
+        "targets": 79.0,
+        "ce_mass": 0.0,
+        "kl_mass": 79.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 64.0,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 5.0
+      },
+      "teacher-cache-onpolicy-r6-loop/assistant": {
+        "targets": 11506.0,
+        "ce_mass": 0.0,
+        "kl_mass": 10631.0,
+        "ul_targets": 875.0,
+        "teacher_top1_correct_mass": 9242.0,
+        "teacher_target_absent_mass": 10.0,
+        "teacher_premature_stop_mass": 16.0
+      },
+      "teacher-cache-onpolicy-r6-loop/thinking": {
+        "targets": 37884.0,
+        "ce_mass": 0.0,
+        "kl_mass": 33113.0,
+        "ul_targets": 4771.0,
+        "teacher_top1_correct_mass": 26734.0,
+        "teacher_target_absent_mass": 22.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/tool-call": {
+        "targets": 291.0,
+        "ce_mass": 0.0,
+        "kl_mass": 291.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 274.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-onpolicy-r6-loop/plain": {
+        "targets": 120.0,
+        "ce_mass": 0.0,
+        "kl_mass": 120.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 120.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/structure": {
+        "targets": 196.0,
+        "ce_mass": 98.0,
+        "kl_mass": 98.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 97.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/assistant": {
+        "targets": 976.0,
+        "ce_mass": 488.0,
+        "kl_mass": 488.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 444.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.5
+      },
+      "teacher-cache-agent-smol-a/thinking": {
+        "targets": 3660.0,
+        "ce_mass": 1830.0,
+        "kl_mass": 1830.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1536.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/tool-call": {
+        "targets": 3068.0,
+        "ce_mass": 1534.0,
+        "kl_mass": 1534.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1494.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-agent-smol-a/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/structure": {
+        "targets": 648.0,
+        "ce_mass": 324.0,
+        "kl_mass": 324.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 311.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.5
+      },
+      "teacher-cache-frontier-tools/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/assistant": {
+        "targets": 3145.0,
+        "ce_mass": 1572.5,
+        "kl_mass": 1572.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1339.0,
+        "teacher_target_absent_mass": 7.5,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-frontier-tools/thinking": {
+        "targets": 123.0,
+        "ce_mass": 61.5,
+        "kl_mass": 61.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 26.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/tool-call": {
+        "targets": 4492.0,
+        "ce_mass": 2246.0,
+        "kl_mass": 2246.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 2191.0,
+        "teacher_target_absent_mass": 1.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-tools/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/structure": {
+        "targets": 802.0,
+        "ce_mass": 401.0,
+        "kl_mass": 401.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 343.5,
+        "teacher_target_absent_mass": 7.5,
+        "teacher_premature_stop_mass": 5.0
+      },
+      "teacher-cache-think-first-w8/system": {
+        "targets": 4904.0,
+        "ce_mass": 2452.0,
+        "kl_mass": 2452.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 945.0,
+        "teacher_target_absent_mass": 182.0,
+        "teacher_premature_stop_mass": 473.0
+      },
+      "teacher-cache-think-first-w8/user": {
+        "targets": 9242.0,
+        "ce_mass": 4621.0,
+        "kl_mass": 4621.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 1453.0,
+        "teacher_target_absent_mass": 629.0,
+        "teacher_premature_stop_mass": 2026.0
+      },
+      "teacher-cache-think-first-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/assistant": {
+        "targets": 27827.0,
+        "ce_mass": 13913.5,
+        "kl_mass": 13913.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 12789.5,
+        "teacher_target_absent_mass": 10.0,
+        "teacher_premature_stop_mass": 5.5
+      },
+      "teacher-cache-think-first-w8/thinking": {
+        "targets": 13805.0,
+        "ce_mass": 6902.5,
+        "kl_mass": 6902.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 5579.0,
+        "teacher_target_absent_mass": 14.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-think-first-w8/plain": {
+        "targets": 180.0,
+        "ce_mass": 90.0,
+        "kl_mass": 90.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 90.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/structure": {
+        "targets": 78.0,
+        "ce_mass": 0.0,
+        "kl_mass": 78.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 70.0,
+        "teacher_target_absent_mass": 2.0,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-loop-check/system": {
+        "targets": 259.0,
+        "ce_mass": 0.0,
+        "kl_mass": 259.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 105.0,
+        "teacher_target_absent_mass": 28.0,
+        "teacher_premature_stop_mass": 20.0
+      },
+      "teacher-cache-loop-check/user": {
+        "targets": 674.0,
+        "ce_mass": 0.0,
+        "kl_mass": 674.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 299.0,
+        "teacher_target_absent_mass": 43.0,
+        "teacher_premature_stop_mass": 153.0
+      },
+      "teacher-cache-loop-check/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/assistant": {
+        "targets": 858.0,
+        "ce_mass": 0.0,
+        "kl_mass": 858.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 791.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/thinking": {
+        "targets": 27820.0,
+        "ce_mass": 0.0,
+        "kl_mass": 18579.0,
+        "ul_targets": 9241.0,
+        "teacher_top1_correct_mass": 16212.0,
+        "teacher_target_absent_mass": 4.0,
+        "teacher_premature_stop_mass": 1.0
+      },
+      "teacher-cache-loop-check/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-loop-check/plain": {
+        "targets": 14.0,
+        "ce_mass": 0.0,
+        "kl_mass": 14.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 14.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/structure": {
+        "targets": 902.0,
+        "ce_mass": 451.0,
+        "kl_mass": 451.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 451.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/user": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/assistant": {
+        "targets": 16226.0,
+        "ce_mass": 8113.0,
+        "kl_mass": 8113.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 6245.0,
+        "teacher_target_absent_mass": 24.0,
+        "teacher_premature_stop_mass": 20.0
+      },
+      "teacher-cache-frontier-qa2/thinking": {
+        "targets": 82.0,
+        "ce_mass": 41.0,
+        "kl_mass": 41.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 37.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-frontier-qa2/plain": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/structure": {
+        "targets": 585.0,
+        "ce_mass": 585.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/user": {
+        "targets": 3497.0,
+        "ce_mass": 3497.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/assistant": {
+        "targets": 2246.0,
+        "ce_mass": 2246.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/thinking": {
+        "targets": 65.0,
+        "ce_mass": 65.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-r8-code-short-w8/plain": {
+        "targets": 65.0,
+        "ce_mass": 65.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/structure": {
+        "targets": 30.0,
+        "ce_mass": 15.0,
+        "kl_mass": 15.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 13.0,
+        "teacher_target_absent_mass": 1.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/system": {
+        "targets": 212.0,
+        "ce_mass": 106.0,
+        "kl_mass": 106.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 46.0,
+        "teacher_target_absent_mass": 8.0,
+        "teacher_premature_stop_mass": 13.5
+      },
+      "teacher-cache-thinking-w8/user": {
+        "targets": 135.0,
+        "ce_mass": 67.5,
+        "kl_mass": 67.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 4.5,
+        "teacher_target_absent_mass": 26.5,
+        "teacher_premature_stop_mass": 61.0
+      },
+      "teacher-cache-thinking-w8/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/assistant": {
+        "targets": 265.0,
+        "ce_mass": 132.5,
+        "kl_mass": 132.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 99.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/thinking": {
+        "targets": 519.0,
+        "ce_mass": 259.5,
+        "kl_mass": 259.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 197.5,
+        "teacher_target_absent_mass": 0.5,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-thinking-w8/plain": {
+        "targets": 6.0,
+        "ce_mass": 3.0,
+        "kl_mass": 3.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 3.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/structure": {
+        "targets": 441.0,
+        "ce_mass": 220.5,
+        "kl_mass": 220.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 161.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 15.0
+      },
+      "teacher-cache-teacher-nothink-math/system": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/user": {
+        "targets": 4253.0,
+        "ce_mass": 2126.5,
+        "kl_mass": 2126.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 465.0,
+        "teacher_target_absent_mass": 215.5,
+        "teacher_premature_stop_mass": 1384.0
+      },
+      "teacher-cache-teacher-nothink-math/tool-result": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/assistant": {
+        "targets": 22861.0,
+        "ce_mass": 11430.5,
+        "kl_mass": 11430.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 11212.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/thinking": {
+        "targets": 49.0,
+        "ce_mass": 24.5,
+        "kl_mass": 24.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 7.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/tool-call": {
+        "targets": 0.0,
+        "ce_mass": 0.0,
+        "kl_mass": 0.0,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 0.0,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      },
+      "teacher-cache-teacher-nothink-math/plain": {
+        "targets": 49.0,
+        "ce_mass": 24.5,
+        "kl_mass": 24.5,
+        "ul_targets": 0.0,
+        "teacher_top1_correct_mass": 24.5,
+        "teacher_target_absent_mass": 0.0,
+        "teacher_premature_stop_mass": 0.0
+      }
+    }
+  },
+  "examples": [
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:83378",
+      "role": "thinking",
+      "prefix": "2}'\nassert serialize_json([1, 2, 3]) == '[1, 2, 3]'\n```<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 1.0
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:83378",
+      "role": "assistant",
+      "prefix": "assert serialize_json([1, 2, 3]) == '[1, 2, 3]'\n```<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "actual": "To",
+      "teacher": "```",
+      "confidence": 0.9712345004081726
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:84669",
+      "role": "thinking",
+      "prefix": " place in the sequence. For example, 90 is written as \"XC\" rather than \"LXXXX\" or \"IC\".<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 1.0
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:84669",
+      "role": "assistant",
+      "prefix": " sequence. For example, 90 is written as \"XC\" rather than \"LXXXX\" or \"IC\".<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "actual": "To",
+      "teacher": "```",
+      "confidence": 0.9836150407791138
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:90815",
+      "role": "thinking",
+      "prefix": "5},\n    {'id': 3, 'name': 'Bob', 'age': 30}\n]\n```<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 1.0
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:90815",
+      "role": "assistant",
+      "prefix": "    {'id': 3, 'name': 'Bob', 'age': 30}\n]\n```<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "actual": "To",
+      "teacher": "```",
+      "confidence": 0.9912510514259338
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:94479",
+      "role": "thinking",
+      "prefix": " integer. The input string `s` is guaranteed to be valid and in the range `1` to `3999`.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 1.0
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:94479",
+      "role": "assistant",
+      "prefix": " input string `s` is guaranteed to be valid and in the range `1` to `3999`.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "actual": "To",
+      "teacher": "```",
+      "confidence": 0.9664015173912048
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:95165",
+      "role": "thinking",
+      "prefix": "abacabd'\npattern = 'abd'\n\nresult = kmp_search(text, pattern)\nassert result == True\n```<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 1.0
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-expand-code-w8",
+      "doc_id": "self-oss-instruct:95165",
+      "role": "assistant",
+      "prefix": "'\npattern = 'abd'\n\nresult = kmp_search(text, pattern)\nassert result == True\n```<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "actual": "The",
+      "teacher": "```",
+      "confidence": 0.9683189988136292
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Code_Contests_30287_I",
+      "role": "thinking",
+      "prefix": "Implement:\n`def run_length_encoding(T, test_cases):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9046386480331421
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Code_Contests_30756_I",
+      "role": "thinking",
+      "prefix": "\n\nImplement:\n`def min_intervals_to_remove(test_cases):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9902894496917725
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Code_Contests_32166_I",
+      "role": "assistant",
+      "prefix": " int], K: int) -> Union[List[str], str]:\n    \"\"\"\n    Analyze book sales by genre and return genres that met or exceeded the threshold",
+      "actual": ".",
+      "teacher": " K",
+      "confidence": 0.9228188991546631
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Docs: Python310_10129_I",
+      "role": "thinking",
+      "prefix": "\n\nImplement:\n`def get_http_status_details(status_code):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9525773525238037
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Docs: Python310_14946_I",
+      "role": "thinking",
+      "prefix": " provided guidelines.\n\nImplement:\n`def setup_cfg_content():`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9324439167976379
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Filter_21731_I",
+      "role": "thinking",
+      "prefix": " approach?\n\nImplement:\n`def max_clear_course(grid):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9241153001785278
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Filter_21731_I",
+      "role": "assistant",
+      "prefix": "[i] will store the height of the bar in the histogram at column i\n    # for the current row\n    heights = [0] * m\n    \n   ",
+      "actual": " def",
+      "teacher": " max",
+      "confidence": 0.9021573662757874
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_2579_I",
+      "role": "assistant",
+      "prefix": "7\n    n = len(arr)\n    if n == 0:\n        return 0\n    \n    # We need to count strictly increasing subsequences of",
+      "actual": " any",
+      "teacher": " length",
+      "confidence": 0.9166439771652222
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_3884_I",
+      "role": "thinking",
+      "prefix": "Implement:\n`def min_steps_to_reach_end(mat):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9579120874404907
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_4718_I",
+      "role": "thinking",
+      "prefix": " one tree.\n\nImplement:\n`def largestRectangle(height):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9241153001785278
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_4759_I",
+      "role": "thinking",
+      "prefix": "_sum_of_non_overlapping_subarrays(a, b, length):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9046386480331421
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_5444_I",
+      "role": "thinking",
+      "prefix": ":\n`def longest_valid_block(arr, d, t):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9579120874404907
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Leetcode_716_I",
+      "role": "thinking",
+      "prefix": " the grid.\n\nImplement:\n`def maxCoins(grid):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9399005770683289
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-teacher-code",
+      "doc_id": "tcode:kodcode:Taco_10549_I",
+      "role": "thinking",
+      "prefix": " is_prime(n):`\n`def isPrimeList(arr):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9241153001785278
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-agent-smol-b",
+      "doc_id": "opencode:sc0e267b45b91c17220c1913d",
+      "role": "thinking",
+      "prefix": "answer.txt (e.g. `echo -n \\\"<value>\\\" > /workdir/answer.txt`), then stop.\"<|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9999713897705078
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-agent-smol-b",
+      "doc_id": "opencode:sc0e267b45b91c17220c1913d",
+      "role": "thinking",
+      "prefix": "0075over18's,,,\r\nham,U dun say so early hor... U c already then say...,,,\n</tool_response><|im_end|>\n<|im_start|>assistant\n<think>",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9046386480331421
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-onpolicy-r6-loop",
+      "doc_id": "onpolicy:curriculum:divide:5254:s3",
+      "role": "assistant",
+      "prefix": "boxed{}.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\nTo divide 2766 by 9, we can use long division:\n\n1.  **",
+      "actual": "9",
+      "teacher": "Div",
+      "confidence": 0.9130703210830688
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-onpolicy-r6-loop",
+      "doc_id": "onpolicy:curriculum:divide:5254:s3",
+      "role": "assistant",
+      "prefix": "</think>\n\nTo divide 2766 by 9, we can use long division:\n\n1.  **9 goes into 27 three times.**",
+      "actual": " (",
+      "teacher": "\n",
+      "confidence": 0.9949393272399902
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "long3:62",
+      "role": "thinking",
+      "prefix": "_{n = 1}^\\infty \\frac{1}{mn(m + n + 1)}.\\]<|im_end|>\n<|im_start|>assistant\n<think>\nWe need",
+      "actual": " to",
+      "teacher": " solve",
+      "confidence": 0.976924479007721
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "long3:62",
+      "role": "thinking",
+      "prefix": "^\\infty \\frac{1}{mn(m + n + 1)}.\\]<|im_end|>\n<|im_start|>assistant\n<think>\nWe need to evaluate sum_{m,n",
+      "actual": "=",
+      "teacher": ">=",
+      "confidence": 0.914241373538971
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:141",
+      "role": "thinking",
+      "prefix": "2 + 1 = d + \\sqrt{a + b + c - d}.\\]Find $d.$<|im_end|>\n<|im_start|>assistant\n<think>\nWe need",
+      "actual": " to",
+      "teacher": " solve",
+      "confidence": 0.9992811679840088
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:141",
+      "role": "thinking",
+      "prefix": " + \\sqrt{a + b + c - d}.\\]Find $d.$<|im_end|>\n<|im_start|>assistant\n<think>\nWe need to solve for real numbers a",
+      "actual": ",",
+      "teacher": ",b",
+      "confidence": 0.9979459643363953
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:144",
+      "role": "thinking",
+      "prefix": " find remainder R(x) such that x^3 = (x^2 + 5x + 1) * Q(x) + R(x), where deg",
+      "actual": "(R",
+      "teacher": " R",
+      "confidence": 0.9624833464622498
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:144",
+      "role": "thinking",
+      "prefix": "^2: quotient term x.\nx^3 - x^2 * (x^2 + 5x + 1) = x^3 -",
+      "actual": " x",
+      "teacher": " (",
+      "confidence": 0.9229878783226013
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:15",
+      "role": "thinking",
+      "prefix": "\n\nDetermine $\\sqrt[6]{1061520150601}$ without a calculator.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "actual": "I",
+      "teacher": "We",
+      "confidence": 0.9996836185455322
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:15",
+      "role": "thinking",
+      "prefix": "sqrt[6]{1061520150601}$ without a calculator.\n\n**Step 1: Factorize the number.**",
+      "actual": "\n\n",
+      "teacher": "\n",
+      "confidence": 0.9509527087211609
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:62",
+      "role": "thinking",
+      "prefix": "_{n = 1}^\\infty \\frac{1}{mn(m + n + 1)}.\\]<|im_end|>\n<|im_start|>assistant\n<think>\nWe need",
+      "actual": " to",
+      "teacher": " solve",
+      "confidence": 0.976924479007721
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "base:62",
+      "role": "thinking",
+      "prefix": "fty \\frac{1}{mn(m + n + 1)}.\\]<|im_end|>\n<|im_start|>assistant\n<think>\nWe need to solve the double sum problem:\n\n",
+      "actual": "Evaluate",
+      "teacher": "S",
+      "confidence": 0.9123461246490479
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "long3-u50:15",
+      "role": "thinking",
+      "prefix": "\n\nDetermine $\\sqrt[6]{1061520150601}$ without a calculator.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "actual": "I",
+      "teacher": "We",
+      "confidence": 0.9996836185455322
+    },
+    {
+      "arm": "agentic",
+      "source": "teacher-cache-loop-check",
+      "doc_id": "long3-u50:15",
+      "role": "thinking",
+      "prefix": "1.\n\nFirst, let me check if it's divisible by small primes.\n\n$1061520150601$ is",
+      "actual": " a",
+      "teacher": " odd",
+      "confidence": 0.9834604263305664
+    }
+  ]
+}

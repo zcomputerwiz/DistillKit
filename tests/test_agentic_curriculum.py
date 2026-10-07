@@ -147,3 +147,13 @@ def test_smaller_recipe_changes_only_requested_replay_weights_and_rate(tmp_path)
     assert argv[argv.index("--max-steps") + 1] == "20"
     assert argv[argv.index("--lr-depth-ramp") + 1:argv.index("--lr-depth-ramp") + 3] == ["0.275", "0.275"]
     assert new["ce"] == old["ce"] and new["assistant"] == old["assistant"]
+
+
+def test_conversational_replay_mask_preserves_raw_sources_and_objectives(tmp_path):
+    from agentic_arm import recipe
+    _, old = recipe(tmp_path / 'data', tmp_path / 'old')
+    _, new = recipe(tmp_path / 'data', tmp_path / 'new', mask_conversational=True)
+    raw = {'teacher-cache-frontier-code-raw', 'teacher-cache-general-pilot-w8'}
+    assert {Path(p).name for p in new['assistant']} == {Path(p).name for p in new['paths']} - raw
+    for key in ('ce', 'kl', 'ul', 'repeat'):
+        assert new[key] == old[key]

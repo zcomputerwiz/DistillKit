@@ -1,6 +1,13 @@
 # Targeted training: map what the student represents where, then train there
 
-## Current decision (2026-10-06)
+## Current decision (2026-10-07)
+
+Pilot 2 has completed. The [evaluation audit](EVALUATION_AUDIT.md) found replay
+context-target conflicts, grading defects, and math-proxy training overlap.
+Most aggregate code-loss regression is prompt loss; answer-only regression is
+small. Keep u50 pending representative outcome evaluation. The user approved
+masking context across all conversational replay, preserving raw code/text.
+The next recipe planner implements this; no new training has started.
 
 Pilot 1 finished and failed retention: see [results](AGENTIC_PILOT_RESULTS.md).
 Keep u50. The user authorized a [smaller follow-up](AGENTIC_V2_PLAN.md) with

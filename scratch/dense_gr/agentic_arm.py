@@ -21,7 +21,8 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
 
-def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, rate_scale=.55, balanced=False):
+def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, rate_scale=.55, balanced=False,
+           mask_conversational=False):
     names = ["agent-smol-a", "agent-smol-b", "frontier-qa2", "frontier-code-raw", "frontier-tools",
              "r8-code-short-w8", "curriculum-v4-w8", "thinking-w8", "think-first-w8", "expand-code-w8",
              "general-pilot-w8", "teacher-math-gen", "onpolicy-r6-loop", "loop-check",
@@ -33,6 +34,11 @@ def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, 
     cache = str((data / "cache").resolve())
     all_caches = list(paths.values()) + ([] if control else [cache])
     assistant = [paths[n] for n in ("agent-smol-a", "agent-smol-b", "frontier-tools", "frontier-qa2")]
+    if mask_conversational:
+        # These two captures are raw continuation, not role-formatted dialogue.
+        # Keep recipe's legacy default for reconstructing archived plan tuning.
+        # Newly generated CLI plans enable this policy by default.
+        assistant = [paths[n] for n in names if n not in ("frontier-code-raw", "general-pilot-w8")]
     ce = [paths["r8-code-short-w8"]]
     repeat = {paths[n]: factors[n] for n in names}
     if not control:
@@ -123,7 +129,8 @@ def plan(args):
     if args.output.exists():
         raise ValueError("refuse to overwrite run directory")
     args.output.mkdir(parents=True)
-    tuning = dict(code_multiplier=args.code_multiplier, rate_scale=args.rate_scale, balanced=args.balanced)
+    tuning = dict(code_multiplier=args.code_multiplier, rate_scale=args.rate_scale, balanced=args.balanced,
+                  mask_conversational=args.mask_conversational)
     _, options = recipe(args.data, args.output / "agentic", steps=args.steps, **tuning)
     print("Measuring replay and new-target mass", flush=True)
     teacher = teacher_for(options)
@@ -179,6 +186,8 @@ def run(args):
     for arm, checkpoint in checkpoints.items():
         invoke(f"live-{arm}", [HERE / "agentic_live_eval.py", "--checkpoint", checkpoint,
                "--data", Path(spec["data"]) / "trajectories.jsonl", "--output", args.output / f"live-{arm}.json"])
+        invoke(f"grade-{arm}", [HERE / "agentic_grade_audit.py", args.output / f"live-{arm}.json",
+                                args.output / f"grade-{arm}.json"])
         if json.loads((Path(spec["data"]) / "summary.json").read_text()).get("version", 1) >= 2:
             invoke(f"live-{arm}-v1", [HERE / "agentic_live_eval.py", "--checkpoint", checkpoint,
                    "--data", HERE / "agentic-v1-verified/trajectories.jsonl",
@@ -211,6 +220,8 @@ if __name__ == "__main__":
     p.add_argument("--code-multiplier", type=int, default=1)
     p.add_argument("--rate-scale", type=float, default=.55)
     p.add_argument("--balanced", action="store_true")
+    p.add_argument("--mask-conversational", action=argparse.BooleanOptionalAction, default=True,
+                   help="mask context in every conversational replay cache (default); raw code/text remains scored")
     a = p.parse_args()
     if not 0 < a.new_share < 1 or a.code_multiplier < 1 or not 0 < a.rate_scale <= 1 or a.steps < 1:
         p.error("invalid share, code multiplier, rate scale, or step count")

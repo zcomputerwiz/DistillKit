@@ -1,0 +1,601 @@
+{
+  "code": {
+    "documents": [
+      "Magicoder-OSS:0",
+      "Magicoder-OSS:100",
+      "Magicoder-OSS:1000",
+      "Magicoder-OSS:1020",
+      "Magicoder-OSS:1040",
+      "Magicoder-OSS:1060",
+      "Magicoder-OSS:1080",
+      "Magicoder-OSS:1100",
+      "Magicoder-OSS:1120",
+      "Magicoder-OSS:1140",
+      "Magicoder-OSS:1160",
+      "Magicoder-OSS:1180",
+      "Magicoder-OSS:120",
+      "Magicoder-OSS:1200",
+      "Magicoder-OSS:1220",
+      "Magicoder-OSS:1240",
+      "Magicoder-OSS:1260",
+      "Magicoder-OSS:1280",
+      "Magicoder-OSS:1300",
+      "Magicoder-OSS:1320",
+      "Magicoder-OSS:1340",
+      "Magicoder-OSS:1360",
+      "Magicoder-OSS:1380",
+      "Magicoder-OSS:140",
+      "Magicoder-OSS:1400",
+      "Magicoder-OSS:1420",
+      "Magicoder-OSS:1440",
+      "Magicoder-OSS:1460",
+      "Magicoder-OSS:1480",
+      "Magicoder-OSS:1500",
+      "Magicoder-OSS:1520",
+      "Magicoder-OSS:1540",
+      "Magicoder-OSS:1560",
+      "Magicoder-OSS:1580",
+      "Magicoder-OSS:160",
+      "Magicoder-OSS:1600",
+      "Magicoder-OSS:1620",
+      "Magicoder-OSS:1640",
+      "Magicoder-OSS:1660",
+      "Magicoder-OSS:1680",
+      "Magicoder-OSS:1700",
+      "Magicoder-OSS:1720",
+      "Magicoder-OSS:1740",
+      "Magicoder-OSS:1760",
+      "Magicoder-OSS:1780",
+      "Magicoder-OSS:180",
+      "Magicoder-OSS:1800",
+      "Magicoder-OSS:1820",
+      "Magicoder-OSS:1840",
+      "Magicoder-OSS:1860",
+      "Magicoder-OSS:1880",
+      "Magicoder-OSS:1900",
+      "Magicoder-OSS:1920",
+      "Magicoder-OSS:1940",
+      "Magicoder-OSS:1960",
+      "Magicoder-OSS:1980",
+      "Magicoder-OSS:20",
+      "Magicoder-OSS:200",
+      "Magicoder-OSS:2000",
+      "Magicoder-OSS:2020",
+      "Magicoder-OSS:2040",
+      "Magicoder-OSS:2060",
+      "Magicoder-OSS:2080",
+      "Magicoder-OSS:2100"
+    ],
+    "eligible_eval_documents": 292,
+    "targets": 31090,
+    "role_targets": {
+      "structure": 575,
+      "system": 0,
+      "user": 16848,
+      "tool-result": 0,
+      "assistant": 13476,
+      "thinking": 64,
+      "tool-call": 0,
+      "plain": 127
+    },
+    "at_prefix_cap": 1,
+    "tokenizer_eos": 248046
+  },
+  "thinking": {
+    "documents": [
+      "think:sft_code:1d3f16d38524f22069e92e5bf5868656",
+      "think:sft_code:1e2e7f2a8ec588dc49a588bf462831ab",
+      "think:sft_code:1ef98d70a02d92e52bbc96090d9b681f",
+      "think:sft_code:1fe9b0291b9d2bb2b026b72779c38829",
+      "think:sft_code:207795cc5c1a315b25253235fa03517d",
+      "think:sft_code:22e93409b7b38e5ae828907dc7b81072",
+      "think:sft_code:25a494ba33865d7a905896e7ee5f0c57",
+      "think:sft_code:2b4798fe7580db084e5976af503ecaba",
+      "think:sft_code:2c8532c333bef07dd8398ea31cbb094b",
+      "think:sft_code:2d7ae626564f926429005ace36538eab",
+      "think:sft_code:31808141eef9280dba1f06e5020f24b3",
+      "think:sft_code:324679daf238a26c2c7dddca2be0f54b",
+      "think:sft_code:32cf7b6f1bb1adc4390a3bb1b722f95c",
+      "think:sft_code:33dbaa2b5d2dd7599416052d90c44780",
+      "think:sft_code:342894f68e1f30a1298a46231ed3bc07",
+      "think:sft_code:346ae5765694ee3a61d879cebb573d42",
+      "think:sft_code:35a26be31b2fc2529207c329aec4860a",
+      "think:sft_code:36570c6df6507dbb294032e7642d50e6",
+      "think:sft_code:368af7bef0307ce390e87ff2450c0eb0",
+      "think:sft_code:38ad96bed2b829f2",
+      "think:sft_code:393ba78195e1ab19d775ec210f51441d",
+      "think:sft_code:3b274a05e45a6bedd109190672967c63",
+      "think:sft_code:3bcfb7756e0da53535868805f98756a3",
+      "think:sft_code:3c6e0f7465656c7454053e8912a547f9",
+      "think:sft_code:3d809ebf6efaa08a31f5eb75d6216b5d",
+      "think:sft_code:3e14182b026d67726bab5cd3a4d6795d",
+      "think:sft_code:3e548129de3332e4405f9f00e5a2ce67",
+      "think:sft_code:3fb65e1b9067d1cdfe09664a96ee4d89",
+      "think:sft_code:41a3970129ee8618637759cff539a6c8",
+      "think:sft_code:42537676eedefe6641867b5f8b7fef41",
+      "think:sft_code:42de0d81c948fba22d867964acbf75be",
+      "think:sft_code:435f74de179c57d0bed6f843b0a0a48e",
+      "think:sft_code:470177204a8c77ebce3de6d371955c23",
+      "think:sft_code:482a1b3b871324d9098381f67ac7dc29",
+      "think:sft_code:49f9a1ec1b4d881fc24172660d1511ce",
+      "think:sft_code:4a9d5d134b96f1a33ae7296faf91c831",
+      "think:sft_code:4af91d26756bb1e1",
+      "think:sft_code:4ba1a316f7c45d6cfe9ba5cb88397df6",
+      "think:sft_code:4c52f56045c0c51dc76608f26f1425c6",
+      "think:sft_code:4cda8b51d34e5fc16b0b2e4b298a607b",
+      "think:sft_code:4dcefe15ec0ece0b13138a2fbb88c65f",
+      "think:sft_code:4f182db72737eb8e8c7e37375d367a3b",
+      "think:sft_code:4fa06fe9edb38e2077806a130fab9514",
+      "think:sft_code:4fe84ed6feb81b1fecabb5e9cbb18dd6",
+      "think:sft_code:51eb61d2c59e98f18a65fd0aa43e9e93",
+      "think:sft_code:529a922dc97c84e13e28f8803c790fb6",
+      "think:sft_code:52cd5fc2e7d8f028b8a0ae944532be86",
+      "think:sft_code:535f288008158b7c7bda45548c006c1f",
+      "think:sft_code:555988e4313a3d7d63157a906e09958a",
+      "think:sft_code:5631d9a548a615a37b6b5a632f01045a",
+      "think:sft_code:589d9ed95ecbd3c978646d6449b3c559",
+      "think:sft_code:58fbc1833c5d52a0e7d66f3cf10a73d9",
+      "think:sft_code:598aced21d049a775fad95459c373f7c",
+      "think:sft_code:5a404992d76341b40bfd45ce238a0a1b",
+      "think:sft_code:5b512f4e7a67313e14eee2919c7d225e",
+      "think:sft_code:5f889fe2a64d3612d8cc59aab245680f",
+      "think:sft_code:5ff25e93fd228e893b12fe1b4cbae021",
+      "think:sft_code:60840619210f2ff4741079e55990618a",
+      "think:sft_code:617bc22389ca20e86e7d182934110d1a",
+      "think:sft_code:62290cec9c29179a9100a91491713424",
+      "think:sft_code:6503fe94dabf823a1591aac1484b4594",
+      "think:sft_code:65852e8c06e350eb821671365b2db99f",
+      "think:sft_code:66c0e149c9564932487721cdaba767f9",
+      "think:sft_code:673e5e43bb40c2f06d88b67d2a921fd9"
+    ],
+    "eligible_eval_documents": 300,
+    "targets": 46137,
+    "role_targets": {
+      "structure": 832,
+      "system": 4924,
+      "user": 5904,
+      "tool-result": 0,
+      "assistant": 25118,
+      "thinking": 9167,
+      "tool-call": 0,
+      "plain": 192
+    },
+    "at_prefix_cap": 0,
+    "tokenizer_eos": 248046
+  },
+  "math_overlap": {
+    "matches": [
+      {
+        "bank": "math",
+        "index": 122,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:23ea1264a96c5d2a0db2d842c3e86f36"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 82,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:2b52f593bc8b5e8b877847a3b0863f9e"
+      },
+      {
+        "bank": "math",
+        "index": 125,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_reasoning:0f79809b43d7b6d2f287461524aa4c44"
+      },
+      {
+        "bank": "math",
+        "index": 147,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:2dc9358bb3df7a3d12ecb7f88a19b22d"
+      },
+      {
+        "bank": "math",
+        "index": 142,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:2e62df0a6d46d08497472790736a955e"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 168,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:2e772012257101a41b68f1eac95eb444"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 157,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:3ed296af019188081e6eeeb831e51b95"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 10,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:40a4e780cf61a5eaec77eb1a601fc4dc"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 103,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:4d68ed70c0ae1017279f1e24b488da9c"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 30,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:4d7d9fecc24d8aec12e0ef3132699b05"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 109,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:4fe32bebb99e209b4c6c2830078b0f2d"
+      },
+      {
+        "bank": "math",
+        "index": 74,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:50da6f95d1809592c7b52a6c0e7d58a8"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 179,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:510e1929c312956a528b09043414c3af"
+      },
+      {
+        "bank": "math",
+        "index": 179,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:51387f9a7f58de2444c40644e20d4731"
+      },
+      {
+        "bank": "math",
+        "index": 177,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:53d3b30eb6b890bbb6b396c7e4669486"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 112,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:54505b2762cfb95a727ea1affa2605e8"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 111,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:5489b4f854b45c057745f4d39769132b"
+      },
+      {
+        "bank": "math",
+        "index": 76,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:5df07aa892e277d718d147157071b478"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 174,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:603c620093f094dc6fbf23499336a5b6"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 37,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:627ebc9915555adf075a2f6fe75287cb"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 177,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_reasoning:22e1a8ec70833a2a431156ab3546c3b4"
+      },
+      {
+        "bank": "math",
+        "index": 139,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:667b4569e7a4e04ef028023e40680066"
+      },
+      {
+        "bank": "math",
+        "index": 121,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:66c2ff0565aed36f7dfb36c0ad74b3e0"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 102,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_reasoning:24d0a893c47ac979388a7a224e4515e6"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 173,
+        "cache": "teacher-cache-thinking-w8",
+        "doc_id": "think:sft_math:694fbc0400b7927fc4741c51bf5eb04b"
+      },
+      {
+        "bank": "math",
+        "index": 191,
+        "cache": "teacher-cache-think-first-w8",
+        "doc_id": "01e6ca41e9b05675a4a037485447e5b8:tf"
+      },
+      {
+        "bank": "math",
+        "index": 47,
+        "cache": "teacher-cache-think-first-w8",
+        "doc_id": "027634a8502915ae83f58d6f2fd2ef38:tf"
+      },
+      {
+        "bank": "gsm8k",
+        "index": 141,
+        "cache": "teacher-cache-think-first-w8",
+        "doc_id": "0a2ffe2e2f486ac932ebe84cb53d6c07:tf"
+      },
+      {
+        "bank": "math",
+        "index": 6,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:6"
+      },
+      {
+        "bank": "math",
+        "index": 8,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:8"
+      },
+      {
+        "bank": "math",
+        "index": 19,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:19"
+      },
+      {
+        "bank": "math",
+        "index": 21,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:21"
+      },
+      {
+        "bank": "math",
+        "index": 35,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:35"
+      },
+      {
+        "bank": "math",
+        "index": 42,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:42"
+      },
+      {
+        "bank": "math",
+        "index": 51,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:51"
+      },
+      {
+        "bank": "math",
+        "index": 56,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:56"
+      },
+      {
+        "bank": "math",
+        "index": 62,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:62"
+      },
+      {
+        "bank": "math",
+        "index": 94,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:94"
+      },
+      {
+        "bank": "math",
+        "index": 100,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:100"
+      },
+      {
+        "bank": "math",
+        "index": 105,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:105"
+      },
+      {
+        "bank": "math",
+        "index": 111,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:111"
+      },
+      {
+        "bank": "math",
+        "index": 116,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:116"
+      },
+      {
+        "bank": "math",
+        "index": 123,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:123"
+      },
+      {
+        "bank": "math",
+        "index": 157,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:157"
+      },
+      {
+        "bank": "math",
+        "index": 167,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:167"
+      },
+      {
+        "bank": "math",
+        "index": 175,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:175"
+      },
+      {
+        "bank": "math",
+        "index": 192,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:192"
+      },
+      {
+        "bank": "math",
+        "index": 194,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:194"
+      },
+      {
+        "bank": "math",
+        "index": 195,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:195"
+      },
+      {
+        "bank": "math",
+        "index": 216,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:216"
+      },
+      {
+        "bank": "math",
+        "index": 246,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3:246"
+      },
+      {
+        "bank": "math",
+        "index": 1,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:1"
+      },
+      {
+        "bank": "math",
+        "index": 6,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:6"
+      },
+      {
+        "bank": "math",
+        "index": 15,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:15"
+      },
+      {
+        "bank": "math",
+        "index": 24,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:24"
+      },
+      {
+        "bank": "math",
+        "index": 25,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:25"
+      },
+      {
+        "bank": "math",
+        "index": 34,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:34"
+      },
+      {
+        "bank": "math",
+        "index": 51,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:51"
+      },
+      {
+        "bank": "math",
+        "index": 89,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:89"
+      },
+      {
+        "bank": "math",
+        "index": 116,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:116"
+      },
+      {
+        "bank": "math",
+        "index": 140,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:140"
+      },
+      {
+        "bank": "math",
+        "index": 175,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:175"
+      },
+      {
+        "bank": "math",
+        "index": 203,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:203"
+      },
+      {
+        "bank": "math",
+        "index": 212,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:212"
+      },
+      {
+        "bank": "math",
+        "index": 248,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:248"
+      },
+      {
+        "bank": "math",
+        "index": 253,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "long3-u50:253"
+      },
+      {
+        "bank": "math",
+        "index": 15,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "base:15"
+      },
+      {
+        "bank": "math",
+        "index": 56,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "base:56"
+      },
+      {
+        "bank": "math",
+        "index": 62,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "base:62"
+      },
+      {
+        "bank": "math",
+        "index": 141,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "base:141"
+      },
+      {
+        "bank": "math",
+        "index": 144,
+        "cache": "teacher-cache-loop-check",
+        "doc_id": "base:144"
+      }
+    ],
+    "counts": {
+      "gsm8k": 16,
+      "math": 48
+    },
+    "method": "exact complete problem token sequence against retained train documents; lower bound, not a paraphrase detector"
+  }
+}

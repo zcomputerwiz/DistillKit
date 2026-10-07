@@ -2,6 +2,12 @@
 
 Assisted-by: Codex
 
+Status 2026-10-07: both arms and their original evaluations completed. See the
+[evaluation audit](EVALUATION_AUDIT.md) before interpreting the proxy results:
+math overlap and context-heavy NLL prevent treating those aggregate scores as
+clean capability measurements. Keep u50. User approved conversational replay
+masking for the next recipe; completed v2 remains unchanged.
+
 Date: 2026-10-06. User authorized continuation after the version-1 retention
 failure. This is another bounded pilot from u50, not an extension of the rejected
 checkpoint. It reuses the existing trainer, cache format, and evaluation tools.

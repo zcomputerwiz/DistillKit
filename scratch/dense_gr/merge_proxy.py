@@ -1,8 +1,14 @@
-"""Cheap screen for merged checkpoints, on nothing the benchmarks score.
+"""Legacy diagnostic screen, not a held-out capability or promotion gate.
+
+Audit 2026-10-07: the round-2 exclusion below does not exclude subsequent
+training captures. At least 16/256 GSM8K and 48/256 MATH questions from the
+default bank occur in retained replay data. Code NLL includes user prompts;
+its change can differ greatly from assistant-answer NLL. See
+scratch/csa2-eval/EVALUATION_AUDIT.md before interpreting these numbers.
 
 Choosing blends by HumanEval+ or GSM8K test accuracy would spend those sets: the winner's
 score would no longer be a test result. So candidates are ranked here on held-out capture
-documents and *train*-split problems no rollout used, and only the finalists see the
+documents and *train*-split problems no round-2 rollout used; only finalists see the
 benchmarks:
 
 - code NLL: `teacher-cache-expand-code`'s eval split (rose in every round as HumanEval+ fell)
@@ -106,6 +112,8 @@ def main() -> int:
     parser.add_argument("--count", type=int, default=256)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    print("WARNING: legacy proxy has known replay overlap and all-token NLL; "
+          "do not use it alone for checkpoint promotion.", flush=True)
     from transformers import AutoTokenizer
 
     from distillkit.models import Qwen35WidenedForCausalLM
