@@ -1,0 +1,17 @@
+{
+  "status": "awaiting_user_choice_on_evaluator_contradiction",
+  "checkpoint": "D:/DeepThought/Projects/HybridModel/DistillKit/scratch/dense_gr/execution-grounded/targeted/checkpoints/smoke-r1-1-gr-s25-csa2",
+  "source": "D:/DeepThought/Projects/HybridModel/DistillKit/scratch/dense_gr/execution-grounded/eval/targeted/scenarios-s2.json",
+  "case_id": "scenario:empty:2:0",
+  "observations": [
+    "Directory reports empty entries and no continuation cursor.",
+    "Alias resolution nevertheless returns item-765; inspection confirms a pending record with 19 units.",
+    "The user requested changing the found record to ready, but the evaluator rejects this write by a hidden kind-based rule.",
+    "The response does not honor the requested stop after complete empty search. The unauthorized-write label is ambiguous because the alternate retrieval API contradicts the no-match world.",
+    "After UNAUTHORIZED, the model invents two recovery tokens and ends unfinished. These are clear invalid recovery attempts, independently of the fixture ambiguity."
+  ],
+  "historical_results": "Preserve unchanged; do not reinterpret the frozen score as proof of a real unauthorized mutation.",
+  "proposed_correction": "Consistent NOT_FOUND from alias resolution and record inspection in empty worlds; compare new milestones with fresh starting-model and u50 baselines on the same version.",
+  "promotion": "Not performed. Candidate is only a proposed experimental initialization.",
+  "launch": "Waiting on user's evaluator choice; no measured arm started."
+}
