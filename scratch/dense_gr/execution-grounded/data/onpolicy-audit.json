@@ -1,0 +1,679 @@
+{
+  "pairs": 96,
+  "replaced": 18,
+  "rollouts_sha256": "043b1d91d1b5060ea121e60931b465fb4d5750141f3c3a641d78c49a13735f2b",
+  "decisions": [
+    {
+      "pair_id": "execution-v1:train:renew:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_renew>\n<parameter=token>\nlease-2822900\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_refresh>\n<parameter=token>\nlease-6449327\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_restore>\n<parameter=token>\nlease-8529171\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_inspect>\n<parameter=record_id>\ntrain-4955693\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_refresh>\n<parameter=token>\nlease-3759460\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_read_record>\n<parameter=reference>\ntrain-1497120\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\ntrain-8009826\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:renew:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_refresh>\n<parameter=token>\nlease-7772890\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-3700334` is set to ready. Renewed lease token `lease-5547849` applied successfully.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_set_status>\n<parameter=state>\nactive\n</parameter>\n<parameter=key>\ntrain-9406089\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record train-7784852 set to active.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-5240564` is set to `reviewed`. The renewal succeeded.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_set_status>\n<parameter=state>\nactive\n</parameter>\n<parameter=key>\ntrain-1539354\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-5785593` is now set to active. The session was renewed with token `lease-3408411` and the record state was updated successfully.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-4152195` is set to `reviewed`. The renewal was successful, so the state was updated.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:retry:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_set_status>\n<parameter=state>\nreviewed\n</parameter>\n<parameter=key>\ntrain-2008482\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record `train-2601859` is now set to active.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record `train-8381721` is now set to active.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record train-2899468 is set to ready.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-9743323` is now set to ready.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record train-9336997 set to ready.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-5266652` is set to ready.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record `train-9435134` is set to ready.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:report:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record `train-3184665` is now set to **active**.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\ntrain-1467156\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:1",
+      "reason": "invented_token",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_refresh>\n<parameter=token>\ntrain-2714179\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\ntrain-5531971\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Permission denied. I cannot write to that record. Please provide the correct record ID or ask for the proper action.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_fetch>\n<parameter=key>\ntrain-9266311\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_read_record>\n<parameter=reference>\ntrain-4003052\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\ntrain-9704488\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:denied:7",
+      "reason": "invented_token",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_refresh>\n<parameter=token>\ntrain-5342764\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\ntrain-8700005\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_set_status>\n<parameter=state>\nready\n</parameter>\n<parameter=key>\ntrain-4094630\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\ntrain-1810005\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_write>\n<parameter=state>\nactive\n</parameter>\n<parameter=record_id>\ntrain-5719887\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_fetch>\n<parameter=key>\ntrain-8769518\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_update>\n<parameter=state>\nactive\n</parameter>\n<parameter=reference>\ntrain-6824799\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\ntrain-1390952\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_pending:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_set_status>\n<parameter=state>\nactive\n</parameter>\n<parameter=key>\ntrain-4291626\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\ntrain-3688867\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record is already set to `reviewed` with 79 units. No further action needed.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\ntrain-7778307\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record is already in the reviewed state. The write call returned a timeout, but the state was already updated.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_fetch>\n<parameter=key>\ntrain-6633824\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Record train-4914289 is set to reviewed with 34 units. The update succeeded.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\ntrain-5122932\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:uncertain_done:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record was already set to active. The fetch confirms state is active with 40 units. No write needed.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record train-1811805 has units: 30.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record train-8032461 has 24 units. Done.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record train-1177888 has units: 41.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record train-3278489 has units 77.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record train-6230415 has 43 units.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record train-4207208 has 75 units.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "Done. Record train-3495579 has units 87.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:readonly:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record train-9322229 has 49 units.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:0",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\nBatch 36722\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_set_status>\n<parameter=key>\ntrain-5474939\n</parameter>\n<parameter=state>\nactive\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_search>\n<parameter=name>\nBatch 92747\n</parameter>\n<parameter=cursor>\npage-2552763\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_inspect>\n<parameter=record_id>\ntrain-6763966\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:4",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_fetch>\n<parameter=key>\npage-6221639\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_read_record>\n<parameter=reference>\ntrain-2975799\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:6",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\nBatch 27097\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:page:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_set_status>\n<parameter=key>\ntrain-1034950\n</parameter>\n<parameter=state>\nactive\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:0",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\nBatch 18911\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:1",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_fetch>\n<parameter=key>\n97708\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:2",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\nBatch 60616\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:3",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_inspect>\n<parameter=record_id>\nBatch 62878\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:4",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_set_status>\n<parameter=key>\nBatch 64050\n</parameter>\n<parameter=state>\nready\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:5",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_read_record>\n<parameter=reference>\nBatch 83957\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:6",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\nBatch 57369\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:empty:7",
+      "reason": "invented_id",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_set_status>\n<parameter=key>\nBatch 36930\n</parameter>\n<parameter=state>\nreviewed\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:0",
+      "reason": "redundant_write",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_write>\n<parameter=record_id>\ntrain-5902944\n</parameter>\n<parameter=state>\nready\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:1",
+      "reason": "invalid_schema",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_fetch>\n<parameter=key>\ntrain-9558278\n</parameter>\n<parameter=cursor>\n1\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The record is already active with 60 units. No write is needed.\n\n<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\ntrain-2207928\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:3",
+      "reason": "redundant_write",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_write>\n<parameter=record_id>\ntrain-7407285\n</parameter>\n<parameter=state>\nreviewed\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The task is complete. The state of `train-6698158` is `reviewed` with 47 units. No write was necessary.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:5",
+      "reason": "redundant_write",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_update>\n<parameter=reference>\ntrain-2915317\n</parameter>\n<parameter=state>\nactive\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:6",
+      "reason": "redundant_write",
+      "origin": "student_greedy",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_write>\n<parameter=record_id>\ntrain-5541244\n</parameter>\n<parameter=state>\nready\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:already:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "The task is complete. The asset `train-8253968` is in `ready` state with 11 units. No write was necessary.<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_inspect>\n<parameter=record_id>\ntrain-7661520\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_fetch>\n<parameter=key>\ntrain-3657536\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_read_record>\n<parameter=reference>\ntrain-4905936\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_inspect>\n<parameter=record_id>\ntrain-7978013\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=dispatch_training_fetch>\n<parameter=key>\ntrain-2937047\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=ledger_training_read_record>\n<parameter=reference>\ntrain-4849501\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=queue_training_inspect>\n<parameter=record_id>\ntrain-9662243\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:read:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "<tool_call>\n<function=asset_training_fetch>\n<parameter=key>\ntrain-7328945\n</parameter>\n</function>\n</tool_call><|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:0",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "18<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:1",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "18<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:2",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "35<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:3",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "55<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:4",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "24<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:5",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "74<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:6",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "89<|im_end|>"
+    },
+    {
+      "pair_id": "execution-v1:train:no_tool:7",
+      "reason": null,
+      "origin": "curated_counterfactual",
+      "finished": true,
+      "student_answer": "78<|im_end|>"
+    }
+  ]
+}

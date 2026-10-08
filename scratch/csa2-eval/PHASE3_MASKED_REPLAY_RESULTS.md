@@ -150,10 +150,12 @@ transaction failures also remain. Both budget workers and the CPU review worker
 have exited; no training or evaluation is currently running. The diagnostic
 review artifact preserves all per-case prefix, stop and correctness evidence.
 
-A single fixed-configuration u50 repeat is now running on GPU 0 using the same
-4K budget, seed, batch shape and isolated compile cache as its completed 4K run.
-The one-shot CPU review worker will compare token identity and correctness flips,
-update `phase3-masking/diagnostics/review.json`, and exit. It cannot launch training
-or promote a model. This check is needed because the cross-budget baseline
-trajectories changed substantially. Its current state is in
-`phase3-masking/diagnostics/status.json`; the original bounded phase is complete.
+A fixed-configuration u50 repeat completed using the same 4K budget, seed, batch
+shape and isolated compile cache. MATH is identical on all 64 cases and remains
+37/64 correct. GSM8K is identical on 41/64 cases, changes 46 to 49 correct, gains
+three answers and loses none. This does not quantify all inference variance.
+The review worker updated `phase3-masking/diagnostics/review.json` and exited;
+`diagnostics/status.json` records repeatability analysis complete. The original
+bounded phase is complete and its candidate is not promoted. The subsequently
+authorized [execution-grounded pilot](EXECUTION_GROUNDED_TRAINING.md) targets the
+independently verified tool failures with a matched masked-replay control.

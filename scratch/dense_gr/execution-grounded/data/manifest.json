@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "pairs": 96,
+  "kinds": [
+    "renew",
+    "retry",
+    "report",
+    "denied",
+    "uncertain_pending",
+    "uncertain_done",
+    "readonly",
+    "page",
+    "empty",
+    "already",
+    "read",
+    "no_tool"
+  ],
+  "variants": 8,
+  "split": "train",
+  "max_tokens": 801,
+  "masked": "all prefix tokens including every tool observation",
+  "sha256": {
+    "pairs.jsonl": "db9ed3a2c699dda0b73a719b86e922c95b30a9390a33477b64f397c8db3ce978",
+    "proofs.jsonl": "b7665983a7510126c4c501338da2b48d03a205149392b67da1c8e3bf91cbd099",
+    "prompts.jsonl": "e271fb327b0818780ccdde9d93bc77d7706b40df7b7a53a6db317e988274633f"
+  }
+}

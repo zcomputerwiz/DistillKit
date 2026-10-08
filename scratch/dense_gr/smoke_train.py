@@ -615,6 +615,12 @@ def main(argv=None) -> int:
             or (args.max_steps is not None and args.max_steps < 1)
             or (args.passes is not None and args.passes <= 0)):
         raise SystemExit("budgets, lengths and reporting counts must be positive")
+    if args.pairs is not None:
+        if args.resume:
+            raise SystemExit("preference-pair resume is unsupported: pair order is not checkpointed")
+        if (args.pairs_per_step < 1 or not math.isfinite(args.dpo_beta) or args.dpo_beta <= 0
+                or any(not math.isfinite(v) or v < 0 for v in (args.pair_weight, args.pair_sft_weight))):
+            raise SystemExit("preference counts/beta must be positive and weights finite and nonnegative")
     if args.no_checkpoint and args.save_every:
         raise SystemExit("--no-checkpoint conflicts with --save-every")
     if args.streaming_head_loss and (not args.shared_head_loss or args.sparse_stage):
