@@ -13,6 +13,7 @@ answer is wrong.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -24,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 import torch  # noqa: E402
 
-from generate import CompiledGreedy, pick  # noqa: E402,F401
+from generate import CompiledGreedy, pick, stop_mask  # noqa: E402,F401
 
 PROMPT = ("Solve the following math problem. Reason step by step, then give the final "
           "answer in \\boxed{{}}.\n\n{problem}")
@@ -79,6 +80,10 @@ def self_test():
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--checkpoint", type=Path, required=True)
+    # Assisted-by: Codex. Opt-in matched stopping and per-case RNG retain the
+    # historical defaults while aligning the final comparison with serving.
+    parser.add_argument('--eos-token-ids',type=int,nargs='+')
+    parser.add_argument('--case-seeds',action='store_true')
     parser.add_argument("--bench", choices=("gsm8k", "math500"), required=True)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--batch-size", type=int, default=64)
@@ -98,6 +103,8 @@ def main() -> int:
     self_test()
     if args.presence and not args.compiled:
         raise SystemExit("--presence needs --compiled")
+    if args.case_seeds and not args.compiled:
+        raise SystemExit('--case-seeds needs --compiled')
     if (args.output / "results.json").exists():
         raise SystemExit("refusing to overwrite %s" % args.output)
     sampling = (0.6, 0.95, 20) if args.sample else None
@@ -117,6 +124,7 @@ def main() -> int:
     items = problems(args.bench)[:args.limit or None]
     tok.padding_side = "left"
     eos = tok.eos_token_id
+    stops = args.eos_token_ids or [eos]
     system = [{"role": "system", "content": args.system}] if args.system else []
     prompts = [tok.apply_chat_template(system + [{"role": "user", "content": PROMPT.format(problem=q)}],
                                        tokenize=False, add_generation_prompt=True,
@@ -127,7 +135,7 @@ def main() -> int:
     if args.compiled:
         longest = max(len(tok(p, add_special_tokens=False)["input_ids"]) for p in prompts)
         width_all = -(-longest // 64) * 64
-        runner = CompiledGreedy(model, args.batch_size, width_all, args.max_new_tokens, eos,
+        runner = CompiledGreedy(model, args.batch_size, width_all, args.max_new_tokens, stops,
                                 sampling=sampling, seed=args.seed, presence=args.presence)
     torch.manual_seed(args.seed)
     started, records = time.monotonic(), []
@@ -149,22 +157,28 @@ def main() -> int:
                         else dict(do_sample=False, temperature=None, top_p=None, top_k=None))
             with torch.inference_mode():
                 output = model.generate(**tokens, max_new_tokens=args.max_new_tokens,
-                                        pad_token_id=eos, **decoding)
+                                        pad_token_id=eos, eos_token_id=stops, **decoding)
         else:
             filled = chunk + [chunk[0]] * (args.batch_size - len(chunk))
             tokens = tok(filled, return_tensors="pt", padding="max_length", max_length=width_all,
                          add_special_tokens=False).to("cuda")
-            output = runner(tokens["input_ids"], tokens["attention_mask"])
+            seeds=None
+            if args.case_seeds:
+                seeds=[int.from_bytes(hashlib.sha256(f'{ident}:{args.seed}'.encode()).digest()[:8],'little')%(2**63-1)
+                       for ident,_,_ in items[start:start+len(chunk)]]
+                seeds += [seeds[0]]*(args.batch_size-len(seeds))
+            output = runner(tokens["input_ids"], tokens["attention_mask"],seeds=seeds)
         width = tokens["input_ids"].shape[1]
         for offset, (ident, question, reference) in enumerate(items[start:start + len(chunk)]):
             new = output[offset, width:]
-            done = (new == eos).nonzero()
+            done = stop_mask(new,stops).nonzero()
             length = int(done[0]) if done.numel() else int(new.numel())
             text = tok.decode(new[:length], skip_special_tokens=True)
             answer = boxed(text)
             records.append(dict(id=ident, reference=reference, answer=answer,
                                 correct=correct(answer, reference), tokens=length,
                                 truncated=not done.numel() and length >= args.max_new_tokens,
+                                prompt_sha256=hashlib.sha256(chunk[offset].encode()).hexdigest(),
                                 raw=text))
         print("%s %d/%d  %.0f s  running accuracy %.3f"
               % (args.bench, len(records), len(items), time.monotonic() - started,
@@ -175,6 +189,7 @@ def main() -> int:
                    truncated=sum(r["truncated"] for r in records),
                    mean_tokens=sum(r["tokens"] for r in records) / len(records),
                    thinking=not args.no_thinking, sampled=args.sample, seed=args.seed,
+                   eos_token_ids=stops, per_case_rng=args.case_seeds,
                    seconds=time.monotonic() - started)
     args.output.mkdir(parents=True, exist_ok=True)
     (args.output / "results.json").write_text(json.dumps(dict(summary=summary, records=records),
