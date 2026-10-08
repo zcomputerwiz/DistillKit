@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "status": "prepared_validated_not_launched_pending_launch_freeze",
+  "status": "ready_for_frozen_bounded_launch",
   "start_checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\execution-grounded\\targeted\\checkpoints\\smoke-r1-1-gr-s25-csa2",
   "start_policy": "Experimental initialization, not promotion. Fresh optimizer; not resume of prior pair state.",
   "steps": 40,
@@ -293,11 +293,7 @@
       "1.0"
     ]
   },
-  "freeze_pending": [
-    "Current candidate sampled unauthorized-case semantic review",
-    "Exact source/runtime/data/checkpoint hashes before launch",
-    "Exact per-milestone evaluation commands and disk budget before launch"
-  ],
+  "freeze_pending": [],
   "input_sha256": {
     "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\data\\manifest.json": "e802e725052014a7729a651cbebf7ea67a4ff8fdc5057d572b31d84c38364cce",
     "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\data\\pair-schedule.json": "d7a58976efff15694b0a80d4976202f54eeccbf4e88064058c15483f79f4be13",

@@ -118,6 +118,7 @@ def freeze():
             argv = replacements(original, checkpoint=checkpoint,
                 output=OUT/'eval'/name/old_output.relative_to(OLD/'eval/targeted'))
             if Path(argv[0]).name == 'agentic_scenarios.py':
+                argv[0] = str(HERE/'completion_scenarios.py')
                 argv += ['--data', str(OUT/'agent-scenarios.json')]
             jobs.append(argv)
         jobs.append([str(HERE/'completion_eval.py'), '--checkpoint', str(checkpoint),

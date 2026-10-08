@@ -1,5 +1,5 @@
 {
-  "status": "awaiting_user_choice_on_evaluator_contradiction",
+  "status": "reviewed_for_experimental_initialization",
   "checkpoint": "D:/DeepThought/Projects/HybridModel/DistillKit/scratch/dense_gr/execution-grounded/targeted/checkpoints/smoke-r1-1-gr-s25-csa2",
   "source": "D:/DeepThought/Projects/HybridModel/DistillKit/scratch/dense_gr/execution-grounded/eval/targeted/scenarios-s2.json",
   "case_id": "scenario:empty:2:0",
@@ -13,5 +13,13 @@
   "historical_results": "Preserve unchanged; do not reinterpret the frozen score as proof of a real unauthorized mutation.",
   "proposed_correction": "Consistent NOT_FOUND from alias resolution and record inspection in empty worlds; compare new milestones with fresh starting-model and u50 baselines on the same version.",
   "promotion": "Not performed. Candidate is only a proposed experimental initialization.",
-  "launch": "Waiting on user's evaluator choice; no measured arm started."
+  "launch": "Reviewed as experimental initialization only. Fresh baseline evaluations precede measured training; no automatic promotion.",
+  "investigation": {
+    "introduced_in": "98b16598fd282f90a9792eb1004a806c071a37a0",
+    "later_change": "aa901f7 only added bounded prefill; no change to fixture semantics",
+    "finding": "No documented intent for contradictory alias/read outcomes. Shared successful handlers lacked an empty-world branch; validation exercised only the reference search-and-stop path.",
+    "confidence": "Inference from source, history, documentation and reference paths; no claim about original author intent."
+  },
+  "correction": "completion_scenarios.py provides consistent-no-match-v2 without modifying historical agentic_scenarios.py. New completion curriculum also rejects reads/writes of phantom empty-world records.",
+  "validation": "27 focused tests pass; all 72 original reference paths pass with unchanged prompts, observations and grades."
 }

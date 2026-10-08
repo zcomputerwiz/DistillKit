@@ -56,6 +56,12 @@ class CompletionWorld(World):
         self.initial_messages = copy.deepcopy(self.messages)
 
     def execute(self, c):
+        # Empty worlds contain no record, including through a guessed ID. The
+        # inherited generic read handler otherwise exposes a phantom record.
+        if self.family == 'empty' and not call_problem(c,self.definitions):
+            if self.operations[c['function']['name']] in ('read','write'):
+                self.errors.append('invented_id')
+                return {'error':'NOT_FOUND'}
         if not self.family.startswith('aggregate'):
             return super().execute(c)
         if call_problem(c, self.definitions):

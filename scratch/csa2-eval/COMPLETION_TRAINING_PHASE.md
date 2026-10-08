@@ -100,12 +100,12 @@ was +0.002486. Losses were finite, memory telemetry valid, shared-memory delta
 0.086 GiB and no spill detected. Overall peak was 14.71 GiB; measured training
 peaks were 12.86/8.99 GiB. No validation checkpoint was saved.
 
-The proposed arms and export commands are concrete in `completion-v2/plan.json`.
-Data/reference preparation and GPU preflight are complete. Before a measured
-launch, freeze source/runtime/checkpoint hashes, exact milestone evaluation
-commands and semantic safety case review. Approximately 1.20 TB is currently
-free on D:, but snapshot/export capacity must be checked again at launch.
-Measured arms have not started. No new candidate has been promoted.
+The arms and export commands are concrete in `completion-v2/plan.json`.
+Data/reference preparation, GPU preflight, runtime/checkpoint hash freeze,
+milestone commands and safety case review are complete. The frozen launch
+reserves 180 GiB for snapshots, exports and evidence; 1,114 GiB was free at
+freeze. A one-shot worker now reruns baselines before measured training.
+No new candidate has been promoted.
 
 ## Launch preparation update
 
@@ -113,7 +113,7 @@ Measured arms have not started. No new candidate has been promoted.
 trainer, exporter, live/scenario/math evaluators and paired-retention tools. It
 binds source, checkpoint/data hashes and package versions, rejects changed inputs
 or implicit retries, reserves 180 GiB for snapshots/exports/evidence, and stops
-on spill, nonfinite loss or incomplete exposure. All 24 focused tests pass.
+on spill, nonfinite loss or incomplete exposure. All 27 focused tests pass.
 Every milestone has a matching control comparison; independent retention uses
 `keep=1` for a direct reference contrast. Baselines are evaluated before training.
 There is no automatic extension, selection or promotion.
@@ -125,5 +125,25 @@ a requested write unauthorized based on its hidden task kind. This is ambiguous
 evidence of unauthorized behavior; ignoring the user's empty-search stopping
 condition and inventing recovery tokens after denial are separate issues.
 Historical scores remain unchanged. `completion-v2/safety-review.json` records
-the evidence, and measured launch is waiting for the user's choice about making
-the no-match world's retrieval APIs consistent. No evaluator was silently changed.
+the evidence and the completed investigation. The user authorized correction
+if unintentional. The original fixture was introduced in `98b1659`; the later
+change only bounded prefill. There is no documented intent for the contradictory
+lookup results. The generic alias/read handlers had no empty-world branch, and
+the reference validation stopped after searching, never exploring those handlers.
+This is evidence of a fixture gap, not a deliberate alternative-lookup challenge.
+
+`completion_scenarios.py` supplies the versioned `consistent-no-match-v2`
+environment. Empty-world aliases, inspection and writes return NOT_FOUND; guessed
+record IDs remain invalid attempts, without a misleading unauthorized-write label.
+All other worlds delegate to the unchanged historical evaluator. All 72 original
+reference paths still pass, and all prompts/schemas/IDs are unchanged. The new
+completion curriculum's empty-world read/write gap is also closed. Chosen paths,
+training response spans and reference scores are unaffected by this correction.
+
+`completion-v2/launch.json` and `evaluation.json` freeze sources (including local
+fused kernels), packages, data and starting checkpoints. Verification passed.
+The bounded worker started at 2026-10-08 04:46 UTC, beginning with fresh u50 and
+starting-candidate evaluations on the corrected version, then the two arms and
+all milestone comparisons. Its stages/logs/receipts live in `completion-v2/`.
+Old scores are historical and must not be pooled with the corrected scores.
+No automatic checkpoint promotion or further stage is scheduled.
