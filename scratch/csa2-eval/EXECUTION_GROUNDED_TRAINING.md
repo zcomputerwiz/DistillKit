@@ -164,9 +164,9 @@ scratch/dense_gr/execution_grounded_run.py eval-control
 scratch/dense_gr/execution_grounded_run.py eval-targeted
 ```
 
-CPU validation: ten executable-world, preference-loss and checkpoint-selection
-replay tests passed, including multiple simultaneous checkpoint frames. Added
-settings validation also rejects invalid pair options before model allocation.
+CPU validation: eleven executable-world, preference-loss, checkpoint-selection
+replay and settings-validation tests passed, including multiple simultaneous
+checkpoint frames and invalid options rejected before model allocation.
 
 Preparation completed: all 96 student turns ended within budget; 18 certified
 failures replaced curated negatives (11 invented IDs, two invented tokens, four
@@ -181,13 +181,24 @@ read-only and no-tool regression tests cover the distinction. Previous labels,
 scores and receipts are retained in `audit-correction/`; corrected reference
 preparation is complete. The unchanged student rollouts were reused by hash.
 
-A two-step GPU preflight is running before the bounded arms. It uses a fresh u50
-copy, the actual pair/replay path and no checkpoint output, then verifies memory
-telemetry, finite losses and an initial reference-relative DPO margin near zero.
-The continuation stops on any failure; after a passing preflight it runs the
+A two-step GPU preflight completed before the bounded arms. It used a fresh u50
+copy, the actual pair/replay path and no checkpoint output. Both steps completed
+with valid memory telemetry and finite losses: measured training peaks were
+15.67/14.77 GiB, shared-memory delta 0.086 GiB, and no spill was detected. Initial
+mean DPO was 0.69972 versus log(2) = 0.69315, with reference-relative mean margin
+-0.01292. This checks two real pairs before the first update, not bitwise reference
+equivalence on the entire dataset. The continuation stops on any failure and runs the
 frozen control/targeted arms, nine evaluations per arm, paired retention evidence
 and CPU comparisons. Its launcher hash and current stage are recorded in
 `execution-status.json`. This is a one-shot worker, not a recurring automation.
+
+The 40-step masked control is now running; targeted training and evaluation are
+queued in that worker. Both measured arms independently load u50. The two-step
+preflight's modified weights were discarded. Across the targeted schedule's 80
+pairs, 16 negatives are certified student failures and 2,057 chosen assistant
+tokens receive the added objective; 52,216 shared prefix tokens remain outside
+the response spans. This is additional preference exposure, not part of the
+966,679-token replay budget. No measured-pilot outcomes are available yet.
 
 The first preflight was stopped by the trainer's finite-plan guard before updates:
 two steps cannot consume the original 40-step ordered schedule. Its failed receipt
