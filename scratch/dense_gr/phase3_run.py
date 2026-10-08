@@ -23,7 +23,7 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def invoke(label, argv, devices):
+def invoke(label, argv, devices, environment_overrides=None):
     runs=OUT/'runs'
     runs.mkdir(parents=True,exist_ok=True)
     receipt=runs/(label+'.json')
@@ -41,9 +41,13 @@ def invoke(label, argv, devices):
             Path(argv[argv.index(flag)+1]).parent.mkdir(parents=True,exist_ok=True)
     env=dict(os.environ,PYTHONPATH=str(ROOT),PYTHONIOENCODING='utf-8',
              PYTHONUNBUFFERED='1',CUDA_VISIBLE_DEVICES=devices)
+    if environment_overrides:
+        env.update(environment_overrides)
     info=dict(label=label,status='running',argv=argv,argv_sha256=signature,
               cuda_visible_devices=devices,started=datetime.now(timezone.utc).isoformat(),
               protocol_sha256=digest(OUT/'evaluation.json'),plan_sha256=digest(OUT/'plan.json'))
+    if environment_overrides:
+        info['environment_overrides']=environment_overrides
     if '--prefill-query-chunk' in argv:
         info['runtime_source_sha256']={name:digest(HERE/name) for name in
             ('bounded_cached_prefill.py','agentic_live_eval.py','agentic_scenarios.py')}
