@@ -30,6 +30,17 @@ supervisory signals. This motivates retaining chosen-response CE and general rep
 instead of starting unrestricted reward-only RL. Its learning rates are not
 transplanted to this different student.
 
+[Agent Error Dataset (September 30, 2026)](https://arxiv.org/html/2609.40111v1)
+retains execution evidence and separates diagnosis training from action repair.
+It supports post-error action targets without requiring reflection text, but its
+actor gains are task-dependent and its real-environment evaluation regresses.
+Its offline DPO pilot changes likelihood margins without establishing task recovery;
+those historical pairs also fail its stricter lineage criterion. Our exact shared
+prefixes address that eligibility issue, not the absence of proven recovery benefit.
+Thus DPO is exploratory here, chosen-response CE is retained, and actual held-out
+execution determines usefulness. A later chosen-CE-only ablation could isolate DPO
+if this combined pilot is promising; the present contrast cannot do so.
+
 These papers support the design direction, not a guarantee, a universal best method,
 or the particular pilot weights. The existing DPO/CCE trainer and rollout tools
 already support a bounded test. A new GRPO backend and inference integration for the
@@ -177,3 +188,9 @@ The continuation stops on any failure; after a passing preflight it runs the
 frozen control/targeted arms, nine evaluations per arm, paired retention evidence
 and CPU comparisons. Its launcher hash and current stage are recorded in
 `execution-status.json`. This is a one-shot worker, not a recurring automation.
+
+The first preflight was stopped by the trainer's finite-plan guard before updates:
+two steps cannot consume the original 40-step ordered schedule. Its failed receipt
+is retained in `preflight-plan-check/`. The preflight now has its own four canonical
+microbatches, copied from the frozen schedule and bound to its source hash. The
+full 80-batch schedules for the measured arms are unchanged.

@@ -31,9 +31,20 @@ def check_training(path, steps):
 
 def preflight():
     plan, _ = verify()
+    # Ordered training deliberately requires consuming its whole finite plan.
+    # Derive a separate canonical four-microbatch plan for this two-step test.
+    frozen = json.loads((OLD/'batches.json').read_text())
+    prefix = dict(frozen, groups=frozen['groups'][:4],
+                  origin_sha256=digest(OLD/'batches.json'), purpose='two-step GPU preflight')
+    path = OUT/'preflight/batches.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists() and json.loads(path.read_text()) != prefix:
+        raise ValueError('preflight batch prefix changed')
+    path.write_text(json.dumps(prefix, indent=2))
     argv = list(plan['arms']['targeted'])
     for flag, value in (('--max-steps', '2'), ('--save-every', '0'), ('--report-every', '1'),
                         ('--evaluate-every', '0'), ('--evaluate-windows', '1'),
+                        ('--ordered-batches', str(path)),
                         ('--output', str(OUT/'preflight/train.json')),
                         ('--checkpoints', str(OUT/'preflight/checkpoints'))):
         argv[argv.index(flag)+1] = value
