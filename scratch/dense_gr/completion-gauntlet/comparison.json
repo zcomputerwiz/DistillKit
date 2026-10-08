@@ -1,0 +1,460 @@
+{
+  "results": {
+    "gsm8k": {
+      "nothink": {
+        "all": {
+          "cases": 1319,
+          "base": 931,
+          "candidate": 936,
+          "gained": 81,
+          "lost": 76,
+          "mcnemar_p": 0.7496650751115798,
+          "truncations": {
+            "base": 2,
+            "candidate": 3
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 1066,
+          "base": 732,
+          "candidate": 739,
+          "gained": 72,
+          "lost": 65,
+          "mcnemar_p": 0.6083841068999594,
+          "truncations": {
+            "base": 1,
+            "candidate": 1
+          }
+        }
+      },
+      "think-s0": {
+        "all": {
+          "cases": 1319,
+          "base": 1010,
+          "candidate": 994,
+          "gained": 111,
+          "lost": 127,
+          "mcnemar_p": 0.3309087396642384,
+          "truncations": {
+            "base": 14,
+            "candidate": 24
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 1066,
+          "base": 802,
+          "candidate": 790,
+          "gained": 90,
+          "lost": 102,
+          "mcnemar_p": 0.4273545893965867,
+          "truncations": {
+            "base": 13,
+            "candidate": 21
+          }
+        }
+      },
+      "think-s1": {
+        "all": {
+          "cases": 1319,
+          "base": 1014,
+          "candidate": 1024,
+          "gained": 120,
+          "lost": 110,
+          "mcnemar_p": 0.552979216745102,
+          "truncations": {
+            "base": 17,
+            "candidate": 30
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 1066,
+          "base": 805,
+          "candidate": 813,
+          "gained": 100,
+          "lost": 92,
+          "mcnemar_p": 0.613547237593459,
+          "truncations": {
+            "base": 16,
+            "candidate": 26
+          }
+        }
+      },
+      "think-s2": {
+        "all": {
+          "cases": 1319,
+          "base": 994,
+          "candidate": 1025,
+          "gained": 133,
+          "lost": 102,
+          "mcnemar_p": 0.050117856720855954,
+          "truncations": {
+            "base": 16,
+            "candidate": 14
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 1066,
+          "base": 792,
+          "candidate": 819,
+          "gained": 110,
+          "lost": 83,
+          "mcnemar_p": 0.06099215686116873,
+          "truncations": {
+            "base": 11,
+            "candidate": 12
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "all": {
+          "estimate": 0.006317917614354308,
+          "ci95": [
+            -0.006317917614354308,
+            0.019206469547637096
+          ]
+        },
+        "local_capture_unmatched": {
+          "estimate": 0.007191994996873045,
+          "ci95": [
+            -0.007191994996873044,
+            0.021575984990619138
+          ]
+        }
+      }
+    },
+    "math500": {
+      "nothink": {
+        "all": {
+          "cases": 500,
+          "base": 256,
+          "candidate": 252,
+          "gained": 46,
+          "lost": 50,
+          "mcnemar_p": 0.7596492883236297,
+          "truncations": {
+            "base": 31,
+            "candidate": 22
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 362,
+          "base": 187,
+          "candidate": 177,
+          "gained": 33,
+          "lost": 43,
+          "mcnemar_p": 0.3018724904870077,
+          "truncations": {
+            "base": 23,
+            "candidate": 18
+          }
+        }
+      },
+      "think-s0": {
+        "all": {
+          "cases": 500,
+          "base": 262,
+          "candidate": 259,
+          "gained": 50,
+          "lost": 53,
+          "mcnemar_p": 0.8438976552528619,
+          "truncations": {
+            "base": 92,
+            "candidate": 108
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 362,
+          "base": 190,
+          "candidate": 179,
+          "gained": 29,
+          "lost": 40,
+          "mcnemar_p": 0.22840022535329696,
+          "truncations": {
+            "base": 69,
+            "candidate": 77
+          }
+        }
+      },
+      "think-s1": {
+        "all": {
+          "cases": 500,
+          "base": 247,
+          "candidate": 271,
+          "gained": 68,
+          "lost": 44,
+          "mcnemar_p": 0.02930222297163292,
+          "truncations": {
+            "base": 95,
+            "candidate": 109
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 362,
+          "base": 177,
+          "candidate": 197,
+          "gained": 49,
+          "lost": 29,
+          "mcnemar_p": 0.030786495821399938,
+          "truncations": {
+            "base": 75,
+            "candidate": 82
+          }
+        }
+      },
+      "think-s2": {
+        "all": {
+          "cases": 500,
+          "base": 262,
+          "candidate": 247,
+          "gained": 52,
+          "lost": 67,
+          "mcnemar_p": 0.19915839818564474,
+          "truncations": {
+            "base": 99,
+            "candidate": 107
+          }
+        },
+        "local_capture_unmatched": {
+          "cases": 362,
+          "base": 182,
+          "candidate": 176,
+          "gained": 42,
+          "lost": 48,
+          "mcnemar_p": 0.5984117182335187,
+          "truncations": {
+            "base": 76,
+            "candidate": 79
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "all": {
+          "estimate": 0.003999999999999999,
+          "ci95": [
+            -0.019999999999999997,
+            0.028
+          ]
+        },
+        "local_capture_unmatched": {
+          "estimate": 0.0027624309392265175,
+          "ci95": [
+            -0.025782688766114177,
+            0.031307550644567216
+          ]
+        }
+      }
+    },
+    "humaneval": {
+      "nothink": {
+        "all": {
+          "cases": 164,
+          "base": 67,
+          "candidate": 68,
+          "gained": 5,
+          "lost": 4,
+          "mcnemar_p": 1.0,
+          "truncations": {
+            "base": 0,
+            "candidate": 2
+          }
+        }
+      },
+      "think-s0": {
+        "all": {
+          "cases": 164,
+          "base": 64,
+          "candidate": 58,
+          "gained": 17,
+          "lost": 23,
+          "mcnemar_p": 0.42959050784338615,
+          "truncations": {
+            "base": 8,
+            "candidate": 10
+          }
+        }
+      },
+      "think-s1": {
+        "all": {
+          "cases": 164,
+          "base": 68,
+          "candidate": 53,
+          "gained": 15,
+          "lost": 30,
+          "mcnemar_p": 0.035697803555194696,
+          "truncations": {
+            "base": 8,
+            "candidate": 9
+          }
+        }
+      },
+      "think-s2": {
+        "all": {
+          "cases": 164,
+          "base": 66,
+          "candidate": 59,
+          "gained": 18,
+          "lost": 25,
+          "mcnemar_p": 0.3603776529357674,
+          "truncations": {
+            "base": 10,
+            "candidate": 11
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "all": {
+          "estimate": -0.05691056910569106,
+          "ci95": [
+            -0.0975609756097561,
+            -0.014227642276422767
+          ]
+        }
+      }
+    },
+    "mbpp": {
+      "nothink": {
+        "all": {
+          "cases": 378,
+          "base": 181,
+          "candidate": 180,
+          "gained": 12,
+          "lost": 13,
+          "mcnemar_p": 1.0,
+          "truncations": {
+            "base": 5,
+            "candidate": 6
+          }
+        }
+      },
+      "think-s0": {
+        "all": {
+          "cases": 378,
+          "base": 156,
+          "candidate": 147,
+          "gained": 40,
+          "lost": 49,
+          "mcnemar_p": 0.39657015814551616,
+          "truncations": {
+            "base": 24,
+            "candidate": 30
+          }
+        }
+      },
+      "think-s1": {
+        "all": {
+          "cases": 378,
+          "base": 156,
+          "candidate": 142,
+          "gained": 42,
+          "lost": 56,
+          "mcnemar_p": 0.18884671980890244,
+          "truncations": {
+            "base": 17,
+            "candidate": 35
+          }
+        }
+      },
+      "think-s2": {
+        "all": {
+          "cases": 378,
+          "base": 162,
+          "candidate": 150,
+          "gained": 36,
+          "lost": 48,
+          "mcnemar_p": 0.2298644069691204,
+          "truncations": {
+            "base": 24,
+            "candidate": 36
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "all": {
+          "estimate": -0.030864197530864192,
+          "ci95": [
+            -0.06172839506172839,
+            -0.0008818342151675483
+          ]
+        }
+      }
+    },
+    "mmlu": [
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "mmlu",
+        "metric": "acc",
+        "comparison": "candidate - base",
+        "estimate": 0.00390625,
+        "ci95": [
+          -0.015625,
+          0.0234375
+        ],
+        "units": 256
+      },
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "mmlu",
+        "metric": "acc_token_norm",
+        "comparison": "candidate - base",
+        "estimate": 0.00390625,
+        "ci95": [
+          -0.015625,
+          0.0234375
+        ],
+        "units": 256
+      },
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "mmlu",
+        "metric": "acc_char_norm",
+        "comparison": "candidate - base",
+        "estimate": 0.00390625,
+        "ci95": [
+          -0.015625,
+          0.0234375
+        ],
+        "units": 256
+      }
+    ],
+    "arc": [
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "arc",
+        "metric": "acc",
+        "comparison": "candidate - base",
+        "estimate": 0.0,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "units": 256
+      },
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "arc",
+        "metric": "acc_token_norm",
+        "comparison": "candidate - base",
+        "estimate": -0.00390625,
+        "ci95": [
+          -0.01171875,
+          0.0
+        ],
+        "units": 256
+      },
+      {
+        "checkpoint": "smoke-r1-1-gr-s25-csa2",
+        "task": "arc",
+        "metric": "acc_char_norm",
+        "comparison": "candidate - base",
+        "estimate": 0.0078125,
+        "ci95": [
+          -0.0078125,
+          0.02734375
+        ],
+        "units": 256
+      }
+    ]
+  },
+  "promotion": "not performed",
+  "caution": "Unadjusted exploratory intervals across multiple benchmarks; public exposure remains possible."
+}

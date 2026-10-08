@@ -129,3 +129,44 @@ GPU 0 and completion step 40 on GPU 1. It verifies the frozen protocol, runs all
 generation and the local overlap screen, then performs sandbox scoring and
 paired comparisons. Live status/logs/receipts are in `completion-gauntlet/`.
 No automatic training, checkpoint promotion or further run is scheduled.
+
+## Completed confirmation
+
+The worker completed all generation, overlap screening, sandbox scoring and
+paired comparisons on 2026-10-08 at 18:02 Chicago time, without a reported job
+failure. No checkpoint was promoted. Evidence: `completion-gauntlet/comparison.json`.
+
+| Benchmark | u50 greedy | Step 40 greedy | u50 sampled mean | Step 40 sampled mean |
+| --- | ---: | ---: | ---: | ---: |
+| HumanEval+ | 40.85% | 41.46% | 40.24% | 34.55% |
+| MBPP+ | 47.88% | 47.62% | 41.80% | 38.71% |
+| GSM8K | 70.58% | 70.96% | 76.27% | 76.90% |
+| MATH-500 | 51.20% | 50.40% | 51.40% | 51.80% |
+
+Sampled means are pass@1 across three matched seeds, not pass@3. Code correctness
+requires passing both the original and expanded tests. Sampled HumanEval+
+candidate-minus-base is -5.69 percentage points, paired task-bootstrap 95% CI
+[-9.76, -1.42]; MBPP+ is -3.09 [-6.17, -0.09]. These intervals are unadjusted
+exploratory comparisons across benchmarks. Both code benchmarks decline in all
+three sampled seeds; greedy differences are small and unresolved.
+
+GSM8K sampled delta is +0.63 points [-0.63, +1.92], MATH-500 +0.40
+[-2.00, +2.80]. Local-capture-unmatched math subsets also have intervals crossing
+zero. Raw MMLU accuracy differs by one correct answer in favor of the candidate
+out of 256; ARC raw accuracy is unchanged. These do not establish equivalence.
+
+The regression is decoding-mode-specific within this test: thinking also uses
+sampling, whereas nonthinking is greedy, so the design cannot separate those
+two factors. Code caps are 2K tokens; truncations increase from 26 to 30 across
+HumanEval thinking seeds, and 65 to 101 across MBPP thinking seeds. Truncation
+may explain part of the loss, but does not establish its full cause. MATH thinking
+also reaches the 4K cap often (286 base, 324 candidate across seeds).
+
+Recommendation: retain u50 as the base and review code failure categories and
+completion length before picking the next initialization or training mix. The
+functional code loss now supports a bounded code-preservation adjustment, but
+does not identify raw source code as the best repair. Prefer fresh verified code
+solution conversations alongside raw code, retain conversational masks, and use
+a matched control. Combine this with the diverse aggregation data described
+above only after documenting the dose and preservation gates. No additional
+training or diagnostic generation was launched automatically.
