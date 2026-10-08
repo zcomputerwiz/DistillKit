@@ -147,3 +147,57 @@ starting-candidate evaluations on the corrected version, then the two arms and
 all milestone comparisons. Its stages/logs/receipts live in `completion-v2/`.
 Old scores are historical and must not be pooled with the corrected scores.
 No automatic checkpoint promotion or further stage is scheduled.
+
+## Completed comparison: 2026-10-08
+
+The worker completed all training, exports, ten checkpoint evaluation sets and
+paired retention/atlas evidence at 08:34 local time. No worker remains running.
+Both arms consumed 966,679 weighted replay targets over 40 steps with valid
+memory telemetry and no spill. Peak training allocation was approximately
+15.69/14.88 GiB; measured throughput was 850 tok/s for control and 752 tok/s
+with the additional completion objective.
+
+| Greedy development measure | Starting candidate | Control step 40 | Completion step 40 |
+| --- | ---: | ---: | ---: |
+| Independent scenarios | 56/72 | 54/72 | 60/72 |
+| New completion held-out suite | 11/44 | 14/44 | 23/44 |
+| Recovery, independent scenarios | 2/9 | 2/9 | 8/9 |
+| Aggregation, independent scenarios | 0/9 | 0/9 | 0/9 |
+| Legacy live suite | 35/48 | 35/48 | 36/48 |
+
+The completion learning curve is 54, 57, 57, 60 successes out of 72 at steps
+10/20/30/40; recovery is 2, 6, 7, 8 out of nine. The new suite rises from
+12 to 15 to 17 to 23 out of 44. This is continued proxy improvement through
+step 40, not evidence of a plateau or permission to extend the stage.
+Independent empty-search and direct-answer scores return to 9/9 at step 40;
+pagination falls to 7/9. Aggregation still commonly reports the first record's
+five units despite a continuation cursor, so the gap remains complete retrieval.
+
+There is a genuine safety regression in `scenario:pagination:2:512`: after a
+directory result explicitly names the first record "different", the model
+inspects and attempts to write that record instead of following the cursor to
+the requested Silver record. It then invents a recovery token from the word
+UNAUTHORIZED and repeats. This is distinct from the corrected empty-world
+fixture ambiguity. The write was rejected; no unauthorized mutation succeeded.
+Step-40 scenarios have zero false completions, but this attempted wrong-record
+write blocks treating the checkpoint as an unconditional replacement.
+
+GSM8K falls from 50/64 in each of the starting candidate's three runs to 46/64
+in each step-40 run. The matched control also scores 46/64, implicating the
+shared replay/stage as well as any treatment effect. MATH scores are
+35/31/37 at start and 32/35/32 at step 40; step 30 scores 40/35/35. These remain
+small development suites with generation variability, not final benchmarks.
+
+Paired independent retention at step 40 versus the starting candidate shows
+code NLL +0.000728 (95% CI +0.000349 to +0.001094) and thinking NLL -0.000042
+(-0.000365 to +0.000265). Code deterioration is small but measurable; thinking
+has no resolved change. Relative to u50, total code/thinking deltas are
++0.003211/+0.000912. Being below the investigation thresholds does not certify
+functional preservation or cancel the observed math and safety regressions.
+
+No checkpoint was promoted and no further training started. Next recipe work
+should diagnose aggregation at the model's actual early-stop prefixes, retain
+empty-search/direct-answer examples, and address wrong-record selection and
+the shared-stage math loss before deciding another bounded comparison.
+All machine summaries and evidence remain in `completion-v2/comparison.json`
+and `completion-v2/eval/{retention,atlas}/`.
