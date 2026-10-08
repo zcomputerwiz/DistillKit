@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "status": "CPU_prepared_no_training",
+  "train_pairs": 222,
+  "heldout_pairs": 72,
+  "trajectories": 88,
+  "max_pair_tokens": 3092,
+  "sha256": {
+    "pairs.jsonl": "12042189dc328bd9c835e740387b4224ca38157b9c1c25e276fc057337f4d168",
+    "heldout-pairs.jsonl": "30b7cd7195f7146a3e3c41906be7229fe842d9b379396695528252e966c21df4",
+    "trajectories.jsonl": "0087966e26ff8fd91922d22c4959a942d8949f524bcdf98d47a1ae4240c4856a",
+    "proofs.jsonl": "4415e5848b4a1d7984d8b15e6afea53be32392b797ab4e5f894e639d75aa501d",
+    "prompts.jsonl": "47b46d705e16d57fc8c1c81e42b5afbad66de36b04ca01716e6df75c1868c941"
+  },
+  "limitation": "Heldout schemas/IDs are disjoint; trajectory templates are shared."
+}

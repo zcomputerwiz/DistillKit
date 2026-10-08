@@ -192,13 +192,16 @@ frozen control/targeted arms, nine evaluations per arm, paired retention evidenc
 and CPU comparisons. Its launcher hash and current stage are recorded in
 `execution-status.json`. This is a one-shot worker, not a recurring automation.
 
-The 40-step masked control is now running; targeted training and evaluation are
-queued in that worker. Both measured arms independently load u50. The two-step
-preflight's modified weights were discarded. Across the targeted schedule's 80
-pairs, 16 negatives are certified student failures and 2,057 chosen assistant
-tokens receive the added objective; 52,216 shared prefix tokens remain outside
-the response spans. This is additional preference exposure, not part of the
-966,679-token replay budget. No measured-pilot outcomes are available yet.
+Both 40-step arms and their bounded evaluation worker have completed. Long greedy
+success was 35/72 for u50, 34/72 for control and 56/72 for targeted; false
+completions were 4, 7 and 0. Targeted recovery was still 2/9 and aggregation 0/9,
+usually due to stopping before retry or further pagination. One unauthorized
+sampled case remains; no candidate is promoted. Across the targeted schedule's
+80 pairs, 16 negatives were certified student failures and 2,057 chosen assistant
+tokens received the added objective; 52,216 prefix tokens remained outside it.
+Independent code/thinking retention worsened slightly, below the investigation
+thresholds. See [the completion-phase preparation](COMPLETION_TRAINING_PHASE.md)
+for completed results, limitations and the next proposed comparison.
 
 The first preflight was stopped by the trainer's finite-plan guard before updates:
 two steps cannot consume the original 40-step ordered schedule. Its failed receipt
