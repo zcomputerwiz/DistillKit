@@ -10,7 +10,9 @@ context stays masked; raw code/text retains full-token loss.
 2026-10-09 execution and optimizer follow-up:
 [INFLUENCE_AUDIT_RESULTS.md](INFLUENCE_AUDIT_RESULTS.md). All 16 sampled solutions
 pass inherited tests, but mutation/stronger-test review confirms one nonfunctional
-email target outside the recent prefix. Requalify it before future replay. The
+email target outside the recent prefix. Its requalification now confirms failure,
+and the exact document is excluded from future replay; see
+[PRESERVATION_REPLAY_READY.md](PRESERVATION_REPLAY_READY.md). The
 sampled combined update improves code NLL and does not justify universal loss
 equalization; broader verified documents and aggregation paths remain the priority.
 

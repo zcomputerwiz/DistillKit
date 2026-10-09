@@ -21,6 +21,12 @@ tensors still undergo AdamW decay. Freeze the indexer for a stage intended to
 preserve routing, or deliberately train it with its separate alignment objective.
 This audit has not changed that inherited choice.
 
+2026-10-09 approved follow-up: the existing indexer freeze and exact email-target
+quality exclusion are now applied and validated in
+[PRESERVATION_REPLAY_READY.md](PRESERVATION_REPLAY_READY.md). This records the
+resolved preservation policy without changing the historical audit inputs or
+loss measurements. No new training stage was launched.
+
 The current completion candidate remains experimental; u50 remains the reference.
 The sampled losses below are training-data diagnostics, not a promotion result or
 an explanation of the earlier held-out regression by themselves.

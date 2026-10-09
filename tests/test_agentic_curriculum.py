@@ -157,3 +157,18 @@ def test_conversational_replay_mask_preserves_raw_sources_and_objectives(tmp_pat
     assert {Path(p).name for p in new['assistant']} == {Path(p).name for p in new['paths']} - raw
     for key in ('ce', 'kl', 'ul', 'repeat'):
         assert new[key] == old[key]
+
+
+def test_preservation_recipe_freezes_router_and_uses_the_same_exclusions_for_measurement(tmp_path):
+    from agentic_arm import recipe, checkpoint_name
+    exclusion = tmp_path/'confirmed-exclusions.json'
+    exclusion.write_text('[]', encoding='ascii')
+    _, legacy = recipe(tmp_path/'data', tmp_path/'legacy', control=True, mask_conversational=True)
+    argv, options = recipe(tmp_path/'data', tmp_path/'next', control=True, mask_conversational=True,
+                           freeze_router=True, exclude_documents=exclusion)
+    assert '--freeze-router' in argv
+    assert argv[argv.index('--exclude-documents')+1] == options['exclude_documents'] == str(exclusion.resolve())
+    assert checkpoint_name(True).endswith('-csa2-frozen')
+    assert checkpoint_name(False).endswith('-csa2')
+    for key in ('paths', 'ce', 'kl', 'ul', 'repeat', 'assistant'):
+        assert options[key] == legacy[key]

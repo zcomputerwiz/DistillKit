@@ -6,8 +6,10 @@ experimental and long1-u50 remains the reference. The
 [reconstruction-loss research](OMNIQUANT_RMSE_ASSESSMENT.md), and completed
 [execution/target/optimizer influence audit](INFLUENCE_AUDIT_RESULTS.md) record
 the current next-phase decisions. No new training stage was launched by the
-audit. Before the next preservation stage, resolve selection-only indexer query
-decay and requalify the confirmed weak-test email target; prioritize diverse
+audit. The selection-only indexer freeze and confirmed weak-test email quarantine
+are applied in the [validated replay component](PRESERVATION_REPLAY_READY.md)
+(37 focused tests pass). Before the next stage, freeze its fresh data, schedule
+and retention gates; prioritize diverse
 executed aggregation paths and verified code rather than automatic loss
 equalization. Conversational context remains masked; benchmark exclusions remain
 limited to confirmed matching tasks.

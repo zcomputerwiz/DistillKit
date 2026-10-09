@@ -11,9 +11,12 @@ The completion candidate is experimental; long1-u50 remains the reference.
 Execution/target checks and discarded fresh/saved optimizer steps are complete,
 with 30 focused tests passing and no detected GPU spill. No new training stage
 was launched. Broader verified code and executed aggregation trajectories remain
-the next-phase priority. The audit flags zero-gradient indexer query decay and
-one weak-test email target for resolution before that phase; it does not support
-automatically rooting or equalizing the existing losses.
+the next-phase priority. The indexer freeze and exact weak-test email quarantine
+are now applied in the [validated replay component](scratch/csa2-eval/PRESERVATION_REPLAY_READY.md),
+with 37 focused tests passing, including CPU and two-GPU training checks.
+Fresh executed trajectories, schedule and retention gates still need to be
+frozen before the next phase. The audit does not support automatically rooting
+or equalizing the existing losses.
 
 This is the continuation/handoff record for the DistillKit n-gram-sidecar fork in
 `D:\DeepThought\Projects\HybridModel\DistillKit`. It began as a log of Claude's

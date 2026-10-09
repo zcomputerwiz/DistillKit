@@ -98,11 +98,86 @@ def recheck_extraction():
     print(json.dumps(result, indent=2), flush=True)
 
 
+def requalify_email(output):
+    """Recheck the confirmed weak-test target without changing archived captures."""
+    import subprocess
+    sys.path.insert(0, str(ROOT/'scratch/downstream/code_bench'))
+    from verify_code import sandbox, solution_of
+    proof_path = HERE/'influence-audit-20261008/manual-quality-checks.json'
+    proof = read(proof_path)
+    source = DATA/'onpolicy-r8-code-short.jsonl'
+    selected = [r for r in rows(source) if r['doc_id'] == proof['doc_id']]
+    if len(selected) != 1:
+        raise ValueError('expected one exact audited source document')
+    audit = read(HERE/'influence-audit-20261008/code-execution-audit.json')
+    audited = next(r for r in audit['rows'] if r['doc_id'] == proof['doc_id'])
+    row = selected[0]
+    solution = solution_of(row['text'][row['prompt_chars']:])
+    if solution.strip() != audited['solution'].strip():
+        raise ValueError('served target changed since the audit')
+    output.mkdir(parents=True, exist_ok=True)
+    destination = output/'email-requalification.json'
+    quarantine = output/'exclude-quality-confirmed.json'
+    if destination.exists() or quarantine.exists():
+        raise ValueError('refusing to overwrite completed quality evidence')
+    # This control validates the strengthened harness only. It is not a new
+    # teacher/student response and is never promoted into a training cache.
+    control = '''import smtplib
+from email.message import EmailMessage
+
+def send_mass_email(smtp_server, port, login, password, sender_email, subject, body, recipient_list):
+    if not recipient_list:
+        return False
+    message = EmailMessage()
+    message['From'] = sender_email
+    message['To'] = ', '.join(recipient_list)
+    message['Subject'] = subject
+    message.set_content(body)
+    server = smtplib.SMTP(smtp_server, port)
+    server.set_debuglevel(0)
+    server.starttls()
+    server.login(login, password)
+    server.sendmail(sender_email, recipient_list, message.as_string())
+    server.quit()
+    return True
+'''
+    noop = 'def send_mass_email(*args, **kwargs):\n    return False\n'
+    stronger = proof['strengthened_tests']
+    cases = [('native_original', solution, audited['tests']),
+             ('native_noop', noop, audited['tests']),
+             ('strengthened_original', solution, stronger),
+             ('strengthened_noop', noop, stronger),
+             ('strengthened_control', control, stronger)]
+    image = subprocess.check_output(['docker', 'image', 'inspect', 'code-verify-sandbox',
+                                    '--format', '{{.Id}}'], text=True).strip()
+    status = sandbox([dict(id=name, solution=code, test=tests) for name,code,tests in cases])
+    expected = dict(native_original='passed', native_noop='passed', strengthened_original='failed',
+                    strengthened_noop='failed', strengthened_control='passed')
+    if status != expected:
+        raise ValueError('quality harness produced unexpected outcomes: ' + str(status))
+    manifest = ROOT.parent/'teacher-cache-r8-code-short-w8/manifest.json'
+    assert proof['doc_id'] in {r['doc_id'] for r in read(manifest)['documents'] if r['split']=='train'}
+    result = dict(status='quarantined_for_future_replay', doc_id=proof['doc_id'], checks=status,
+        sandbox_image=image, strengthened_tests=stronger, positive_control=control,
+        control_policy='Harness-only positive control; never inserted into training data.',
+        quarantine_scope='This exact confirmed nonfunctional document only; historical labels/caches unchanged.',
+        solution_sha256=hashlib.sha256(solution.encode()).hexdigest(),
+        input_sha256={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in (source,proof_path,manifest)})
+    destination.write_text(json.dumps(result, indent=2, ensure_ascii=True)+'\n', encoding='ascii')
+    quarantine.write_text(json.dumps([proof['doc_id']], indent=2)+'\n', encoding='ascii')
+    print('Requalification confirms failure; quarantined one exact future-replay document.')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--screen-code',action='store_true',help='Decode retained tokens and flag code benchmark stem overlap')
     parser.add_argument('--recheck-extraction',action='store_true',help='Verify changed first/last final fences in the existing Docker sandbox')
+    parser.add_argument('--requalify-email',action='store_true',help='Requalify the audited weak-test target; write a future-only quality exclusion')
+    parser.add_argument('--quality-output',type=Path,default=HERE/'replay-ready-20261009')
     options = parser.parse_args()
+    if options.requalify_email:
+        requalify_email(options.quality_output)
+        return
     OUT.mkdir(exist_ok=True)
     if options.recheck_extraction:
         recheck_extraction()

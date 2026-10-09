@@ -17,12 +17,13 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
+PRESERVATION_EXCLUSION = HERE / "replay-ready-20261009/exclude-replay-next-20261009.json"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(HERE))
 
 
 def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, rate_scale=.55, balanced=False,
-           mask_conversational=False):
+           mask_conversational=False, freeze_router=False, exclude_documents=None):
     names = ["agent-smol-a", "agent-smol-b", "frontier-qa2", "frontier-code-raw", "frontier-tools",
              "r8-code-short-w8", "curriculum-v4-w8", "thinking-w8", "think-first-w8", "expand-code-w8",
              "general-pilot-w8", "teacher-math-gen", "onpolicy-r6-loop", "loop-check",
@@ -66,8 +67,22 @@ def recipe(data, out, new_repeat=1, steps=50, control=False, code_multiplier=1, 
             "--seed", "25", "--checkpoints", str(out / "checkpoints"), "--output", str(out / "train.json")]
     if balanced:
         argv += ["--balanced-prefix-batches", str(steps * 2)]
-    return argv, dict(paths=all_caches, assistant=assistant, ce=ce, repeat=repeat,
-                      kl=[paths["frontier-code-raw"]], ul=[paths["onpolicy-r6-loop"], paths["loop-check"]])
+    # Explicit options retain the historical programmatic recipe for archived
+    # audits. New CLI preservation plans enable the freeze and updated exclusions.
+    if freeze_router:
+        argv += ["--freeze-router"]
+    options = dict(paths=all_caches, assistant=assistant, ce=ce, repeat=repeat,
+                   kl=[paths["frontier-code-raw"]], ul=[paths["onpolicy-r6-loop"], paths["loop-check"]])
+    if exclude_documents is not None:
+        exclusion = str(Path(exclude_documents).resolve())
+        argv[argv.index("--exclude-documents") + 1] = exclusion
+        options["exclude_documents"] = exclusion
+    return argv, options
+
+
+def checkpoint_name(freeze_router=False):
+    """The fixed recipe's trainer variant, including its existing freeze suffix."""
+    return "smoke-r1-1-gr-s25-csa2" + ("-frozen" if freeze_router else "")
 
 
 def teacher_for(options):
@@ -86,7 +101,8 @@ def teacher_for(options):
     heading = header + effort + encode("\n\n")
     teacher = CachedTeacher(options["paths"], device="cpu", seed=25, max_length=32768,
         answer_marker=encode(ANSWER_MARKER), min_answer_tokens=2,
-        exclude=excluded_documents(ROOT.parent / "capture-data/exclude-long-r5.json"),
+        exclude=excluded_documents(Path(options.get("exclude_documents",
+                                    ROOT.parent / "capture-data/exclude-long-r5.json"))),
         strip_prefix=[(whole, 0, len(whole)), (heading, len(header), len(heading))],
         strip_nonthinking=(encode(ANSWER_MARKER), encode("\n<think>\n\n</think>")),
         ce_only=options["ce"], assistant_only=options["assistant"],
@@ -126,11 +142,14 @@ def measure(teacher, steps, balanced=False):
 
 
 def plan(args):
+    if not args.exclude_documents.is_file():
+        raise ValueError("missing preservation exclusions: " + str(args.exclude_documents))
     if args.output.exists():
         raise ValueError("refuse to overwrite run directory")
     args.output.mkdir(parents=True)
     tuning = dict(code_multiplier=args.code_multiplier, rate_scale=args.rate_scale, balanced=args.balanced,
-                  mask_conversational=args.mask_conversational)
+                  mask_conversational=args.mask_conversational, freeze_router=args.freeze_router,
+                  exclude_documents=str(args.exclude_documents.resolve()))
     _, options = recipe(args.data, args.output / "agentic", steps=args.steps, **tuning)
     print("Measuring replay and new-target mass", flush=True)
     teacher = teacher_for(options)
@@ -156,6 +175,8 @@ def plan(args):
     teacher.cache.close()
     result = dict(start_checkpoint=str(HERE / "merges-long1/u50"), steps=args.steps,
                   new_repeat=factor, data=str(args.data.resolve()), arms=plans, tuning=tuning,
+                  checkpoint_name=checkpoint_name(args.freeze_router),
+                  input_sha256={str(args.exclude_documents.resolve()): hashlib.sha256(args.exclude_documents.read_bytes()).hexdigest()},
                   requested_new_share=args.new_share,
                   limitation="Equal optimizer steps and recipe, not identical token counts or replay documents after regrouping.")
     (args.output / "plan.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -165,6 +186,9 @@ def plan(args):
 def run(args):
     os.chdir(ROOT)
     spec = json.loads((args.output / "plan.json").read_text())
+    for path, expected in spec.get("input_sha256", {}).items():
+        if hashlib.sha256(Path(path).read_bytes()).hexdigest() != expected:
+            raise ValueError("frozen plan input changed: " + path)
     env = dict(os.environ, PYTHONPATH=str(ROOT), PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
     status = args.output / "status.json"
 
@@ -182,7 +206,8 @@ def run(args):
         (args.output / arm).mkdir(exist_ok=True)
         invoke("train-" + arm, spec["arms"][arm]["argv"])
     checkpoints = {"base": spec["start_checkpoint"], **{
-        a: str(args.output / a / "checkpoints/smoke-r1-1-gr-s25-csa2") for a in ("agentic", "replay")}}
+        a: str(args.output / a / "checkpoints" / spec.get("checkpoint_name", checkpoint_name()))
+        for a in ("agentic", "replay")}}
     for arm, checkpoint in checkpoints.items():
         invoke(f"live-{arm}", [HERE / "agentic_live_eval.py", "--checkpoint", checkpoint,
                "--data", Path(spec["data"]) / "trajectories.jsonl", "--output", args.output / f"live-{arm}.json"])
@@ -222,6 +247,10 @@ if __name__ == "__main__":
     p.add_argument("--balanced", action="store_true")
     p.add_argument("--mask-conversational", action=argparse.BooleanOptionalAction, default=True,
                    help="mask context in every conversational replay cache (default); raw code/text remains scored")
+    p.add_argument("--freeze-router", action=argparse.BooleanOptionalAction, default=True,
+                   help="preserve selection-only router weights in new plans (default); no indexer alignment objective here")
+    p.add_argument("--exclude-documents", type=Path, default=PRESERVATION_EXCLUSION,
+                   help="run-specific benchmark and confirmed-quality exclusions, also used for mixture measurement")
     a = p.parse_args()
     if not 0 < a.new_share < 1 or a.code_multiplier < 1 or not 0 < a.rate_scale <= 1 or a.steps < 1:
         p.error("invalid share, code multiplier, rate scale, or step count")

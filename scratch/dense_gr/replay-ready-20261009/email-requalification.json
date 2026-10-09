@@ -1,0 +1,22 @@
+{
+  "status": "quarantined_for_future_replay",
+  "doc_id": "onpolicy:kodcode:Filter_62706_I:s0",
+  "checks": {
+    "native_original": "passed",
+    "native_noop": "passed",
+    "strengthened_original": "failed",
+    "strengthened_noop": "failed",
+    "strengthened_control": "passed"
+  },
+  "sandbox_image": "sha256:da773462eb6fee0eb3ecfd4bf05d41b07fbd313903e5b6dd4d37814eb2b786cc",
+  "strengthened_tests": "from solution import send_mass_email\n\ndef test_message_is_actually_sent(monkeypatch):\n    import smtplib\n    sent=[]\n    class SMTP:\n        def __init__(self,*args,**kwargs): pass\n        def set_debuglevel(self,*args): pass\n        def starttls(self): pass\n        def login(self,*args): pass\n        def sendmail(self,sender,recipients,message):\n            assert isinstance(message,(str,bytes)), 'SMTP requires a serialized message'\n            sent.append((sender,recipients,message))\n        def quit(self): pass\n    monkeypatch.setattr(smtplib,'SMTP',SMTP)\n    send_mass_email('example.test',587,'user','password','sender@example.test','Subject','Body',['a@example.test','b@example.test'])\n    assert len(sent)==1, 'Function must send a valid message, not silently return after an exception'\n    assert sent[0][0]=='sender@example.test'\n    assert sent[0][1]==['a@example.test','b@example.test']\n",
+  "positive_control": "import smtplib\nfrom email.message import EmailMessage\n\ndef send_mass_email(smtp_server, port, login, password, sender_email, subject, body, recipient_list):\n    if not recipient_list:\n        return False\n    message = EmailMessage()\n    message['From'] = sender_email\n    message['To'] = ', '.join(recipient_list)\n    message['Subject'] = subject\n    message.set_content(body)\n    server = smtplib.SMTP(smtp_server, port)\n    server.set_debuglevel(0)\n    server.starttls()\n    server.login(login, password)\n    server.sendmail(sender_email, recipient_list, message.as_string())\n    server.quit()\n    return True\n",
+  "control_policy": "Harness-only positive control; never inserted into training data.",
+  "quarantine_scope": "This exact confirmed nonfunctional document only; historical labels/caches unchanged.",
+  "solution_sha256": "94e7a15cb7a3a1dd06d0ae27dcfc27274e25e16b793027e3516970f5d3002258",
+  "input_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\onpolicy-r8-code-short.jsonl": "d3f8eb10b55cd053d6fa07350ef3777f14c75cb5dc898eafa68d1367db08e3ad",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\influence-audit-20261008\\manual-quality-checks.json": "09b8b6eed39d60a2667ead030ae0a13e426463e771d123e094de9f1b4a2cb5e9",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-r8-code-short-w8\\manifest.json": "a97811e55e733b05f1fdd1ef3af8469ed5314c48eb7d4fa1d4e14ad23d86a210"
+  }
+}

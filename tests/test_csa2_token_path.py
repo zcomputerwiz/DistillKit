@@ -18,16 +18,16 @@ import torch
 
 from distillkit.models import Qwen35WidenedForCausalLM
 from distillkit.models.qwen35.csa2 import (Qwen35SparseLatentAttention, isolated_indexer,
-                                            recorded_attention)
+                                            recorded_attention, router_parameters)
 from test_csa2_routing import csa2_config
 
 LENGTH, CHUNK = 150, 32
 
 
-def build(top_k=LENGTH + 10, chunk=CHUNK):
+def build(top_k=LENGTH + 10, chunk=CHUNK, **config_kwargs):
     torch.manual_seed(0)
     config = csa2_config(csa2_router_bias=False, csa2_top_k=top_k, csa2_local_window=8,
-                         csa2_query_chunk=chunk)
+                         csa2_query_chunk=chunk, **config_kwargs)
     model = Qwen35WidenedForCausalLM(config).double()
     layers = [l.self_attn for l in model.model.layers
               if isinstance(getattr(l, "self_attn", None), Qwen35SparseLatentAttention)]
@@ -145,6 +145,64 @@ def test_statistics_match_the_expanded_selection():
         expanded = layer.routing_statistics()
         for key in ("density", "selected", "entropy"):
             assert compact[key] == pytest.approx(expanded[key], abs=1e-9), (layer.layer_idx, key)
+
+
+@pytest.mark.parametrize('tensor_parallel', [False, True])
+def test_frozen_router_preserves_forward_selection_and_weights_while_backbone_trains(tensor_parallel):
+    if tensor_parallel and torch.cuda.device_count() < 2:
+        pytest.skip('TP preservation check needs two CUDA devices')
+    geometry = dict(linear_num_key_heads=2, num_key_value_heads=2) if tensor_parallel else {}
+    model, layers = build(top_k=24, **geometry)
+    if tensor_parallel:
+        model = model.to(device='cuda:0', dtype=torch.bfloat16)
+    tokens = torch.randint(1, 64, (1, 64), device=next(model.parameters()).device)
+    model.eval()
+    with torch.no_grad():
+        original = model(input_ids=tokens, use_cache=False).logits.clone()
+        allowed = [layer.last_allowed.clone() for layer in layers]
+    router = dict(router_parameters(model))
+    assert any('indexer_proj' in name for name in router)
+    for parameter in router.values():
+        parameter.requires_grad_(False)
+    with torch.no_grad():
+        frozen = model(input_ids=tokens, use_cache=False).logits
+    assert torch.equal(original, frozen)
+    assert all(torch.equal(before, layer.last_allowed) for before, layer in zip(allowed, layers))
+    if tensor_parallel:
+        from distillkit.parallel.model import shard_model
+        from distillkit.parallel.sync import sync_replicated_gradients
+        sys.path.insert(0, "scratch/dense_gr")
+        from training_step import KahanAdamW8bit, backward_step
+        shard_model(model, ['cuda:0', 'cuda:1'], shard_embeddings=False, embedding_device='cuda:1')
+        optimizer_type = KahanAdamW8bit
+    else:
+        optimizer_type = torch.optim.AdamW
+    router = dict(router_parameters(model))
+    assert all(not p.requires_grad for p in router.values()), 'sharding restored a frozen parameter'
+    before = {name:p.detach().clone() for name,p in router.items()}
+    body = next(p for name,p in model.named_parameters() if '.mlp.' in name and p.requires_grad)
+    body_before = body.detach().clone()
+    optimizer = optimizer_type([p for p in model.parameters() if p.requires_grad], lr=.001, weight_decay=.1)
+    held = {id(p) for group in optimizer.param_groups for p in group['params']}
+    assert not held.intersection(id(p) for p in router.values())
+    model.train()
+    model.model.gradient_checkpointing = True
+    with torch.autograd.set_multithreading_enabled(False):
+        if tensor_parallel:
+            # The production trainer moves hidden rows to the remote tied head;
+            # the stock HF outer forward assumes head and body share a device.
+            backward_step(model, [dict(input_ids=tokens, ce_only=True)],
+                          shared_head=True, streaming_head=True, head_chunk=16)
+        else:
+            model(input_ids=tokens, labels=tokens, use_cache=False).loss.backward()
+    if tensor_parallel:
+        sync_replicated_gradients(model)
+    assert all(p.grad is None for p in router.values())
+    assert body.grad is not None and bool(body.grad.abs().sum() > 0)
+    optimizer.step()
+    assert not torch.equal(body_before, body), 'backbone did not train'
+    assert all(torch.equal(before[name], p) for name,p in router.items())
+    assert all(p not in optimizer.state for p in router.values()), 'frozen router acquired optimizer state'
 
 
 def test_the_sparse_stage_indexer_loss_matches_the_dense_path(monkeypatch):
