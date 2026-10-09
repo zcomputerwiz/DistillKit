@@ -1,0 +1,57 @@
+{
+  "teacher_code": {
+    "retained": {
+      "documents": 475,
+      "keyword_features": {
+        "list_or_array": 246,
+        "string": 129,
+        "duplicate_or_multiplicity": 49,
+        "boundary_or_empty": 114,
+        "dictionary_or_set": 45,
+        "package_or_api": 2
+      },
+      "origins": {
+        "kodcode:Leetcode": 94,
+        "kodcode:Code_Contests": 79,
+        "kodcode:Taco": 133,
+        "kodcode:Algorithm": 58,
+        "kodcode:Filter": 105,
+        "kodcode:Docs": 6
+      }
+    },
+    "outside_recent": {
+      "documents": 392,
+      "keyword_features": {
+        "list_or_array": 197,
+        "string": 111,
+        "duplicate_or_multiplicity": 43,
+        "boundary_or_empty": 91,
+        "dictionary_or_set": 35,
+        "package_or_api": 0
+      },
+      "origins": {
+        "kodcode:Leetcode": 76,
+        "kodcode:Code_Contests": 72,
+        "kodcode:Taco": 101,
+        "kodcode:Algorithm": 45,
+        "kodcode:Docs": 4,
+        "kodcode:Filter": 94
+      }
+    }
+  },
+  "patterns": {
+    "list_or_array": "\\blist\\b|\\barray\\b",
+    "string": "\\bstring\\b",
+    "duplicate_or_multiplicity": "duplicate|multiplicity|repeated|frequency|occurrence",
+    "boundary_or_empty": "empty|boundary|edge case|zero|negative|single element",
+    "dictionary_or_set": "\\bdictionary\\b|\\bset\\b",
+    "package_or_api": "\\bpandas\\b|\\bnumpy\\b|\\bapi\\b|\\bpackage\\b"
+  },
+  "source_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-teacher.jsonl": "8e1d7a9a952895b46cd9b3f868377b55ac8f8ac5f506e33f308ddf2fe75e51de"
+  },
+  "caveats": [
+    "Keyword features overlap, are descriptive and do not establish test coverage.",
+    "Outside recent prefix does not mean untrained historically."
+  ]
+}

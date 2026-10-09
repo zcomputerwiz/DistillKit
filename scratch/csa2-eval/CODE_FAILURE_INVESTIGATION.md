@@ -11,6 +11,13 @@ The original scores overstate the code decline because the extractor can score
 reasoning drafts. Rescoring final answers improves both arms, but does not erase
 the HumanEval regression. MBPP's corrected interval crosses zero.
 
+These are unscreened public-bank results. The subsequent
+[replay data assessment](CODE_DATASET_ASSESSMENT.md) confirms 103 task identities
+in the retained training pool. Removing those tasks leaves HumanEval -3.55 points
+[-8.20, +1.09] and MBPP -1.89 [-4.94, +1.05]. Both screened intervals cross zero;
+the unscreened HumanEval significance is not evidence of a statistically clear
+independent functional-code decline. The historical table below is preserved.
+
 | Sampled thinking pass@1, mean of three seeds | u50 | Step 40 | Delta and paired 95% CI, percentage points |
 | --- | ---: | ---: | --- |
 | HumanEval+, original extraction | 40.24% | 34.55% | -5.69 [-9.76, -1.42] |

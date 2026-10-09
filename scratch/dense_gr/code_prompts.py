@@ -3,8 +3,8 @@
 Round 7's DPO pairs came from math and general prompts, where a code answer only had to
 finish without looping, and code paid for the loop fix (non-thinking HumanEval+ 44.5% ->
 40.9%). KodCode-V1 gives function-level Python problems with the expected signature and
-pytest suites, decontaminated against HumanEval and MBPP by its authors; problems it
-flags as similar to a benchmark are skipped here as well. Each prompt names the
+pytest suites, plus benchmark-similarity metadata. This script filters that metadata;
+the cutoff is not proof that all benchmark task matches are absent. Each prompt names the
 function(s) the tests import and asks for one fenced block, rendered with the
 checkpoint's chat template in thinking mode (60%) or not.
 

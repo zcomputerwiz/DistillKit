@@ -1,0 +1,75 @@
+{
+  "pools": {
+    "teacher-code": {
+      "counts": {
+        "documents": 475,
+        "single_final_fence": 473,
+        "multiple_or_no_final_fences": 2
+      },
+      "changed_extraction": [
+        {
+          "doc_id": "tcode:kodcode:Leetcode_1125_I",
+          "selected": true,
+          "final_fences": 2,
+          "first_final_sha256": "91ff69ee1b435a3baf5fa3ba4eb5534cb150fd5bb8206e06f86e094e97e29037",
+          "historical_last_sha256": "8c8acf70a6e98a040693332deb1c983737f74d1fa19f0090194857d872afdf4a",
+          "first_explicit_python_equals_verified_last": true,
+          "historical_last_status": "passed",
+          "first_final_status": "failed"
+        }
+      ]
+    },
+    "r8-code-short-w8": {
+      "counts": {
+        "documents": 1085,
+        "single_final_fence": 1079,
+        "multiple_or_no_final_fences": 6
+      },
+      "changed_extraction": [
+        {
+          "doc_id": "onpolicy:kodcode:Taco_11082_I:s0",
+          "selected": false,
+          "final_fences": 2,
+          "first_final_sha256": "aebabfc8ce9ddbc068e0163e3f23b074fb22b14086ccd9ed022cd58ecc41321b",
+          "historical_last_sha256": "2493fa2d3ffda05bbb7b229b7c62f52e8caddee10b0d735da176696bd53a1022",
+          "first_explicit_python_equals_verified_last": false,
+          "historical_last_status": "passed",
+          "first_final_status": "passed"
+        },
+        {
+          "doc_id": "onpolicy:kodcode:Filter_20543_I:s1",
+          "selected": false,
+          "final_fences": 2,
+          "first_final_sha256": "6cd6d4307777f4022e69cc2a86f2e92be5f62e9242d2dec24d5e5498bafba13f",
+          "historical_last_sha256": "5b5d09cedfd8a3fc9eb86d32a4b57fd6799e54358deb4296e51939cd3a5d1954",
+          "first_explicit_python_equals_verified_last": false,
+          "historical_last_status": "passed",
+          "first_final_status": "passed"
+        },
+        {
+          "doc_id": "onpolicy:kodcode:Code_Contests_29213_I:s1",
+          "selected": false,
+          "final_fences": 3,
+          "first_final_sha256": "e08e9f55da54019a3f62dd13ad2b518207bfb3ff1159fd166bc209ad8ff4b5aa",
+          "historical_last_sha256": "41cc02bdbe56d9da8eb2efef248d499714fcb2ac548410f2071cecd510fe8e99",
+          "first_explicit_python_equals_verified_last": false,
+          "historical_last_status": "passed",
+          "first_final_status": "failed"
+        }
+      ]
+    }
+  },
+  "source_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\teacher-code-verified.jsonl": "4256b3d4279ca8d4954e6e645055fbd356b76b0db89d6449b240848ba9a37495",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-teacher.jsonl": "8e1d7a9a952895b46cd9b3f868377b55ac8f8ac5f506e33f308ddf2fe75e51de",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-code\\manifest.json": "f1a9bd98e749640cbd649ed7f02aa0fb93d24481c10ea10c104a66e9690be261",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\onpolicy-r8-code-short.jsonl": "d3f8eb10b55cd053d6fa07350ef3777f14c75cb5dc898eafa68d1367db08e3ad",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-r8.jsonl": "2b8eedc2b04982e98452b66b92ff2bbba676e15a5b228f898a4f2f04c4c5bedb",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-r8-code-short-w8\\manifest.json": "a97811e55e733b05f1fdd1ef3af8469ed5314c48eb7d4fa1d4e14ad23d86a210",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\code_dataset_audit.py": "ad5b2609ed1ab1331b0ffb82fd97410e1088ad1420f2a17b061576588edfde6d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\downstream\\code_bench\\verify_code.py": "527a55b44434b53f5ff779d550639968db63ee26eca83f6c88e77de806620c6a",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\downstream\\code_bench\\verify_runner.py": "36ce41986cb8522f9933a91c6a3cd697979b7e18883c6861bffe6c5226fc2ce6"
+  },
+  "sandbox_image": "sha256:da773462eb6fee0eb3ecfd4bf05d41b07fbd313903e5b6dd4d37814eb2b786cc",
+  "caveat": "Rechecked changed extractions only. Existing labels/captures unchanged; no model generation."
+}

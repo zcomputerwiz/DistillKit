@@ -1,0 +1,375 @@
+{
+  "results": {
+    "recent_prefix_unmatched": {
+      "humaneval": {
+        "excluded_task_ids": [
+          "HumanEval/161"
+        ],
+        "cases": 163,
+        "modes": {
+          "nothink": {
+            "cases": 163,
+            "base": 67,
+            "candidate": 68,
+            "gained": 5,
+            "lost": 4
+          },
+          "think-s0": {
+            "cases": 163,
+            "base": 68,
+            "candidate": 59,
+            "gained": 15,
+            "lost": 24
+          },
+          "think-s1": {
+            "cases": 163,
+            "base": 71,
+            "candidate": 64,
+            "gained": 18,
+            "lost": 25
+          },
+          "think-s2": {
+            "cases": 163,
+            "base": 71,
+            "candidate": 65,
+            "gained": 21,
+            "lost": 27
+          }
+        },
+        "sampled_base": 0.4294478527607362,
+        "sampled_candidate": 0.38445807770961143,
+        "sampled_mean_delta": {
+          "estimate": -0.044989775051124746,
+          "ci95": [
+            -0.08793456032719836,
+            -0.004089979550102249
+          ]
+        },
+        "greedy_delta": {
+          "estimate": 0.006134969325153374,
+          "ci95": [
+            -0.03067484662576687,
+            0.04294478527607362
+          ]
+        }
+      },
+      "mbpp": {
+        "excluded_task_ids": [
+          "Mbpp/226",
+          "Mbpp/232",
+          "Mbpp/398"
+        ],
+        "cases": 375,
+        "modes": {
+          "nothink": {
+            "cases": 375,
+            "base": 180,
+            "candidate": 179,
+            "gained": 12,
+            "lost": 13
+          },
+          "think-s0": {
+            "cases": 375,
+            "base": 167,
+            "candidate": 166,
+            "gained": 35,
+            "lost": 36
+          },
+          "think-s1": {
+            "cases": 375,
+            "base": 168,
+            "candidate": 160,
+            "gained": 36,
+            "lost": 44
+          },
+          "think-s2": {
+            "cases": 375,
+            "base": 175,
+            "candidate": 160,
+            "gained": 32,
+            "lost": 47
+          }
+        },
+        "sampled_base": 0.4533333333333333,
+        "sampled_candidate": 0.432,
+        "sampled_mean_delta": {
+          "estimate": -0.021333333333333333,
+          "ci95": [
+            -0.04977777777777777,
+            0.00711111111111111
+          ]
+        },
+        "greedy_delta": {
+          "estimate": -0.0026666666666666666,
+          "ci95": [
+            -0.029333333333333333,
+            0.024
+          ]
+        }
+      }
+    },
+    "retained_pool_unmatched": {
+      "humaneval": {
+        "excluded_task_ids": [
+          "HumanEval/106",
+          "HumanEval/107",
+          "HumanEval/111",
+          "HumanEval/114",
+          "HumanEval/115",
+          "HumanEval/116",
+          "HumanEval/123",
+          "HumanEval/13",
+          "HumanEval/136",
+          "HumanEval/138",
+          "HumanEval/140",
+          "HumanEval/141",
+          "HumanEval/146",
+          "HumanEval/149",
+          "HumanEval/154",
+          "HumanEval/155",
+          "HumanEval/161",
+          "HumanEval/17",
+          "HumanEval/19",
+          "HumanEval/20",
+          "HumanEval/22",
+          "HumanEval/26",
+          "HumanEval/33",
+          "HumanEval/36",
+          "HumanEval/39",
+          "HumanEval/40",
+          "HumanEval/41",
+          "HumanEval/43",
+          "HumanEval/45",
+          "HumanEval/47",
+          "HumanEval/52",
+          "HumanEval/60",
+          "HumanEval/66",
+          "HumanEval/7",
+          "HumanEval/71",
+          "HumanEval/77",
+          "HumanEval/8",
+          "HumanEval/88",
+          "HumanEval/89",
+          "HumanEval/90",
+          "HumanEval/91",
+          "HumanEval/98"
+        ],
+        "cases": 122,
+        "modes": {
+          "nothink": {
+            "cases": 122,
+            "base": 52,
+            "candidate": 52,
+            "gained": 3,
+            "lost": 3
+          },
+          "think-s0": {
+            "cases": 122,
+            "base": 48,
+            "candidate": 44,
+            "gained": 10,
+            "lost": 14
+          },
+          "think-s1": {
+            "cases": 122,
+            "base": 56,
+            "candidate": 45,
+            "gained": 11,
+            "lost": 22
+          },
+          "think-s2": {
+            "cases": 122,
+            "base": 50,
+            "candidate": 52,
+            "gained": 18,
+            "lost": 16
+          }
+        },
+        "sampled_base": 0.4207650273224044,
+        "sampled_candidate": 0.38524590163934425,
+        "sampled_mean_delta": {
+          "estimate": -0.035519125683060114,
+          "ci95": [
+            -0.08196721311475409,
+            0.01092896174863388
+          ]
+        },
+        "greedy_delta": {
+          "estimate": 0.0,
+          "ci95": [
+            -0.040983606557377046,
+            0.040983606557377046
+          ]
+        }
+      },
+      "mbpp": {
+        "excluded_task_ids": [
+          "Mbpp/101",
+          "Mbpp/103",
+          "Mbpp/106",
+          "Mbpp/108",
+          "Mbpp/113",
+          "Mbpp/116",
+          "Mbpp/119",
+          "Mbpp/12",
+          "Mbpp/120",
+          "Mbpp/124",
+          "Mbpp/128",
+          "Mbpp/139",
+          "Mbpp/141",
+          "Mbpp/145",
+          "Mbpp/162",
+          "Mbpp/165",
+          "Mbpp/166",
+          "Mbpp/171",
+          "Mbpp/20",
+          "Mbpp/224",
+          "Mbpp/226",
+          "Mbpp/227",
+          "Mbpp/232",
+          "Mbpp/242",
+          "Mbpp/253",
+          "Mbpp/262",
+          "Mbpp/269",
+          "Mbpp/281",
+          "Mbpp/285",
+          "Mbpp/287",
+          "Mbpp/293",
+          "Mbpp/297",
+          "Mbpp/308",
+          "Mbpp/310",
+          "Mbpp/312",
+          "Mbpp/397",
+          "Mbpp/398",
+          "Mbpp/410",
+          "Mbpp/421",
+          "Mbpp/427",
+          "Mbpp/429",
+          "Mbpp/435",
+          "Mbpp/439",
+          "Mbpp/440",
+          "Mbpp/454",
+          "Mbpp/460",
+          "Mbpp/463",
+          "Mbpp/470",
+          "Mbpp/471",
+          "Mbpp/477",
+          "Mbpp/479",
+          "Mbpp/64",
+          "Mbpp/69",
+          "Mbpp/70",
+          "Mbpp/75",
+          "Mbpp/86",
+          "Mbpp/90",
+          "Mbpp/91",
+          "Mbpp/95",
+          "Mbpp/97",
+          "Mbpp/99"
+        ],
+        "cases": 317,
+        "modes": {
+          "nothink": {
+            "cases": 317,
+            "base": 146,
+            "candidate": 144,
+            "gained": 10,
+            "lost": 12
+          },
+          "think-s0": {
+            "cases": 317,
+            "base": 136,
+            "candidate": 136,
+            "gained": 32,
+            "lost": 32
+          },
+          "think-s1": {
+            "cases": 317,
+            "base": 135,
+            "candidate": 129,
+            "gained": 31,
+            "lost": 37
+          },
+          "think-s2": {
+            "cases": 317,
+            "base": 146,
+            "candidate": 134,
+            "gained": 27,
+            "lost": 39
+          }
+        },
+        "sampled_base": 0.4384858044164038,
+        "sampled_candidate": 0.4195583596214511,
+        "sampled_mean_delta": {
+          "estimate": -0.01892744479495268,
+          "ci95": [
+            -0.04942166140904311,
+            0.010541535226077434
+          ]
+        },
+        "greedy_delta": {
+          "estimate": -0.006309148264984227,
+          "ci95": [
+            -0.03470031545741325,
+            0.022082018927444796
+          ]
+        }
+      }
+    }
+  },
+  "source_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\control\\train.json": "35ae2cc8896e75da4cd6bd3bd69f85ddcb5c7809a2fa6ad1bc620253d75e508c",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\exclude-long-r5.json": "9638e74c267d03a83dacf043f392ad3aa1950c3ba92d1764594aceb89101344d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\batches.json": "19fd4f6a2e6dd8ca2e336b5380f8ed411788d1cb393dd1d70b187d73ecf5b026",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\frontier-code-raw.jsonl": "a070e6d4c205f43f0497de0c38e4c001728653d96f11e0a54a48d88f1d5bc114",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\teacher-code-verified.jsonl": "4256b3d4279ca8d4954e6e645055fbd356b76b0db89d6449b240848ba9a37495",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\expand-code.jsonl": "f1ce29c3938d8bcf9e6d34bea8dba70969d70c6efb73ada1c560e76c61fb20d5",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\onpolicy-r8-code-short.jsonl": "d3f8eb10b55cd053d6fa07350ef3777f14c75cb5dc898eafa68d1367db08e3ad",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\thinking-code-math.jsonl": "36c40aff4abe19c287274508b06e6f6e45eaf527e785b5edcce5fb4b77fde465",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\think-first-5m.jsonl": "fc61ca965f4b6e7592aa9f9defcb34998cf8c5352807f1f5d9981fabe6a6db5a",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-teacher.jsonl": "8e1d7a9a952895b46cd9b3f868377b55ac8f8ac5f506e33f308ddf2fe75e51de",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\teacher-code-index-r5.jsonl": "bde8c9b27652f7a6c992ccdaf34dd79a876fc4657019f4380bf65428a84f82bd",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-r8.jsonl": "2b8eedc2b04982e98452b66b92ff2bbba676e15a5b228f898a4f2f04c4c5bedb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\datasets.json": "399b85f6b33cffac5fc07511a2048e3754b91d67cf382b1d6d0f0e9c06825b58",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-code-raw\\manifest.json": "68b3ee07a99ede58117ffdf505ff1bc708dcb06e5c64a2436b427381fe7ed68a",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-code\\manifest.json": "f1a9bd98e749640cbd649ed7f02aa0fb93d24481c10ea10c104a66e9690be261",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-expand-code-w8\\manifest.json": "62db4dce84cb786000b791cff09fcb93a2f0228e23df8d285d04faf0c11861b0",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-r8-code-short-w8\\manifest.json": "a97811e55e733b05f1fdd1ef3af8469ed5314c48eb7d4fa1d4e14ad23d86a210",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-thinking-w8\\manifest.json": "69c9167c4e506ffc2b55e9148f1b5ee86b8c1c3eb53832d9b5df04a47dee8122",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-think-first-w8\\manifest.json": "470a6062324394288748afb862efb6c957740f751b78b2339f39e2c97f6f3b99",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\dataset-audit\\audit.json": "1550106df0f62cb8af6d50017380d956aadf50e7f9892e47c6cc86b4a723282f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\code_replay_review.py": "2ea482a8c775a1750127e7794ef111374823e8a2af2d7cb0b1c361e3546ae30f",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-agent-smol-a\\manifest.json": "e74a44d0193be150f86443eca047fcfc343ed476b42c076ab42abb017bb055a5",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-agent-smol-b\\manifest.json": "4ab60d95c18918051a88774aed24f4726d8427b3e5f023daa30569f669593d53",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-qa2\\manifest.json": "8abcf94104b75c092235d46df3a4c1cfdff46bc9ee576efecd95bcfb8b733445",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-tools\\manifest.json": "cb61958b6cfcb0ebf6568aa473af73b4db44943fb7c0de032396e4b2650877a3",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-curriculum-v4-w8\\manifest.json": "5fd17a7619d790e81ecaf80229240c4f93e957c0cd248c4cf9063700aaf31303",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-general-pilot-w8\\manifest.json": "3b035380bbb8de276dbfebdc9870b582456ff8c0b0ef10794f7f2ee1f6c65a89",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-math-gen\\manifest.json": "2f423d1b94eb32bc63df68061417a4118bcee89d82dd7caaf61231df24495de2",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-onpolicy-r6-loop\\manifest.json": "0169d40d6276b7bece58b234e4e70e1583825cce4e2fc371012f0ce2791f4102",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-loop-check\\manifest.json": "a6c95b3ae0577b5d7b2da5960fbc2f16744b432968021bba8a3b82c0cabf0ee3",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-nothink-math\\manifest.json": "35fe713e01db64f337327e553555992a434cf60f8507cca314a5f0b14beb6af1",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-comparison.json": "b380e92a7ff8c7007b128b0fbd03faab2071acc74c3aea73ff50bf87b7ae58e0",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-nothink\\eval_results.json": "ed533aecb7e73ed5eb4e69f8ccbc71157cb72c936ced75f70c8e2e7ced1e05c8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s0\\eval_results.json": "707a9291aeb60e180176c496d825bf921d34027745eb5f0d9f83e44ff37e0757",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s1\\eval_results.json": "71206d0b237d78191cb57e263fad792ce845e153de0f862c046377d7d9a67592",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s2\\eval_results.json": "7614f2467b1229d80cbfaf18cf7cef09d978385d0f2e135b1dcf176e52d9ed81",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-nothink\\eval_results.json": "eb3a316528bfc961e13af3790cc7f526a32910dc757f3c10bd906ba867f0b56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s0\\eval_results.json": "330115964d9eff45ee988eb7f2cf736ccadc005e7a87cd4dd28c2206be6c0c34",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s1\\eval_results.json": "5b10ccf794b541194a80465073c416c4d68726de17885406a778cd28108c21be",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s2\\eval_results.json": "f1b36688c4c58299ac24c4d765ee27053f2027c19d040bf86a884ca3afdcaa52",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-nothink\\eval_results.json": "9e03ceed533e2f54ed3f82e771235d4f7d9f696c4083526114a835b043ab7d12",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s0\\eval_results.json": "801169cea8e8d719c43976ded6d4f619a030ac1867c302c4c678ebd2c5213d4c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s1\\eval_results.json": "c38010bfaf81836375a3b3b5fb82a2cff12c865d0aad21bdc61e00448c672588",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s2\\eval_results.json": "f94fab1820ab2eb03fc11104144308767f8d989f12a3e986a0db42edaf0bd9f9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-nothink\\eval_results.json": "03a703eaf11d6b6bc810aad650beee880930740bbd68d37dba211b8d14690d8d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s0\\eval_results.json": "669fb50b8a339e27a7dc8dd998b55bd7504d10415c900ecedaa01cd65fe442b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s1\\eval_results.json": "74149385e0fb129db85096090e0ed97f97d1de97f1a656223c9f84780e3968b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s2\\eval_results.json": "73e2bad6a616b9e79982c7ce59c31a924493494fbd9effaa2108dd2fe5fe651f"
+  },
+  "caveats": [
+    "Final-answer diagnostic scores, with no additional generation or code execution.",
+    "Unmatched refers only to the audited retained training pool or recent prefix.",
+    "Older student and foundation-model exposure is not ruled out.",
+    "Paired task bootstrap across three seeds; exploratory, unadjusted intervals."
+  ]
+}

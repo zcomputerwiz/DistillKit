@@ -799,6 +799,13 @@ Contaminated problems are easier for everyone (the source scores ~6 points highe
 so the inflation is modest. Future rounds exclude `exclude-master-v2.json` (the previous
 master plus the 503 contaminated documents, the 61 unparsable-code traces and the 48
 reference disagreements, 2,169 ids), and `eval_checkpoint.ps1` reports the clean scores.
+
+2026-10-08 exclusion follow-up: recent runs correctly used the later derived
+`exclude-long-r5.json` (4,175 IDs), but inherited code/reasoning corpora had a
+HumanEval/MBPP coverage gap. The [replay data assessment](CODE_DATASET_ASSESSMENT.md)
+documents 104 confirmed matching document IDs and a future-use 4,279-ID union in
+`scratch/dense_gr/completion-gauntlet/dataset-audit/`. Historical indexes and
+frozen batch schedules are preserved; future schedules must use the new union.
 ### Round 8: verified code; the DPO failure mode on near-identical pairs (2026-09-29)
 
 KodCode-V1 problems (pytest suites, benchmark similarity under 0.8; `code_prompts.py`)

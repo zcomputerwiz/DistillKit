@@ -1,0 +1,1896 @@
+{
+  "sources": {
+    "frontier-code-raw": {
+      "cached_documents": 839,
+      "retained_train": {
+        "documents": 768,
+        "tokens": 14327628,
+        "nonempty_thinking": 0,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_prefix": {
+        "documents": 17,
+        "tokens": 324440,
+        "nonempty_thinking": 0,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_visits": 17,
+      "available_outside_recent_prefix": 751,
+      "origins": {
+        "code-raw": 768
+      },
+      "recent_origins": {
+        "code-raw": 17
+      },
+      "reasoning_lengths": {
+        "turns": 0,
+        "median": null,
+        "p90": null
+      },
+      "recent_reasoning_lengths": {
+        "turns": 0,
+        "median": null,
+        "p90": null
+      },
+      "flags": [],
+      "metadata_missing": 0
+    },
+    "teacher-code": {
+      "cached_documents": 862,
+      "retained_train": {
+        "documents": 475,
+        "tokens": 367297,
+        "nonempty_thinking": 188,
+        "empty_thinking": 287,
+        "capture_truncated": 0,
+        "ends_im_end": 475,
+        "verified:passed": 475,
+        "finished:True": 475,
+        "thought_closed:True": 475,
+        "judge_kept:True": 475,
+        "judge_valid:yes": 475
+      },
+      "recent_prefix": {
+        "documents": 83,
+        "tokens": 76810,
+        "nonempty_thinking": 39,
+        "empty_thinking": 44,
+        "capture_truncated": 0,
+        "ends_im_end": 83,
+        "verified:passed": 83,
+        "finished:True": 83,
+        "thought_closed:True": 83,
+        "judge_kept:True": 83,
+        "judge_valid:yes": 83
+      },
+      "recent_visits": 83,
+      "available_outside_recent_prefix": 392,
+      "origins": {
+        "kodcode:Leetcode": 94,
+        "kodcode:Code_Contests": 79,
+        "kodcode:Taco": 133,
+        "kodcode:Algorithm": 58,
+        "kodcode:Filter": 105,
+        "kodcode:Docs": 6
+      },
+      "recent_origins": {
+        "kodcode:Filter": 11,
+        "kodcode:Algorithm": 13,
+        "kodcode:Code_Contests": 7,
+        "kodcode:Taco": 32,
+        "kodcode:Leetcode": 18,
+        "kodcode:Docs": 2
+      },
+      "reasoning_lengths": {
+        "turns": 188,
+        "median": 574.5,
+        "p90": 1038.6
+      },
+      "recent_reasoning_lengths": {
+        "turns": 39,
+        "median": 547.0,
+        "p90": 1208.4000000000003
+      },
+      "flags": [],
+      "metadata_missing": 0
+    },
+    "expand-code-w8": {
+      "cached_documents": 5825,
+      "retained_train": {
+        "documents": 5507,
+        "tokens": 2365156,
+        "nonempty_thinking": 0,
+        "empty_thinking": 5507,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_prefix": {
+        "documents": 256,
+        "tokens": 121603,
+        "nonempty_thinking": 0,
+        "empty_thinking": 256,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_visits": 264,
+      "available_outside_recent_prefix": 5251,
+      "origins": {
+        "Magicoder-OSS": 2062,
+        "self-oss-instruct": 3445
+      },
+      "recent_origins": {
+        "self-oss-instruct": 85,
+        "Magicoder-OSS": 171
+      },
+      "reasoning_lengths": {
+        "turns": 0,
+        "median": null,
+        "p90": null
+      },
+      "recent_reasoning_lengths": {
+        "turns": 0,
+        "median": null,
+        "p90": null
+      },
+      "flags": [],
+      "metadata_missing": 0
+    },
+    "r8-code-short-w8": {
+      "cached_documents": 1085,
+      "retained_train": {
+        "documents": 1085,
+        "tokens": 464800,
+        "nonempty_thinking": 621,
+        "empty_thinking": 464,
+        "capture_truncated": 0,
+        "ends_im_end": 1085,
+        "verified:passed": 1085,
+        "finished:True": 1085
+      },
+      "recent_prefix": {
+        "documents": 51,
+        "tokens": 28874,
+        "nonempty_thinking": 41,
+        "empty_thinking": 10,
+        "capture_truncated": 0,
+        "ends_im_end": 51,
+        "verified:passed": 51,
+        "finished:True": 51
+      },
+      "recent_visits": 51,
+      "available_outside_recent_prefix": 1034,
+      "origins": {
+        "kodcode:Filter": 338,
+        "kodcode:Prefill": 247,
+        "kodcode:Taco": 246,
+        "kodcode:Code_Contests": 102,
+        "kodcode:Leetcode": 152
+      },
+      "recent_origins": {
+        "kodcode:Filter": 27,
+        "kodcode:Code_Contests": 14,
+        "kodcode:Leetcode": 10
+      },
+      "reasoning_lengths": {
+        "turns": 621,
+        "median": 116.0,
+        "p90": 261.0
+      },
+      "recent_reasoning_lengths": {
+        "turns": 41,
+        "median": 153.0,
+        "p90": 262.0
+      },
+      "flags": [],
+      "metadata_missing": 0
+    },
+    "thinking-w8": {
+      "cached_documents": 5993,
+      "retained_train": {
+        "documents": 5290,
+        "tokens": 2648483,
+        "nonempty_thinking": 5290,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_prefix": {
+        "documents": 87,
+        "tokens": 59421,
+        "nonempty_thinking": 87,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_visits": 87,
+      "available_outside_recent_prefix": 5203,
+      "origins": {
+        "MetaMathQA": 1654,
+        "Evol-Code": 635,
+        "CommonsenseQA": 119,
+        "QASC": 79,
+        "tulu-3": 50,
+        "NuminaMath-CoT": 615,
+        "SciQ": 163,
+        "OrcaMath": 599,
+        "MATH/algebra": 111,
+        "CodeAlpaca": 683,
+        "Dolly": 4,
+        "MBPP": 46,
+        "k3_math_formal": 144,
+        "MATH/precalculus": 38,
+        "k3_executable_code": 56,
+        "MATH/counting_and_probability": 40,
+        "MATH/intermediate_algebra": 46,
+        "MATH/number_theory": 47,
+        "MATH/prealgebra": 79,
+        "MATH/geometry": 29,
+        "HumanEval": 29,
+        "OpenBookQA": 22,
+        "ARC-Challenge": 1,
+        "ARC-Easy": 1
+      },
+      "recent_origins": {
+        "Evol-Code": 40,
+        "CodeAlpaca": 43,
+        "k3_executable_code": 1,
+        "HumanEval": 1,
+        "MBPP": 2
+      },
+      "reasoning_lengths": {
+        "turns": 8987,
+        "median": 102.0,
+        "p90": 263.0
+      },
+      "recent_reasoning_lengths": {
+        "turns": 87,
+        "median": 127.0,
+        "p90": 190.00000000000003
+      },
+      "flags": [],
+      "metadata_missing": 0
+    },
+    "think-first-w8": {
+      "cached_documents": 4635,
+      "retained_train": {
+        "documents": 3673,
+        "tokens": 2732999,
+        "nonempty_thinking": 3608,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_prefix": {
+        "documents": 115,
+        "tokens": 57762,
+        "nonempty_thinking": 115,
+        "empty_thinking": 0,
+        "capture_truncated": 0,
+        "ends_im_end": 0
+      },
+      "recent_visits": 115,
+      "available_outside_recent_prefix": 3558,
+      "origins": {
+        "CommonsenseQA": 302,
+        "k3_strict_instruction": 102,
+        "MetaMathQA": 599,
+        "SciQ": 372,
+        "OrcaMath": 223,
+        "OpenBookQA": 54,
+        "Evol-Code": 633,
+        "QASC": 162,
+        "tulu-3": 168,
+        "CodeAlpaca": 367,
+        "MATH/prealgebra": 36,
+        "NuminaMath-CoT": 220,
+        "k3_executable_code": 47,
+        "HumanEval": 13,
+        "MATH/intermediate_algebra": 15,
+        "Dolly": 29,
+        "MBPP": 21,
+        "MATH/algebra": 52,
+        "k3_science_logic_data": 82,
+        "k3_math_formal": 51,
+        "k3_grounded_long_context": 67,
+        "MATH/number_theory": 17,
+        "MATH/counting_and_probability": 14,
+        "MATH/precalculus": 13,
+        "MATH/geometry": 14
+      },
+      "recent_origins": {
+        "MetaMathQA": 10,
+        "k3_science_logic_data": 2,
+        "SciQ": 20,
+        "CommonsenseQA": 19,
+        "CodeAlpaca": 14,
+        "OrcaMath": 5,
+        "tulu-3": 4,
+        "NuminaMath-CoT": 6,
+        "Evol-Code": 4,
+        "k3_strict_instruction": 4,
+        "OpenBookQA": 5,
+        "QASC": 13,
+        "Dolly": 1,
+        "k3_math_formal": 2,
+        "MBPP": 2,
+        "MATH/algebra": 1,
+        "MATH/number_theory": 1,
+        "MATH/prealgebra": 1,
+        "MATH/geometry": 1
+      },
+      "reasoning_lengths": {
+        "turns": 5898,
+        "median": 109.0,
+        "p90": 246.0
+      },
+      "recent_reasoning_lengths": {
+        "turns": 202,
+        "median": 100.5,
+        "p90": 227.9
+      },
+      "flags": [],
+      "metadata_missing": 0
+    }
+  },
+  "active_verified_code_test_structure": {
+    "tcode:kodcode:Filter_21731_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_25837_I": {
+      "functions": 5,
+      "assertions": 12,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_32256_I": {
+      "functions": 4,
+      "assertions": 12,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_92400_I": {
+      "functions": 8,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_379_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_4507_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_10549_I": {
+      "functions": 9,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_23927_I": {
+      "functions": 5,
+      "assertions": 4,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_3884_I": {
+      "functions": 8,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_20252_I": {
+      "functions": 9,
+      "assertions": 12,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_28997_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_24082_I": {
+      "functions": 6,
+      "assertions": 12,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_94188_I": {
+      "functions": 6,
+      "assertions": 12,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_2579_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_3089_I": {
+      "functions": 10,
+      "assertions": 10,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_4718_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_30623_I": {
+      "functions": 3,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_93315_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Docs: Python310_14946_I": {
+      "functions": 1,
+      "assertions": 1,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Leetcode_716_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_13716_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_32388_I": {
+      "functions": 6,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_93423_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_14360_I": {
+      "functions": 1,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_11284_I": {
+      "functions": 6,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_64160_I": {
+      "functions": 6,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_90747_I": {
+      "functions": 8,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Algorithm_24403_I": {
+      "functions": 4,
+      "assertions": 10,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_93885_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_91906_I": {
+      "functions": 8,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Filter_20839_I": {
+      "functions": 6,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_26740_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_90756_I": {
+      "functions": 1,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_13334_I": {
+      "functions": 10,
+      "assertions": 10,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Algorithm_23954_I": {
+      "functions": 6,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_89989_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_4759_I": {
+      "functions": 4,
+      "assertions": 11,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_90011_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_26090_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_90669_I": {
+      "functions": 2,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_10404_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_92937_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_63046_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_63200_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_93685_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_32091_I": {
+      "functions": 9,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_25834_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_1932_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_92857_I": {
+      "functions": 7,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_5444_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_90482_I": {
+      "functions": 2,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Leetcode_2211_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_23106_I": {
+      "functions": 7,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_2054_I": {
+      "functions": 9,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_11070_I": {
+      "functions": 5,
+      "assertions": 11,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_62526_I": {
+      "functions": 5,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_27060_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_13272_I": {
+      "functions": 5,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_23861_I": {
+      "functions": 9,
+      "assertions": 11,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_33206_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_15292_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_3079_I": {
+      "functions": 10,
+      "assertions": 10,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_2267_I": {
+      "functions": 3,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_11785_I": {
+      "functions": 3,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_23939_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_1125_I": {
+      "functions": 5,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_10635_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_94629_I": {
+      "functions": 1,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Leetcode_1123_I": {
+      "functions": 4,
+      "assertions": 13,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_14934_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_95006_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Docs: Python310_10129_I": {
+      "functions": 5,
+      "assertions": 4,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Filter_22189_I": {
+      "functions": 5,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Taco_12419_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_13603_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_23410_I": {
+      "functions": 2,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Leetcode_2622_I": {
+      "functions": 5,
+      "assertions": 5,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Leetcode_3163_I": {
+      "functions": 7,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Code_Contests_32901_I": {
+      "functions": 6,
+      "assertions": 6,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Taco_91995_I": {
+      "functions": 1,
+      "assertions": 9,
+      "parametrize": false,
+      "edge_name_hint": false
+    },
+    "tcode:kodcode:Algorithm_25204_I": {
+      "functions": 8,
+      "assertions": 8,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Algorithm_26212_I": {
+      "functions": 7,
+      "assertions": 7,
+      "parametrize": false,
+      "edge_name_hint": true
+    },
+    "tcode:kodcode:Filter_20275_I": {
+      "functions": 5,
+      "assertions": 4,
+      "parametrize": false,
+      "edge_name_hint": true
+    }
+  },
+  "active_verified_prompt_overlap_flags": [],
+  "retained_cache_code_overlap_flags": [
+    {
+      "source": "frontier-code-raw",
+      "doc_id": "code-raw:code:tensorboard:3",
+      "benchmark": "humaneval:HumanEval/78",
+      "exact_full_stem": false,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 153,
+      "selected": false
+    },
+    {
+      "source": "expand-code-w8",
+      "doc_id": "Magicoder-OSS:268",
+      "benchmark": "mbpp:247",
+      "exact_full_stem": false,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 4,
+      "selected": false
+    },
+    {
+      "source": "expand-code-w8",
+      "doc_id": "Magicoder-OSS:1697",
+      "benchmark": "humaneval:HumanEval/146",
+      "exact_full_stem": false,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 48,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_reasoning:094594f673e70e499e1ba15e2d43d5e0",
+      "benchmark": "mbpp:421",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:20c67d6acfc38f02ee35f6020bbf0593",
+      "benchmark": "humaneval:HumanEval/146",
+      "exact_full_stem": true,
+      "shared_13word_grams": 48,
+      "benchmark_13word_grams": 48,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:23a85583418859efa314110c5877ad6d",
+      "benchmark": "mbpp:435",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:24208b4810b54c03bfd525fd2fdefbaf",
+      "benchmark": "mbpp:226",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:26eb6079dd778f7200c6b7e8e4408398",
+      "benchmark": "mbpp:116",
+      "exact_full_stem": true,
+      "shared_13word_grams": 3,
+      "benchmark_13word_grams": 3,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:2760c6f3ac43d1d92ba9dea6afac84e0",
+      "benchmark": "mbpp:287",
+      "exact_full_stem": true,
+      "shared_13word_grams": 9,
+      "benchmark_13word_grams": 9,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:29fc4b50a9cc1c92c9485c3dcb7c54e5",
+      "benchmark": "humaneval:HumanEval/155",
+      "exact_full_stem": true,
+      "shared_13word_grams": 16,
+      "benchmark_13word_grams": 16,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_reasoning:0f505f62fad9323ad1e0f2bb40540ca9",
+      "benchmark": "humaneval:HumanEval/140",
+      "exact_full_stem": true,
+      "shared_13word_grams": 34,
+      "benchmark_13word_grams": 34,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:2eb27c55bc9b8167686484d7bd73085e",
+      "benchmark": "mbpp:262",
+      "exact_full_stem": true,
+      "shared_13word_grams": 28,
+      "benchmark_13word_grams": 28,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:2f4dfa533a31ab702fee70a5a6cf578d",
+      "benchmark": "mbpp:86",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3094f07a2c7a7dd6e47cddc50f4e1a48",
+      "benchmark": "humaneval:HumanEval/161",
+      "exact_full_stem": true,
+      "shared_13word_grams": 47,
+      "benchmark_13word_grams": 47,
+      "selected": true
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:317f88d004a45fb9d86cab1dc29f4451",
+      "benchmark": "mbpp:398",
+      "exact_full_stem": true,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 4,
+      "selected": true
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:34ce1b1657f636d36e0f76d522504a06",
+      "benchmark": "mbpp:242",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:354565876f3b39814c12f49003ec4ee7",
+      "benchmark": "mbpp:429",
+      "exact_full_stem": true,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 2,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:35e336411a6a1833a9f90cfe0fc16c25",
+      "benchmark": "humaneval:HumanEval/149",
+      "exact_full_stem": true,
+      "shared_13word_grams": 112,
+      "benchmark_13word_grams": 112,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:363d7c44db0ee81925bcdeaa388a15e1",
+      "benchmark": "mbpp:119",
+      "exact_full_stem": true,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 4,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:373205464dc10bee0632aed1099aeff4",
+      "benchmark": "humaneval:HumanEval/141",
+      "exact_full_stem": true,
+      "shared_13word_grams": 115,
+      "benchmark_13word_grams": 115,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:38845628e2b4b7899b0e5e3cbbe00102",
+      "benchmark": "humaneval:HumanEval/88",
+      "exact_full_stem": true,
+      "shared_13word_grams": 84,
+      "benchmark_13word_grams": 84,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3971aec317581d30cf2600067c26528c",
+      "benchmark": "humaneval:HumanEval/40",
+      "exact_full_stem": false,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 49,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3971aec317581d30cf2600067c26528c",
+      "benchmark": "humaneval:HumanEval/43",
+      "exact_full_stem": true,
+      "shared_13word_grams": 48,
+      "benchmark_13word_grams": 48,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3b6aee4ef6b4ccf7c31eccf41d6d031f",
+      "benchmark": "humaneval:HumanEval/106",
+      "exact_full_stem": true,
+      "shared_13word_grams": 66,
+      "benchmark_13word_grams": 66,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3d23e0b2059376717f9af253d630160c",
+      "benchmark": "mbpp:108",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:3d8ab02f396eeb1aaa61fd2f718ae229",
+      "benchmark": "mbpp:101",
+      "exact_full_stem": true,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 4,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_reasoning:1706fc5719d89458551be9dce84649bc",
+      "benchmark": "mbpp:171",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:447c7f06bc4befd80f579ee3d544c774",
+      "benchmark": "mbpp:124",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:45d74938ed0854cabc60ae99e37db04c",
+      "benchmark": "humaneval:HumanEval/60",
+      "exact_full_stem": true,
+      "shared_13word_grams": 18,
+      "benchmark_13word_grams": 18,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:46563af228c2995b8ba505e048e667eb",
+      "benchmark": "humaneval:HumanEval/114",
+      "exact_full_stem": true,
+      "shared_13word_grams": 23,
+      "benchmark_13word_grams": 23,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:47cff1cb6092dbaa3e5f8fdb90f2eed9",
+      "benchmark": "mbpp:470",
+      "exact_full_stem": true,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 4,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:48775e361e9c22f3bc9438895aa7e9c3",
+      "benchmark": "humaneval:HumanEval/41",
+      "exact_full_stem": true,
+      "shared_13word_grams": 97,
+      "benchmark_13word_grams": 97,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:490bdd9d45b901c4f67934dcd677b694",
+      "benchmark": "mbpp:427",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:491a280907b0f9707982a7e97e466dd4",
+      "benchmark": "humaneval:HumanEval/111",
+      "exact_full_stem": true,
+      "shared_13word_grams": 65,
+      "benchmark_13word_grams": 65,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:493f92ffc40edf10857fc7a8b6ef1f80",
+      "benchmark": "humaneval:HumanEval/20",
+      "exact_full_stem": true,
+      "shared_13word_grams": 66,
+      "benchmark_13word_grams": 66,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:4a95ef5bbb5ee1ec96e4e1559ee12dbe",
+      "benchmark": "humaneval:HumanEval/138",
+      "exact_full_stem": true,
+      "shared_13word_grams": 19,
+      "benchmark_13word_grams": 19,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:4b8dcb9d48628d729df7452085c585a2",
+      "benchmark": "mbpp:439",
+      "exact_full_stem": true,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 2,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:4e5003c6761100a7f93926211db6164b",
+      "benchmark": "mbpp:477",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:4f1c9db00c41a904c362bfd9dbefc23e",
+      "benchmark": "humaneval:HumanEval/17",
+      "exact_full_stem": true,
+      "shared_13word_grams": 73,
+      "benchmark_13word_grams": 73,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:4fc68b7d496b96f59300a8abaa7c53f5",
+      "benchmark": "humaneval:HumanEval/19",
+      "exact_full_stem": true,
+      "shared_13word_grams": 40,
+      "benchmark_13word_grams": 40,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:50b3177ddd15c5d99a6c5410dcfed622",
+      "benchmark": "humaneval:HumanEval/47",
+      "exact_full_stem": true,
+      "shared_13word_grams": 16,
+      "benchmark_13word_grams": 16,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:51c5365cd5fb9b378b7c409dbfad7e9b",
+      "benchmark": "mbpp:285",
+      "exact_full_stem": true,
+      "shared_13word_grams": 7,
+      "benchmark_13word_grams": 7,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5423d0c454c93e4004d22d57cdec04e2",
+      "benchmark": "humaneval:HumanEval/52",
+      "exact_full_stem": true,
+      "shared_13word_grams": 21,
+      "benchmark_13word_grams": 21,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:54314842e479491ac32fb546e82f0d16",
+      "benchmark": "mbpp:310",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5490a0f44ccf3f07c4ee511c6555a591",
+      "benchmark": "humaneval:HumanEval/36",
+      "exact_full_stem": true,
+      "shared_13word_grams": 22,
+      "benchmark_13word_grams": 22,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5755d97f21d0b8e46b97cf48112563ef",
+      "benchmark": "mbpp:20",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:58853c5c3306e35f93829fe0513042a1",
+      "benchmark": "mbpp:460",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:58946c25b9a0a4d119e9471f6772c396",
+      "benchmark": "mbpp:95",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:58bddbbbb4529227d543ae39a4238e35",
+      "benchmark": "humaneval:HumanEval/154",
+      "exact_full_stem": true,
+      "shared_13word_grams": 42,
+      "benchmark_13word_grams": 42,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:59a1bf2958a54c23b60efed3c39e4e3a",
+      "benchmark": "mbpp:12",
+      "exact_full_stem": true,
+      "shared_13word_grams": 6,
+      "benchmark_13word_grams": 6,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5a4b8f36ff1dcfdd60a71a03c8b9227d",
+      "benchmark": "humaneval:HumanEval/91",
+      "exact_full_stem": true,
+      "shared_13word_grams": 45,
+      "benchmark_13word_grams": 45,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5a6a4a22f84d71f8d6fb5881f2d2b69f",
+      "benchmark": "mbpp:165",
+      "exact_full_stem": true,
+      "shared_13word_grams": 16,
+      "benchmark_13word_grams": 16,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5ab507db2aa0d0b7ecadd3701b7be345",
+      "benchmark": "mbpp:479",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5d04778f4352bc73e301d94d7646711e",
+      "benchmark": "humaneval:HumanEval/107",
+      "exact_full_stem": true,
+      "shared_13word_grams": 93,
+      "benchmark_13word_grams": 93,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5e38c2f5064848c48a42cbb4bacfb4b0",
+      "benchmark": "mbpp:397",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5f235a5395b86130f9009302913f4960",
+      "benchmark": "humaneval:HumanEval/40",
+      "exact_full_stem": true,
+      "shared_13word_grams": 49,
+      "benchmark_13word_grams": 49,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5f235a5395b86130f9009302913f4960",
+      "benchmark": "humaneval:HumanEval/43",
+      "exact_full_stem": false,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 48,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:5f9c7a56075b0d6f932a110ff4d07bbe",
+      "benchmark": "mbpp:70",
+      "exact_full_stem": true,
+      "shared_13word_grams": 3,
+      "benchmark_13word_grams": 3,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:622e440a57ab344fb6ddf7e93ba7343b",
+      "benchmark": "humaneval:HumanEval/39",
+      "exact_full_stem": true,
+      "shared_13word_grams": 22,
+      "benchmark_13word_grams": 22,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:631623cc33cb9bd5a9bc0b99a95ce24b",
+      "benchmark": "mbpp:454",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6371186fb72c303a929de4c38fdeed59",
+      "benchmark": "humaneval:HumanEval/45",
+      "exact_full_stem": true,
+      "shared_13word_grams": 9,
+      "benchmark_13word_grams": 9,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:651ea79cee5293209aa8a999d05cbdb8",
+      "benchmark": "mbpp:463",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:668e82e27b37955e9ded124daa842542",
+      "benchmark": "humaneval:HumanEval/33",
+      "exact_full_stem": true,
+      "shared_13word_grams": 65,
+      "benchmark_13word_grams": 65,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:668e82e27b37955e9ded124daa842542",
+      "benchmark": "humaneval:HumanEval/37",
+      "exact_full_stem": false,
+      "shared_13word_grams": 10,
+      "benchmark_13word_grams": 50,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:66a610e68b4b2c696cb36a6024927bc1",
+      "benchmark": "mbpp:106",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:66dfc67fe2a9da65716f5f0928ecc771",
+      "benchmark": "mbpp:224",
+      "exact_full_stem": true,
+      "shared_13word_grams": 8,
+      "benchmark_13word_grams": 8,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:67324ed0d5a0ecbfbcec5fb1b4cbd41b",
+      "benchmark": "mbpp:162",
+      "exact_full_stem": true,
+      "shared_13word_grams": 15,
+      "benchmark_13word_grams": 15,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:67458666ad70460bbfb3f7012a862875",
+      "benchmark": "mbpp:297",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:679ad7a4afeb42f39ae28e2812e869f3",
+      "benchmark": "mbpp:166",
+      "exact_full_stem": true,
+      "shared_13word_grams": 8,
+      "benchmark_13word_grams": 8,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6885299c84279c355b255277c0c15664",
+      "benchmark": "mbpp:253",
+      "exact_full_stem": true,
+      "shared_13word_grams": 3,
+      "benchmark_13word_grams": 3,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6984966d1cae1b38c3f61561b29e98c0",
+      "benchmark": "humaneval:HumanEval/13",
+      "exact_full_stem": true,
+      "shared_13word_grams": 14,
+      "benchmark_13word_grams": 14,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6a2fc1b5d11a4d137880db582e61e204",
+      "benchmark": "mbpp:471",
+      "exact_full_stem": true,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 2,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6a5d9bc59d72bc9c2325417bce7d43d6",
+      "benchmark": "mbpp:120",
+      "exact_full_stem": true,
+      "shared_13word_grams": 7,
+      "benchmark_13word_grams": 7,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6cf752f92f2efcb3f77ae591a51dd3ab",
+      "benchmark": "mbpp:75",
+      "exact_full_stem": true,
+      "shared_13word_grams": 7,
+      "benchmark_13word_grams": 7,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6d4959caabd946d1841a38dec1d43cb4",
+      "benchmark": "mbpp:312",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6da8e68137315c76ee5ad51a2dade0c7",
+      "benchmark": "mbpp:99",
+      "exact_full_stem": true,
+      "shared_13word_grams": 9,
+      "benchmark_13word_grams": 9,
+      "selected": false
+    },
+    {
+      "source": "thinking-w8",
+      "doc_id": "think:sft_code:6e47db86da92e59fd4cc6fd456c185cd",
+      "benchmark": "humaneval:HumanEval/77",
+      "exact_full_stem": true,
+      "shared_13word_grams": 40,
+      "benchmark_13word_grams": 40,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "00525d577c428cb8230d27714bef028b:tf",
+      "benchmark": "humaneval:HumanEval/22",
+      "exact_full_stem": true,
+      "shared_13word_grams": 24,
+      "benchmark_13word_grams": 24,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0072637b22b66d8d1c96514ffe00d417:tf",
+      "benchmark": "mbpp:128",
+      "exact_full_stem": true,
+      "shared_13word_grams": 6,
+      "benchmark_13word_grams": 6,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0466c4ee583964cf2f0e53a80ee871b0:tf",
+      "benchmark": "humaneval:HumanEval/136",
+      "exact_full_stem": true,
+      "shared_13word_grams": 48,
+      "benchmark_13word_grams": 48,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "04be14ee24e64c6b19aa649236f2e878:tf",
+      "benchmark": "mbpp:139",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "058fe63131254e41c917beec1c4908ec:tf",
+      "benchmark": "mbpp:308",
+      "exact_full_stem": true,
+      "shared_13word_grams": 9,
+      "benchmark_13word_grams": 9,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0602051c57ddd11a349ba12e0623e165:tf",
+      "benchmark": "humaneval:HumanEval/157",
+      "exact_full_stem": false,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 44,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0602051c57ddd11a349ba12e0623e165:tf",
+      "benchmark": "humaneval:HumanEval/71",
+      "exact_full_stem": true,
+      "shared_13word_grams": 56,
+      "benchmark_13word_grams": 56,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "06ac313e0263d203ff92abbd167e1d23:tf",
+      "benchmark": "mbpp:226",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": true
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "07cd6867fe5d8e30d476b98fbb13ad45:tf",
+      "benchmark": "humaneval:HumanEval/90",
+      "exact_full_stem": true,
+      "shared_13word_grams": 39,
+      "benchmark_13word_grams": 39,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0958bfa08c5814161b07cf0bfa572dc7:tf",
+      "benchmark": "humaneval:HumanEval/123",
+      "exact_full_stem": true,
+      "shared_13word_grams": 130,
+      "benchmark_13word_grams": 130,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "09d302b3231966a338d61d85825c6618:tf",
+      "benchmark": "mbpp:410",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0a5cd376eb63695454b7aa4b2a2939dd:tf",
+      "benchmark": "humaneval:HumanEval/116",
+      "exact_full_stem": true,
+      "shared_13word_grams": 65,
+      "benchmark_13word_grams": 65,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0a765525799e5667a5bb1c8f5dc424d5:tf",
+      "benchmark": "mbpp:113",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0b4e31a9f2c119a694038672666c4c54:tf",
+      "benchmark": "mbpp:145",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0d789cb3dfdc5d44e42b3d3bb802112c:tf",
+      "benchmark": "mbpp:103",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0dc7ae99e2fbaf0ec5d711de6af70db8:tf",
+      "benchmark": "mbpp:91",
+      "exact_full_stem": true,
+      "shared_13word_grams": 8,
+      "benchmark_13word_grams": 8,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0e05dd35b752996419e86d818140a190:tf",
+      "benchmark": "mbpp:69",
+      "exact_full_stem": true,
+      "shared_13word_grams": 2,
+      "benchmark_13word_grams": 2,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0f16ccf5c1d5f5294edeeb2030de99b2:tf",
+      "benchmark": "humaneval:HumanEval/66",
+      "exact_full_stem": true,
+      "shared_13word_grams": 30,
+      "benchmark_13word_grams": 30,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "0f6da740e9ebdcd28a78bd7bb8276fc0:tf",
+      "benchmark": "mbpp:440",
+      "exact_full_stem": true,
+      "shared_13word_grams": 3,
+      "benchmark_13word_grams": 3,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "10601fb3187d1d7bc271f7af8711fa9c:tf",
+      "benchmark": "humaneval:HumanEval/115",
+      "exact_full_stem": false,
+      "shared_13word_grams": 142,
+      "benchmark_13word_grams": 148,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "11386e6ad961c3ad3c25f773dd68f028:tf",
+      "benchmark": "humaneval:HumanEval/98",
+      "exact_full_stem": true,
+      "shared_13word_grams": 18,
+      "benchmark_13word_grams": 18,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "122b9a4985c89ec595922f63a6ba5209:tf",
+      "benchmark": "humaneval:HumanEval/89",
+      "exact_full_stem": true,
+      "shared_13word_grams": 50,
+      "benchmark_13word_grams": 50,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "1297615b415672b70ab99b4fd4c8056f:tf",
+      "benchmark": "humaneval:HumanEval/26",
+      "exact_full_stem": true,
+      "shared_13word_grams": 32,
+      "benchmark_13word_grams": 32,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "13d8844a7687ac884f6f5e85a8336fc1:tf",
+      "benchmark": "humaneval:HumanEval/29",
+      "exact_full_stem": false,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 26,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "13d8844a7687ac884f6f5e85a8336fc1:tf",
+      "benchmark": "humaneval:HumanEval/7",
+      "exact_full_stem": true,
+      "shared_13word_grams": 25,
+      "benchmark_13word_grams": 25,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "14d7ca0756883181a82c8e9f98df7c65:tf",
+      "benchmark": "mbpp:232",
+      "exact_full_stem": true,
+      "shared_13word_grams": 12,
+      "benchmark_13word_grams": 12,
+      "selected": true
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "14d7ca0756883181a82c8e9f98df7c65:tf",
+      "benchmark": "mbpp:265",
+      "exact_full_stem": false,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 15,
+      "selected": true
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "173e3d2f7b4f940e5100f67595fdc30f:tf",
+      "benchmark": "humaneval:HumanEval/8",
+      "exact_full_stem": true,
+      "shared_13word_grams": 49,
+      "benchmark_13word_grams": 49,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "175fff3899954c150a225a91e05e01e0:tf",
+      "benchmark": "mbpp:269",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "1770e40353a57e2cc31798db16bd96c0:tf",
+      "benchmark": "mbpp:97",
+      "exact_full_stem": true,
+      "shared_13word_grams": 7,
+      "benchmark_13word_grams": 7,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "18d6622c3418e1bb4e54b96e2fb4eb28:tf",
+      "benchmark": "mbpp:141",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "18d6622c3418e1bb4e54b96e2fb4eb28:tf",
+      "benchmark": "mbpp:71",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "192c278abda72067983a2ac03870097a:tf",
+      "benchmark": "mbpp:281",
+      "exact_full_stem": true,
+      "shared_13word_grams": 5,
+      "benchmark_13word_grams": 5,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "195a0b012924ccb7f2a36fd91a4cf729:tf",
+      "benchmark": "mbpp:227",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "19f22b3c78f50bb542ca915fc949395f:tf",
+      "benchmark": "mbpp:64",
+      "exact_full_stem": true,
+      "shared_13word_grams": 4,
+      "benchmark_13word_grams": 4,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "19f645cda1c209517e2b246ae9e7e79a:tf",
+      "benchmark": "mbpp:90",
+      "exact_full_stem": true,
+      "shared_13word_grams": 0,
+      "benchmark_13word_grams": 0,
+      "selected": false
+    },
+    {
+      "source": "think-first-w8",
+      "doc_id": "1aba5e7f6f919a195eb215b5870f3882:tf",
+      "benchmark": "mbpp:293",
+      "exact_full_stem": true,
+      "shared_13word_grams": 1,
+      "benchmark_13word_grams": 1,
+      "selected": false
+    }
+  ],
+  "full_retained_token_screen": true,
+  "source_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\control\\train.json": "35ae2cc8896e75da4cd6bd3bd69f85ddcb5c7809a2fa6ad1bc620253d75e508c",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\exclude-long-r5.json": "9638e74c267d03a83dacf043f392ad3aa1950c3ba92d1764594aceb89101344d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\batches.json": "19fd4f6a2e6dd8ca2e336b5380f8ed411788d1cb393dd1d70b187d73ecf5b026",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\frontier-code-raw.jsonl": "a070e6d4c205f43f0497de0c38e4c001728653d96f11e0a54a48d88f1d5bc114",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\teacher-code-verified.jsonl": "4256b3d4279ca8d4954e6e645055fbd356b76b0db89d6449b240848ba9a37495",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\expand-code.jsonl": "f1ce29c3938d8bcf9e6d34bea8dba70969d70c6efb73ada1c560e76c61fb20d5",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\onpolicy-r8-code-short.jsonl": "d3f8eb10b55cd053d6fa07350ef3777f14c75cb5dc898eafa68d1367db08e3ad",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\thinking-code-math.jsonl": "36c40aff4abe19c287274508b06e6f6e45eaf527e785b5edcce5fb4b77fde465",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\think-first-5m.jsonl": "fc61ca965f4b6e7592aa9f9defcb34998cf8c5352807f1f5d9981fabe6a6db5a",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-teacher.jsonl": "8e1d7a9a952895b46cd9b3f868377b55ac8f8ac5f506e33f308ddf2fe75e51de",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\teacher-code-index-r5.jsonl": "bde8c9b27652f7a6c992ccdaf34dd79a876fc4657019f4380bf65428a84f82bd",
+    "D:\\DeepThought\\Projects\\HybridModel\\capture-data\\code-prompts-r8.jsonl": "2b8eedc2b04982e98452b66b92ff2bbba676e15a5b228f898a4f2f04c4c5bedb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\datasets.json": "399b85f6b33cffac5fc07511a2048e3754b91d67cf382b1d6d0f0e9c06825b58",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-code-raw\\manifest.json": "68b3ee07a99ede58117ffdf505ff1bc708dcb06e5c64a2436b427381fe7ed68a",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-code\\manifest.json": "f1a9bd98e749640cbd649ed7f02aa0fb93d24481c10ea10c104a66e9690be261",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-expand-code-w8\\manifest.json": "62db4dce84cb786000b791cff09fcb93a2f0228e23df8d285d04faf0c11861b0",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-r8-code-short-w8\\manifest.json": "a97811e55e733b05f1fdd1ef3af8469ed5314c48eb7d4fa1d4e14ad23d86a210",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-thinking-w8\\manifest.json": "69c9167c4e506ffc2b55e9148f1b5ee86b8c1c3eb53832d9b5df04a47dee8122",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-think-first-w8\\manifest.json": "470a6062324394288748afb862efb6c957740f751b78b2339f39e2c97f6f3b99"
+  },
+  "caveats": [
+    "Test names and assertions do not prove coverage or correctness.",
+    "Outside recent prefix does not mean never trained on before.",
+    "Reasoning lengths count native token boundaries, not judge correctness.",
+    "Code stem overlap is only a flag; no exclusion list or training data changed."
+  ]
+}

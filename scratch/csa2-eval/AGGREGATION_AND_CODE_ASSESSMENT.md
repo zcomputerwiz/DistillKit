@@ -178,3 +178,21 @@ solution conversations alongside raw code, retain conversational masks, and use
 a matched control. Combine this with the diverse aggregation data described
 above only after documenting the dose and preservation gates. No additional
 training or diagnostic generation was launched automatically.
+
+## Subsequent replay assessment
+
+The [data assessment](CODE_DATASET_ASSESSMENT.md) screened all 16 current replay
+caches and confirmed 104 documents matching 103 public code tasks. A separately
+screened final-answer comparison leaves 122 HumanEval and 317 MBPP tasks: sampled
+deltas -3.55 [-8.20, +1.09] and -1.89 [-4.94, +1.05] percentage points. Both
+intervals cross zero. Code preservation remains a concern, but statistical
+significance from the unscreened HumanEval bank should not be presented as an
+independent functional-code finding.
+
+The future exclusion union is 4,279 IDs, without changing historical inputs.
+Use diverse existing verified solutions (392 teacher documents outside the
+recent prefix), broaden raw-document sampling and build fresh complete executed
+aggregation worlds. First/last-final-fence checks also identify a small data
+qualification mismatch. The next bounded phase should measure real target
+exposure and whole-trajectory coverage, rather than increase raw-code weight
+or repeat the four aggregation worlds. This assessment starts no training.

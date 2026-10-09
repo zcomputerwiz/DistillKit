@@ -1,7 +1,8 @@
 """Which training documents contain a GSM8K test or MATH-500 question?
 
-The corpora were screened against the benchmarks scored when they were built (MMLU, ARC,
-HumanEval, MBPP, ...); GSM8K and MATH-500 joined the evaluation later. This matches every
+The automatic expand_corpus.py banks cover MMLU and ARC; they do not establish
+HumanEval/MBPP exclusion coverage. GSM8K and MATH-500 joined the evaluation later.
+This script screens only those two math banks. It matches every
 document's user turns against both test sets -- exact after whitespace and case
 normalization, and by 13-word shingle containment, the screen `expand_corpus.py` uses --
 and writes the ids of the documents that contain one.
