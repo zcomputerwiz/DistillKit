@@ -1,0 +1,6915 @@
+{
+  "results": {
+    "humaneval": {
+      "seeds": {
+        "think-s0": {
+          "cases": 164,
+          "base": 68,
+          "candidate": 59,
+          "gained": 15,
+          "lost": 24,
+          "discordant_categories": {
+            "lost:extended_test_failure": 5,
+            "gained:base_test_failure": 12,
+            "lost:base_test_failure": 17,
+            "gained:cap_before_final": 1,
+            "gained:syntax_error": 2,
+            "lost:cap_before_final": 2
+          }
+        },
+        "think-s1": {
+          "cases": 164,
+          "base": 71,
+          "candidate": 64,
+          "gained": 18,
+          "lost": 25,
+          "discordant_categories": {
+            "lost:extended_test_failure": 2,
+            "gained:extended_test_failure": 2,
+            "lost:base_test_failure": 22,
+            "gained:base_test_failure": 15,
+            "gained:cap_before_final": 1,
+            "lost:syntax_error": 1
+          }
+        },
+        "think-s2": {
+          "cases": 164,
+          "base": 71,
+          "candidate": 65,
+          "gained": 21,
+          "lost": 27,
+          "discordant_categories": {
+            "lost:base_test_failure": 20,
+            "lost:extended_test_failure": 4,
+            "gained:base_test_failure": 15,
+            "lost:syntax_error": 1,
+            "lost:cap_before_final": 2,
+            "gained:extended_test_failure": 3,
+            "gained:syntax_error": 1,
+            "gained:cap_before_final": 2
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "estimate": -0.044715447154471545,
+        "ci95": [
+          -0.08536585365853659,
+          -0.004065040650406503
+        ]
+      },
+      "all_six_nontruncated_sampled": {
+        "cases": 132,
+        "estimate": -0.04292929292929293,
+        "ci95": [
+          -0.0883838383838384,
+          0.002525252525252527
+        ]
+      }
+    },
+    "mbpp": {
+      "seeds": {
+        "think-s0": {
+          "cases": 378,
+          "base": 169,
+          "candidate": 167,
+          "gained": 35,
+          "lost": 37,
+          "discordant_categories": {
+            "lost:extended_test_failure": 7,
+            "lost:base_test_failure": 25,
+            "lost:missing_entry_point": 2,
+            "gained:base_test_failure": 27,
+            "lost:cap_before_final": 3,
+            "gained:cap_before_final": 3,
+            "gained:extended_test_failure": 1,
+            "gained:missing_entry_point": 3,
+            "gained:syntax_error": 1
+          }
+        },
+        "think-s1": {
+          "cases": 378,
+          "base": 170,
+          "candidate": 162,
+          "gained": 36,
+          "lost": 44,
+          "discordant_categories": {
+            "lost:base_test_failure": 31,
+            "gained:extended_test_failure": 4,
+            "lost:extended_test_failure": 6,
+            "gained:base_test_failure": 26,
+            "lost:cap_before_final": 6,
+            "gained:cap_before_final": 3,
+            "gained:missing_entry_point": 3,
+            "lost:missing_entry_point": 1
+          }
+        },
+        "think-s2": {
+          "cases": 378,
+          "base": 176,
+          "candidate": 161,
+          "gained": 33,
+          "lost": 48,
+          "discordant_categories": {
+            "lost:base_test_failure": 38,
+            "gained:base_test_failure": 25,
+            "lost:cap_before_final": 4,
+            "gained:extended_test_failure": 7,
+            "gained:missing_entry_point": 1,
+            "lost:missing_entry_point": 3,
+            "lost:extended_test_failure": 2,
+            "lost:syntax_error": 1
+          }
+        }
+      },
+      "sampled_mean_delta": {
+        "estimate": -0.022045855379188715,
+        "ci95": [
+          -0.050264550264550255,
+          0.005291005291005289
+        ]
+      },
+      "all_six_nontruncated_sampled": {
+        "cases": 299,
+        "estimate": -0.023411371237458192,
+        "ci95": [
+          -0.05465440356744703,
+          0.008918617614269786
+        ]
+      }
+    }
+  },
+  "changes": [
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/17",
+      "original": {
+        "task_id": "HumanEval/17",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/17",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/37",
+      "original": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/52",
+      "original": {
+        "task_id": "HumanEval/52",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/52",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/63",
+      "original": {
+        "task_id": "HumanEval/63",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/63",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/79",
+      "original": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/85",
+      "original": {
+        "task_id": "HumanEval/85",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/85",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/86",
+      "original": {
+        "task_id": "HumanEval/86",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/86",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/92",
+      "original": {
+        "task_id": "HumanEval/92",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/92",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/98",
+      "original": {
+        "task_id": "HumanEval/98",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/98",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/102",
+      "original": {
+        "task_id": "HumanEval/102",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/102",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/107",
+      "original": {
+        "task_id": "HumanEval/107",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/107",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/113",
+      "original": {
+        "task_id": "HumanEval/113",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/113",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/120",
+      "original": {
+        "task_id": "HumanEval/120",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/120",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/124",
+      "original": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/143",
+      "original": {
+        "task_id": "HumanEval/143",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/143",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/152",
+      "original": {
+        "task_id": "HumanEval/152",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/152",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "HumanEval/159",
+      "original": {
+        "task_id": "HumanEval/159",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/159",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/1",
+      "original": {
+        "task_id": "HumanEval/1",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/1",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/19",
+      "original": {
+        "task_id": "HumanEval/19",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/19",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/29",
+      "original": {
+        "task_id": "HumanEval/29",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/29",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/39",
+      "original": {
+        "task_id": "HumanEval/39",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/39",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/44",
+      "original": {
+        "task_id": "HumanEval/44",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/44",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/46",
+      "original": {
+        "task_id": "HumanEval/46",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/46",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/59",
+      "original": {
+        "task_id": "HumanEval/59",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/59",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/72",
+      "original": {
+        "task_id": "HumanEval/72",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/72",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/80",
+      "original": {
+        "task_id": "HumanEval/80",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/80",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/108",
+      "original": {
+        "task_id": "HumanEval/108",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/108",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/110",
+      "original": {
+        "task_id": "HumanEval/110",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/110",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/113",
+      "original": {
+        "task_id": "HumanEval/113",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/113",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/127",
+      "original": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/132",
+      "original": {
+        "task_id": "HumanEval/132",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/132",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/137",
+      "original": {
+        "task_id": "HumanEval/137",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/137",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/151",
+      "original": {
+        "task_id": "HumanEval/151",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/151",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/153",
+      "original": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/154",
+      "original": {
+        "task_id": "HumanEval/154",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/154",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "HumanEval/160",
+      "original": {
+        "task_id": "HumanEval/160",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/160",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/11",
+      "original": {
+        "task_id": "HumanEval/11",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/11",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/32",
+      "original": {
+        "task_id": "HumanEval/32",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/32",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/47",
+      "original": {
+        "task_id": "HumanEval/47",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/47",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/61",
+      "original": {
+        "task_id": "HumanEval/61",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/61",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/62",
+      "original": {
+        "task_id": "HumanEval/62",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/62",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/68",
+      "original": {
+        "task_id": "HumanEval/68",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/68",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/69",
+      "original": {
+        "task_id": "HumanEval/69",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/69",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/75",
+      "original": {
+        "task_id": "HumanEval/75",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/75",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/90",
+      "original": {
+        "task_id": "HumanEval/90",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/90",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/100",
+      "original": {
+        "task_id": "HumanEval/100",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/100",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/124",
+      "original": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/154",
+      "original": {
+        "task_id": "HumanEval/154",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/154",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "HumanEval/156",
+      "original": {
+        "task_id": "HumanEval/156",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/156",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/7",
+      "original": {
+        "task_id": "HumanEval/7",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/7",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/11",
+      "original": {
+        "task_id": "HumanEval/11",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/11",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/17",
+      "original": {
+        "task_id": "HumanEval/17",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/17",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/35",
+      "original": {
+        "task_id": "HumanEval/35",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/35",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/37",
+      "original": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/43",
+      "original": {
+        "task_id": "HumanEval/43",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/43",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/57",
+      "original": {
+        "task_id": "HumanEval/57",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/57",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/67",
+      "original": {
+        "task_id": "HumanEval/67",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/67",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/68",
+      "original": {
+        "task_id": "HumanEval/68",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/68",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/71",
+      "original": {
+        "task_id": "HumanEval/71",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/71",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/75",
+      "original": {
+        "task_id": "HumanEval/75",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/75",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/78",
+      "original": {
+        "task_id": "HumanEval/78",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/78",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/79",
+      "original": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/85",
+      "original": {
+        "task_id": "HumanEval/85",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/85",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/90",
+      "original": {
+        "task_id": "HumanEval/90",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/90",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/91",
+      "original": {
+        "task_id": "HumanEval/91",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/91",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/92",
+      "original": {
+        "task_id": "HumanEval/92",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/92",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/98",
+      "original": {
+        "task_id": "HumanEval/98",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/98",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/99",
+      "original": {
+        "task_id": "HumanEval/99",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/99",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/104",
+      "original": {
+        "task_id": "HumanEval/104",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/104",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/109",
+      "original": {
+        "task_id": "HumanEval/109",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/109",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/110",
+      "original": {
+        "task_id": "HumanEval/110",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/110",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/112",
+      "original": {
+        "task_id": "HumanEval/112",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/112",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/116",
+      "original": {
+        "task_id": "HumanEval/116",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/116",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/124",
+      "original": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/124",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/126",
+      "original": {
+        "task_id": "HumanEval/126",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/126",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/127",
+      "original": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/127",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/137",
+      "original": {
+        "task_id": "HumanEval/137",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/137",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/142",
+      "original": {
+        "task_id": "HumanEval/142",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/142",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/145",
+      "original": {
+        "task_id": "HumanEval/145",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/145",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/152",
+      "original": {
+        "task_id": "HumanEval/152",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/152",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/153",
+      "original": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "HumanEval/160",
+      "original": {
+        "task_id": "HumanEval/160",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/160",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/11",
+      "original": {
+        "task_id": "HumanEval/11",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/11",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/33",
+      "original": {
+        "task_id": "HumanEval/33",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/33",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/38",
+      "original": {
+        "task_id": "HumanEval/38",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/38",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/72",
+      "original": {
+        "task_id": "HumanEval/72",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/72",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/78",
+      "original": {
+        "task_id": "HumanEval/78",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/78",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/79",
+      "original": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/79",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/81",
+      "original": {
+        "task_id": "HumanEval/81",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/81",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/83",
+      "original": {
+        "task_id": "HumanEval/83",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/83",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/86",
+      "original": {
+        "task_id": "HumanEval/86",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/86",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/104",
+      "original": {
+        "task_id": "HumanEval/104",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/104",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/111",
+      "original": {
+        "task_id": "HumanEval/111",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/111",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/115",
+      "original": {
+        "task_id": "HumanEval/115",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/115",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/123",
+      "original": {
+        "task_id": "HumanEval/123",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/123",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/126",
+      "original": {
+        "task_id": "HumanEval/126",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/126",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/127",
+      "original": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/140",
+      "original": {
+        "task_id": "HumanEval/140",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/140",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/143",
+      "original": {
+        "task_id": "HumanEval/143",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/143",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/144",
+      "original": {
+        "task_id": "HumanEval/144",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/144",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/152",
+      "original": {
+        "task_id": "HumanEval/152",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/152",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "HumanEval/159",
+      "original": {
+        "task_id": "HumanEval/159",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/159",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/2",
+      "original": {
+        "task_id": "HumanEval/2",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/2",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/14",
+      "original": {
+        "task_id": "HumanEval/14",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/14",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/26",
+      "original": {
+        "task_id": "HumanEval/26",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/26",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/37",
+      "original": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/37",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/46",
+      "original": {
+        "task_id": "HumanEval/46",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/46",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/53",
+      "original": {
+        "task_id": "HumanEval/53",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/53",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/64",
+      "original": {
+        "task_id": "HumanEval/64",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/64",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/71",
+      "original": {
+        "task_id": "HumanEval/71",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/71",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/81",
+      "original": {
+        "task_id": "HumanEval/81",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/81",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/86",
+      "original": {
+        "task_id": "HumanEval/86",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/86",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/90",
+      "original": {
+        "task_id": "HumanEval/90",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/90",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/91",
+      "original": {
+        "task_id": "HumanEval/91",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/91",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/96",
+      "original": {
+        "task_id": "HumanEval/96",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/96",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/110",
+      "original": {
+        "task_id": "HumanEval/110",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/110",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/117",
+      "original": {
+        "task_id": "HumanEval/117",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/117",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/127",
+      "original": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/127",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/139",
+      "original": {
+        "task_id": "HumanEval/139",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/139",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/141",
+      "original": {
+        "task_id": "HumanEval/141",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/141",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/145",
+      "original": {
+        "task_id": "HumanEval/145",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/145",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/147",
+      "original": {
+        "task_id": "HumanEval/147",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/147",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/149",
+      "original": {
+        "task_id": "HumanEval/149",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/149",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/153",
+      "original": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/153",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/154",
+      "original": {
+        "task_id": "HumanEval/154",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/154",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/158",
+      "original": {
+        "task_id": "HumanEval/158",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/158",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "humaneval",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "HumanEval/163",
+      "original": {
+        "task_id": "HumanEval/163",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "HumanEval/163",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/2",
+      "original": {
+        "task_id": "Mbpp/2",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/2",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/4",
+      "original": {
+        "task_id": "Mbpp/4",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/4",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/9",
+      "original": {
+        "task_id": "Mbpp/9",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/9",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/63",
+      "original": {
+        "task_id": "Mbpp/63",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/63",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/66",
+      "original": {
+        "task_id": "Mbpp/66",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/66",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/70",
+      "original": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/75",
+      "original": {
+        "task_id": "Mbpp/75",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/75",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/79",
+      "original": {
+        "task_id": "Mbpp/79",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/79",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/87",
+      "original": {
+        "task_id": "Mbpp/87",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/87",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/89",
+      "original": {
+        "task_id": "Mbpp/89",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/89",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/91",
+      "original": {
+        "task_id": "Mbpp/91",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/91",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/92",
+      "original": {
+        "task_id": "Mbpp/92",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/92",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/102",
+      "original": {
+        "task_id": "Mbpp/102",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/102",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/129",
+      "original": {
+        "task_id": "Mbpp/129",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/129",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/135",
+      "original": {
+        "task_id": "Mbpp/135",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/135",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/139",
+      "original": {
+        "task_id": "Mbpp/139",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/139",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/141",
+      "original": {
+        "task_id": "Mbpp/141",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/141",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/171",
+      "original": {
+        "task_id": "Mbpp/171",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/171",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/240",
+      "original": {
+        "task_id": "Mbpp/240",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/240",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/247",
+      "original": {
+        "task_id": "Mbpp/247",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/247",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/272",
+      "original": {
+        "task_id": "Mbpp/272",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/272",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/273",
+      "original": {
+        "task_id": "Mbpp/273",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/273",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/277",
+      "original": {
+        "task_id": "Mbpp/277",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/277",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/283",
+      "original": {
+        "task_id": "Mbpp/283",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/283",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/296",
+      "original": {
+        "task_id": "Mbpp/296",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/296",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/310",
+      "original": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/391",
+      "original": {
+        "task_id": "Mbpp/391",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/391",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/409",
+      "original": {
+        "task_id": "Mbpp/409",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/409",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/414",
+      "original": {
+        "task_id": "Mbpp/414",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/414",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/415",
+      "original": {
+        "task_id": "Mbpp/415",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/415",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/420",
+      "original": {
+        "task_id": "Mbpp/420",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/420",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/427",
+      "original": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/436",
+      "original": {
+        "task_id": "Mbpp/436",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/436",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/439",
+      "original": {
+        "task_id": "Mbpp/439",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/439",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/451",
+      "original": {
+        "task_id": "Mbpp/451",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/451",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/453",
+      "original": {
+        "task_id": "Mbpp/453",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/453",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/454",
+      "original": {
+        "task_id": "Mbpp/454",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/454",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/471",
+      "original": {
+        "task_id": "Mbpp/471",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/471",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/472",
+      "original": {
+        "task_id": "Mbpp/472",
+        "base": "fail",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/472",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/564",
+      "original": {
+        "task_id": "Mbpp/564",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/564",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/568",
+      "original": {
+        "task_id": "Mbpp/568",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/568",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/580",
+      "original": {
+        "task_id": "Mbpp/580",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/580",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/607",
+      "original": {
+        "task_id": "Mbpp/607",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/607",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/619",
+      "original": {
+        "task_id": "Mbpp/619",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/619",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/626",
+      "original": {
+        "task_id": "Mbpp/626",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/626",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/632",
+      "original": {
+        "task_id": "Mbpp/632",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/632",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/633",
+      "original": {
+        "task_id": "Mbpp/633",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/633",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/643",
+      "original": {
+        "task_id": "Mbpp/643",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/643",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/732",
+      "original": {
+        "task_id": "Mbpp/732",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/732",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/760",
+      "original": {
+        "task_id": "Mbpp/760",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/760",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/764",
+      "original": {
+        "task_id": "Mbpp/764",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/764",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "base",
+      "task_id": "Mbpp/803",
+      "original": {
+        "task_id": "Mbpp/803",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/803",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/7",
+      "original": {
+        "task_id": "Mbpp/7",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/7",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/16",
+      "original": {
+        "task_id": "Mbpp/16",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/16",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/61",
+      "original": {
+        "task_id": "Mbpp/61",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/61",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/71",
+      "original": {
+        "task_id": "Mbpp/71",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/71",
+        "base": "timeout",
+        "plus": "timeout"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/72",
+      "original": {
+        "task_id": "Mbpp/72",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/72",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/75",
+      "original": {
+        "task_id": "Mbpp/75",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/75",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/82",
+      "original": {
+        "task_id": "Mbpp/82",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/82",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/91",
+      "original": {
+        "task_id": "Mbpp/91",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/91",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/99",
+      "original": {
+        "task_id": "Mbpp/99",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/99",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/108",
+      "original": {
+        "task_id": "Mbpp/108",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/108",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/111",
+      "original": {
+        "task_id": "Mbpp/111",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/111",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/118",
+      "original": {
+        "task_id": "Mbpp/118",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/118",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/125",
+      "original": {
+        "task_id": "Mbpp/125",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/125",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/132",
+      "original": {
+        "task_id": "Mbpp/132",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/132",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/139",
+      "original": {
+        "task_id": "Mbpp/139",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/139",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/226",
+      "original": {
+        "task_id": "Mbpp/226",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/226",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/227",
+      "original": {
+        "task_id": "Mbpp/227",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/227",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/240",
+      "original": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/240",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/242",
+      "original": {
+        "task_id": "Mbpp/242",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/242",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/261",
+      "original": {
+        "task_id": "Mbpp/261",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/261",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/270",
+      "original": {
+        "task_id": "Mbpp/270",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/270",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/272",
+      "original": {
+        "task_id": "Mbpp/272",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/272",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/290",
+      "original": {
+        "task_id": "Mbpp/290",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/290",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/294",
+      "original": {
+        "task_id": "Mbpp/294",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/294",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/299",
+      "original": {
+        "task_id": "Mbpp/299",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/299",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/300",
+      "original": {
+        "task_id": "Mbpp/300",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/300",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/301",
+      "original": {
+        "task_id": "Mbpp/301",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/301",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/305",
+      "original": {
+        "task_id": "Mbpp/305",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/305",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/310",
+      "original": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/418",
+      "original": {
+        "task_id": "Mbpp/418",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/418",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/419",
+      "original": {
+        "task_id": "Mbpp/419",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/419",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/435",
+      "original": {
+        "task_id": "Mbpp/435",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/435",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/440",
+      "original": {
+        "task_id": "Mbpp/440",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/440",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/557",
+      "original": {
+        "task_id": "Mbpp/557",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/557",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/568",
+      "original": {
+        "task_id": "Mbpp/568",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/568",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/589",
+      "original": {
+        "task_id": "Mbpp/589",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/589",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/604",
+      "original": {
+        "task_id": "Mbpp/604",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/604",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/620",
+      "original": {
+        "task_id": "Mbpp/620",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/620",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/623",
+      "original": {
+        "task_id": "Mbpp/623",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/623",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/635",
+      "original": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/643",
+      "original": {
+        "task_id": "Mbpp/643",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/643",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/720",
+      "original": {
+        "task_id": "Mbpp/720",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/720",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/732",
+      "original": {
+        "task_id": "Mbpp/732",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/732",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/736",
+      "original": {
+        "task_id": "Mbpp/736",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/736",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/737",
+      "original": {
+        "task_id": "Mbpp/737",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/737",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/752",
+      "original": {
+        "task_id": "Mbpp/752",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/752",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/759",
+      "original": {
+        "task_id": "Mbpp/759",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/759",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/778",
+      "original": {
+        "task_id": "Mbpp/778",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/778",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/787",
+      "original": {
+        "task_id": "Mbpp/787",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/787",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/797",
+      "original": {
+        "task_id": "Mbpp/797",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/797",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s0",
+      "arm": "candidate",
+      "task_id": "Mbpp/799",
+      "original": {
+        "task_id": "Mbpp/799",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/799",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/6",
+      "original": {
+        "task_id": "Mbpp/6",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/6",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/11",
+      "original": {
+        "task_id": "Mbpp/11",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/11",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/12",
+      "original": {
+        "task_id": "Mbpp/12",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/12",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/71",
+      "original": {
+        "task_id": "Mbpp/71",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/71",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/87",
+      "original": {
+        "task_id": "Mbpp/87",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/87",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/93",
+      "original": {
+        "task_id": "Mbpp/93",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/93",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/95",
+      "original": {
+        "task_id": "Mbpp/95",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/95",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/130",
+      "original": {
+        "task_id": "Mbpp/130",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/130",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/172",
+      "original": {
+        "task_id": "Mbpp/172",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/172",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/233",
+      "original": {
+        "task_id": "Mbpp/233",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/233",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/240",
+      "original": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/255",
+      "original": {
+        "task_id": "Mbpp/255",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/255",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/260",
+      "original": {
+        "task_id": "Mbpp/260",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/260",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/264",
+      "original": {
+        "task_id": "Mbpp/264",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/264",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/278",
+      "original": {
+        "task_id": "Mbpp/278",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/278",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/285",
+      "original": {
+        "task_id": "Mbpp/285",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/285",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/290",
+      "original": {
+        "task_id": "Mbpp/290",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/290",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/389",
+      "original": {
+        "task_id": "Mbpp/389",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/389",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/405",
+      "original": {
+        "task_id": "Mbpp/405",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/405",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/409",
+      "original": {
+        "task_id": "Mbpp/409",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/409",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/414",
+      "original": {
+        "task_id": "Mbpp/414",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/414",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/427",
+      "original": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/437",
+      "original": {
+        "task_id": "Mbpp/437",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/437",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/447",
+      "original": {
+        "task_id": "Mbpp/447",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/447",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/453",
+      "original": {
+        "task_id": "Mbpp/453",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/453",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/457",
+      "original": {
+        "task_id": "Mbpp/457",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/457",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/471",
+      "original": {
+        "task_id": "Mbpp/471",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/471",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/479",
+      "original": {
+        "task_id": "Mbpp/479",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/479",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/558",
+      "original": {
+        "task_id": "Mbpp/558",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/558",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/565",
+      "original": {
+        "task_id": "Mbpp/565",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/565",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/585",
+      "original": {
+        "task_id": "Mbpp/585",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/585",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/597",
+      "original": {
+        "task_id": "Mbpp/597",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/597",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/603",
+      "original": {
+        "task_id": "Mbpp/603",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/603",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/635",
+      "original": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/736",
+      "original": {
+        "task_id": "Mbpp/736",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/736",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/759",
+      "original": {
+        "task_id": "Mbpp/759",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/759",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/760",
+      "original": {
+        "task_id": "Mbpp/760",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/760",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/764",
+      "original": {
+        "task_id": "Mbpp/764",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/764",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/765",
+      "original": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/772",
+      "original": {
+        "task_id": "Mbpp/772",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/772",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/777",
+      "original": {
+        "task_id": "Mbpp/777",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/777",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/781",
+      "original": {
+        "task_id": "Mbpp/781",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/781",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "base",
+      "task_id": "Mbpp/786",
+      "original": {
+        "task_id": "Mbpp/786",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/786",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/4",
+      "original": {
+        "task_id": "Mbpp/4",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/4",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/17",
+      "original": {
+        "task_id": "Mbpp/17",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/17",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/63",
+      "original": {
+        "task_id": "Mbpp/63",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/63",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/65",
+      "original": {
+        "task_id": "Mbpp/65",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/65",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/70",
+      "original": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/79",
+      "original": {
+        "task_id": "Mbpp/79",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/79",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/88",
+      "original": {
+        "task_id": "Mbpp/88",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/88",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/98",
+      "original": {
+        "task_id": "Mbpp/98",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/98",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/99",
+      "original": {
+        "task_id": "Mbpp/99",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/99",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/104",
+      "original": {
+        "task_id": "Mbpp/104",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/104",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/108",
+      "original": {
+        "task_id": "Mbpp/108",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/108",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/128",
+      "original": {
+        "task_id": "Mbpp/128",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/128",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/222",
+      "original": {
+        "task_id": "Mbpp/222",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/222",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/226",
+      "original": {
+        "task_id": "Mbpp/226",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/226",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/230",
+      "original": {
+        "task_id": "Mbpp/230",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/230",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/240",
+      "original": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/242",
+      "original": {
+        "task_id": "Mbpp/242",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/242",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/256",
+      "original": {
+        "task_id": "Mbpp/256",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/256",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/257",
+      "original": {
+        "task_id": "Mbpp/257",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/257",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/261",
+      "original": {
+        "task_id": "Mbpp/261",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/261",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/282",
+      "original": {
+        "task_id": "Mbpp/282",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/282",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/285",
+      "original": {
+        "task_id": "Mbpp/285",
+        "base": "fail",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/285",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/310",
+      "original": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/310",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/390",
+      "original": {
+        "task_id": "Mbpp/390",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/390",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/391",
+      "original": {
+        "task_id": "Mbpp/391",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/391",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/395",
+      "original": {
+        "task_id": "Mbpp/395",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/395",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/405",
+      "original": {
+        "task_id": "Mbpp/405",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/405",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/425",
+      "original": {
+        "task_id": "Mbpp/425",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/425",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/427",
+      "original": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/427",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/433",
+      "original": {
+        "task_id": "Mbpp/433",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/433",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/454",
+      "original": {
+        "task_id": "Mbpp/454",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/454",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/462",
+      "original": {
+        "task_id": "Mbpp/462",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/462",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/468",
+      "original": {
+        "task_id": "Mbpp/468",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/468",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/470",
+      "original": {
+        "task_id": "Mbpp/470",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/470",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/569",
+      "original": {
+        "task_id": "Mbpp/569",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/569",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/579",
+      "original": {
+        "task_id": "Mbpp/579",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/579",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/583",
+      "original": {
+        "task_id": "Mbpp/583",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/583",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/585",
+      "original": {
+        "task_id": "Mbpp/585",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/585",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/586",
+      "original": {
+        "task_id": "Mbpp/586",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/586",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/594",
+      "original": {
+        "task_id": "Mbpp/594",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/594",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/597",
+      "original": {
+        "task_id": "Mbpp/597",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/597",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/629",
+      "original": {
+        "task_id": "Mbpp/629",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/629",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/635",
+      "original": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/721",
+      "original": {
+        "task_id": "Mbpp/721",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/721",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/733",
+      "original": {
+        "task_id": "Mbpp/733",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/733",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/734",
+      "original": {
+        "task_id": "Mbpp/734",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/734",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/741",
+      "original": {
+        "task_id": "Mbpp/741",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/741",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/751",
+      "original": {
+        "task_id": "Mbpp/751",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/751",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/754",
+      "original": {
+        "task_id": "Mbpp/754",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/754",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/755",
+      "original": {
+        "task_id": "Mbpp/755",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/755",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/764",
+      "original": {
+        "task_id": "Mbpp/764",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/764",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/765",
+      "original": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/770",
+      "original": {
+        "task_id": "Mbpp/770",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/770",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/772",
+      "original": {
+        "task_id": "Mbpp/772",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/772",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/784",
+      "original": {
+        "task_id": "Mbpp/784",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/784",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/801",
+      "original": {
+        "task_id": "Mbpp/801",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/801",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s1",
+      "arm": "candidate",
+      "task_id": "Mbpp/809",
+      "original": {
+        "task_id": "Mbpp/809",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/809",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/4",
+      "original": {
+        "task_id": "Mbpp/4",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/4",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/16",
+      "original": {
+        "task_id": "Mbpp/16",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/16",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/65",
+      "original": {
+        "task_id": "Mbpp/65",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/65",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/69",
+      "original": {
+        "task_id": "Mbpp/69",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/69",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/70",
+      "original": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/74",
+      "original": {
+        "task_id": "Mbpp/74",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/74",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/86",
+      "original": {
+        "task_id": "Mbpp/86",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/86",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/90",
+      "original": {
+        "task_id": "Mbpp/90",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/90",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/99",
+      "original": {
+        "task_id": "Mbpp/99",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/99",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/101",
+      "original": {
+        "task_id": "Mbpp/101",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/101",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/102",
+      "original": {
+        "task_id": "Mbpp/102",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/102",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/116",
+      "original": {
+        "task_id": "Mbpp/116",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/116",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/160",
+      "original": {
+        "task_id": "Mbpp/160",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/160",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/168",
+      "original": {
+        "task_id": "Mbpp/168",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/168",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/222",
+      "original": {
+        "task_id": "Mbpp/222",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/222",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/240",
+      "original": {
+        "task_id": "Mbpp/240",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/240",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/261",
+      "original": {
+        "task_id": "Mbpp/261",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/261",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/264",
+      "original": {
+        "task_id": "Mbpp/264",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/264",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/285",
+      "original": {
+        "task_id": "Mbpp/285",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/285",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/294",
+      "original": {
+        "task_id": "Mbpp/294",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/294",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/300",
+      "original": {
+        "task_id": "Mbpp/300",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/300",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/405",
+      "original": {
+        "task_id": "Mbpp/405",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/405",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/414",
+      "original": {
+        "task_id": "Mbpp/414",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/414",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/419",
+      "original": {
+        "task_id": "Mbpp/419",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/419",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/440",
+      "original": {
+        "task_id": "Mbpp/440",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/440",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/473",
+      "original": {
+        "task_id": "Mbpp/473",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/473",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/479",
+      "original": {
+        "task_id": "Mbpp/479",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/479",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/580",
+      "original": {
+        "task_id": "Mbpp/580",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/580",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/588",
+      "original": {
+        "task_id": "Mbpp/588",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/588",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/632",
+      "original": {
+        "task_id": "Mbpp/632",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/632",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/720",
+      "original": {
+        "task_id": "Mbpp/720",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/720",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/732",
+      "original": {
+        "task_id": "Mbpp/732",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/732",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/735",
+      "original": {
+        "task_id": "Mbpp/735",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/735",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/739",
+      "original": {
+        "task_id": "Mbpp/739",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/739",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/741",
+      "original": {
+        "task_id": "Mbpp/741",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/741",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/750",
+      "original": {
+        "task_id": "Mbpp/750",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/750",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/765",
+      "original": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/765",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/775",
+      "original": {
+        "task_id": "Mbpp/775",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/775",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/790",
+      "original": {
+        "task_id": "Mbpp/790",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/790",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/791",
+      "original": {
+        "task_id": "Mbpp/791",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/791",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/799",
+      "original": {
+        "task_id": "Mbpp/799",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/799",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/804",
+      "original": {
+        "task_id": "Mbpp/804",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/804",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "base",
+      "task_id": "Mbpp/805",
+      "original": {
+        "task_id": "Mbpp/805",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/805",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/3",
+      "original": {
+        "task_id": "Mbpp/3",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/3",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/4",
+      "original": {
+        "task_id": "Mbpp/4",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/4",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/7",
+      "original": {
+        "task_id": "Mbpp/7",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/7",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/16",
+      "original": {
+        "task_id": "Mbpp/16",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/16",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/65",
+      "original": {
+        "task_id": "Mbpp/65",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/65",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/67",
+      "original": {
+        "task_id": "Mbpp/67",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/67",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/69",
+      "original": {
+        "task_id": "Mbpp/69",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/69",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/70",
+      "original": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/70",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/87",
+      "original": {
+        "task_id": "Mbpp/87",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/87",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/100",
+      "original": {
+        "task_id": "Mbpp/100",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/100",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/106",
+      "original": {
+        "task_id": "Mbpp/106",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/106",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/118",
+      "original": {
+        "task_id": "Mbpp/118",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/118",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/130",
+      "original": {
+        "task_id": "Mbpp/130",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/130",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/222",
+      "original": {
+        "task_id": "Mbpp/222",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/222",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/224",
+      "original": {
+        "task_id": "Mbpp/224",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/224",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/251",
+      "original": {
+        "task_id": "Mbpp/251",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/251",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/276",
+      "original": {
+        "task_id": "Mbpp/276",
+        "base": "pass",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/276",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/297",
+      "original": {
+        "task_id": "Mbpp/297",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/297",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/300",
+      "original": {
+        "task_id": "Mbpp/300",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/300",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/311",
+      "original": {
+        "task_id": "Mbpp/311",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/311",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/392",
+      "original": {
+        "task_id": "Mbpp/392",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/392",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/414",
+      "original": {
+        "task_id": "Mbpp/414",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/414",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/433",
+      "original": {
+        "task_id": "Mbpp/433",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/433",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/453",
+      "original": {
+        "task_id": "Mbpp/453",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/453",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/455",
+      "original": {
+        "task_id": "Mbpp/455",
+        "base": "pass",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/455",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/456",
+      "original": {
+        "task_id": "Mbpp/456",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/456",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/473",
+      "original": {
+        "task_id": "Mbpp/473",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/473",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/478",
+      "original": {
+        "task_id": "Mbpp/478",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/478",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/479",
+      "original": {
+        "task_id": "Mbpp/479",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/479",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/572",
+      "original": {
+        "task_id": "Mbpp/572",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/572",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/576",
+      "original": {
+        "task_id": "Mbpp/576",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/576",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/577",
+      "original": {
+        "task_id": "Mbpp/577",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/577",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/586",
+      "original": {
+        "task_id": "Mbpp/586",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/586",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/589",
+      "original": {
+        "task_id": "Mbpp/589",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/589",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/593",
+      "original": {
+        "task_id": "Mbpp/593",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/593",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/619",
+      "original": {
+        "task_id": "Mbpp/619",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/619",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/631",
+      "original": {
+        "task_id": "Mbpp/631",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/631",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/635",
+      "original": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/635",
+        "base": "fail",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/644",
+      "original": {
+        "task_id": "Mbpp/644",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/644",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/720",
+      "original": {
+        "task_id": "Mbpp/720",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/720",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/736",
+      "original": {
+        "task_id": "Mbpp/736",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/736",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/748",
+      "original": {
+        "task_id": "Mbpp/748",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/748",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/750",
+      "original": {
+        "task_id": "Mbpp/750",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/750",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/778",
+      "original": {
+        "task_id": "Mbpp/778",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/778",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/785",
+      "original": {
+        "task_id": "Mbpp/785",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/785",
+        "base": "fail",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/790",
+      "original": {
+        "task_id": "Mbpp/790",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/790",
+        "base": "pass",
+        "plus": "fail"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/793",
+      "original": {
+        "task_id": "Mbpp/793",
+        "base": "fail",
+        "plus": "pass"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/793",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/803",
+      "original": {
+        "task_id": "Mbpp/803",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/803",
+        "base": "pass",
+        "plus": "pass"
+      }
+    },
+    {
+      "bench": "mbpp",
+      "mode": "think-s2",
+      "arm": "candidate",
+      "task_id": "Mbpp/804",
+      "original": {
+        "task_id": "Mbpp/804",
+        "base": "fail",
+        "plus": "fail"
+      },
+      "final_answer": {
+        "task_id": "Mbpp/804",
+        "base": "fail",
+        "plus": "fail"
+      }
+    }
+  ],
+  "diagnostic_input_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-humaneval-think-s0\\completions.jsonl": "9853e835777b1fed6d3ebd8ff8411043df93e7d03a195c93adfd0b9399d0f1e2",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-humaneval-think-s0\\completions.jsonl": "25a7178e2a9a429e150a774c38088f563b3a7a3b7fde2d36f5db2e8b740edb45",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-humaneval-think-s1\\completions.jsonl": "59d59528af38c28ad5116b982b6aedfa23a3269a621c568167cde7d0c02047f9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-humaneval-think-s1\\completions.jsonl": "0193fc3daa44442ad72db1a9f65ad453a5bc4d50b8a7bc7338b0d2aa4d53b4f6",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-humaneval-think-s2\\completions.jsonl": "97e5e9efc4c4be4cc1128bcbbc9f0d24737dad25d83586be6b3872fdf7000378",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-humaneval-think-s2\\completions.jsonl": "6bd4e6a870009da9cf061ea472f0bea613f636bd9add893b9fb2b7cc91a7e17f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-mbpp-think-s0\\completions.jsonl": "cc7bd1e2ca398f15f84bfd92f2043c9ed737f05065fec91ceada7d9de6194638",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-mbpp-think-s0\\completions.jsonl": "6b14cc0b16c39bca4cc049f1e698576593d5a3d13df3effadae9317f6c7e75cb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-mbpp-think-s1\\completions.jsonl": "abedb8b9e710d02c9dc6d3d576a3800979f843273456faa008dfb1cdaf43f7ad",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-mbpp-think-s1\\completions.jsonl": "c7521951d1002dabe1093cd9781783ef190648210ffbe2b620365b6f177f32fe",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\base-mbpp-think-s2\\completions.jsonl": "cc0e50a2ee88becf8ee29ce9fe367ed49b80c1aff93357a0ca2b5d4cd50f7248",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\failure-audit\\final-answer-scoring\\candidate-mbpp-think-s2\\completions.jsonl": "b070014eb7f8537efbf26899f9988f0c380d6f4bb5d8a66a8f7554e31530d529"
+  },
+  "code_sandbox_image": "sha256:17be45d94d238e76d50d6515983070f670fc6ae7ecb62f54cc0c4ac51c29c606",
+  "scorer_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\downstream\\code_bench\\run_docker.ps1": "45f94b6b84b8586fccd3bc06c5d5b6c8da2abb186819f632cb52343393a95494",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\downstream\\code_bench\\robust_eval.py": "8bc2625775ad030ddde7c7c0724947d60cb57b1eb53523c02a2614164ae534e9"
+  },
+  "caveat": "Separate diagnostic using final channel, no code repairs; original frozen gauntlet unchanged."
+}

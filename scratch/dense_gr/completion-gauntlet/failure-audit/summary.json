@@ -1,0 +1,670 @@
+{
+  "results": {
+    "humaneval": {
+      "nothink": {
+        "base": {
+          "categories": {
+            "extended_test_failure": 9,
+            "base_test_failure": 87,
+            "pass": 67,
+            "syntax_error": 1
+          },
+          "flags": {
+            "syntax_error": 1
+          },
+          "tokens": {
+            "mean": 208.6768292682927,
+            "median": 188.5,
+            "p90": 332.6000000000003
+          },
+          "closed_think_tokens": {
+            "cases": 0,
+            "mean": null,
+            "median": null
+          }
+        },
+        "candidate": {
+          "categories": {
+            "extended_test_failure": 10,
+            "base_test_failure": 83,
+            "pass": 68,
+            "syntax_error": 3
+          },
+          "flags": {
+            "truncated": 2,
+            "syntax_error": 3
+          },
+          "tokens": {
+            "mean": 225.91463414634146,
+            "median": 184.5,
+            "p90": 346.4000000000002
+          },
+          "closed_think_tokens": {
+            "cases": 0,
+            "mean": null,
+            "median": null
+          }
+        },
+        "discordant_categories": {
+          "lost:base_test_failure": 4,
+          "gained:base_test_failure": 5
+        },
+        "both_nontruncated": {
+          "cases": 162,
+          "base": 67,
+          "candidate": 68,
+          "gained": 5,
+          "lost": 4,
+          "excluded_discordant": {}
+        }
+      },
+      "think-s0": {
+        "base": {
+          "categories": {
+            "pass": 64,
+            "base_test_failure": 72,
+            "extended_test_failure": 6,
+            "extracted_thinking_instead_of_final": 7,
+            "cap_before_final": 7,
+            "syntax_error": 8
+          },
+          "flags": {
+            "first_fence_in_thinking": 31,
+            "different_final_code": 17,
+            "truncated": 8,
+            "no_think_close": 7,
+            "syntax_error": 14
+          },
+          "tokens": {
+            "mean": 540.829268292683,
+            "median": 408.0,
+            "p90": 1024.9000000000003
+          },
+          "closed_think_tokens": {
+            "cases": 157,
+            "mean": 275.38216560509557,
+            "median": 194.0
+          }
+        },
+        "candidate": {
+          "categories": {
+            "extended_test_failure": 7,
+            "extracted_thinking_instead_of_final": 7,
+            "pass": 58,
+            "base_test_failure": 67,
+            "syntax_error": 16,
+            "cap_before_final": 9
+          },
+          "flags": {
+            "first_fence_in_thinking": 24,
+            "different_final_code": 19,
+            "syntax_error": 24,
+            "truncated": 10,
+            "no_think_close": 9
+          },
+          "tokens": {
+            "mean": 633.3963414634146,
+            "median": 476.5,
+            "p90": 1284.2000000000037
+          },
+          "closed_think_tokens": {
+            "cases": 155,
+            "mean": 350.5483870967742,
+            "median": 242.0
+          }
+        },
+        "discordant_categories": {
+          "lost:extended_test_failure": 4,
+          "gained:base_test_failure": 11,
+          "lost:base_test_failure": 13,
+          "lost:extracted_thinking_instead_of_final": 3,
+          "gained:cap_before_final": 1,
+          "gained:syntax_error": 4,
+          "gained:extracted_thinking_instead_of_final": 1,
+          "lost:syntax_error": 1,
+          "lost:cap_before_final": 2
+        },
+        "both_nontruncated": {
+          "cases": 151,
+          "base": 62,
+          "candidate": 57,
+          "gained": 16,
+          "lost": 21,
+          "excluded_discordant": {
+            "gained": 1,
+            "lost": 2
+          }
+        }
+      },
+      "think-s1": {
+        "base": {
+          "categories": {
+            "pass": 68,
+            "base_test_failure": 67,
+            "extended_test_failure": 5,
+            "cap_before_final": 8,
+            "extracted_thinking_instead_of_final": 11,
+            "syntax_error": 5
+          },
+          "flags": {
+            "first_fence_in_thinking": 24,
+            "truncated": 8,
+            "no_think_close": 8,
+            "syntax_error": 16,
+            "different_final_code": 13
+          },
+          "tokens": {
+            "mean": 570.3719512195122,
+            "median": 452.5,
+            "p90": 1063.8000000000006
+          },
+          "closed_think_tokens": {
+            "cases": 156,
+            "mean": 280.53846153846155,
+            "median": 195.5
+          }
+        },
+        "candidate": {
+          "categories": {
+            "extended_test_failure": 5,
+            "cap_before_final": 9,
+            "pass": 53,
+            "base_test_failure": 63,
+            "extracted_thinking_instead_of_final": 13,
+            "syntax_error": 20,
+            "missing_entry_point": 1
+          },
+          "flags": {
+            "first_fence_in_thinking": 44,
+            "truncated": 9,
+            "no_think_close": 9,
+            "different_final_code": 33,
+            "syntax_error": 29,
+            "missing_entry_point": 2
+          },
+          "tokens": {
+            "mean": 622.9756097560976,
+            "median": 486.5,
+            "p90": 1131.3000000000002
+          },
+          "closed_think_tokens": {
+            "cases": 155,
+            "mean": 344.10322580645163,
+            "median": 252.0
+          }
+        },
+        "discordant_categories": {
+          "lost:extended_test_failure": 2,
+          "gained:extended_test_failure": 2,
+          "lost:extracted_thinking_instead_of_final": 6,
+          "lost:base_test_failure": 15,
+          "gained:base_test_failure": 10,
+          "lost:syntax_error": 7,
+          "gained:cap_before_final": 1,
+          "gained:extracted_thinking_instead_of_final": 2
+        },
+        "both_nontruncated": {
+          "cases": 149,
+          "base": 68,
+          "candidate": 52,
+          "gained": 14,
+          "lost": 30,
+          "excluded_discordant": {
+            "gained": 1
+          }
+        }
+      },
+      "think-s2": {
+        "base": {
+          "categories": {
+            "base_test_failure": 65,
+            "pass": 66,
+            "extracted_thinking_instead_of_final": 14,
+            "extended_test_failure": 4,
+            "cap_before_final": 7,
+            "syntax_error": 7,
+            "missing_entry_point": 1
+          },
+          "flags": {
+            "first_fence_in_thinking": 33,
+            "different_final_code": 20,
+            "missing_entry_point": 2,
+            "truncated": 10,
+            "no_think_close": 8,
+            "syntax_error": 14
+          },
+          "tokens": {
+            "mean": 598.8780487804878,
+            "median": 441.5,
+            "p90": 1227.7000000000005
+          },
+          "closed_think_tokens": {
+            "cases": 156,
+            "mean": 311.95512820512823,
+            "median": 232.5
+          }
+        },
+        "candidate": {
+          "categories": {
+            "base_test_failure": 61,
+            "cap_before_final": 10,
+            "extracted_thinking_instead_of_final": 12,
+            "pass": 59,
+            "syntax_error": 15,
+            "extended_test_failure": 7
+          },
+          "flags": {
+            "truncated": 11,
+            "no_think_close": 11,
+            "syntax_error": 24,
+            "first_fence_in_thinking": 37,
+            "different_final_code": 25,
+            "missing_entry_point": 1
+          },
+          "tokens": {
+            "mean": 620.8475609756098,
+            "median": 456.5,
+            "p90": 1361.4000000000012
+          },
+          "closed_think_tokens": {
+            "cases": 153,
+            "mean": 330.62745098039215,
+            "median": 257.0
+          }
+        },
+        "discordant_categories": {
+          "lost:extracted_thinking_instead_of_final": 3,
+          "lost:base_test_failure": 13,
+          "lost:extended_test_failure": 3,
+          "gained:base_test_failure": 11,
+          "lost:syntax_error": 4,
+          "lost:cap_before_final": 2,
+          "gained:extended_test_failure": 1,
+          "gained:syntax_error": 1,
+          "gained:cap_before_final": 2,
+          "gained:extracted_thinking_instead_of_final": 3
+        },
+        "both_nontruncated": {
+          "cases": 144,
+          "base": 63,
+          "candidate": 57,
+          "gained": 16,
+          "lost": 22,
+          "excluded_discordant": {
+            "lost": 3,
+            "gained": 2
+          }
+        }
+      },
+      "all_six_nontruncated_sampled": {
+        "cases": 132,
+        "estimate": -0.05808080808080807,
+        "ci95": [
+          -0.10606060606060606,
+          -0.012626262626262623
+        ]
+      }
+    },
+    "mbpp": {
+      "nothink": {
+        "base": {
+          "categories": {
+            "pass": 181,
+            "base_test_failure": 148,
+            "missing_entry_point": 19,
+            "extended_test_failure": 29,
+            "syntax_error": 1
+          },
+          "flags": {
+            "missing_entry_point": 20,
+            "truncated": 5,
+            "syntax_error": 1
+          },
+          "tokens": {
+            "mean": 106.85185185185185,
+            "median": 59.0,
+            "p90": 147.90000000000003
+          },
+          "closed_think_tokens": {
+            "cases": 0,
+            "mean": null,
+            "median": null
+          }
+        },
+        "candidate": {
+          "categories": {
+            "pass": 180,
+            "base_test_failure": 150,
+            "missing_entry_point": 17,
+            "extended_test_failure": 28,
+            "syntax_error": 3
+          },
+          "flags": {
+            "missing_entry_point": 18,
+            "truncated": 6,
+            "syntax_error": 3
+          },
+          "tokens": {
+            "mean": 92.77513227513228,
+            "median": 45.0,
+            "p90": 124.30000000000001
+          },
+          "closed_think_tokens": {
+            "cases": 0,
+            "mean": null,
+            "median": null
+          }
+        },
+        "discordant_categories": {
+          "lost:base_test_failure": 12,
+          "gained:base_test_failure": 10,
+          "gained:extended_test_failure": 2,
+          "lost:extended_test_failure": 1
+        },
+        "both_nontruncated": {
+          "cases": 369,
+          "base": 181,
+          "candidate": 180,
+          "gained": 12,
+          "lost": 13,
+          "excluded_discordant": {}
+        }
+      },
+      "think-s0": {
+        "base": {
+          "categories": {
+            "syntax_error": 23,
+            "pass": 156,
+            "extracted_thinking_instead_of_final": 20,
+            "missing_entry_point": 18,
+            "cap_before_final": 22,
+            "base_test_failure": 119,
+            "extended_test_failure": 20
+          },
+          "flags": {
+            "different_final_code": 52,
+            "syntax_error": 39,
+            "first_fence_in_thinking": 73,
+            "missing_entry_point": 29,
+            "truncated": 24,
+            "no_think_close": 22
+          },
+          "tokens": {
+            "mean": 402.25132275132273,
+            "median": 233.0,
+            "p90": 737.8000000000001
+          },
+          "closed_think_tokens": {
+            "cases": 356,
+            "mean": 215.1432584269663,
+            "median": 147.0
+          }
+        },
+        "candidate": {
+          "categories": {
+            "pass": 147,
+            "missing_entry_point": 15,
+            "syntax_error": 34,
+            "cap_before_final": 30,
+            "base_test_failure": 108,
+            "extracted_thinking_instead_of_final": 19,
+            "extended_test_failure": 25
+          },
+          "flags": {
+            "missing_entry_point": 22,
+            "different_final_code": 51,
+            "syntax_error": 62,
+            "truncated": 30,
+            "no_think_close": 33,
+            "first_fence_in_thinking": 93
+          },
+          "tokens": {
+            "mean": 446.978835978836,
+            "median": 249.0,
+            "p90": 1287.0000000000007
+          },
+          "closed_think_tokens": {
+            "cases": 345,
+            "mean": 239.45217391304348,
+            "median": 174.0
+          }
+        },
+        "discordant_categories": {
+          "gained:syntax_error": 13,
+          "gained:extracted_thinking_instead_of_final": 2,
+          "lost:syntax_error": 16,
+          "lost:base_test_failure": 19,
+          "lost:extracted_thinking_instead_of_final": 6,
+          "lost:missing_entry_point": 1,
+          "lost:cap_before_final": 3,
+          "gained:base_test_failure": 18,
+          "gained:cap_before_final": 3,
+          "lost:extended_test_failure": 4,
+          "gained:extended_test_failure": 1,
+          "gained:missing_entry_point": 3
+        },
+        "both_nontruncated": {
+          "cases": 335,
+          "base": 153,
+          "candidate": 143,
+          "gained": 36,
+          "lost": 46,
+          "excluded_discordant": {
+            "lost": 3,
+            "gained": 4
+          }
+        }
+      },
+      "think-s1": {
+        "base": {
+          "categories": {
+            "pass": 156,
+            "base_test_failure": 127,
+            "syntax_error": 20,
+            "extended_test_failure": 23,
+            "extracted_thinking_instead_of_final": 19,
+            "missing_entry_point": 17,
+            "cap_before_final": 16
+          },
+          "flags": {
+            "first_fence_in_thinking": 74,
+            "different_final_code": 43,
+            "syntax_error": 35,
+            "missing_entry_point": 24,
+            "truncated": 17,
+            "no_think_close": 17
+          },
+          "tokens": {
+            "mean": 409.75396825396825,
+            "median": 244.0,
+            "p90": 910.7000000000003
+          },
+          "closed_think_tokens": {
+            "cases": 361,
+            "mean": 237.62603878116343,
+            "median": 153.0
+          }
+        },
+        "candidate": {
+          "categories": {
+            "pass": 142,
+            "base_test_failure": 108,
+            "syntax_error": 34,
+            "cap_before_final": 34,
+            "extended_test_failure": 26,
+            "missing_entry_point": 13,
+            "extracted_thinking_instead_of_final": 21
+          },
+          "flags": {
+            "first_fence_in_thinking": 98,
+            "different_final_code": 57,
+            "syntax_error": 64,
+            "truncated": 35,
+            "no_think_close": 35,
+            "missing_entry_point": 23
+          },
+          "tokens": {
+            "mean": 467.86772486772486,
+            "median": 242.0,
+            "p90": 1543.5000000000027
+          },
+          "closed_think_tokens": {
+            "cases": 343,
+            "mean": 244.28279883381924,
+            "median": 167.0
+          }
+        },
+        "discordant_categories": {
+          "lost:syntax_error": 17,
+          "lost:base_test_failure": 16,
+          "lost:extracted_thinking_instead_of_final": 11,
+          "gained:extended_test_failure": 4,
+          "gained:extracted_thinking_instead_of_final": 5,
+          "lost:extended_test_failure": 6,
+          "gained:base_test_failure": 20,
+          "gained:syntax_error": 8,
+          "lost:cap_before_final": 6,
+          "gained:cap_before_final": 3,
+          "gained:missing_entry_point": 2
+        },
+        "both_nontruncated": {
+          "cases": 334,
+          "base": 150,
+          "candidate": 138,
+          "gained": 38,
+          "lost": 50,
+          "excluded_discordant": {
+            "lost": 6,
+            "gained": 4
+          }
+        }
+      },
+      "think-s2": {
+        "base": {
+          "categories": {
+            "pass": 162,
+            "extracted_thinking_instead_of_final": 20,
+            "missing_entry_point": 20,
+            "extended_test_failure": 28,
+            "base_test_failure": 110,
+            "cap_before_final": 21,
+            "syntax_error": 17
+          },
+          "flags": {
+            "first_fence_in_thinking": 75,
+            "different_final_code": 43,
+            "missing_entry_point": 28,
+            "truncated": 24,
+            "no_think_close": 23,
+            "syntax_error": 38
+          },
+          "tokens": {
+            "mean": 425.47354497354496,
+            "median": 243.5,
+            "p90": 972.3000000000006
+          },
+          "closed_think_tokens": {
+            "cases": 355,
+            "mean": 231.76338028169013,
+            "median": 151.0
+          }
+        },
+        "candidate": {
+          "categories": {
+            "pass": 150,
+            "syntax_error": 34,
+            "extracted_thinking_instead_of_final": 14,
+            "missing_entry_point": 22,
+            "base_test_failure": 104,
+            "cap_before_final": 34,
+            "extended_test_failure": 20
+          },
+          "flags": {
+            "different_final_code": 49,
+            "syntax_error": 65,
+            "first_fence_in_thinking": 94,
+            "missing_entry_point": 25,
+            "truncated": 36,
+            "no_think_close": 35
+          },
+          "tokens": {
+            "mean": 469.82804232804233,
+            "median": 245.0,
+            "p90": 1611.6000000000004
+          },
+          "closed_think_tokens": {
+            "cases": 343,
+            "mean": 246.54518950437318,
+            "median": 175.0
+          }
+        },
+        "discordant_categories": {
+          "lost:syntax_error": 11,
+          "gained:extracted_thinking_instead_of_final": 3,
+          "lost:cap_before_final": 4,
+          "lost:base_test_failure": 27,
+          "lost:extracted_thinking_instead_of_final": 3,
+          "gained:base_test_failure": 18,
+          "gained:extended_test_failure": 6,
+          "gained:missing_entry_point": 1,
+          "gained:syntax_error": 8,
+          "lost:missing_entry_point": 2,
+          "lost:extended_test_failure": 1
+        },
+        "both_nontruncated": {
+          "cases": 333,
+          "base": 156,
+          "candidate": 150,
+          "gained": 36,
+          "lost": 42,
+          "excluded_discordant": {
+            "lost": 6
+          }
+        }
+      },
+      "all_six_nontruncated_sampled": {
+        "cases": 299,
+        "estimate": -0.035674470457079145,
+        "ci95": [
+          -0.0713489409141583,
+          -0.001114827201783724
+        ]
+      }
+    }
+  },
+  "source_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-nothink\\completions.jsonl": "6293e90cdaa78d018405ed5527eaefe685b20568173ccce03c148fcc800d3604",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-nothink\\eval_results.json": "ed533aecb7e73ed5eb4e69f8ccbc71157cb72c936ced75f70c8e2e7ced1e05c8",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-nothink\\completions.jsonl": "85691c1628b8721cfe26650430cc2f8edd88ada4fbe1ba128a669f48db913d23",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-nothink\\eval_results.json": "eb3a316528bfc961e13af3790cc7f526a32910dc757f3c10bd906ba867f0b56b",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s0\\completions.jsonl": "70292e2a12a39f63a2a7f0738579c5e6e373096e13384ae0c595be08675071ef",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s0\\eval_results.json": "707a9291aeb60e180176c496d825bf921d34027745eb5f0d9f83e44ff37e0757",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s0\\completions.jsonl": "362c3dd9dee271a9428372b9f71c43d793515bfe73aac93d0d289bcd8e8020e3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s0\\eval_results.json": "330115964d9eff45ee988eb7f2cf736ccadc005e7a87cd4dd28c2206be6c0c34",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s1\\completions.jsonl": "88823e17904a6bf355815e62027367f51bf872fc2c45822ff7e5e89681d98037",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s1\\eval_results.json": "71206d0b237d78191cb57e263fad792ce845e153de0f862c046377d7d9a67592",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s1\\completions.jsonl": "8b93ed5c6da7413a384e3c9aa6fa5a2b307ad40f99e28ffe2c6e6c4aaa6e2f51",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s1\\eval_results.json": "5b10ccf794b541194a80465073c416c4d68726de17885406a778cd28108c21be",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s2\\completions.jsonl": "612d805aa3dd1207cce7278ad3b760dc8bd9151296702be1078dfbe37e4c2ecb",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\humaneval-think-s2\\eval_results.json": "7614f2467b1229d80cbfaf18cf7cef09d978385d0f2e135b1dcf176e52d9ed81",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s2\\completions.jsonl": "270e05c1495e0e93d448658b484ee51ff230e24f928ffa63b255172708536af5",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\humaneval-think-s2\\eval_results.json": "f1b36688c4c58299ac24c4d765ee27053f2027c19d040bf86a884ca3afdcaa52",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-nothink\\completions.jsonl": "66e91c492460f40f36e67501ff56574bc6f9151843187487288234a19e217360",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-nothink\\eval_results.json": "9e03ceed533e2f54ed3f82e771235d4f7d9f696c4083526114a835b043ab7d12",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-nothink\\completions.jsonl": "7af0df5ed45dc94e4d430874b431c937dcfd523e83bb14f45646a53ee5884aa3",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-nothink\\eval_results.json": "03a703eaf11d6b6bc810aad650beee880930740bbd68d37dba211b8d14690d8d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s0\\completions.jsonl": "bd2e96a714ba709ecdde3f82cfc8d0a35a13b448490b5c898780a2ada19bd93d",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s0\\eval_results.json": "801169cea8e8d719c43976ded6d4f619a030ac1867c302c4c678ebd2c5213d4c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s0\\completions.jsonl": "5ae7b5b7c0d733ba5724d27c468f7fc1a508633fd381c7fa4a2c695864eb1b8f",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s0\\eval_results.json": "669fb50b8a339e27a7dc8dd998b55bd7504d10415c900ecedaa01cd65fe442b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s1\\completions.jsonl": "bba6c88aa2e643acdc9a043fd1c5b64670db750a85e1ae03ffe8c8acc4bb661c",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s1\\eval_results.json": "c38010bfaf81836375a3b3b5fb82a2cff12c865d0aad21bdc61e00448c672588",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s1\\completions.jsonl": "6d0e29c2be98733d0322c45dbf66c5e6f96965ff8c0e0993ffdee8dcb922ce23",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s1\\eval_results.json": "74149385e0fb129db85096090e0ed97f97d1de97f1a656223c9f84780e3968b9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s2\\completions.jsonl": "b51c4b5c79d304f5e84c187ca946c710ddfa7a80b53bcd4a9fe6cdbc0c732516",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\base\\mbpp-think-s2\\eval_results.json": "f94fab1820ab2eb03fc11104144308767f8d989f12a3e986a0db42edaf0bd9f9",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s2\\completions.jsonl": "c06f550194d9583ed9c75791d1872babe5c89cd2992895998567c63bdf0ead9e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\candidate\\mbpp-think-s2\\eval_results.json": "73e2bad6a616b9e79982c7ce59c31a924493494fbd9effaa2108dd2fe5fe651f"
+  },
+  "caveat": "Descriptive classifications; no generated code executed. Length-conditioned subsets are selected outcomes."
+}

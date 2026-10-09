@@ -132,6 +132,14 @@ No automatic training, checkpoint promotion or further run is scheduled.
 
 ## Completed confirmation
 
+The table below records the original frozen extraction protocol. The subsequent
+[code failure investigation](CODE_FAILURE_INVESTIGATION.md) found that this
+extractor sometimes scores reasoning drafts instead of final answers. Separate
+final-answer rescoring narrows sampled HumanEval's decline to -4.47 points
+[-8.54, -0.41] and MBPP's to -2.20 [-5.03, +0.53]. HumanEval remains concerning;
+MBPP is unresolved after the grading correction. Use those diagnostic results
+for conclusions about the final solutions while preserving the original run.
+
 The worker completed all generation, overlap screening, sandbox scoring and
 paired comparisons on 2026-10-08 at 18:02 Chicago time, without a reported job
 failure. No checkpoint was promoted. Evidence: `completion-gauntlet/comparison.json`.
