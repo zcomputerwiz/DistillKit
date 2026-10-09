@@ -1,0 +1,40 @@
+..............................                                           [100%]
+============================== warnings summary ===============================
+.venv\Lib\site-packages\torch\jit\_script.py:365: 14 warnings
+  D:\DeepThought\Projects\HybridModel\DistillKit\.venv\Lib\site-packages\torch\jit\_script.py:365: DeprecationWarning: `torch.jit.script_method` is deprecated. Please switch to `torch.compile` or `torch.export`.
+    warnings.warn(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: Memory efficient kernel not used because: (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:986.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: Memory Efficient attention has been runtime disabled. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen/native/transformers/sdp_utils_cpp.h:552.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: Flash attention kernel not used because: (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:988.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: Torch was not compiled with flash attention. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:797.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: cuDNN attention kernel not used because: (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:990.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: cuDNN attention has been runtime disabled. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen\native\transformers\cuda\sdp_utils.cpp:706.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+distillkit\models\qwen35\gqa_dispatch.py:66
+  D:\DeepThought\Projects\HybridModel\DistillKit\distillkit\models\qwen35\gqa_dispatch.py:66: UserWarning: For dense input, both fused kernels require query, key and value to have the same num_heads. Query.sizes(): [1, 4, 8, 32], Key sizes(): [1, 2, 8, 32], Value sizes(): [1, 2, 8, 32] instead. To broadcast dense inputs, try using unsqueeze and expand_to before passing them into the kernel. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\aten\src\ATen/native/transformers/sdp_utils_cpp.h:426.)
+    torch.nn.functional.scaled_dot_product_attention(
+
+tests/test_dense_gr_training_step.py::test_three_steps_tensor_parallel_matches_unsharded[False-devices1]
+  D:\DeepThought\Projects\HybridModel\DistillKit\.venv\Lib\site-packages\torch\autograd\graph.py:869: UserWarning: The AccumulateGrad node's stream does not match the stream of the node that produced the incoming gradient. This may incur unnecessary synchronization and break CUDA graph capture if the AccumulateGrad node's stream is the default stream. This mismatch is caused by an AccumulateGrad node created prior to the current iteration being kept alive. This can happen if the autograd graph is still being kept alive by tensors such as the loss, or if you are using DDP, which will stash a reference to the node. To resolve the mismatch, delete all references to the autograd graph or ensure that DDP initialization is performed under the same stream as subsequent forwards. If the mismatch is intentional, you can use torch.autograd.graph.set_warn_on_accumulate_grad_stream_mismatch(False) to suppress this warning. (Triggered internally at C:\actions-runner\_work\pytorch\pytorch\pytorch\torch\csrc\autograd\input_buffer.cpp:250.)
+    return Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+30 passed, 22 warnings in 14.40s

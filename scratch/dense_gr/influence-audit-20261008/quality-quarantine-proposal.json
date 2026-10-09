@@ -1,0 +1,11 @@
+{
+  "status": "proposal_not_applied",
+  "documents": [
+    {
+      "doc_id": "onpolicy:kodcode:Filter_62706_I:s0",
+      "reason": "Inherited mock lacks set_debuglevel; solution catches that exception and returns False. Even with a complete mock it supplies sendmail a tuple rather than a serialized message.",
+      "evidence": "manual-quality-checks.json"
+    }
+  ],
+  "policy": "Keep historical data unchanged. Requalify or omit this confirmed nonfunctional target before future replay; this is a data-quality screen distinct from benchmark exclusions."
+}

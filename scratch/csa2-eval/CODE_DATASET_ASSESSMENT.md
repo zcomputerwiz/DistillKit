@@ -7,6 +7,13 @@ CPU cache scans and eight solution checks in the existing Docker sandbox complet
 The approved policy is **exclude confirmed matching tasks only**. Conversational
 context stays masked; raw code/text retains full-token loss.
 
+2026-10-09 execution and optimizer follow-up:
+[INFLUENCE_AUDIT_RESULTS.md](INFLUENCE_AUDIT_RESULTS.md). All 16 sampled solutions
+pass inherited tests, but mutation/stronger-test review confirms one nonfunctional
+email target outside the recent prefix. Requalify it before future replay. The
+sampled combined update improves code NLL and does not justify universal loss
+equalization; broader verified documents and aggregation paths remain the priority.
+
 ## Findings
 
 Use the existing data more carefully before adding a large dataset. The 475

@@ -1,0 +1,16 @@
+{
+  "positive_paths": "All 222 chosen responses matched regenerated prefixes and expected reference actions, with no chosen execution errors.",
+  "uncertified_by_generic_student_certifier": {
+    "denies_verified_completion": 24,
+    "retry_without_checking_outcome": 12,
+    "false_completion": 10,
+    "unnecessary_tool": 6
+  },
+  "interpretation": {
+    "denies_verified_completion": "World already has desired state and a verified write; the negative prose denies that established result.",
+    "false_completion": "Denied/empty world remains pending without the claimed write. The generic terminal prose certifier does not implement this truth check.",
+    "retry_without_checking_outcome": "The request permits a write, but its timeout result is unknown. Retrying without reading is a safety/progress contrast; it is not an invalid-schema label. In committed worlds retrying can increment mutations again.",
+    "unnecessary_tool": "The answer is available in the prompt. Read is schema-valid but unnecessary; this is an efficiency contrast."
+  },
+  "caveat": "These labels cover factual truth, safe sequencing and efficiency. Runtime validity alone cannot certify preference quality; no labels were changed."
+}

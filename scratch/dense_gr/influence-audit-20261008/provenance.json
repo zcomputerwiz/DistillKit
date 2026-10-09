@@ -1,0 +1,40 @@
+{
+  "recorded_after_main_audit": true,
+  "repository_head": "a45966c9c669a0debe6bc1352482d8f078bda227",
+  "python": "3.12.14",
+  "source_sha256": {
+    "scratch/dense_gr/influence_audit.py": "79073eaa351ac0e92ddb3f785e6790d7e3df6f5f93fa4455f6efa81ed1f6b226",
+    "scratch/dense_gr/influence_gpu.py": "c403cc26c3aa6b09418c39cd0727ece12b3dd102a458801df7741aae8320d020",
+    "scratch/dense_gr/influence_focus.py": "b21495594620041eacb6ad65f5ee16cadb2654198b5279aaa4f44f4ca8b9b876",
+    "scratch/dense_gr/training_step.py": "84f51aa98fec73b964d102f83b2f97f2397d628a62e03bec4662c6bb0dbc2a93",
+    "scratch/dense_gr/streaming_head.py": "ec49d15c65fc9648e4f6d1cff89ba0bed8cfe5a5c30bdbce854c439208b7941d",
+    "scratch/dense_gr/shared_head.py": "3d835e756201cb0b5af06ad5e7d61760ecc0be6f06ba8258f60a864afd9b9bc7",
+    "scratch/dense_gr/selection_replay.py": "ca78bce2be428fd53a7de9633e843f1bd2a568a3eca4602dac94c83457f57d84",
+    "distillkit/parallel/sync.py": "193baba8f602645f3e4bd817ba6fbeb7f1e94516cf67388332dca0b7876c550b",
+    "distillkit/models/qwen35/csa2.py": "ef2bcae7c446e4e425c9483fb4580842ded50fa439a0b05289d34f6296f9e90e",
+    "scratch/dense_gr/completion-v2/completion/checkpoints/smoke-r1-1-gr-s25-csa2/config.json": "59ab288c7838d2a0abbbfd6551ff636cb89e5aa02fad48776d829fbd093b0ec7",
+    "scratch/dense_gr/influence_summary.py": "ba11fe4610d2e98c7423c18609879c792c6c81a9a1e9d908d7881ff9adac7aa1"
+  },
+  "tests": {
+    "command": ".venv/Scripts/python.exe -X utf8 -m pytest tests/test_dense_gr_training_step.py tests/test_completion_curriculum.py tests/test_completion_train.py tests/test_code_replay_review.py -q",
+    "cuda_visible_devices": "0,1",
+    "passed": 30
+  },
+  "main_audit_source_matches": true,
+  "saved_state": {
+    "path": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\completion\\checkpoints\\state-step-00000040\\state.pt",
+    "size": 12570274097,
+    "mtime_ns": 1791443402311745300,
+    "sha256": "27a5ddb758f3059516844edb32aea1df4623ba5a42fc3e0000681ba5f466ec6f",
+    "hashed_after_audit": true
+  },
+  "focused_audit_source_matches": true,
+  "sandbox": {
+    "image": "code-verify-sandbox:latest",
+    "served_solutions": 16,
+    "mutants": 25,
+    "mutants_rejected": 23,
+    "confirmed_quality_defects": 1,
+    "external_network_used": false
+  }
+}

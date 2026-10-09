@@ -1,0 +1,215 @@
+{
+  "source_sha256": "ba11fe4610d2e98c7423c18609879c792c6c81a9a1e9d908d7881ff9adac7aa1",
+  "document_visits": 1425,
+  "weighted_targets": 965332.0,
+  "excluded_visits": 4,
+  "role_targets": {
+    "structure": 10286.0,
+    "system": 0.0,
+    "user": 0.0,
+    "tool-result": 0.0,
+    "assistant": 279691.0,
+    "thinking": 233911.0,
+    "tool-call": 51755.0,
+    "plain": 389689.0
+  },
+  "source_profile": {
+    "agent-smol-a": {
+      "targets": 22630.0,
+      "share": 0.023442711937447427,
+      "teacher_top1_match": 0.8752540874944763,
+      "actual_absent": 8.837825894829872e-05,
+      "premature_stop": 0.0
+    },
+    "agent-smol-b": {
+      "targets": 79398.0,
+      "share": 0.0822494229964406,
+      "teacher_top1_match": 0.902340109322653,
+      "actual_absent": 5.0379102748180054e-05,
+      "premature_stop": 8.81634298093151e-05
+    },
+    "curriculum-v4-w8": {
+      "targets": 25505.0,
+      "share": 0.02642096190740595,
+      "teacher_top1_match": 0.8569692217212311,
+      "actual_absent": 0.012742599490296021,
+      "premature_stop": 3.9207998431680065e-05
+    },
+    "expand-code-w8": {
+      "targets": 57405.0,
+      "share": 0.05946658766103268,
+      "teacher_top1_match": 0.8482013761867433,
+      "actual_absent": 0.0012368260604476962,
+      "premature_stop": 0.005452486717184914
+    },
+    "frontier-code-raw": {
+      "targets": 324423.0,
+      "share": 0.33607401391438385,
+      "teacher_top1_match": 0.87221004675994,
+      "actual_absent": 0.006389805901554452,
+      "premature_stop": 3.0823955144980473e-06
+    },
+    "frontier-qa2": {
+      "targets": 31757.0,
+      "share": 0.03289749018990358,
+      "teacher_top1_match": 0.7879207733727996,
+      "actual_absent": 0.0027710426047800486,
+      "premature_stop": 0.0025821078817268635
+    },
+    "frontier-tools": {
+      "targets": 17096.0,
+      "share": 0.01770996921266466,
+      "teacher_top1_match": 0.8799719232569022,
+      "actual_absent": 0.002339728591483388,
+      "premature_stop": 0.0012868507253158633
+    },
+    "general-pilot-w8": {
+      "targets": 65266.0,
+      "share": 0.06760990001367405,
+      "teacher_top1_match": 0.6408543498912144,
+      "actual_absent": 0.041828823583489105,
+      "premature_stop": 1.532191340054546e-05
+    },
+    "loop-check": {
+      "targets": 36891.0,
+      "share": 0.038215867701474726,
+      "teacher_top1_match": 0.8499551114407276,
+      "actual_absent": 0.00011710058940630001,
+      "premature_stop": 0.0
+    },
+    "onpolicy-r6-loop": {
+      "targets": 28496.0,
+      "share": 0.02951937778919584,
+      "teacher_top1_match": 0.8034277136066053,
+      "actual_absent": 0.0006671948625995579,
+      "premature_stop": 0.00012509903673741713
+    },
+    "r8-code-short-w8": {
+      "targets": 16357.0,
+      "share": 0.016944429481256188,
+      "teacher_top1_match": null,
+      "actual_absent": null,
+      "premature_stop": null
+    },
+    "teacher-code": {
+      "targets": 51271.0,
+      "share": 0.053112297116432484,
+      "teacher_top1_match": 0.9680326110276765,
+      "actual_absent": 0.0,
+      "premature_stop": 0.00021454623471358077
+    },
+    "teacher-math-gen": {
+      "targets": 81181.0,
+      "share": 0.0840964559343314,
+      "teacher_top1_match": 0.9567632820487553,
+      "actual_absent": 0.0,
+      "premature_stop": 0.0001231815326246289
+    },
+    "teacher-nothink-math": {
+      "targets": 48565.0,
+      "share": 0.05030911644905587,
+      "teacher_top1_match": 0.9785648100483888,
+      "actual_absent": 0.0,
+      "premature_stop": 0.00045300113250283127
+    },
+    "think-first-w8": {
+      "targets": 34460.0,
+      "share": 0.035697563118181105,
+      "teacher_top1_match": 0.8359837492745212,
+      "actual_absent": 0.0011607661056297156,
+      "premature_stop": 0.00017411491584445735
+    },
+    "thinking-w8": {
+      "targets": 44631.0,
+      "share": 0.04623383457711958,
+      "teacher_top1_match": 0.8836907082521117,
+      "actual_absent": 0.0012323273061325087,
+      "premature_stop": 0.00040330711837063924
+    }
+  },
+  "code_native_passes": 16,
+  "rejected_mutants": 23,
+  "router_state": [
+    {
+      "parameter": "model.layers.3.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.000972747802734375
+    },
+    {
+      "parameter": "model.layers.7.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.000972747802734375
+    },
+    {
+      "parameter": "model.layers.11.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.000972747802734375
+    },
+    {
+      "parameter": "model.layers.15.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.000972747802734375
+    },
+    {
+      "parameter": "model.layers.19.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.00183868408203125
+    },
+    {
+      "parameter": "model.layers.23.self_attn.index_q_proj.weight",
+      "step": 40,
+      "lr": 0.000937,
+      "weight_decay": 0.1,
+      "first_moment_absmax": 0.0,
+      "second_moment_absmax": 0.0,
+      "gradient_abs_max": 0.0,
+      "compensation_abs_max": 0.00194549560546875
+    }
+  ],
+  "router_decay": {
+    "expected_fresh_saved_norms": [
+      0.010809206371793174,
+      0.010813018894263903
+    ],
+    "measured_fresh_saved_norms": [
+      0.010810061419140107,
+      0.010775679654947853
+    ],
+    "relative_errors": [
+      7.91036194076363e-05,
+      0.0034531743337522674
+    ],
+    "interpretation": "Six query projections receive zero gradients and have zero saved moments; compensated movement matches decay alone. Other indexer gradients are None in these five focused pairs."
+  },
+  "target_mass": {
+    "min_captured": 0.1636078655719757,
+    "max_captured": 1.000921368598938,
+    "visits_with_any_overshoot": 1395,
+    "caveat": "Document maxima do not measure the fraction of affected positions. FP16 cache rounding is a plausible explanation; original full-precision values are unavailable. Existing loss clamps the tail and does not renormalize the head."
+  }
+}

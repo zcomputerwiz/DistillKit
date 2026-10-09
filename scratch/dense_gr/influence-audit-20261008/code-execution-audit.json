@@ -1,0 +1,320 @@
+{
+  "rows": [
+    {
+      "doc_id": "tcode:kodcode:Taco_90756_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": true,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def isDivisible(k, N):\n    remainder = 0\n    for digit in N:\n        remainder = (remainder * 10 + int(digit)) % k\n    return remainder == 0\n",
+      "tests": "from solution import isDivisible\n\ndef test_is_divisible():\n    assert isDivisible(11, \"123456789\") == False\n    assert isDivisible(3, \"123456\") == True\n    assert isDivisible(7, \"49\") == True\n    assert isDivisible(10, \"1001\") == False\n    assert isDivisible(2, \"1024\") == True\n    assert isDivisible(5, \"55555\") == True\n    assert isDivisible(17, \"123456789\") == False",
+      "prompt": "<|im_start|>user\nGiven an integer k and a number N in the form of string, your task is to determine whether the number N is divisible by k.\n\nNote: The given number is very large and so the input is taken as a string.\n\nExample 1:\nInput:\nk = 11\nN = \"123456789\"\nOutput:\nFalse\nExplanation:\n123456789 when divided by 11 does not give a remainder of 0.\n\nExample 2:\nInput:\nk = 3\nN = \"123456\"\nOutput:\nTrue\nExplanation:\n123456 when divided by 3 gives a remainder of 0.\n\nYour Task:\nYou don't need to read input or print anything. Your task is to complete the function isDivisible() which takes an integer k and a string N as input and returns a boolean answer.\n\nExpected Time Complexity: O(|N|)\nExpected Auxiliary Space: O(1)\n\nConstraints:\n1 <= |N| <= 10^{3}\n1 <= k <= 10^{3}\n\nImplement:\n`def isDivisible(k, N):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Code_Contests_28997_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": true,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def minimum_swaps(arr):\n    n = len(arr)\n    visited = [False] * n\n    swaps = 0\n    \n    for i in range(n):\n        if visited[i] or arr[i] == i + 1:\n            visited[i] = True\n            continue\n        \n        # Follow the cycle starting from position i\n        cycle_length = 0\n        j = i\n        while not visited[j]:\n            visited[j] = True\n            cycle_length += 1\n            j = arr[j] - 1  # value arr[j] belongs at position arr[j]-1\n        \n        swaps += cycle_length - 1\n    \n    return swaps\n",
+      "tests": "from solution import minimum_swaps\n\ndef test_example_1():\n    assert minimum_swaps([4, 3, 2, 1, 5]) == 2\n\ndef test_example_2():\n    assert minimum_swaps([1, 3, 4, 2]) == 2\n\ndef test_single_book():\n    assert minimum_swaps([1]) == 0\n\ndef test_sorted_books():\n    assert minimum_swaps([1, 2, 3, 4, 5]) == 0\n\ndef test_reverse_order():\n    assert minimum_swaps([5, 4, 3, 2, 1]) == 2\n\ndef test_random_order():\n    assert minimum_swaps([3, 1, 2, 5, 4]) == 3",
+      "prompt": "<|im_start|>user\nSarah has a unique way of organizing her books in a shelf. Each book has a unique ID and a specific position on the shelf. However, she has misplaced some books recently, and the IDs might not be in their actual positions. Sarah wants to fix this by swapping the least number of books so that each book's ID matches its position on the shelf.\n\nGiven the initial arrangement of books, output the minimum number of swaps necessary to reorder the books correctly.\n\nInput\n\nThe first line contains a single integer n (1 \u2264 n \u2264 1000) \u2013 the number of books on the shelf.\n\nThe second line contains n unique integers \u2013 where the i-th integer represents the book ID currently at the i-th position on the shelf (1 \u2264 ID \u2264 n).\n\nOutput\n\nPrint a single integer \u2013 the minimum number of swaps needed to reorder the books so that the ID of the book at each position i is (i+1).\n\nExamples\n\nInput\n\n5\n4 3 2 1 5\n\nOutput\n\n2\n\nInput\n\n4\n1 3 4 2\n\nOutput\n\n2\n\nNote\n\nIn the first example, the initial array is [4, 3, 2, 1, 5]. Swapping book IDs at positions 1 and 4 [positions are 0-based] (i.e., swapping 4 and 1) followed by swapping IDs at positions 2 and 3 (i.e., swapping 3 and 2) will correct the shelf, which results in two swaps in total. Hence, the output is 2.\n\nIn the second example, the initial array is [1, 3, 4, 2]. To correct the shelf, swap book IDs at positions 1 and 3 (i.e., swapping 3 and 4) followed by swapping IDs at positions 2 and 3 (i.e., swapping 4 and 2). Hence, the output is also 2.\n\nImplement:\n`def minimum_swaps(arr):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Leetcode_5444_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": true,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def longest_valid_block(arr, d, t):\n    \"\"\"\n    Find the longest valid block in the array.\n    \n    A block is a contiguous subarray of equal numbers.\n    A block is valid if:\n    - The difference between the maximum and minimum element in the block is at most d\n    - Its length is at least t\n    \n    Since a block is defined as a contiguous subarray of equal numbers,\n    all elements in a block are the same. Therefore, the max - min = 0,\n    which is always <= d (since d is non-negative).\n    \n    So the condition simplifies to: find the longest contiguous subarray\n    of equal numbers with length >= t.\n    \n    If multiple blocks have the same maximum length, return the one with\n    the smallest starting index.\n    \n    Args:\n        arr: 0-indexed integer array representing colors\n        d: maximum allowed difference between max and min in block\n        t: minimum length for a block to be valid\n    \n    Returns:\n        Tuple (index, length) of the longest valid block, or (0, 0) if none exists\n    \"\"\"\n    if not arr:\n        return (0, 0)\n    \n    n = len(arr)\n    best_index = 0\n    best_length = 0\n    \n    i = 0\n    while i < n:\n        j = i\n        # Find the end of the current block (contiguous equal elements)\n        while j < n and arr[j] == arr[i]:\n            j += 1\n        \n        length = j - i\n        # Check if this block is valid\n        # Since all elements are equal, max - min = 0 <= d (d >= 0)\n        # So we just need length >= t\n        if length >= t:\n            if length > best_length:\n                best_length = length\n                best_index = i\n        \n        i = j\n    \n    if best_length == 0:\n        return (0, 0)\n    \n    return (best_index, best_length)\n",
+      "tests": "from solution import longest_valid_block\n\ndef test_single_color_block():\n    arr = [0, 0, 0, 0, 0]\n    assert longest_valid_block(arr, 0, 2) == (0, 5)\n\ndef test_multiple_blocks():\n    arr = [1, 1, 2, 2, 2, 1]\n    assert longest_valid_block(arr, 0, 2) == (2, 3)\n\ndef test_no_valid_block():\n    arr = [1, 2, 3, 4, 5]\n    assert longest_valid_block(arr, 0, 2) == (0, 0)\n\ndef test_minsize_greater_than_block():\n    arr = [1, 1, 1, 1]\n    assert longest_valid_block(arr, 0, 5) == (0, 0)\n\ndef test_multiple_same_length_blocks():\n    arr = [1, 1, 2, 2, 1, 1]\n    assert longest_valid_block(arr, 0, 2) == (0, 2)\n\ndef test_valid_block_with_d():\n    arr = [1, 2, 2, 2, 3, 1]\n    assert longest_valid_block(arr, 2, 2) == (1, 3)",
+      "prompt": "<|im_start|>user\nYou are given a **0-indexed** integer array `arr` representing colors, where each non-negative integer in `arr` denotes a different color. We define a block as a contiguous subarray of equal numbers. A block is considered valid if the difference between the maximum and minimum element in the block is at most `d` and its length is at least `t`.  Your task is to find and return the starting index and length of the longest valid block. If there are multiple such blocks with the same length, return the one with the smallest starting index.\n\nOutput the index and length as a tuple `(index, length)`.\n\nImplement:\n`def longest_valid_block(arr, d, t):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "timeout"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Code_Contests_30913_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "def transform_string(S):\n    char_map = {}\n    next_num = 1\n    result = []\n    for c in S:\n        if c not in char_map:\n            char_map[c] = next_num\n            next_num += 1\n        result.append(str(char_map[c]))\n    return ' '.join(result)\n",
+      "tests": "from solution import transform_string\n\ndef test_transform_string_example_1():\n    assert transform_string(\"abac\") == \"1 2 1 3\"\n\ndef test_transform_string_example_2():\n    assert transform_string(\"hello\") == \"1 2 3 3 4\"\n\ndef test_transform_string_example_3():\n    assert transform_string(\"xyz\") == \"1 2 3\"\n\ndef test_transform_string_single_character():\n    assert transform_string(\"a\") == \"1\"\n\ndef test_transform_string_repeated_characters():\n    assert transform_string(\"aaaaa\") == \"1 1 1 1 1\"\n\ndef test_transform_string_long_string():\n    input_str = \"abcdefghijklmnopqrstuvwxyz\" * 5\n    expected_output = \" \".join(str(i % 26 + 1) for i in range(130))\n    assert transform_string(input_str) == expected_output",
+      "prompt": "<|im_start|>user\nAlex is a computer science student who loves playing with strings. One day, he encountered a problem while solving a puzzle and needs your help. Given a string `S` consisting of lowercase English alphabets, he wants to transform it following these rules:\n\n1. Each distinct character in the string should be replaced with a unique integer starting from 1 based on the order of their first occurrence in the string.\n2. The order of integers in the resulting sequence should match the order in which the corresponding characters appear in the string.\n\nFor example, the string \"abac\" would be transformed into the sequence \"1 2 1 3\".\n\nYour task is to write a function that takes a string `S` and returns the transformed sequence as described.\n\nInput\n\nA single line containing string `S` (1 \u2264 |S| \u2264 1000), which consists of only lowercase English letters.\n\nOutput\n\nA single line containing the space-separated sequence of integers representing the transformation of the input string `S`.\n\nExamples\n\nInput\n\nabac\n\nOutput\n\n1 2 1 3\n\nInput\n\nhello\n\nOutput\n\n1 2 3 3 4\n\nInput\n\nxyz\n\nOutput\n\n1 2 3\n\nImplement:\n`def transform_string(S):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Code_Contests_33228_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def longest_tree_line(n, grid):\n    max_len = 0\n    \n    # Check horizontal lines (rows)\n    for i in range(n):\n        current = 0\n        for j in range(n):\n            if grid[i][j] == 'T':\n                current += 1\n                max_len = max(max_len, current)\n            else:\n                current = 0\n    \n    # Check vertical lines (columns)\n    for j in range(n):\n        current = 0\n        for i in range(n):\n            if grid[i][j] == 'T':\n                current += 1\n                max_len = max(max_len, current)\n            else:\n                current = 0\n    \n    return max_len\n",
+      "tests": "from solution import longest_tree_line\n\ndef test_example():\n    grid = [\n        \"T..T.\",\n        \"TTTT.\",\n        \"T.T.T\",\n        \"..TTT\",\n        \".TT.T\"\n    ]\n    assert longest_tree_line(5, grid) == 4\n\ndef test_single_cell_tree():\n    grid = [\n        \"T\"\n    ]\n    assert longest_tree_line(1, grid) == 1\n\ndef test_no_trees():\n    grid = [\n        \".\"\n    ]\n    assert longest_tree_line(1, grid) == 0\n\ndef test_all_trees():\n    grid = [\n        \"TTT\",\n        \"TTT\",\n        \"TTT\"\n    ]\n    assert longest_tree_line(3, grid) == 3\n\ndef test_mixed_grid():\n    grid = [\n        \"T.T\",\n        \".T.\",\n        \"T.T\"\n    ]\n    assert longest_tree_line(3, grid) == 1\n\ndef test_vertical_line():\n    grid = [\n        \"T.T.\",\n        \"T.T.\",\n        \"T.T.\",\n        \"T..T\"\n    ]\n    assert longest_tree_line(4, grid) == 4",
+      "prompt": "<|im_start|>user\nDiana's cousin, Riana, owns a beautiful garden which is divided into a grid of cells. Each cell either contains a tree or is empty. Riana recently learned about feng shui and believes that trees placed in a straight line (horizontally or vertically) create disharmony. She wants to identify such lines of trees and make a record of them. \n\nGiven the current layout of the garden, represented as a grid with 'T' representing a tree and '.' representing an empty cell, find the longest straight line of trees (either horizontal or vertical) in the garden. \n\nWrite a program to determine the length of the longest horizontal or vertical line of trees in the garden.\n\nInput\nThe first line contains an integer N denoting the size of the NxN grid (1 \u2264 N \u2264 1000). \nEach of the next N lines contains a string of length N consisting of characters 'T' and '.'.\n\nOutput\nPrint a single integer: the length of the longest straight line of trees in the grid.\n\nExample\nInput\n5\nT..T.\nTTTT.\nT.T.T\n..TTT\n.TT.T\n\nOutput\n4\n\nExplanation\nIn this example, the longest straight line of trees is the horizontal line of trees \"TTTT\" in the second row, which has a length of 4. There are no longer lines of trees either horizontally or vertically.\n\nImplement:\n`def longest_tree_line(n, grid):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Code_Contests_29605_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def maximum_path_sum(M, N, grid):\n    \"\"\"\n    Find the maximum path sum from any cell in the top row to any cell in the bottom row.\n    Moves allowed: down-left, down, down-right.\n    \"\"\"\n    if M == 0 or N == 0:\n        return 0\n    \n    # dp[i][j] represents the maximum path sum ending at cell (i, j)\n    # We can optimize space by using only two rows, but given constraints, \n    # a full DP table is fine (1000x1000 = 1e6 elements)\n    \n    # Initialize dp with the first row\n    dp = [row[:] for row in grid]\n    \n    # Fill the dp table for rows 1 to M-1\n    for i in range(1, M):\n        for j in range(N):\n            # The maximum value from the row above that can reach (i, j)\n            # From (i-1, j-1), (i-1, j), (i-1, j+1)\n            max_prev = 0\n            # Check left-diagonal: (i-1, j-1)\n            if j - 1 >= 0:\n                max_prev = max(max_prev, dp[i-1][j-1])\n            # Check straight up: (i-1, j)\n            max_prev = max(max_prev, dp[i-1][j])\n            # Check right-diagonal: (i-1, j+1)\n            if j + 1 < N:\n                max_prev = max(max_prev, dp[i-1][j+1])\n            \n            dp[i][j] = grid[i][j] + max_prev\n    \n    # The answer is the maximum value in the last row\n    return max(dp[M-1])\n",
+      "tests": "from solution import maximum_path_sum\n\ndef test_case_1():\n    M, N = 3, 3\n    grid = [\n        [1, 2, 3],\n        [4, 5, 6],\n        [7, 8, 9]\n    ]\n    assert maximum_path_sum(M, N, grid) == 18\n\ndef test_case_2():\n    M, N = 2, 2\n    grid = [\n        [1, 2],\n        [3, 4]\n    ]\n    assert maximum_path_sum(M, N, grid) == 6\n\ndef test_case_3():\n    M, N = 3, 4\n    grid = [\n        [1, 2, 3, 4],\n        [4, 5, 6, 7],\n        [7, 8, 9, 10]\n    ]\n    assert maximum_path_sum(M, N, grid) == 21\n\ndef test_case_4():\n    M, N = 1, 1\n    grid = [\n        [5]\n    ]\n    assert maximum_path_sum(M, N, grid) == 5\n\ndef test_case_5():\n    M, N = 3, 3\n    grid = [\n        [1, 2, 3],\n        [0, 0, 0],\n        [1, 2, 10]\n    ]\n    assert maximum_path_sum(M, N, grid) == 13",
+      "prompt": "<|im_start|>user\nGiven a grid of dimensions MxN, each cell in the grid contains an integer value representing the cost of entering that cell. Your task is to find the maximum path sum from any cell in the top row to any cell in the bottom row. You can move from a cell to any of the three cells directly below it (left-diagonal, down, right-diagonal) in the next row.\n\nInput:\n\nThe first line contains two integer values M and N, representing the number of rows and columns in the grid, respectively. Each of the next M lines contains N space-separated integers representing the cost values of the cells in the grid.\n\nOutput:\n\nPrint a single integer, the maximum path sum from any cell in the top row to any cell in the bottom row.\n\nConstraints:\n\n1 \u2264 M, N \u2264 1000\n\n1 \u2264 Cost of Cells \u2264 10^5\n\nSAMPLE INPUT\n3 3\n1 2 3\n4 5 6\n7 8 9\n\nSAMPLE OUTPUT\n18\n\nExplanation\n\nOne possible path achieving the maximum path sum is: \n- From (0,2) (top row, third column) with cost 3 \n- To (1,1) (second row, second column) with cost 5 \n- To (2,1) (bottom row, second column) with cost 8 \n\nThe maximum path sum is 3 + 5 + 8 = 16.\n\nImplement:\n`def maximum_path_sum(M, N, grid):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Algorithm_25474_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def merge_shifts(shifts):\n    if not shifts:\n        return []\n    \n    # Sort shifts by start time, then by end time for consistent ordering\n    sorted_shifts = sorted(shifts, key=lambda x: (x[0], x[1]))\n    \n    # Initialize merged list with the first shift\n    merged = [list(sorted_shifts[0])]\n    \n    for current in sorted_shifts[1:]:\n        last = merged[-1]\n        # If current shift starts before or at the end of the last merged shift,\n        # they overlap or are touching \u2014 merge them\n        if current[0] <= last[1]:\n            last[1] = max(last[1], current[1])\n        else:\n            merged.append(list(current))\n    \n    return [tuple(shift) for shift in merged]\n",
+      "tests": "from solution import merge_shifts\n\ndef test_no_overlapping_shifts():\n    assert merge_shifts([(9, 12), (13, 16)]) == [(9, 12), (13, 16)]\n\ndef test_one_shift_fully_within_another():\n    assert merge_shifts([(9, 12), (10, 11)]) == [(9, 12)]\n\ndef test_shifts_touching_boundaries():\n    assert merge_shifts([(9, 12), (12, 15)]) == [(9, 15)]\n    \ndef test_multiple_overlapping_shifts():\n    assert merge_shifts([(9, 12), (11, 14), (13, 16)]) == [(9, 16)]\n\ndef test_no_shifts():\n    assert merge_shifts([]) == []\n\ndef test_single_shift():\n    assert merge_shifts([(9, 12)]) == [(9, 12)]\n\ndef test_complex_overlaps():\n    assert merge_shifts([(1, 3), (2, 6), (8, 10), (15, 18), (17, 20)]) == [(1, 6), (8, 10), (15, 20)]\n    \ndef test_already_sorted_shifts():\n    assert merge_shifts([(1, 2), (2, 3), (3, 4)]) == [(1, 4)]\n    \ndef test_unordered_input_shifts():\n    assert merge_shifts([(5, 7), (1, 3), (2, 6)]) == [(1, 7)]\n    \ndef test_shifts_with_exactly_same_times():\n    assert merge_shifts([(1, 4), (1, 4)]) == [(1, 4)]",
+      "prompt": "<|im_start|>user\nEmployee Schedule Adjustment\n\nYou are tasked with developing an automated system for a company to manage its employees' work schedules. In this system, each employee is assigned a list of work shifts, represented as pairs of integers where the first integer is the start time and the second integer is the end time of the shift (24-hour format). Sometimes, the shifts overlap, and the goal is to merge overlapping shifts and provide a non-overlapping schedule for each employee.\n\n### Requirements\n1. **Function to Merge Shifts**: Write a function `merge_shifts` that takes a list of pairs of integers and returns a new list of pairs where overlapping shifts have been merged.\n    - **Input**:\n        - `shifts`: a list of tuples, where each tuple contains two integers representing the start and end times of a shift.\n    - **Output**:\n        - A list of tuples representing the merged, non-overlapping shifts.\n        \n### Constraints\n- The start and end times will be integers within the range [0, 23].\n- The list may contain between 1 and 100 shifts.\n- A shift always starts before it ends (start time < end time).\n\n### Example\n```python\nmerge_shifts([(9, 12), (11, 14), (16, 18), (18, 20)])\n```\nExpected Output:\n```python\n[(9, 14), (16, 20)]\n```\n\n### Notes\n- If a shift is within another shift, it should be merged into the outer shift.\n- Consider edge cases such as a shift that ends as another shift starts.\n- Ensure the returned list of shifts is sorted by start times for consistency.\n\nImplement:\n`def merge_shifts(shifts):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "tcode:kodcode:Taco_90181_I",
+      "source": "teacher-code",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def find(parent, i):\n    if parent[i] != i:\n        parent[i] = find(parent, parent[i])\n    return parent[i]\n\ndef union(parent, rank, x, y):\n    root_x = find(parent, x)\n    root_y = find(parent, y)\n    \n    if root_x == root_y:\n        return False\n    \n    if rank[root_x] < rank[root_y]:\n        parent[root_x] = root_y\n    elif rank[root_x] > rank[root_y]:\n        parent[root_y] = root_x\n    else:\n        parent[root_y] = root_x\n        rank[root_x] += 1\n    \n    return True\n\ndef minTollCost(N, M, roads):\n    # Sort roads by toll cost (third element)\n    roads.sort(key=lambda x: x[2])\n    \n    # Initialize parent and rank arrays\n    parent = list(range(N + 1))\n    rank = [0] * (N + 1)\n    \n    total_cost = 0\n    edges_used = 0\n    \n    for road in roads:\n        u, v, cost = road\n        if union(parent, rank, u, v):\n            total_cost += cost\n            edges_used += 1\n            if edges_used == N - 1:\n                break\n    \n    return total_cost\n",
+      "tests": "from solution import minTollCost\n\ndef test_minTollCost_example1():\n    N = 4\n    M = 5\n    roads = [[1, 2, 5], [1, 3, 10], [2, 3, 7], [2, 4, 4], [3, 4, 3]]\n    assert minTollCost(N, M, roads) == 12\n\ndef test_minTollCost_example2():\n    N = 3\n    M = 3\n    roads = [[1, 2, 2], [2, 3, 3], [1, 3, 4]]\n    assert minTollCost(N, M, roads) == 5\n    \ndef test_minTollCost_no_roads():\n    N = 1\n    M = 0\n    roads = []\n    assert minTollCost(N, M, roads) == 0\n    \ndef test_minTollCost_all_equal():\n    N = 4\n    M = 6\n    roads = [[1, 2, 1], [1, 3, 1], [1, 4, 1], [2, 3, 1], [2, 4, 1], [3, 4, 1]]\n    assert minTollCost(N, M, roads) == 3\n    \ndef test_minTollCost_large_values():\n    N = 3\n    M = 3\n    roads = [[1, 2, 10000], [2, 3, 10000], [1, 3, 9999]]\n    assert minTollCost(N, M, roads) == 19999",
+      "prompt": "<|im_start|>user\nIn a secluded village, there is a map consisting of N houses connected by M bidirectional roads. Each road has a certain toll associated with it. The villagers want to ensure that their village is well connected in such a way that the total toll cost is minimized. As an expert in algorithms, help the villagers to find the Minimum Toll Cost required to connect all houses.\n\nThe given map is represented as an undirected graph where each house is a node and each road is an edge with a specific toll cost. Use Kruskal's algorithm to find the minimum spanning tree that will connect all houses with the minimal toll cost.\n\nExample 1:\nInput:\nN = 4, M = 5\nroads = [[1, 2, 5], [1, 3, 10], [2, 3, 7], [2, 4, 4], [3, 4, 3]]\nOutput: 12\nExplanation:\nThe minimum toll cost to connect all houses (nodes) is 12. The selected roads are (3, 4), (2, 4), and (1, 2).\n\nExample 2:\nInput:\nN = 3, M = 3\nroads = [[1, 2, 2], [2, 3, 3], [1, 3, 4]]\nOutput: 5\nExplanation:\nThe minimum toll cost to connect all houses (nodes) is 5. The selected roads are (1, 2) and (2, 3).\n\nYour Task:\nYou don't need to read input or print anything. Your task is to complete the function `minTollCost()` which takes the number of houses N, the number of roads M, and the list of roads with their toll costs as input parameters and returns the minimum toll cost to connect all houses.\n\nConstraints:\n1 \u2264 N \u2264 10^4\n1 \u2264 M \u2264 5*10^4\n1 \u2264 toll cost \u2264 10^4\n\nImplement:\n`def find(parent, i):`\n`def union(parent, rank, x, y):`\n`def minTollCost(N, M, roads):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_23100_I:greedy",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": true,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def lookup_max_value(lst):\n    \"\"\"\n    Return the maximum integer value in a list of integers.\n    If the list is empty, return None.\n    \"\"\"\n    if not lst:\n        return None\n\n    max_value = lst[0]\n    for value in lst[1:]:\n        if value > max_value:\n            max_value = value\n    return max_value\n",
+      "tests": "from solution import lookup_max_value\n\ndef test_lookup_max_value_empty_list():\n    assert lookup_max_value([]) == None\n\ndef test_lookup_max_value_single_element_list():\n    assert lookup_max_value([5]) == 5\n\ndef test_lookup_max_value_multi_element_list():\n    assert lookup_max_value([5, 3, 9, 1, 7]) == 9\n\ndef test_lookup_max_value_list_with_negative_numbers():\n    assert lookup_max_value([-3, -5, -1]) == -1",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nI need a lookup function that will allow me to get the maximum integer value in a list of integers, which works even when the list is empty. \nCan't use built in max() function. \n\nHere are some test cases:\ntest_lookup_max_value_empty_list()\ntest_lookup_max_value_single_element_list()\ntest_lookup_max_value_multi_element_list()\ntest_lookup_max_value_list_with_negative_numbers() \n\nHere is the test code:\n```python\nimport unittest\n\nclass TestMaxValueLookup(unittest.TestCase):\n\n    def test_lookup_max_value_empty_list(self):\n        self.assertEqual(lookup_max_value([]), None)\n\n    def test_lookup_max_value_single_element_list(self):\n        self.assertEqual(lookup_max_value([5]), 5)\n\n    def test_lookup_max_value_multi_element_list(self):\n        self.assertEqual(lookup_max_value([5, 3, 9, 1, 7]), 9)\n\n    def test_lookup_max_value_list_with_negative_numbers(self):\n        self.assertEqual(lookup_max_value([-3, -5, -1]), -1)\n\nif __name__ == '__main__':\n    unittest.main()\n```\n\nHow do I solve this?\n\nImplement:\n`def lookup_max_value(lst):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "passed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_21973_I:greedy",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": true,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "def duplicate_count(text=''):\n    \"\"\"\n    This function takes a string of words as an input and returns the number of words present in the string without considering duplicates.\n\n    Parameters:\n    text (str): The input string containing words. Default value is an empty string.\n\n    Returns:\n    int: The number of unique words in the input string.\n    \"\"\"\n    # Check if the input string is None\n    if text is None:\n        return 0\n    \n    # Split the input string into a list of words\n    words = text.split()\n    \n    # Convert the list of words into a set to remove duplicates\n    unique_words = set(words)\n    \n    # Return the number of unique words\n    return len(unique_words)\n",
+      "tests": "from solution import duplicate_count\n\ndef test_duplicate_count_with_duplicates():\n    assert duplicate_count(\"apple apple banana\") == 2\n\ndef test_duplicate_count_all_unique():\n    assert duplicate_count(\"one two three four\") == 4\n\ndef test_duplicate_count_single_word():\n    assert duplicate_count(\"unique\") == 1\n\ndef test_duplicate_count_empty_string():\n    assert duplicate_count(\"\") == 0\n\ndef test_duplicate_count_none():\n    assert duplicate_count(None) == 0\n\ndef test_duplicate_count_with_punctuation():\n    assert duplicate_count(\"hello, world! hello.\") == 3\n\ndef test_duplicate_count_mixed_case():\n    assert duplicate_count(\"Hello hello HELLO\") == 3",
+      "prompt": "<|im_start|>user\nCreate a function called `duplicate_count` which takes a string of words as an input and returns the number of words present in the string without considering duplicates.\n\n### Example Test Case\n\n* `duplicate_count(\"apple apple banana\")` should return `2` because there are only `2` unique words: `\"apple\"` and `\"banana\"`.\n\n### Parameters\n\n* `text`: The input string containing words. Default value is an empty string.\n\n### Returns\n\n* The number of unique words in the input string.\n\n### Code\n\n```python\ndef duplicate_count(text):\n    \"\"\"\n    This function takes a string of words as an input and returns the number of words present in the string without considering duplicates.\n\n    Parameters:\n    text (str): The input string containing words. Default value is an empty string.\n\n    Returns:\n    int: The number of unique words in the input string.\n    \"\"\"\n    # Split the input string into a list of words\n    words = text.split()\n    \n    # Convert the list of words into a set to remove duplicates\n    unique_words = set(words)\n    \n    # Return the number of unique words\n    return len(unique_words)\n\n# Test the function\nprint(duplicate_count(\"apple apple banana\"))\n```\n\nHere is the code execution result:\n```\n2\n```\n\nNow, I need to handle the case when the input string is \"null\" or \"undefined\" in Python. In other words, I need to check if the input string is `None` before calling the `split()` function. \n\nHow can I do this?\n\nImplement:\n`def duplicate_count(text=''):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Taco_92299_I:s1",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns",
+        "comparison_boundary"
+      ],
+      "solution": "def minimal_new_items(n: int, k: int, items: list) -> int:\n    unique = len(set(items))\n    if unique > k:\n        # already more unique items than k; minimum is 1\n        return 1\n    return k - unique\n",
+      "tests": "from solution import minimal_new_items\n\ndef test_example1():\n    assert minimal_new_items(5, 3, [1, 2, 2, 3, 1]) == 0\n\ndef test_example2():\n    assert minimal_new_items(4, 6, [1, 2, 3, 4]) == 2\n\ndef test_example3():\n    assert minimal_new_items(3, 2, [5, 5, 5]) == 1\n\ndef test_no_new_items():\n    assert minimal_new_items(7, 5, [1, 2, 3, 4, 3, 2, 1]) == 1\n\ndef test_exact_unique_items():\n    assert minimal_new_items(5, 5, [1, 2, 3, 4, 5]) == 0\n\ndef test_all_items_same():\n    assert minimal_new_items(5, 2, [1, 1, 1, 1, 1]) == 1",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nMaria loves to collect unique items. She has an initial collection of items represented as an array of integers. Each integer in the array represents a different item type. Maria wants to add a minimal number of new items to her collection so that she has exactly k unique items in total.\n\nWrite a program to help Maria determine the minimum number of new items she needs to add to her collection.\n\nInput\n\nThe first line contains two integers n and k (1 \u2264 n, k \u2264 1000). The second line contains n space-separated integers a1, a2, ..., an (1 \u2264 ai \u2264 1000).\n\nOutput\n\nA single integer \u2014 the minimum number of new items Maria needs to add to her collection to have exactly k unique items.\n\nExamples\n\nInput\n\n5 3\n1 2 2 3 1\n\nOutput\n\n0\n\nInput\n\n4 6\n1 2 3 4\n\nOutput\n\n2\n\nInput\n\n3 2\n5 5 5\n\nOutput\n\n1\n\nNote\n\nIn the first example, Maria already has 3 unique items (1, 2, and 3) in her collection, so she does not need to add any new items.\n\nIn the second example, Maria has 4 unique items (1, 2, 3, and 4) and needs to add 2 additional unique items to reach a total of 6 unique items.\n\nIn the third example, Maria only has 1 unique item (5) and needs to add 1 more unique item to have at least 2 unique items in total.\n\nImplement:\n`def minimal_new_items(n, k, items):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed",
+        "comparison_boundary": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_62706_I:s0",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "import smtplib\n\n\ndef send_mass_email(smtp_server, port, login, password, sender_email, subject, body, recipient_list):\n    \"\"\"\n    Send a mass email to multiple recipients using SMTP.\n\n    Args:\n        smtp_server: SMTP server address (e.g., 'smtp.example.com').\n        port: SMTP server port (default 587 for TLS).\n        login: SMTP username.\n        password: SMTP password.\n        sender_email: Sender email address.\n        subject: Email subject line.\n        body: Email body content.\n        recipient_list: List of recipient email addresses.\n\n    Returns:\n        bool: True if the email was sent successfully, False otherwise.\n    \"\"\"\n    recipients = recipient_list if recipient_list else []\n\n    if not recipients:\n        return False\n\n    try:\n        server = smtplib.SMTP(smtp_server, port)\n        server.set_debuglevel(0)\n        server.starttls()\n        server.login(login, password)\n        server.sendmail(sender_email, recipients, (subject, body))\n        return True\n    except Exception as e:\n        print(f\"Failed to send email: {e}\")\n        return False\n",
+      "tests": "import pytest\n\n@pytest.fixture\ndef mock_smtp(monkeypatch):\n    class MockSMTP:\n        def __init__(self, *args, **kwargs):\n            pass\n        def starttls(self):\n            pass\n        def login(self, *args, **kwargs):\n            pass\n        def sendmail(self, *args, **kwargs):\n            pass\n        def quit(self):\n            pass\n\n    monkeypatch.setattr(\"smtplib.SMTP\", MockSMTP)\n\ndef test_send_mass_email(mock_smtp):\n    from solution import send_mass_email\n\n    smtp_server = \"smtp.example.com\"\n    port = 587\n    login = \"user@example.com\"\n    password = \"password\"\n    sender_email = \"noreply@example.com\"\n    subject = \"Test Event\"\n    body = \"You are invited to the test event.\"\n    recipient_list = [\"recipient1@example.com\", \"recipient2@example.com\"]\n\n    # This test only ensures that the code runs without error with mock SMTP\n    send_mass_email(smtp_server, port, login, password, sender_email, subject, body, recipient_list)",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nHow can I invite multiple users to an event or group in a mass email using Python?\n\nImplement:\n`def send_mass_email(smtp_server, port, login, password, sender_email, subject, body, recipient_list):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "passed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Code_Contests_32679_I:s1",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "def longest_good_string_length(s):\n    \"\"\"\n    Given a string s, find the length of the longest good string that can be obtained\n    by removing some characters from s.\n    \n    A good string consists of only one type of character.\n    \"\"\"\n    if not s:\n        return 0\n    \n    # Count the frequency of each character in s\n    char_counts = {}\n    for char in s:\n        char_counts[char] = char_counts.get(char, 0) + 1\n    \n    # Find the maximum frequency (the longest run of a single character)\n    max_freq = max(char_counts.values())\n    \n    return max_freq\n",
+      "tests": "from solution import longest_good_string_length\n\ndef test_all_same_characters():\n    assert longest_good_string_length(\"aaa\") == 3\n\ndef test_example_case_1():\n    assert longest_good_string_length(\"aabbccc\") == 3\n\ndef test_example_case_2():\n    assert longest_good_string_length(\"abcd\") == 1\n\ndef test_empty_string():\n    assert longest_good_string_length(\"\") == 0\n\ndef test_single_character_string():\n    assert longest_good_string_length(\"a\") == 1\n\ndef test_mixed_characters():\n    assert longest_good_string_length(\"aabbbcccc\") == 4\n\ndef test_long_string():\n    assert longest_good_string_length(\"a\" * 50000 + \"b\" * 50000) == 50000\n\ndef test_case_insensitivity():\n    assert longest_good_string_length(\"AaBbCc\") == 1  # since 'A', 'B', 'C' and 'a', 'b', 'c' are different based on ASCII",
+      "prompt": "<|im_start|>user\nA good string is a string that contains only one type of character. For example, \"aaaa\" is a good string because it consists only of character 'a'. Given a string s, we can remove some of its characters to obtain another string t. Find the length of the longest good string that can be obtained from the string s by removing some (possibly none) characters.\n\nInput\n\nThe first line contains the string s consisting of lowercase English letters. The length of the string s lies within the range 1 to 100,000.\n\nOutput\n\nPrint a single integer \u2014 the length of the longest good string that can be obtained from the string s.\n\nExamples\n\nInput\n\naabbccc\n\nOutput\n\n3\n\nInput\n\nabcd\n\nOutput\n\n1\n\nImplement:\n`def longest_good_string_length(s):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Prefill_8703_I:s0",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "def union_lists(list1, list2):\n    return list(set(list1) | set(list2))\n",
+      "tests": "from solution import union_lists\n\ndef test_union_with_no_common_elements():\n    assert union_lists([1, 2, 3], [4, 5, 6]) == [1, 2, 3, 4, 5, 6]\n\ndef test_union_with_some_common_elements():\n    assert union_lists([1, 2, 3], [3, 4, 5]) == [1, 2, 3, 4, 5]\n\ndef test_union_with_identical_elements():\n    assert union_lists([1, 2, 3], [1, 2, 3]) == [1, 2, 3]\n\ndef test_union_with_empty_list():\n    assert union_lists([], [1, 2, 3]) == [1, 2, 3]\n    assert union_lists([1, 2, 3], []) == [1, 2, 3]\n\ndef test_union_with_both_empty_lists():\n    assert union_lists([], []) == []\n\ndef test_union_with_repeated_elements():\n    assert union_lists([1, 1, 2, 2, 3, 3], [3, 3, 4, 4, 5, 5]) == [1, 2, 3, 4, 5]",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nWrite a function to find the union of two lists of integers. The union of two lists is a list containing all the unique elements that appear in either of the lists.\n\nImplement:\n`def union_lists(list1, list2):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_64196_I:greedy",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "import random\nimport string\n\ndef generate_username():\n    return ''.join(random.choice(string.ascii_uppercase) for _ in range(2)) + ''.join(random.choice('0123456789') for _ in range(4)) + ''.join(random.choice(string.ascii_uppercase) for _ in range(3))\n",
+      "tests": "from solution import generate_username\nimport re\n\ndef test_generate_username_format():\n    username = generate_username()\n    assert re.match(r'^[A-Z]{2}[0-9]{4}[A-Z]{3}$', username)\n\ndef test_generate_username_randomness():\n    usernames = {generate_username() for _ in range(1000)}\n    assert len(usernames) == 1000\n    \ndef test_generate_username_uppercase_letters():\n    username = generate_username()\n    assert username[:2].isupper()\n    assert username[6:].isupper()\n\ndef test_generate_username_digits():\n    username = generate_username()\n    assert username[2:6].isdigit()",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nI need to create a software that can generate random usernames. These usernames should be a combination of letters and numbers, with a specific format. The format should be two uppercase letters, followed by four digits, and then three uppercase letters. This format is [AA1111AAA]. How can I write a code to generate these usernames in Python?\n\nImplement:\n`def generate_username():`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Prefill_10208_I:greedy",
+      "source": "r8-code-short-w8",
+      "selected_gradient_sample": false,
+      "original_verified": "passed",
+      "variants": [
+        "served",
+        "null_returns"
+      ],
+      "solution": "def array_sum(arr):\n    return sum(arr)\n",
+      "tests": "from solution import array_sum\n\ndef test_array_sum_empty():\n    assert array_sum([]) == 0\n\ndef test_array_sum_positive_numbers():\n    assert array_sum([1, 2, 3, 4, 5]) == 15\n\ndef test_array_sum_negative_numbers():\n    assert array_sum([-1, -2, -3, -4, -5]) == -15\n\ndef test_array_sum_mixed_sign_numbers():\n    assert array_sum([-1, 2, -3, 4, -5]) == -3\n\ndef test_array_sum_single_element():\n    assert array_sum([10]) == 10\n\ndef test_array_sum_floats():\n    assert array_sum([1.5, 2.5, 3.5, 4.5]) == 12.0",
+      "prompt": "<|im_start|>system\nReasoning effort is set to xhigh. Please think carefully through the task, validate key assumptions, consider plausible alternatives, and prioritize correctness, consistency, and clarity in the final answer.<|im_end|>\n<|im_start|>user\nWrite a function to calculate the sum of elements in a single-dimensional array in Python. Name the function as `array_sum` and it should take one parameter, which is the array. Your function should return the sum of all elements in the array.\n\nImplement:\n`def array_sum(arr):`\n\nGive the complete solution in a single ```python code block.<|im_end|>\n<|im_start|>assistant\n<think>\n",
+      "served_extraction_matches_historical_last": true,
+      "statuses": {
+        "served": "passed",
+        "null_returns": "failed"
+      }
+    }
+  ],
+  "counts": {
+    "passed": 18,
+    "failed": 22,
+    "timeout": 1
+  },
+  "caveats": [
+    "Surviving comparison mutations may be equivalent; manual review is required.",
+    "Existing tests are reexecuted; passing is not a completeness guarantee.",
+    "No source label, frozen result or cached teacher target changed."
+  ]
+}

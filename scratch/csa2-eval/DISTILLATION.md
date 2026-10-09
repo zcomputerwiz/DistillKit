@@ -1,5 +1,17 @@
 # Distilling the converted 2B against the cached teacher (2026-09-21)
 
+2026-10-09 follow-up (Assisted-by: Codex): the current completion candidate remains
+experimental and long1-u50 remains the reference. The
+[replay assessment](CODE_DATASET_ASSESSMENT.md),
+[reconstruction-loss research](OMNIQUANT_RMSE_ASSESSMENT.md), and completed
+[execution/target/optimizer influence audit](INFLUENCE_AUDIT_RESULTS.md) record
+the current next-phase decisions. No new training stage was launched by the
+audit. Before the next preservation stage, resolve selection-only indexer query
+decay and requalify the confirmed weak-test email target; prioritize diverse
+executed aggregation paths and verified code rather than automatic loss
+equalization. Conversational context remains masked; benchmark exclusions remain
+limited to confirmed matching tasks.
+
 The conversion screen left two regressions. Control tokens had been destroyed by 30M
 tokens of cross-entropy on the `dense_gr` code corpus, which carries none of this
 tokenizer's protocol tokens. MMLU had fallen 12.5 points to the conversion itself, and

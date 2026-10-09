@@ -1,5 +1,20 @@
 # HybridModel / DistillKit fork — status & handoff (updated 2026-09-09)
 
+## Current hybrid student follow-up (2026-10-09)
+
+Assisted-by: Codex
+
+The older sidecar history below is preserved. Current hybrid training/evaluation
+decisions are in [DISTILLATION.md](scratch/csa2-eval/DISTILLATION.md) and the
+[completed influence audit](scratch/csa2-eval/INFLUENCE_AUDIT_RESULTS.md).
+The completion candidate is experimental; long1-u50 remains the reference.
+Execution/target checks and discarded fresh/saved optimizer steps are complete,
+with 30 focused tests passing and no detected GPU spill. No new training stage
+was launched. Broader verified code and executed aggregation trajectories remain
+the next-phase priority. The audit flags zero-gradient indexer query decay and
+one weak-test email target for resolution before that phase; it does not support
+automatically rooting or equalizing the existing losses.
+
 This is the continuation/handoff record for the DistillKit n-gram-sidecar fork in
 `D:\DeepThought\Projects\HybridModel\DistillKit`. It began as a log of Claude's
 unfinished GGUF provider + verification work and has grown into the authoritative

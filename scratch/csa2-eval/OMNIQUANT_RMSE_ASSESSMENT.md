@@ -7,6 +7,12 @@ checkpoint, model implementation or replay policy changed. The user clarified
 that the interest is transferable concepts for handling outliers, rather than
 directly adopting RMSE.
 
+2026-10-09 follow-up: the requested execution/target/full-gradient/copied-optimizer
+checks are complete. See [the influence audit](INFLUENCE_AUDIT_RESULTS.md).
+The sampled combined updates improve code NLL; automatic root-loss balancing is
+not supported. The audit found one weak-test target and zero-gradient indexer
+query decay that should be addressed before the next preservation stage.
+
 ## Decision
 
 Borrow the principle of measuring and limiting disproportionate influence at a

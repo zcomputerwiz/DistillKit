@@ -1,0 +1,1725 @@
+{
+  "version": 1,
+  "purpose": "discarded diagnostics; no training or promotion",
+  "checkpoint": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\completion\\checkpoints\\smoke-r1-1-gr-s25-csa2",
+  "state": "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\completion\\checkpoints\\state-step-00000040",
+  "replay": [
+    {
+      "doc_id": "claude-code:s78dceaea77f2662685b5981d",
+      "source": "agent-smol-a",
+      "width": 16384,
+      "targets": 554.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 14.0,
+          "ce_weight": 7.0,
+          "kl_weight": 7.0,
+          "teacher_top1_correct_weight": 7.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 2.0,
+          "ce_weight": 1.0,
+          "kl_weight": 1.0,
+          "teacher_top1_correct_weight": 1.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 268.0,
+          "ce_weight": 134.0,
+          "kl_weight": 134.0,
+          "teacher_top1_correct_weight": 113.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 270.0,
+          "ce_weight": 135.0,
+          "kl_weight": 135.0,
+          "teacher_top1_correct_weight": 128.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9887036085128784,
+      "max_captured_mass": 1.0001634359359741,
+      "input_sha256": "c9a888e4b0554a6b65d642bee283259590939763a0928500f84f84d434810679",
+      "coefficient": 0.023442711937447427,
+      "preservation": false
+    },
+    {
+      "doc_id": "codex:s0abe2c150aaa2af9c6ec3c4d",
+      "source": "agent-smol-b",
+      "width": 8192,
+      "targets": 677.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 30.0,
+          "ce_weight": 15.0,
+          "kl_weight": 15.0,
+          "teacher_top1_correct_weight": 13.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 158.0,
+          "ce_weight": 79.0,
+          "kl_weight": 79.0,
+          "teacher_top1_correct_weight": 68.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 144.0,
+          "ce_weight": 72.0,
+          "kl_weight": 72.0,
+          "teacher_top1_correct_weight": 63.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 345.0,
+          "ce_weight": 172.5,
+          "kl_weight": 172.5,
+          "teacher_top1_correct_weight": 168.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9940848350524902,
+      "max_captured_mass": 1.0002951622009277,
+      "input_sha256": "bd7f0d1f04e3f66379e13be801073212305878567748f7c46812b2b4de545905",
+      "coefficient": 0.0822494229964406,
+      "preservation": false
+    },
+    {
+      "doc_id": "curriculum:subtract:2411",
+      "source": "curriculum-v4-w8",
+      "width": 256,
+      "targets": 107.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 14.0,
+          "ce_weight": 7.0,
+          "kl_weight": 7.0,
+          "teacher_top1_correct_weight": 5.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 89.0,
+          "ce_weight": 44.5,
+          "kl_weight": 44.5,
+          "teacher_top1_correct_weight": 37.0,
+          "teacher_actual_absent_weight": 1.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.8059582114219666,
+      "max_captured_mass": 1.0001130104064941,
+      "input_sha256": "128c6a09ae4114e80975c79ff943a1b74caf392036f9959c8550e18ce187c2dc",
+      "coefficient": 0.02642096190740595,
+      "preservation": false
+    },
+    {
+      "doc_id": "Magicoder-OSS:1298",
+      "source": "expand-code-w8",
+      "width": 512,
+      "targets": 237.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 232.0,
+          "ce_weight": 116.0,
+          "kl_weight": 116.0,
+          "teacher_top1_correct_weight": 93.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.5
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 0.5,
+          "kl_weight": 0.5,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9303470253944397,
+      "max_captured_mass": 1.0000709295272827,
+      "input_sha256": "79c00ae7414dce77e714adbc54365dcc531bc67c8a9257e01194244099cf1577",
+      "coefficient": 0.05946658766103268,
+      "preservation": false
+    },
+    {
+      "doc_id": "code-raw:code:pandas:5",
+      "source": "frontier-code-raw",
+      "width": 8192,
+      "targets": 8191.0,
+      "ce_only": false,
+      "kl_only": true,
+      "roles": {
+        "structure": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 8191.0,
+          "ce_weight": 0.0,
+          "kl_weight": 8191.0,
+          "teacher_top1_correct_weight": 7057.0,
+          "teacher_actual_absent_weight": 54.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.26897311210632324,
+      "max_captured_mass": 1.000821590423584,
+      "input_sha256": "1433d04d56e4445131afee4c6c26a868a4c221cea1d22545e90dafd68970b9ba",
+      "coefficient": 0.11202467130479463,
+      "preservation": true
+    },
+    {
+      "doc_id": "code-raw:code:tensorboard:10",
+      "source": "frontier-code-raw",
+      "width": 8192,
+      "targets": 8191.0,
+      "ce_only": false,
+      "kl_only": true,
+      "roles": {
+        "structure": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 8191.0,
+          "ce_weight": 0.0,
+          "kl_weight": 8191.0,
+          "teacher_top1_correct_weight": 7347.0,
+          "teacher_actual_absent_weight": 27.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.26897311210632324,
+      "max_captured_mass": 1.0002086162567139,
+      "input_sha256": "7b778c299e712cd998e0ef8197e5cf7fd498bf359af84320d6a44dda4bca496b",
+      "coefficient": 0.11202467130479463,
+      "preservation": true
+    },
+    {
+      "doc_id": "code-raw:code:torch:27",
+      "source": "frontier-code-raw",
+      "width": 8192,
+      "targets": 8191.0,
+      "ce_only": false,
+      "kl_only": true,
+      "roles": {
+        "structure": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 8191.0,
+          "ce_weight": 0.0,
+          "kl_weight": 8191.0,
+          "teacher_top1_correct_weight": 6167.0,
+          "teacher_actual_absent_weight": 154.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.26897311210632324,
+      "max_captured_mass": 1.0005110502243042,
+      "input_sha256": "204e4115999728fa632c6c53de61891b0b4fbaa8ed5304bf5b988b29b8612647",
+      "coefficient": 0.11202467130479463,
+      "preservation": true
+    },
+    {
+      "doc_id": "qa:code:numpy:11",
+      "source": "frontier-qa2",
+      "width": 10624,
+      "targets": 4344.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 264.0,
+          "ce_weight": 132.0,
+          "kl_weight": 132.0,
+          "teacher_top1_correct_weight": 132.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 4056.0,
+          "ce_weight": 2028.0,
+          "kl_weight": 2028.0,
+          "teacher_top1_correct_weight": 1628.0,
+          "teacher_actual_absent_weight": 4.0,
+          "premature_stop_weight": 4.0
+        },
+        "thinking": {
+          "targets": 24.0,
+          "ce_weight": 12.0,
+          "kl_weight": 12.0,
+          "teacher_top1_correct_weight": 11.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9489399194717407,
+      "max_captured_mass": 1.0001280307769775,
+      "input_sha256": "0f434c1b915260d618755ccb4813143424ca9e81f36a864c0993d25e8f355fc1",
+      "coefficient": 0.03289749018990358,
+      "preservation": false
+    },
+    {
+      "doc_id": "tools:tools:134:no_call:1",
+      "source": "frontier-tools",
+      "width": 640,
+      "targets": 128.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 123.0,
+          "ce_weight": 61.5,
+          "kl_weight": 61.5,
+          "teacher_top1_correct_weight": 45.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.5
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 0.5,
+          "kl_weight": 0.5,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.983269453048706,
+      "max_captured_mass": 1.0000896453857422,
+      "input_sha256": "5f4e6250002f852dc53a9aa296faeabe09fa922b3ab455adcdfe194eff23f986",
+      "coefficient": 0.01770996921266466,
+      "preservation": false
+    },
+    {
+      "doc_id": "code:code-3334938:0",
+      "source": "general-pilot-w8",
+      "width": 1024,
+      "targets": 1023.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 1023.0,
+          "ce_weight": 511.5,
+          "kl_weight": 511.5,
+          "teacher_top1_correct_weight": 441.5,
+          "teacher_actual_absent_weight": 9.5,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.25200143456459045,
+      "max_captured_mass": 1.000211238861084,
+      "input_sha256": "4f13afc2fa6904c587eaaf123b1a88fb5538f247a06c14f248cac3069a383138",
+      "coefficient": 0.06760990001367405,
+      "preservation": false
+    },
+    {
+      "doc_id": "long3-u50:126",
+      "source": "loop-check",
+      "width": 4096,
+      "targets": 3963.0,
+      "ce_only": false,
+      "kl_only": true,
+      "roles": {
+        "structure": {
+          "targets": 2.0,
+          "ce_weight": 0.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 3961.0,
+          "ce_weight": 0.0,
+          "kl_weight": 3263.0,
+          "teacher_top1_correct_weight": 3056.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9798339605331421,
+      "max_captured_mass": 1.0003916025161743,
+      "input_sha256": "6126a5ab488a4b6805d315cff14898fc9a404cd788a5d38f4507054de8af1696",
+      "coefficient": 0.038215867701474726,
+      "preservation": false
+    },
+    {
+      "doc_id": "onpolicy:gsm8k:3022:s1",
+      "source": "onpolicy-r6-loop",
+      "width": 1152,
+      "targets": 1029.0,
+      "ce_only": false,
+      "kl_only": true,
+      "roles": {
+        "structure": {
+          "targets": 3.0,
+          "ce_weight": 0.0,
+          "kl_weight": 3.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 1025.0,
+          "ce_weight": 0.0,
+          "kl_weight": 973.0,
+          "teacher_top1_correct_weight": 859.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 0.0,
+          "kl_weight": 1.0,
+          "teacher_top1_correct_weight": 1.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.988510251045227,
+      "max_captured_mass": 1.0002228021621704,
+      "input_sha256": "19b3b4dabd3369161b26e5d7aaccb223ebf201ff19a130d8f9eb064041d71b62",
+      "coefficient": 0.02951937778919584,
+      "preservation": false
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_23100_I:greedy",
+      "source": "r8-code-short-w8",
+      "width": 640,
+      "targets": 213.0,
+      "ce_only": true,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 4.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 146.0,
+          "ce_weight": 146.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 63.0,
+          "ce_weight": 63.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9427546858787537,
+      "max_captured_mass": 1.0001486539840698,
+      "input_sha256": "50e9e0cd0d1bb1c3a607253f78761100578bac9d56daddff7a136d1d513a770f",
+      "coefficient": 0.009398863227884292,
+      "preservation": true
+    },
+    {
+      "doc_id": "onpolicy:kodcode:Filter_21973_I:greedy",
+      "source": "r8-code-short-w8",
+      "width": 640,
+      "targets": 171.0,
+      "ce_only": true,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 4.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 166.0,
+          "ce_weight": 166.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 1.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9998140931129456,
+      "max_captured_mass": 1.000016689300537,
+      "input_sha256": "7ce5629487f4bb9bab0d9b329136583cbde15e8e289a07a6d0fd517f98b2cf82",
+      "coefficient": 0.0075455662533718965,
+      "preservation": true
+    },
+    {
+      "doc_id": "tcode:kodcode:Taco_90756_I",
+      "source": "teacher-code",
+      "width": 1152,
+      "targets": 765.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 166.0,
+          "ce_weight": 83.0,
+          "kl_weight": 83.0,
+          "teacher_top1_correct_weight": 78.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 595.0,
+          "ce_weight": 297.5,
+          "kl_weight": 297.5,
+          "teacher_top1_correct_weight": 289.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9986991882324219,
+      "max_captured_mass": 1.0002213716506958,
+      "input_sha256": "7bcf62b6e614e1c8e4a7a3d5bd8c5f6892b3f8c5c3856d949edbe923a436a552",
+      "coefficient": 0.014998489218926117,
+      "preservation": true
+    },
+    {
+      "doc_id": "tcode:kodcode:Code_Contests_28997_I",
+      "source": "teacher-code",
+      "width": 2048,
+      "targets": 1486.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 525.0,
+          "ce_weight": 262.5,
+          "kl_weight": 262.5,
+          "teacher_top1_correct_weight": 250.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 957.0,
+          "ce_weight": 478.5,
+          "kl_weight": 478.5,
+          "teacher_top1_correct_weight": 466.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9995440244674683,
+      "max_captured_mass": 1.0002630949020386,
+      "input_sha256": "f470e64e820ae8f357c79b3acee66d8a31142fe0580ad5795c7fe18d00613dcb",
+      "coefficient": 0.029134320234410732,
+      "preservation": true
+    },
+    {
+      "doc_id": "tcode:kodcode:Leetcode_5444_I",
+      "source": "teacher-code",
+      "width": 640,
+      "targets": 458.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.5
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 453.0,
+          "ce_weight": 226.5,
+          "kl_weight": 226.5,
+          "teacher_top1_correct_weight": 216.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 0.5,
+          "kl_weight": 0.5,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9988356232643127,
+      "max_captured_mass": 1.0001901388168335,
+      "input_sha256": "9bd7c5aca040978979d476a6ff03e36c7240919957df86858d6d53430454a0da",
+      "coefficient": 0.008979487663095635,
+      "preservation": true
+    },
+    {
+      "doc_id": "tgen:math:prealgebra:720#0",
+      "source": "teacher-math-gen",
+      "width": 384,
+      "targets": 318.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.5
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 167.0,
+          "ce_weight": 83.5,
+          "kl_weight": 83.5,
+          "teacher_top1_correct_weight": 83.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 147.0,
+          "ce_weight": 73.5,
+          "kl_weight": 73.5,
+          "teacher_top1_correct_weight": 72.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9997867345809937,
+      "max_captured_mass": 1.0000531673431396,
+      "input_sha256": "458816f9521f668243fca7d92cb83b3fb041ad220229f9f64d0f87e35c3215a3",
+      "coefficient": 0.0840964559343314,
+      "preservation": false
+    },
+    {
+      "doc_id": "tnothink:math:prealgebra:225#0",
+      "source": "teacher-nothink-math",
+      "width": 512,
+      "targets": 397.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 392.0,
+          "ce_weight": 196.0,
+          "kl_weight": 196.0,
+          "teacher_top1_correct_weight": 192.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 1.0,
+          "ce_weight": 0.5,
+          "kl_weight": 0.5,
+          "teacher_top1_correct_weight": 0.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9997676014900208,
+      "max_captured_mass": 1.000162959098816,
+      "input_sha256": "dd888d52a0fab820a2f33b80f5685cb8cb16d413596e24da3996e365a71b1dc4",
+      "coefficient": 0.05030911644905588,
+      "preservation": false
+    },
+    {
+      "doc_id": "05f6eab0b9238aaddc2aec417b422e43:tf",
+      "source": "think-first-w8",
+      "width": 512,
+      "targets": 216.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 1.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 57.0,
+          "ce_weight": 28.5,
+          "kl_weight": 28.5,
+          "teacher_top1_correct_weight": 22.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 155.0,
+          "ce_weight": 77.5,
+          "kl_weight": 77.5,
+          "teacher_top1_correct_weight": 56.0,
+          "teacher_actual_absent_weight": 0.5,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9715042114257812,
+      "max_captured_mass": 1.000243902206421,
+      "input_sha256": "391287c76d557545bae969ea52c2158e6e77b6f420f1ae17182d4badbb091904",
+      "coefficient": 0.035697563118181105,
+      "preservation": false
+    },
+    {
+      "doc_id": "think:sft_code:2d91b72be9c09a8ba0bafe1d917ac286",
+      "source": "thinking-w8",
+      "width": 896,
+      "targets": 563.0,
+      "ce_only": false,
+      "kl_only": false,
+      "roles": {
+        "structure": {
+          "targets": 4.0,
+          "ce_weight": 2.0,
+          "kl_weight": 2.0,
+          "teacher_top1_correct_weight": 2.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "system": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "user": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-result": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "assistant": {
+          "targets": 447.0,
+          "ce_weight": 223.5,
+          "kl_weight": 223.5,
+          "teacher_top1_correct_weight": 209.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "thinking": {
+          "targets": 112.0,
+          "ce_weight": 56.0,
+          "kl_weight": 56.0,
+          "teacher_top1_correct_weight": 40.5,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "tool-call": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        },
+        "plain": {
+          "targets": 0.0,
+          "ce_weight": 0.0,
+          "kl_weight": 0.0,
+          "teacher_top1_correct_weight": 0.0,
+          "teacher_actual_absent_weight": 0.0,
+          "premature_stop_weight": 0.0
+        }
+      },
+      "min_captured_mass": 0.9727059602737427,
+      "max_captured_mass": 1.0002063512802124,
+      "input_sha256": "e29018f24e6503a353b4893855a0eb91fb0821d8036b441ec49af2a4105da5ca",
+      "coefficient": 0.04623383457711958,
+      "preservation": false
+    }
+  ],
+  "pair_ids": [
+    "completion-v2:train:aggregate:2:turn:0",
+    "completion-v2:train:aggregate_overlap:4:turn:0",
+    "completion-v2:train:recover_checked:2:turn:0",
+    "completion-v2:train:timeout_pending:2:turn:0",
+    "completion-v2:train:denied:1:turn:1",
+    "completion-v2:train:empty:4:turn:0",
+    "completion-v2:train:no_tool:3:turn:0"
+  ],
+  "source_targets": {
+    "agent-smol-a": 22630.0,
+    "agent-smol-b": 79398.0,
+    "curriculum-v4-w8": 25505.0,
+    "expand-code-w8": 57405.0,
+    "frontier-code-raw": 324423.0,
+    "frontier-qa2": 31757.0,
+    "frontier-tools": 17096.0,
+    "general-pilot-w8": 65266.0,
+    "loop-check": 36891.0,
+    "onpolicy-r6-loop": 28496.0,
+    "r8-code-short-w8": 16357.0,
+    "teacher-code": 51271.0,
+    "teacher-math-gen": 81181.0,
+    "teacher-nothink-math": 48565.0,
+    "think-first-w8": 34460.0,
+    "thinking-w8": 44631.0
+  },
+  "weighting": "Retain source shares from historical prefix after confirmed exclusions; within sampled source, token-weighted.",
+  "limits": [
+    "Small deterministic training-data sample; not an independent outcome evaluation.",
+    "Raw code capped at 8K, other sources at 4K or 16K where assistant targets occur later.",
+    "Selected preference pairs are stratified, not a reconstruction of their historical frequency.",
+    "No root loss, balancing rule or gradient surgery applied."
+  ],
+  "input_sha256": {
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\completion\\train.json": "34e06501c6cb3f6ecbd7e187cd31e90ca1c5674488701d4e9055b5e7e8bdf4fd",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-gauntlet\\dataset-audit\\exclude-replay-next-20261008.json": "9584493255c82707332aa54a6861939c795a3092f3ea6ba7c6eee7f8d60a5f1e",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\phase3-masking\\batches.json": "19fd4f6a2e6dd8ca2e336b5380f8ed411788d1cb393dd1d70b187d73ecf5b026",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\data\\pairs-ref.jsonl": "7a9e62d5e480e244f2954dd9683075c91925d7abed847a37d47f6ea871af55f5",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\completion-v2\\data\\pairs-final.jsonl": "34f8662345ad4f400afd477c896c360a3c30f062f63e75320dd856586af66342",
+    "D:\\DeepThought\\Projects\\HybridModel\\DistillKit\\scratch\\dense_gr\\influence_audit.py": "79073eaa351ac0e92ddb3f785e6790d7e3df6f5f93fa4455f6efa81ed1f6b226",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-agent-smol-a\\manifest.json": "e74a44d0193be150f86443eca047fcfc343ed476b42c076ab42abb017bb055a5",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-agent-smol-b\\manifest.json": "4ab60d95c18918051a88774aed24f4726d8427b3e5f023daa30569f669593d53",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-qa2\\manifest.json": "8abcf94104b75c092235d46df3a4c1cfdff46bc9ee576efecd95bcfb8b733445",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-code-raw\\manifest.json": "68b3ee07a99ede58117ffdf505ff1bc708dcb06e5c64a2436b427381fe7ed68a",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-frontier-tools\\manifest.json": "cb61958b6cfcb0ebf6568aa473af73b4db44943fb7c0de032396e4b2650877a3",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-r8-code-short-w8\\manifest.json": "a97811e55e733b05f1fdd1ef3af8469ed5314c48eb7d4fa1d4e14ad23d86a210",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-curriculum-v4-w8\\manifest.json": "5fd17a7619d790e81ecaf80229240c4f93e957c0cd248c4cf9063700aaf31303",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-thinking-w8\\manifest.json": "69c9167c4e506ffc2b55e9148f1b5ee86b8c1c3eb53832d9b5df04a47dee8122",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-think-first-w8\\manifest.json": "470a6062324394288748afb862efb6c957740f751b78b2339f39e2c97f6f3b99",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-expand-code-w8\\manifest.json": "62db4dce84cb786000b791cff09fcb93a2f0228e23df8d285d04faf0c11861b0",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-general-pilot-w8\\manifest.json": "3b035380bbb8de276dbfebdc9870b582456ff8c0b0ef10794f7f2ee1f6c65a89",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-math-gen\\manifest.json": "2f423d1b94eb32bc63df68061417a4118bcee89d82dd7caaf61231df24495de2",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-onpolicy-r6-loop\\manifest.json": "0169d40d6276b7bece58b234e4e70e1583825cce4e2fc371012f0ce2791f4102",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-loop-check\\manifest.json": "a6c95b3ae0577b5d7b2da5960fbc2f16744b432968021bba8a3b82c0cabf0ee3",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-nothink-math\\manifest.json": "35fe713e01db64f337327e553555992a434cf60f8507cca314a5f0b14beb6af1",
+    "D:\\DeepThought\\Projects\\HybridModel\\teacher-cache-teacher-code\\manifest.json": "f1a9bd98e749640cbd649ed7f02aa0fb93d24481c10ea10c104a66e9690be261"
+  }
+}

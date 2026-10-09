@@ -1,0 +1,10 @@
+{
+  "doc_id": "onpolicy:kodcode:Filter_62706_I:s0",
+  "original_status": "passed",
+  "strengthened_status": "failed",
+  "strengthened_tests": "from solution import send_mass_email\n\ndef test_message_is_actually_sent(monkeypatch):\n    import smtplib\n    sent=[]\n    class SMTP:\n        def __init__(self,*args,**kwargs): pass\n        def set_debuglevel(self,*args): pass\n        def starttls(self): pass\n        def login(self,*args): pass\n        def sendmail(self,sender,recipients,message):\n            assert isinstance(message,(str,bytes)), 'SMTP requires a serialized message'\n            sent.append((sender,recipients,message))\n        def quit(self): pass\n    monkeypatch.setattr(smtplib,'SMTP',SMTP)\n    send_mass_email('example.test',587,'user','password','sender@example.test','Subject','Body',['a@example.test','b@example.test'])\n    assert len(sent)==1, 'Function must send a valid message, not silently return after an exception'\n    assert sent[0][0]=='sender@example.test'\n    assert sent[0][1]==['a@example.test','b@example.test']\n",
+  "defect": "Inherited mock lacks set_debuglevel; solution catches that exception and returns False. Even with a complete mock it supplies sendmail a tuple rather than a serialized message.",
+  "policy": "Flag for future requalification; historical cache and labels unchanged.",
+  "historical_prefix": false,
+  "equivalent_mutation": "Filter_23100 maximum over integers: > versus >= updates to the same value on equality, so survival is expected."
+}
