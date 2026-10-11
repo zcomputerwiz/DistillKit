@@ -1,0 +1,2 @@
+{"task_id": "Mbpp/398", "solution": "def sum_of_digits(lst):\n    return sum(int(d) for d in str(abs(n))) for n in lst"}
+{"task_id": "Mbpp/573", "solution": "def unique_product(lst):\n    return reduce(lambda acc, x: acc * x, set(lst), 1)"}

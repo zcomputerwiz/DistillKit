@@ -27,6 +27,17 @@ limited to confirmed matching tasks.
   "5 + 17 = 22" passes and "5 + 17 = 34" or a partial "5" does not. The old rule wanted
   exactly one number; `--numeric-grading strict` reproduces it, and each grade records
   `report_strict` as well.
+- Rescored completion step 40 against u50 (`corrected-v2/summary.json`,
+  `completion-v2/eval/regrade-numeric-supported.json`, `regrade_scenarios.py`; replays
+  reproduce every saved strict grade). Code barely moves from Codex's final-answer
+  rescoring (9 of 3,252 answers differ): thinking HumanEval+ 42.68 to 38.21, -4.47
+  [-8.54, -0.41]; MBPP+ 45.50 to 43.21, -2.29 [-5.11, +0.44]; with confirmed
+  overlaps removed -3.55 and -2.00, both intervals crossing zero. The agent suite does
+  move: u50 rises from 35/72 to 41/72 (aggregate, injection, known-read and no-tool
+  reports that showed their working), every trained checkpoint is unchanged
+  (step 40 stays 60/72; sampled runs unchanged). Part of the old 35-to-60 gap was the
+  candidates learning bare one-number answers; the real gap is 41 to 60, carried by
+  recovery (0 to 8/9) and pagination (2 to 7/9). Aggregation is u50 2/9, step 40 0/9.
 - The frozen phase3/execution-grounded/completion-v2/gauntlet protocols hash these
   sources, so their `verify` now fails by design; reproduce them from commit e5aa77c.
 
