@@ -69,9 +69,16 @@ def stop_mask(tokens, eos):
     return (tokens.unsqueeze(-1) == ids).any(-1)
 
 
+EXTRACTOR = "final-channel-v2"
+
+
 def extract(text: str) -> str:
-    """The first fenced block, else the raw text. No repair: a completion that does not
-    parse is a result."""
+    """The first fenced block of the final answer, else the answer's raw text. The answer
+    is whatever follows the last `</think>`: the first fence anywhere used to pick up
+    drafts from the reasoning (v1, before 2026-10-10, understated thinking-mode scores).
+    A reply that never closes its reasoning keeps the whole text. No repair: a completion
+    that does not parse is a result."""
+    text = text.rsplit("</think>", 1)[-1]
     match = FENCE.search(text)
     return (match.group(1) if match else text).strip()
 
@@ -303,6 +310,7 @@ def main() -> int:
                      {"do_sample": False, "greedy": True}) | {"padding_side": "left",
                                                               "pad_token": "eos"},
         "instruction_template": TEMPLATES[args.bench], "thinking": not args.no_thinking,
+        "extractor": EXTRACTOR,
         "mean_generated_tokens": sum(lengths) / max(len(lengths), 1),
         "median_generated_tokens": sorted(lengths)[len(lengths) // 2],
         "truncations": truncated, "elapsed_seconds": elapsed,

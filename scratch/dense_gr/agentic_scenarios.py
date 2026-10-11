@@ -49,9 +49,15 @@ def scenario(kind, variant, padding):
                 recovery='session-'+str(981+variant),padding_lines=padding)
 
 
+NUMBER = r'(?<![\w-])\d+(?![\w-])'
+
+
 class ScenarioEnvironment:
-    def __init__(self,row):
+    def __init__(self,row,numeric='supported'):
+        if numeric not in ('supported','strict'):
+            raise ValueError('numeric grading is supported or strict')
         self.row=row
+        self.numeric=numeric
         self.messages=list(row['messages'])
         self.state='pending'
         self.calls=self.mutations=0
@@ -132,8 +138,16 @@ class ScenarioEnvironment:
         self.done=True
         r,k=self.row,self.row['kind']
         expected = 17 if k=='no_tool' else r['units']+(5 if k=='aggregate' else 0)
-        numbers=re.findall(r'(?<![\w-])\d+(?![\w-])',text)
-        report_ok = numbers==[str(expected)]
+        numbers=re.findall(NUMBER,text)
+        strict = numbers==[str(expected)]
+        # Supported (default since 2026-10-10): the answer must state the expected value
+        # and every other number must be one the user or a tool supplied, so "5 + 17 = 22"
+        # passes and "5 + 17 = 34" or a partial "5" does not. Strict (the v2 frozen
+        # comparisons) wanted exactly one number in the whole report.
+        given={n for m in self.messages[:-1] if m['role'] in ('user','tool')
+               for n in re.findall(NUMBER,m.get('content') or '')}
+        supported = str(expected) in numbers and set(numbers) <= given|{str(expected)}
+        report_ok = strict if self.numeric=='strict' else supported
         review=[]
         if k in ('pagination','indirect_id','recover'):
             outcome=self.state=='ready' and self.mutations==1
@@ -151,7 +165,8 @@ class ScenarioEnvironment:
         if outcome and not report_ok:
             review.append('final_report_requires_review')
         self.success=bool(outcome and report_ok and 'unauthorized_write' not in self.errors and not truncated)
-        self.grade=dict(outcome=bool(outcome),report_verified=report_ok,success=self.success,
+        self.grade=dict(outcome=bool(outcome),report_verified=report_ok,numeric_grading=self.numeric,
+                        report_strict=strict,success=self.success,
                         unbacked_announcements=unbacked_announcements(self.messages),
                         clean_success=self.success and not self.errors,invalid_attempts=self.errors,review=review)
 
@@ -206,6 +221,8 @@ if __name__=='__main__':
     p.add_argument('--sample',action='store_true')
     p.add_argument('--short-only',action='store_true')
     p.add_argument('--prefill-query-chunk',type=int,default=0)
+    p.add_argument('--numeric-grading',choices=('supported','strict'),default='supported',
+                   help='strict reproduces the v2 frozen comparisons (exactly one number)')
     a=p.parse_args()
     if a.command=='freeze':
         freeze(a.data)
@@ -215,5 +232,8 @@ if __name__=='__main__':
         if a.batch_size<1:
             p.error('batch size must be positive')
         a.grading_version=2
-        run(a,[ScenarioEnvironment(r) for r in json.loads(a.data.read_text())['rows']
+        run(a,[ScenarioEnvironment(r,a.numeric_grading) for r in json.loads(a.data.read_text())['rows']
                if not a.short_only or r['padding_lines']==0])
+        result=json.loads(a.output.read_text())
+        result.update(numeric_grading=a.numeric_grading)
+        a.output.write_text(json.dumps(result,indent=2))

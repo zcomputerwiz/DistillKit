@@ -76,3 +76,22 @@ def test_both_stops_and_per_case_rng_independence():
     fresh=[torch.Generator().manual_seed(s) for s in (999,11)]
     reference_rng=torch.Generator().manual_seed(11)
     assert pick(logits,(.6,.95,4),fresh)[1]==pick(logits[1:],(.6,.95,4),reference_rng)[0]
+
+
+def test_numeric_report_accepts_supported_working_not_wrong_or_partial_totals():
+    def finish(text, numeric='supported', kind='aggregate'):
+        row=scenario(kind,0,0)
+        env=ScenarioEnvironment(row,numeric)
+        for name,args in reference(row)[0]:
+            act(env,name,**args)
+        env.respond(text)
+        return env
+    # aggregate: records hold 5 and 17 units, expected total 22
+    assert finish('5 + 17 = 22 units in total.').success
+    assert not finish('5 + 17 = 22 units in total.','strict').success
+    assert finish('22').success and finish('22','strict').success
+    assert not finish('5 + 17 = 34 units.').success
+    assert not finish('Total units: 5.').success
+    assert not finish('The total is 22, plus 3 pending.').success
+    assert finish('8 + 9 = 17',kind='no_tool').success
+    assert not finish('8 + 9 = 27',kind='no_tool').success

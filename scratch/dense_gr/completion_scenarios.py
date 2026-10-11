@@ -62,6 +62,8 @@ def main():
     parser.add_argument('--sample',action='store_true')
     parser.add_argument('--short-only',action='store_true')
     parser.add_argument('--prefill-query-chunk',type=int,default=0)
+    parser.add_argument('--numeric-grading',choices=('supported','strict'),default='supported',
+                        help='strict reproduces the v2 frozen comparisons (exactly one number)')
     args=parser.parse_args()
     if args.command == 'freeze':
         freeze()
@@ -72,11 +74,11 @@ def main():
     if data.get('environment_version') != 'consistent-no-match-v2':
         raise ValueError('requires corrected, versioned scenario data')
     args.grading_version=2
-    environments=[ConsistentScenarioEnvironment(row) for row in data['rows']
+    environments=[ConsistentScenarioEnvironment(row,args.numeric_grading) for row in data['rows']
         if not args.short_only or row['padding_lines']==0]
     run(args,environments)
     result=json.loads(args.output.read_text())
-    result.update(environment_version=data['environment_version'],
+    result.update(environment_version=data['environment_version'],numeric_grading=args.numeric_grading,
         data_sha256=hashlib.sha256(args.data.read_bytes()).hexdigest())
     args.output.write_text(json.dumps(result,indent=2)+'\n')
 

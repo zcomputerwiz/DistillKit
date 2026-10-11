@@ -14,6 +14,22 @@ executed aggregation paths and verified code rather than automatic loss
 equalization. Conversational context remains masked; benchmark exclusions remain
 limited to confirmed matching tasks.
 
+2026-10-10 evaluator fixes:
+- **Code extraction** (`code_bench/generate.py`, `extractor: final-channel-v2` in each
+  manifest): thinking-mode completions are now scored on the first fence after the last
+  `</think>`. The old rule took the first fence anywhere, including reasoning drafts, so
+  every earlier thinking-mode HumanEval+/MBPP+ score in this file is understated (u50:
+  about 2.4 and 3.6 points; see [CODE_FAILURE_INVESTIGATION.md](CODE_FAILURE_INVESTIGATION.md)).
+  Non-thinking scores are unaffected. Compare old numbers only with old numbers.
+- **Agent scenario numeric reports** (`agentic_scenarios.py`, `completion_scenarios.py`,
+  `--numeric-grading supported`, the new default): a report passes when it states the
+  expected value and every other number in it came from the user or a tool, so
+  "5 + 17 = 22" passes and "5 + 17 = 34" or a partial "5" does not. The old rule wanted
+  exactly one number; `--numeric-grading strict` reproduces it, and each grade records
+  `report_strict` as well.
+- The frozen phase3/execution-grounded/completion-v2/gauntlet protocols hash these
+  sources, so their `verify` now fails by design; reproduce them from commit e5aa77c.
+
 The conversion screen left two regressions. Control tokens had been destroyed by 30M
 tokens of cross-entropy on the `dense_gr` code corpus, which carries none of this
 tokenizer's protocol tokens. MMLU had fallen 12.5 points to the conversion itself, and
